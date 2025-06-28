@@ -1,0 +1,120 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary-50: #e6f7ff;
+  --color-primary-100: #bae7ff;
+  --color-primary-200: #91d5ff;
+  --color-primary-300: #69c0ff;
+  --color-primary-400: #40a9ff;
+  --color-primary-500: #1890ff;
+  --color-primary-600: #096dd9;
+  --color-primary-700: #0050b3;
+  --color-primary-800: #003a8c;
+  --color-primary-900: #002766;
+}
+
+/* Base styles */
+#root {
+  @apply h-screen overflow-hidden;
+}
+
+/* Ant Design customizations */
+.ant-layout {
+  @apply h-screen;
+}
+
+.ant-layout-content {
+  @apply p-6 bg-gray-50 overflow-y-auto;
+}
+
+.ant-card {
+  @apply rounded-lg shadow-sm border-0;
+}
+
+.ant-table {
+  @apply rounded-lg overflow-hidden;
+}
+
+.ant-table-thead > tr > th {
+  @apply bg-gray-50 font-semibold;
+}
+
+.ant-form-item {
+  @apply mb-4;
+}
+
+.ant-btn {
+  @apply rounded-md;
+}
+
+.ant-modal {
+  @apply rounded-lg;
+}
+
+.ant-modal-header {
+  @apply rounded-t-lg;
+}
+
+/* Dashboard stats customization */
+.dashboard-stats .ant-card {
+  @apply text-center;
+}
+
+.dashboard-stats .ant-statistic-title {
+  @apply text-gray-600 text-sm mb-1;
+}
+
+.dashboard-stats .ant-statistic-content {
+  @apply text-primary-500 text-2xl font-semibold;
+}
+
+/* Form improvements */
+.ant-form-item-label > label {
+  @apply font-medium;
+}
+
+.ant-input, .ant-select-selector, .ant-picker {
+  @apply rounded-md;
+}
+
+.ant-input:focus, .ant-select-focused .ant-select-selector, .ant-picker:focus {
+  @apply border-primary-500 shadow-sm;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+}
+
+/* Table customizations */
+.ant-table-tbody > tr:hover > td {
+  @apply bg-gray-50;
+}
+
+.ant-pagination {
+  @apply mt-4 text-right;
+}
+
+/* Success and error states */
+.ant-message-success .anticon {
+  @apply text-green-500;
+}
+
+.ant-message-error .anticon {
+  @apply text-red-500;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .ant-layout-content {
+    @apply p-4;
+  }
+  
+  .ant-card {
+    @apply mb-4;
+  }
+  
+  .ant-table {
+    @apply text-xs;
+  }
+  
+  .ant-btn {
+    @apply px-2 py-1 text-xs;
+  }
+}
