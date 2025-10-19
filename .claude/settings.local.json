@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(radon cc core/views.py -s -a)",
+      "Bash(radon mi core/ -s)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

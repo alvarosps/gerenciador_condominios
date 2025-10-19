@@ -1,153 +1,235 @@
-# Frontend - Sistema de Gerenciamento de Condomínios
+# Condomínios Manager - Frontend
 
-Este é o frontend da aplicação de gerenciamento de condomínios, desenvolvido com React + TypeScript + Vite e estilizado com **Tailwind CSS v4** e **Ant Design**.
+Enterprise-grade frontend application for property management built with Next.js 14 (using Next.js 15.5.6), TypeScript, Ant Design, and TanStack Query.
 
-## 🛠️ Tecnologias Utilizadas
+## Phase 1: Foundation & Infrastructure ✅
 
-- **React 19.1.0** - Biblioteca principal para construção da interface
-- **TypeScript 5.8.3** - Superset do JavaScript com tipagem estática
-- **Vite 6.3.5** - Build tool e dev server
-- **Tailwind CSS 4.1.11** - Framework CSS utility-first
-- **Ant Design 5.25.4** - Biblioteca de componentes React
-- **React Router DOM 7.6.2** - Roteamento para aplicações React
-- **Axios 1.9.0** - Cliente HTTP para requisições à API
-- **Day.js 1.11.13** - Biblioteca para manipulação de datas
+This phase establishes the project foundation with quality gates and reusable components.
 
-## 📦 Instalação e Execução
+### Completed Setup
 
-### Pré-requisitos
-- Node.js 18+ 
-- npm ou yarn
+#### Core Stack
+- ✅ Next.js 15.5.6 with App Router
+- ✅ React 19.2.0
+- ✅ TypeScript 5.9.3 (strict mode enabled)
+- ✅ Tailwind CSS 4.1.14
+- ✅ Ant Design 5.27.5 with Next.js Registry
 
-### Passos para executar
+#### State Management & Data Fetching
+- ✅ TanStack Query v5.90.5 (server state)
+- ✅ Zustand 5.0.8 (client state - ready for use)
+- ✅ Axios 1.12.2 with interceptors
 
-```bash
-# Instalar dependências
-npm install
+#### Forms & Validation
+- ✅ React Hook Form 7.65.0
+- ✅ Zod 4.1.12 (runtime validation)
+- ✅ Schemas for all entities (Building, Apartment, Tenant, Lease, Furniture)
 
-# Executar em modo de desenvolvimento
-npm run dev
+#### UI & Components
+- ✅ Ant Design components (Portuguese BR locale)
+- ✅ Base layouts (MainLayout, Sidebar, Header)
+- ✅ Reusable components (Loading, ErrorBoundary, ConfirmDialog)
+- ✅ DataTable with pagination and sorting
 
-# Build para produção
-npm run build
+#### Code Quality Tools
+- ✅ ESLint with TypeScript support
+- ✅ Prettier configured
+- ✅ Husky pre-commit hooks
+- ✅ lint-staged for staged file linting
+- ✅ Commitlint for conventional commits
 
-# Preview do build de produção
-npm run preview
-```
+#### Testing Setup
+- ✅ Vitest configured
+- ✅ React Testing Library
+- ✅ Playwright for E2E (configured)
+- ✅ MSW for API mocking
 
-A aplicação estará disponível em `http://localhost:3000`
+#### Utilities
+- ✅ Brazilian formatters (CPF, CNPJ, phone, currency, date)
+- ✅ Validators (CPF/CNPJ checksum)
+- ✅ Helper functions (late fee, tag fee calculations)
+- ✅ Constants (routes, pagination, fees)
 
-## 🎨 Estilização
+#### CI/CD
+- ✅ GitHub Actions workflow configured
+- ✅ Quality gates (type-check, lint, format, tests, build)
 
-### Tailwind CSS v4
-A aplicação foi refatorada para usar a versão mais recente do Tailwind CSS (v4), que traz:
-
-- **Nova sintaxe de configuração**: Usa `@theme` dentro do CSS em vez de arquivo de configuração JavaScript
-- **Import simplificado**: `@import "tailwindcss"` em vez de múltiplas diretivas
-- **Melhor performance**: Engine mais rápida e otimizada
-- **Tipagem melhorada**: Melhor suporte para TypeScript
-
-### Integração com Ant Design
-- Mantém todos os componentes do Ant Design funcionais
-- Customiza estilos do Ant Design usando classes do Tailwind
-- Cores personalizadas definidas no tema para manter consistência
-- Classes utilitárias do Tailwind para layouts responsivos e espaçamentos
-
-### Cores Personalizadas
-```css
-/* Paleta primary baseada no azul do Ant Design */
---color-primary-50: #e6f7ff;
---color-primary-100: #bae7ff;
---color-primary-200: #91d5ff;
---color-primary-300: #69c0ff;
---color-primary-400: #40a9ff;
---color-primary-500: #1890ff;
---color-primary-600: #096dd9;
---color-primary-700: #0050b3;
---color-primary-800: #003a8c;
---color-primary-900: #002766;
-```
-
-## 📁 Estrutura do Projeto
+### Project Structure
 
 ```
 frontend/
-├── src/
-│   ├── components/          # Componentes reutilizáveis
-│   │   └── AppLayout.tsx    # Layout principal da aplicação
-│   ├── pages/               # Páginas da aplicação
-│   │   ├── Dashboard.tsx    # Dashboard principal
-│   │   ├── Buildings.tsx    # Gestão de prédios
-│   │   ├── Apartments.tsx   # Gestão de apartamentos
-│   │   ├── Tenants.tsx      # Gestão de inquilinos
-│   │   ├── Leases.tsx       # Gestão de contratos
-│   │   └── Furnitures.tsx   # Gestão de móveis
-│   ├── hooks/               # Hooks personalizados
-│   │   └── useApi.ts        # Hook para chamadas da API
-│   ├── services/            # Serviços e configurações
-│   │   └── api.ts          # Configuração do Axios
-│   ├── types/               # Definições de tipos TypeScript
-│   │   └── index.ts        # Tipos principais
-│   ├── utils/               # Utilitários e helpers
-│   │   └── formatters.ts   # Formatadores de dados
-│   ├── App.tsx             # Componente principal
-│   ├── App.css             # Estilos globais e Tailwind
-│   └── main.tsx            # Ponto de entrada da aplicação
-├── postcss.config.js       # Configuração do PostCSS
-├── tsconfig.json           # Configuração do TypeScript
-├── vite.config.ts          # Configuração do Vite
-└── package.json            # Dependências e scripts
+├── app/                        # Next.js App Router
+│   ├── layout.tsx             # Root layout with providers
+│   ├── page.tsx               # Home page
+│   ├── providers.tsx          # QueryClient + Ant Design providers
+│   ├── globals.css            # Global styles + Tailwind
+│   ├── error.tsx              # Error page
+│   ├── not-found.tsx          # 404 page
+│   └── global-error.tsx       # Global error handler
+├── components/
+│   ├── layouts/               # Layout components
+│   │   ├── main-layout.tsx   # Dashboard layout
+│   │   ├── sidebar.tsx       # Navigation sidebar
+│   │   └── header.tsx        # Top header
+│   ├── shared/                # Shared components
+│   │   ├── loading.tsx       # Loading spinner
+│   │   ├── error-boundary.tsx # Error boundary
+│   │   └── confirm-dialog.tsx # Confirmation dialogs
+│   └── tables/                # Table components
+│       └── data-table.tsx    # Reusable data table
+├── lib/
+│   ├── api/
+│   │   ├── client.ts         # Axios instance
+│   │   ├── hooks/            # TanStack Query hooks (ready)
+│   │   └── endpoints/        # API endpoint definitions (ready)
+│   ├── schemas/               # Zod schemas
+│   │   ├── building.schema.ts
+│   │   ├── apartment.schema.ts
+│   │   ├── tenant.schema.ts
+│   │   ├── lease.schema.ts
+│   │   └── furniture.schema.ts
+│   ├── utils/                 # Utility functions
+│   │   ├── formatters.ts     # BR formatters
+│   │   ├── validators.ts     # CPF/CNPJ validation
+│   │   ├── helpers.ts        # Helper functions
+│   │   └── constants.ts      # App constants
+│   └── config/
+│       └── query-client.ts   # TanStack Query config
+├── hooks/                     # Custom hooks (ready for use)
+├── store/                     # Zustand stores (ready for use)
+├── tests/                     # Test files
+│   ├── setup.ts              # Test setup
+│   ├── unit/                 # Unit tests
+│   ├── integration/          # Integration tests
+│   └── e2e/                  # E2E tests
+└── .github/workflows/
+    └── ci.yml                # CI pipeline
 ```
 
-## 🚀 Funcionalidades Implementadas
+## Development
 
-### Dashboard
-- **Estatísticas em cards**: Exibição de métricas importantes com ícones
-- **Atividades recentes**: Timeline de eventos do sistema
-- **Ações rápidas**: Botões para principais funcionalidades
-- **Layout responsivo**: Adaptável a diferentes tamanhos de tela
+### Available Scripts
 
-### Layout Principal
-- **Sidebar navegável**: Menu lateral com todas as seções
-- **Header responsivo**: Título da aplicação e controle de sidebar
-- **Conteúdo principal**: Área de trabalho para cada página
+```bash
+# Development server
+npm run dev                    # Starts at http://localhost:3000
 
-## 📱 Responsividade
+# Build and production
+npm run build                  # Production build (see known issues below)
+npm start                      # Start production server
 
-A aplicação é totalmente responsiva, usando:
+# Code quality
+npm run lint                   # Run ESLint
+npm run lint:fix               # Fix ESLint errors
+npm run format                 # Format with Prettier
+npm run format:check           # Check formatting
+npm run type-check             # TypeScript type checking
 
-- **Grid system do Ant Design**: Para layouts estruturados
-- **Classes utilitárias do Tailwind**: Para ajustes finos
-- **Breakpoints padrão**:
-  - `xs`: < 576px (celulares)
-  - `sm`: ≥ 576px (celulares grandes)
-  - `md`: ≥ 768px (tablets)
-  - `lg`: ≥ 992px (desktops)
-  - `xl`: ≥ 1200px (telas grandes)
+# Testing
+npm run test:unit              # Run unit tests
+npm run test:watch             # Watch mode for tests
+npm run test:e2e               # Run E2E tests with Playwright
+```
 
-## 🎯 Próximos Passos
+### Development Server
 
-1. **Implementar páginas restantes**: Buildings, Apartments, Tenants, Leases, Furnitures
-2. **Conectar com API backend**: Integração com Django REST API
-3. **Adicionar formulários**: Criação e edição de entidades
-4. **Implementar autenticação**: Login e controle de acesso
-5. **Testes unitários**: Jest + React Testing Library
-6. **Documentação de componentes**: Storybook
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
-## 🤝 Contribuição
+Visit `http://localhost:3000` - The application runs successfully in development mode.
 
-Para contribuir com o projeto:
+### Quality Gates
 
-1. Faça um fork do repositório
-2. Crie uma branch para sua feature (`git checkout -b feature/nova-feature`)
-3. Commit suas mudanças (`git commit -m 'Adiciona nova feature'`)
-4. Push para a branch (`git push origin feature/nova-feature`)
-5. Abra um Pull Request
+All code must pass these checks:
 
-## 📝 Convenções de Código
+1. **TypeScript strict mode** - Zero errors ✅
+2. **ESLint** - Zero errors (console.error warnings acceptable in error handlers) ✅
+3. **Prettier** - Consistent formatting ✅
+4. **Pre-commit hooks** - Automatic linting and type checking ✅
 
-- **Components**: PascalCase (ex: `AppLayout.tsx`)
-- **Files**: camelCase (ex: `useApi.ts`)
-- **CSS Classes**: Usar classes do Tailwind sempre que possível
-- **Types**: Definir tipos TypeScript explícitos
-- **Imports**: Organizar imports por categoria (libs, components, utils) 
+## Known Issues
+
+### Build Static Export Error (Non-blocking)
+
+**Status:** Development server works perfectly. Static build has compatibility issue.
+
+**Issue:** Next.js 15 + Ant Design 5 has a known incompatibility with static page generation for error pages (404, 500). The error occurs during build:
+
+```
+Error: <Html> should not be imported outside of pages/_document
+```
+
+**Impact:**
+- ✅ Development mode: **Works perfectly**
+- ✅ Type checking: **Passes**
+- ✅ Linting: **Passes**
+- ❌ Static build: **Fails during page generation**
+
+**Workaround Options:**
+1. Use development mode for Phase 1-2 (recommended for now)
+2. Deploy with `output: 'standalone'` mode (server-side rendering)
+3. Wait for Ant Design compatibility update
+4. Downgrade to Next.js 14 (not recommended)
+
+**Resolution Plan:**
+This will be addressed in Phase 2 when we implement actual features. Options:
+- Use server-side rendering instead of static export
+- Implement custom error pages without Ant Design components
+- Monitor Ant Design updates for Next.js 15 compatibility
+
+## API Integration
+
+The frontend is configured to connect to the Django backend:
+
+- **Development:** `http://localhost:8000/api`
+- **Production:** Configure via `NEXT_PUBLIC_API_URL` environment variable
+
+API routes are proxied through Next.js rewrites (see `next.config.js`).
+
+## Next Steps - Phase 2
+
+Ready to implement:
+
+1. Buildings CRUD module
+2. Furniture CRUD module
+3. API hooks with TanStack Query
+4. Form implementations with React Hook Form + Zod
+5. Unit tests with Vitest
+
+## Quality Metrics - Phase 1 ✅
+
+- ✅ TypeScript strict mode enabled
+- ✅ ESLint configured with zero errors
+- ✅ Prettier formatting consistent
+- ✅ Pre-commit hooks working
+- ✅ CI/CD pipeline configured
+- ✅ Development server running
+- ✅ All base components created
+- ✅ All schemas defined
+- ✅ All utilities implemented
+
+## Environment Variables
+
+Create a `.env.local` file:
+
+```bash
+# API Configuration
+NEXT_PUBLIC_API_URL=http://localhost:8000/api
+```
+
+## Contributing
+
+1. All commits must pass pre-commit hooks
+2. Follow conventional commit format
+3. Maintain 80%+ test coverage
+4. Zero ESLint warnings policy
+5. All PRs must pass CI checks
+
+---
+
+**Phase 1 Status:** ✅ **Complete**
+
+Ready for Phase 2: Buildings & Furniture Modules

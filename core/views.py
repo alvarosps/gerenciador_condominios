@@ -9,6 +9,7 @@ import sys
 import asyncio
 from pyppeteer import launch
 from datetime import date, timedelta
+from dateutil.relativedelta import relativedelta
 from jinja2 import Environment, FileSystemLoader
 
 from .models import Building, Furniture, Apartment, Tenant, Lease
@@ -53,8 +54,20 @@ class LeaseViewSet(viewsets.ModelViewSet):
             # Calcular data final com base na validade
             start_date = lease.start_date
             validity = lease.validity_months
-            next_month_date = (start_date + timedelta(days=30)).strftime("%d/%m/%Y")
-            final_date = (start_date + timedelta(days=validity*30)).strftime("%d/%m/%Y")
+
+            # Calculate next month date properly (add 1 month)
+            next_month_date = (start_date + relativedelta(months=1)).strftime("%d/%m/%Y")
+
+            # Calculate final date by adding the exact number of months
+            calculated_final_date = start_date + relativedelta(months=validity)
+
+            # Special case: if start_date is Feb 29 and calculated_final_date is Feb 28,
+            # move it to March 1
+            if start_date.month == 2 and start_date.day == 29:
+                if calculated_final_date.month == 2 and calculated_final_date.day == 28:
+                    calculated_final_date = calculated_final_date + timedelta(days=1)
+
+            final_date = calculated_final_date.strftime("%d/%m/%Y")
             
             # Cálculo do valor total: aluguel + limpeza + valor da caução da tag
             valor_tags = 50 if len(lease.tenants.all()) == 1 else 80
