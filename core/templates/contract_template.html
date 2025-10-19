@@ -1,350 +1,437 @@
 <!DOCTYPE html>
 <html>
-    <head>
-        <meta charset="utf-8">
-        <title>Contrato de Aluguel</title>
-        <style>
-            body {
-                font-family: Arial, sans-serif;
-                font-size: 12pt;
-                margin: 2cm;
-            }
-            h1 {
-                text-align: center;
-                font-size: 16pt;
-                margin-bottom: 20px;
-            }
-            h2 {
-                text-align: center;
-            }
-            p {
-                text-align: justify;
-            }
-            .bold {
-                font-weight: bold;
-            }
-            ul {
-                list-style-type: disc;
-                margin-left: 0;
-                padding-left: 0;
-                width: 100%;
-                text-align: justify;
-            }
+  <head>
+    <meta charset="utf-8" />
+    <title>CONTRATO RESIDENCIAL DE ALUGUEL</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        font-size: 12pt;
+        margin: 2cm;
+      }
+      h1 {
+        text-align: center;
+        font-size: 16pt;
+        margin-bottom: 20px;
+      }
+      h2 {
+        text-align: center;
+      }
+      p {
+        text-align: justify;
+      }
+      .bold {
+        font-weight: bold;
+      }
+      ul {
+        list-style-type: disc;
+        margin-left: 0;
+        padding-left: 0;
+        width: 100%;
+        text-align: justify;
+      }
 
-            ul li {
-                padding-left: 40px;
-                margin-bottom: 10px;
-            }
-            table {
-                width: 100%;
-                border-collapse: collapse;
-                margin-bottom: 20px;
-            }
-            table, td, th {
-                border: 1px solid black;
-            }
-            td {
-                padding: 5px;
-            }
-            .paragraph {
-                display: block;
-            }
-            .page-break {
-                page-break-before: always;
-            }
-            .signature-section {
-                margin-top: 50px;
-            }
-            .row {
-                display: flex;
-                justify-content: space-between;
-                margin-bottom: 20px;
-            }
-            .column {
-                flex-basis: 45%;
-                text-align: center;
-            }
-            .signature-line {
-                border-bottom: 1px solid black;
-                width: 100%;
-                margin-bottom: 5px;
-            }
-            .signature-title {
-                font-style: italic;
-            }
-            .witness-section {
-                margin-top: 40px;
-            }
-            .witness-title {
-                text-align: left;
-                font-weight: bold;
-            }
-            .mobilias {
-                width: 100%;
-                border-collapse: collapse;
-            }
-        </style>
-    </head>
-    <body>
-        <h1>
-            CONTRATO DE ALUGUEL
-        </h1>
+      ul li {
+        padding-left: 40px;
+        margin-bottom: 10px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 20px;
+      }
+      table,
+      td,
+      th {
+        border: 1px solid black;
+      }
+      td {
+        padding: 5px;
+      }
+      .paragraph {
+        display: block;
+      }
+      .page-break {
+        page-break-before: always;
+      }
+      .signature-section {
+        margin-top: 50px;
+      }
+      .row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 20px;
+      }
+      .column {
+        flex-basis: 45%;
+        text-align: center;
+      }
+      .signature-line {
+        border-bottom: 1px solid black;
+        width: 100%;
+        margin-bottom: 5px;
+      }
+      .signature-title {
+        font-style: italic;
+      }
+      .witness-section {
+        margin-top: 40px;
+      }
+      .witness-title {
+        text-align: left;
+        font-weight: bold;
+      }
+      .mobilias {
+        width: 100%;
+        border-collapse: collapse;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>CONTRATO RESIDENCIAL DE ALUGUEL</h1>
 
-        <p>
-            NESTE ATO denomidado(s)
-            LOCADOR(ES): Célia Maria Steinmetz, Nacionalidade: Brasileira, Estado Civil: Casada, CPF: 957.236.250-04,
-            Residente e domiciliado na rua Av. Circular 850, Bairro Vila Jardim, Porto Alegre, Rio Grande do Sul, Brasil. CEP 91320-180.
-            Telefone (51) 99598-9025
-        </p>
-        <p>
-            DE OUTRO LADO,
-            LOCATÁRIO(S): <span class="bold">{{ tenant.name }}</span>, Estado Civil: <span class="bold">{{ tenant.marital_status }}</span>,
-            CPF: <span class="bold">{{ tenant.cpf_cnpj }}</span>, RG: <span class="bold">{{ tenant.rg or 'N/A' }}</span>,
-            Profissão: <span class="bold">{{ tenant.profession }}</span>, Celular: <span class="bold">{{ tenant.phone }}</span>
-        </p>
+    <p>
+      NESTE ATO denomidado(s) LOCADOR(ES): Célia Maria Steinmetz, Nacionalidade:
+      Brasileira, Estado Civil: Casada, CPF: 957.236.250-04, Residente e
+      domiciliado na rua Av. Circular 850, Bairro Vila Jardim, Porto Alegre, Rio
+      Grande do Sul, Brasil. CEP 91320-180. Telefone (51) 99598-9025
+    </p>
+    <p>
+      DE OUTRO LADO, LOCATÁRIO(S): <span class="bold">{{ tenant.name }}</span>,
+      Estado Civil: <span class="bold">{{ tenant.marital_status }}</span>, CPF:
+      <span class="bold">{{ tenant.cpf_cnpj }}</span>, RG:
+      <span class="bold">{{ tenant.rg or 'N/A' }}</span>, Profissão:
+      <span class="bold">{{ tenant.profession }}</span>, Celular:
+      <span class="bold">{{ tenant.phone }}</span>
+    </p>
 
-        <p>
-            OBJETO DE LOCAÇÃO: Kitnet mobiliado, Situado na
-            <span class="bold">Av. Circular {{ building_number }}, Apartamento {{ apartment_number }}</span>,
-            Bairro Vila Jardim, Porto Alegre, Rio Grande do Sul, Brasil. CEP 91320-180.
-        </p>
+    <p>
+      OBJETO DE LOCAÇÃO: Kitnet mobiliado, Situado na
+      <span class="bold"
+        >Av. Circular {{ building_number }}, Apartamento {{ apartment_number
+        }}</span
+      >, Bairro Vila Jardim, Porto Alegre, Rio Grande do Sul, Brasil. CEP
+      91320-180.
+    </p>
 
-        <table border="1" cellspacing="0" cellpadding="5" class="mobilias">
-            <tr>
-                <th colspan="2">Mobílias presentes no Kitnet:</th>
-            </tr>
-            {% for i in range(0, furnitures|length, 2) %}
-                <tr>
-                    <td>
-                        (X) {{ furnitures[i] }}
-                    </td>
-                    <td>
-                        {% if i+1 < furnitures|length %}
-                            (X) {{ furnitures[i+1] }}
-                        {% endif %}
-                    </td>
-                </tr>
-            {% endfor %}
-            <tr>
-                <td style="height: 20px;"></td>
-                <td style="height: 20px;"></td>
-            </tr>
-            <tr>
-                <td style="height: 20px;"></td>
-                <td style="height: 20px;"></td>
-            </tr>
-        </table>
+    <table border="1" cellspacing="0" cellpadding="5" class="mobilias">
+      <tr>
+        <th colspan="2">Mobílias presentes no Kitnet:</th>
+      </tr>
+      {% for i in range(0, furnitures|length, 2) %}
+      <tr>
+        <td>(X) {{ furnitures[i] }}</td>
+        <td>
+          {% if i+1 < furnitures|length %} (X) {{ furnitures[i+1] }} {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+      <tr>
+        <td style="height: 20px"></td>
+        <td style="height: 20px"></td>
+      </tr>
+      <tr>
+        <td style="height: 20px"></td>
+        <td style="height: 20px"></td>
+      </tr>
+    </table>
 
-        <p>
-            <span class="bold">O PRAZO da locação do imóvel</span> terá validade de
-            <span class="bold">{{ validity }} meses</span>, iniciando no dia
-            <span class="bold">{{ start_date }}</span>, e <span class="bold">terminando no dia {{ final_date }}</span>.
-            A partir desta data, tanto LOCADOR como LOCATÁRIO podem pedir o encerramento do contrato de locação,
-            sem multas, com aviso prévio de 30 dias. Caso o LOCATÁRIO não saia do imóvel após os 30 dias,
-            o mesmo será considerado como <span class="bold">inquilino irregular</span>,
-            e o LOCADOR poderá pedir a <span class="bold">desocupação do imóvel</span> judicialmente,
-            e o LOCATÁRIO será responsável por todas as despesas judiciais e honorários advocatícios.
-        </p>
+    <p>
+      <span class="bold">O PRAZO da locação do imóvel</span> terá validade de
+      <span class="bold">{{ validity }} meses</span>, iniciando no dia
+      <span class="bold">{{ start_date }}</span>, e
+      <span class="bold">terminando no dia {{ final_date }}</span>. A partir
+      desta data, tanto LOCADOR como LOCATÁRIO podem pedir o encerramento do
+      contrato de locação, sem multas, com aviso prévio de 30 dias. Caso o
+      LOCATÁRIO não saia do imóvel após os 30 dias, o mesmo será considerado
+      como <span class="bold">inquilino irregular</span>, e o LOCADOR poderá
+      pedir a <span class="bold">desocupação do imóvel</span> judicialmente, e o
+      LOCATÁRIO será responsável por todas as despesas judiciais e honorários
+      advocatícios.
+    </p>
 
-        <p>
-            A presente <span class="bold">LOCAÇÃO</span> destina-se ao uso do imóvel
-            <span class="bold">somente para fins residenciais</span>, sendo <span class="bold">proibido uso comercial</span>.
-            Também é proíbido ao LOCATÁRIO de <span class="bold">sublocar</span> ou
-            <span class="bold">usar de outra forma diferente do previsto</span> o kitnet, sem a devida autorização do LOCADOR.
-        </p>
+    <p>
+      A presente <span class="bold">LOCAÇÃO</span> destina-se ao uso do imóvel
+      <span class="bold">somente para fins residenciais</span>, sendo
+      <span class="bold">proibido uso comercial</span>. Também é proíbido ao
+      LOCATÁRIO de <span class="bold">sublocar</span> ou
+      <span class="bold">usar de outra forma diferente do previsto</span> o
+      kitnet, sem a devida autorização do LOCADOR.
+    </p>
 
-        <p>
-            O LOCATÁRIO pagará o valor de <span class="bold">{{ rental_value | currency }}</span>
-            ({{ rental_value | extenso }} reais),
-            <span class="bold">para moradia de {{ lease.number_of_tenants }} pessoa(s)</span>,
-            a ser efetuado diretamente ao LOCADOR, ou por PIX/Depósito bancário.
-            <span class="bold">O pagamento deve ser feito até o dia {{ lease.due_day }} de cada mês</span>.
-            <span class="bold">Será cobrada multa de 3% por cada dia de atraso subsequente</span>,
-            além de correções e outras despesas previstas em lei.
-        </p>
+    <p>
+      O LOCATÁRIO pagará o valor de
+      <span class="bold">{{ rental_value | currency }}</span>
+      ({{ rental_value | extenso }} reais),
+      <span class="bold"
+        >para moradia de no máximo {{ lease.number_of_tenants }} pessoa(s)</span
+      >, a ser efetuado diretamente ao LOCADOR, ou por PIX/Depósito bancário.
+      <span class="bold"
+        >O pagamento deve ser feito até o dia {{ lease.due_day }} de cada
+        mês</span
+      >.
+      <span class="bold"
+        >Será cobrada multa de 3% por cada dia de atraso subsequente</span
+      >, além de correções e outras despesas previstas em lei.
+    </p>
 
-        <p>
-          O pagamento do aluguel é sempre referente ao mês que o LOCATÁRIO estará morando no kitnet,
-          ou seja, o pagamento feito na data de hoje, {{ start_date }}, garante a moradia até a data {{ next_month_date }},
-          ficando o pagamento sempre para o dia {{ lease.due_day }} de cada mês.
-          <span class="bold">Caso o LOCATÁRIO deseje alterar a data de vencimento</span>,
-          será calculado o valor proporcional do aluguel, levando em consideração a diferença de dias entre as 2 datas.
-          e o mesmo deve ser pago até a nova data de vencimento, junto com o valor do próximo aluguel.
-        </p>
-        
-        <div class="page-break" />
+    <p>
+      O pagamento do aluguel é sempre referente ao mês que o LOCATÁRIO estará
+      morando no kitnet, ou seja, o pagamento feito na data de hoje, {{
+      start_date }}, garante a moradia até a data {{ next_month_date }}, ficando
+      o pagamento sempre para o dia {{ lease.due_day }} de cada mês.
+      <span class="bold"
+        >Caso o LOCATÁRIO deseje alterar a data de vencimento</span
+      >, será calculado o valor proporcional do aluguel, levando em consideração
+      a diferença de dias entre as 2 datas. e o mesmo deve ser pago até a nova
+      data de vencimento, junto com o valor do próximo aluguel.
+    </p>
 
-        <h1>
-            CONTRATO DE ALUGUEL
-        </h1>
+    <div class="page-break" />
 
-        <p>
-            DEPÓSITO no valor correspondente a 1 (um) mês de aluguel, <span class="bold">{{ rental_value | currency }}</span>
-            ({{ rental_value | extenso }} reais) referente ao mês de aluguel adiantado,
-            <span class="bold">{{ valor_tags | currency }}</span>
-            ({{ valor_tags | extenso }} reais) referente a caução da(s) tag(s) de acesso ao condomínio, e
-            <span class="bold">{{ cleaning_fee | currency }}</span>,
-            ({{ cleaning_fee | extenso }}) referente a taxa de limpeza. Totalizando
-            <span class="bold">{{ valor_total | currency }}</span> ({{ valor_total | extenso }}).
-        </p>
+    <h1>CONTRATO RESIDENCIAL DE ALUGUEL</h1>
 
-        
-        {% if tenant.deposit_amount and tenant.deposit_amount > 0 %}
-            <p>
-                O LOCATÁRIO possui um caução no valor de <span class="bold">{{ tenant.deposit_amount | currency }}</span>,
-                ({{ tenant.deposit_amount | extenso }} reais) cobrado como <span class="bold">garantia para retenção do imóvel</span>,
-                que será devolvido no término do contrato.
-            </p>
-        {% endif %}
+    <p>
+      DEPÓSITO no valor correspondente a 1 (um) mês de aluguel,
+      <span class="bold">{{ rental_value | currency }}</span>
+      ({{ rental_value | extenso }} reais) referente ao mês de aluguel
+      adiantado,
+      <span class="bold">{{ valor_tags | currency }}</span>
+      ({{ valor_tags | extenso }} reais) referente a caução da(s) tag(s) de
+      acesso ao condomínio, e
+      <span class="bold">{{ cleaning_fee | currency }}</span>, ({{ cleaning_fee
+      | extenso }}) referente a taxa de limpeza. Totalizando
+      <span class="bold">{{ valor_total | currency }}</span> ({{ valor_total |
+      extenso }}).
+    </p>
 
-        <p>
-            O valor referente ao caução da tag é devolvido no momento de entrega do kitnet, quando o inquilino for embora,
-            mediante entrega da(s) tag(s).
-        </p>
+    {% if tenant.deposit_amount and tenant.deposit_amount > 0 %}
+    <p>
+      O LOCATÁRIO possui um caução no valor de
+      <span class="bold">{{ tenant.deposit_amount | currency }}</span>, ({{
+      tenant.deposit_amount | extenso }} reais) cobrado como
+      <span class="bold">garantia para retenção do imóvel</span>, que será
+      devolvido no término do contrato.
+    </p>
+    <p>
+      Durante o período de contrato, o valor do caução pode ser usado somente para
+      o pagamento da multa por quebra de contrato. <span class="bold"></span>Ele não pode ser usado como pagamento
+      do mês de aluguel</span>.
+    </p>
+    {% endif %}
 
-        <p>
-            O valor do aluguel será <span class="bold">REAJUSTADO</span> a cada período de <span class="bold">12 meses</span>,
-            de acordo com a variação <span class="bold">do índice do IGP-M/FGV</span> ou <span class="bold">outro índice</span>escolhido.
-        </p>
+    <p>
+      O valor referente ao caução da tag é devolvido no momento de entrega do
+      kitnet, quando o inquilino for embora, mediante entrega da(s) tag(s).
+      Esse valor pode ser usado caso o(s) inquilino(s) percam a tag e precisem de uma nova.
+    </p>
 
-        <p>
-            RECIBO do valor total pago será emitido pelo LOCADOR ou procurador imediatamente responsável.
-        </p>
+    <p>
+      As tags de acesso do condomínio são codificadas com um código único, se uma tag for copiada,
+      o sistema pode detectar duplicação de código e as tags irão parar de funcionar.
+    </p>
 
-        <p>
-            <span class="bold">O LOCADOR responsabiliza-se de pagar</span>
-            todos os serviços públicos e despesas ligadas à conservação do imóvel, tais como: Imposto Predial (IPTU),
-            taxa de luz, saneamento e esgoto.
-        </p>
+    <p>
+      O valor do aluguel será <span class="bold">REAJUSTADO</span> a cada
+      período de <span class="bold">12 meses</span>, de acordo com a variação
+      <span class="bold">do índice do IGP-M/FGV</span> ou
+      <span class="bold">outro índice</span>escolhido.
+    </p>
 
-        <p>
-            O condomínio possui regras de convivência, que estão na última página deste contrato. Em caso de não cumprimento destas regras,
-            o LOCADOR reserva-se o direito de <span class="bold">aplicar uma multa de R$100,00 (cem reais)</span>,
-            caso o LOCATÁRIO não pare com a atividade que está quebrando as regras e, <span class="bold">em caso de reinscidência</span>,
-            o LOCADOR <span class="bold">pode pedir a rescisão deste contrato</span>.
-        </p>
+    <p>
+      RECIBO do valor total pago será emitido pelo LOCADOR ou procurador
+      imediatamente responsável.
+    </p>
 
-        <p>
-            O condomínio possui câmeras de segurança que estão monitorando e gravando 24h por dia, áudio e vídeo.
-            Essas gravações podem e serão utilizadas como forma de prova para as quebras de contrato, caso seja necessário.
-        </p>
+    <p>
+      COMPROVANTES DE RESIDÊNCIA devem ser solicitados com no mínimo 3 dias
+      de antecedência.
+    </p>
 
-        {% if "Botijão de gás" in furnitures %}
-        <p>
-            Na entrada, um botijão de gás (casco) é disponibilizado. Deve ser deixado na saída do kitnet.
-            Caso o botijão esteja cheio e o LOCADOR queira levar, o mesmo deve deixar um botijão vazio (casco).
-            Se o LOCADOR não puder deixar um casco vazio, deverá deixar o botijão que se encontra no kitnet, mesmo que cheio.
-        </p>
-        {% endif %}
+    <p>
+      <span class="bold">O LOCADOR responsabiliza-se de pagar</span>
+      todos os serviços públicos e despesas ligadas à conservação do imóvel,
+      tais como: Imposto Predial (IPTU), taxa de luz, saneamento e esgoto.
+    </p>
 
-        <p>
-            O LOCADOR disponibiliza de internet <span class="bold">cortesia, ou seja, o LOCATÁRIO não paga e/ou tem direitos sobre ela</span>,
-            porém, não garante a estabilidade e velocidade da conexão,
-            pois esta é muito variável dependendo da localização do kitnet com relação aos roteadores do condomínio,
-            e a internet do condomínio tem como principal uso os sistemas do condomínio.
-            Caso deseje, o LOCADOR tem a permissão de contratar um plano de internet particular e ser feita a instalação no kitnet.
-        </p>
+    <p>
+      O condomínio possui regras de convivência, que estão na última página
+      deste contrato. Em caso de não cumprimento destas regras, o LOCADOR
+      reserva-se o direito de
+      <span class="bold">aplicar uma multa de R$100,00 (cem reais)</span>, caso
+      o LOCATÁRIO não pare com a atividade que está quebrando as regras e,
+      <span class="bold">em caso de reinscidência</span>, o LOCADOR
+      <span class="bold">pode pedir a rescisão imediata deste contrato</span>.
+    </p>
 
-        <p>
-            Quaisquer construções, modificações ou contribuições de melhoria que sejam destinadas ao imóvel deverão, de imediato,
-            ser submetidas a autorização expressa do LOCADOR.
-        </p>
-        <p>
-            <span class="bold">É PROIBIDO a instalação de Ar Condicionado ou uso de Ar Condicionado Portátil</span>,
-            e também <span class="bold">é PROIBIDO o uso de Máquina de secar roupas</span>
-        </p>
+    <p>
+      O condomínio possui câmeras de segurança que estão monitorando e gravando
+      24h por dia, áudio e vídeo. Essas gravações podem e serão utilizadas como
+      forma de prova para as quebras de contrato, caso seja necessário.
+    </p>
 
-        <p>
-            Caso uma <span class="bold">RESCISÃO</span> do contrato de aluguel seja necessária,
-            ambas as partes concordam em dar <span class="bold">um prazo de 30 dias de aviso prévio</span>,
-            e <span class="bold">multa/indenização</span> de 1 (um) mês de aluguel será paga pela
-            <span class="bold">parte responsável pela rescisão</span> do mesmo.
-        </p>
+    {% if "Botijão de gás" in furnitures %}
+    <p>
+      Na entrada, um botijão de gás (casco) é disponibilizado. Deve ser deixado
+      na saída do kitnet. Caso o botijão esteja cheio e o LOCADOR queira levar,
+      o mesmo deve deixar um botijão vazio (casco). Se o LOCADOR não puder
+      deixar um casco vazio, deverá deixar o botijão que se encontra no kitnet,
+      mesmo que cheio.
+    </p>
+    {% endif %}
 
-        <p>
-            RESCISÃO <span class="bold">imediata</span> do presente contrato,
-            <span class="bold">sem prejuízo dos numerários previstos neste</span>, ocorrerá,
-            <span class="bold">caso aconteça qualquer sinistro que venha a impossibilitar o uso do imóvel,
-              ou em caso de descumprimento excessivo das regras, ou em caso de desapropriação do imóvel</span>.
-        </p>
-        
-        <div class="page-break" />
+    <p>
+      O LOCADOR disponibiliza de internet
+      <span class="bold"
+        >cortesia, ou seja, o LOCATÁRIO não paga e/ou tem direitos sobre
+        ela</span
+      >, porém, não garante a estabilidade e velocidade da conexão, pois esta é
+      muito variável dependendo da localização do kitnet com relação aos
+      roteadores do condomínio, e a internet do condomínio tem como principal
+      uso os sistemas do condomínio. Caso deseje, o LOCADOR tem a permissão de
+      contratar um plano de internet particular e ser feita a instalação no
+      kitnet. <span class="bold">Não é permitido colocar cabos Ethernet nos
+      roteadores do condomínio, para uso particular nos kitnets</span>.
+    </p>
 
-        <h1>
-            CONTRATO DE ALUGUEL
-        </h1>
+    <p>
+      Quaisquer construções, modificações ou contribuições de melhoria que sejam
+      destinadas ao imóvel deverão, de imediato, ser submetidas a autorização
+      expressa do LOCADOR.
+    </p>
 
-        <p>
-            O LOCATÁRIO irá receber <span class="bold">1 cópia da chave do apartamento</span>,
-            e <span class="bold">{{ lease.number_of_tenants }} tag(s)</span> e <span class="bold">deve devolvê-las</span>
-            ao final do contrato / saída do kitnet. Caso ocorra <span class="bold">a perda de 1 tag</span>,
-            será utilizado o valor do caução da tag, e receberá uma nova.
-            Em <span class="bold">caso de reinscidência de perda da tag</span>,
-            será cobrado a multa de R$50,00 ({{ 50 | extenso}} reais) para cada vez que acontecer.
-            O LOCADOR não tem obrigação de possuir chave reserva para o kitnet, caso o LOCATÁRIO perca a chave,
-            e o LOCADOR não possua chaves reservas,
-            é de responsabilidade do LOCATÁRIO chamar um chaveiro para abrir a porta e fazer uma nova chave.
-            Caso ocorra a <span class="bold">perda da chave</span>, e o LOCADOR possuir uma chave reserva disponível,
-            será cobrado uma multa de R$50,00 ({{ 50 | extenso}} reais) e será entregue uma chave reserva.
-        </p>
+    <p>
+      <span class="bold"
+        >É PROIBIDO a instalação de Ar Condicionado ou uso de Ar Condicionado
+        Portátil</spa
+      >, e também
+      <span class="bold">
+        é PROIBIDO a instalação e o uso de qualquer tipo de Máquina de secar roupas.
+      </span>.
+      Caso o LOCATÁRIO faça uma instalação, será cobrado uma multa e também pode ser considerado
+      quebra de contrato.
+    </p>
+    
+    <div class="page-break" />
 
-        <p>
-            O LOCATÁRIO e LOCADOR elegem o foro de Porto Alegre, onde está situado o imóvel,
-            para dirimir quaisquer dúvidas provenientes da execução e cumprimento do presente contrato.
-        </p>
+    <h1>CONTRATO RESIDENCIAL DE ALUGUEL</h1>
 
-        <p>
-            Os herdeiros, cessionários ou sucessores das partes vinculadas neste contrato de aluguel se obrigam desde já ao teor completo deste contrato.
-        </p>
+    <p>
+      Em caso de <span class="bold">rescisão antecipada</span> por parte do LOCATÁRIO,
+      sem motivo legal que justifique a quebra imediata do contrato, este se compromete a:
+      <ul>
+        <li>Notificar o LOCADOR com antecedência mínima de 30 (trinta) dias, por escrito;</li>
+        <li>Pagar uma multa no valor equivalente a 1 (um) mês de aluguel vigente na data da notificação;</li>
+        <li>
+          Caso exista caução no valor correspondente a 1 (um) mês de aluguel,
+          esta poderá ser utilizada para o pagamento da multa, 
+          desde que não existam débitos pendentes ou danos ao imóvel;
+        </li>
+        <li>No caso de rescisão solicitada pelo LOCADOR, sem que haja infração contratual por parte do LOCATÁRIO,
+          deverá ser concedido aviso prévio mínimo de 30 (trinta) dias, por escrito;
+        </li>
+      </ul>
+    </p>
 
-        <p>
-            De maneira acordada e justa, LOCADOR e LOCATÁRIO, assinam juntamente, o presente INSTRUMENTO DE LOCAÇÃO RESIDENCIAL, que passa a virgorar e fica desde agora aceito, pelas cláusulas acima descritas.
-        </p>
+    <p>
+      RESCISÃO <span class="bold">imediata</span> do presente contrato,
+      <span class="bold">sem prejuízo dos numerários previstos neste</span>,
+      ocorrerá,
+      <span class="bold"
+        >caso aconteça qualquer sinistro que venha a impossibilitar o uso do
+        imóvel, ou em caso de descumprimento excessivo das regras, ou em caso de
+        desapropriação do imóvel</span
+      >.
+    </p>
 
-        <div class="page-break" />
+    <p>
+      O LOCATÁRIO irá receber
+      <span class="bold">1 cópia da chave do apartamento</span>, e
+      <span class="bold">{{ lease.number_of_tenants }} tag(s)</span> e
+      <span class="bold">deve devolvê-las</span> ao final do contrato / saída do
+      kitnet. Caso ocorra <span class="bold">a perda de 1 tag</span>, será
+      utilizado o valor do caução da tag (se existir), e receberá uma nova. Em
+      <span class="bold">caso de reinscidência de perda da tag, ou de não possuir caução</span>,
+      será cobrado a multa de R$50,00 ({{ 50 | extenso}} reais) para cada vez que
+      acontecer. O LOCADOR não tem obrigação de possuir chave reserva para o
+      kitnet, caso o LOCATÁRIO perca a chave, e o LOCADOR não possua chaves
+      reservas, é de responsabilidade do LOCATÁRIO chamar um chaveiro para abrir
+      a porta e fazer uma nova chave. Caso ocorra a
+      <span class="bold">perda da chave</span>, e o LOCADOR possuir uma chave
+      reserva disponível, será cobrado uma multa de R$50,00 ({{ 50 | extenso}}
+      reais) e será entregue uma chave reserva.
+    </p>
 
-        <h1>
-            CONTRATO DE ALUGUEL
-        </h1>
+    <p>
+      O LOCADOR garante a manutenção da geladeira, fogão e máquina de lavar roupas
+      do kitnet, durante toda a locação. Chuveiro elétrico e lâmpadas possuem os 3 primeiros
+      meses de garantia do LOCADOR, após esse período, é de responsabilidade do LOCATÁRIO.
+    </p>
 
-        <h1>Regras do prédio/Regras de Convivência</h1>
+    <p>
+      O atendimento da manutenção é apenas de segunda
+      a sexta feira, entre 9:00 e 19:00. Atendimentos fora desse horário de atendimento irão
+      ter custos, exceto para casos de emergência.
+    </p>
 
-        <ul>
-            {% for regra in rules %}
-                <li>{{ regra | safe }}</li>
-            {% endfor %}
-        </ul>
+    <p>
+      O LOCATÁRIO e LOCADOR elegem o foro de Porto Alegre, onde está situado o
+      imóvel, para dirimir quaisquer dúvidas provenientes da execução e
+      cumprimento do presente contrato.
+    </p>
 
-        <h2>
-            O não cumprimento das regras acima citadas irá implicar em multa e possível rescisão imediata do contrato.
-        </h2>
+    <p>
+      Os herdeiros, cessionários ou sucessores das partes vinculadas neste
+      CONTRATO RESIDENCIAL DE ALUGUEL se obrigam desde já ao teor completo deste contrato.
+    </p>
 
-        <div class="signature-section">
-            <div class="row">
-                <div class="column">
-                    <p>LOCAL: Porto Alegre</p>
-                </div>
-                <div class="column">
-                    <p>
-                        DATA: {{ start_date }}
-                    </p>
-                </div>
-            </div>
+    <p>
+      De maneira acordada e justa, LOCADOR e LOCATÁRIO, assinam juntamente, o
+      presente INSTRUMENTO DE LOCAÇÃO RESIDENCIAL, que passa a virgorar e fica
+      desde agora aceito, pelas cláusulas acima descritas.
+    </p>
 
-            <div class="row">
-                <div class="column">
-                    <div class="signature-line"></div>
-                    <p class="signature-title">Locador: Célia Maria Steinmetz</p>
-                </div>
-                <div class="column">
-                    <div class="signature-line"></div>
-                    <p class="signature-title">Locatário: {{ tenant.name }}</p>
-                </div>
-            </div>
+    <div class="page-break" />
 
-            <div class="witness-section">
-                <p class="witness-title">Testemunhas:</p>
-            </div>
+    <h1>CONTRATO RESIDENCIAL DE ALUGUEL</h1>
+
+    <h1>Regras do prédio/Regras de Convivência</h1>
+
+    <ul>
+      {% for regra in rules %}
+      <li>{{ regra | safe }}</li>
+      {% endfor %}
+    </ul>
+
+    <h2>
+      O não cumprimento das regras acima citadas irá implicar em multa e
+      possível rescisão imediata do contrato.
+    </h2>
+
+    <div class="signature-section">
+      <div class="row">
+        <div class="column">
+          <p>LOCAL: Porto Alegre</p>
         </div>
-    </body>
+        <div class="column">
+          <p>DATA: {{ start_date }}</p>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="column">
+          <div class="signature-line"></div>
+          <p class="signature-title">Locador: Célia Maria Steinmetz</p>
+        </div>
+        <div class="column">
+          <div class="signature-line"></div>
+          <p class="signature-title">Locatário: {{ tenant.name }}</p>
+        </div>
+      </div>
+
+      <div class="witness-section">
+        <p class="witness-title">Testemunhas:</p>
+      </div>
+    </div>
+  </body>
 </html>
