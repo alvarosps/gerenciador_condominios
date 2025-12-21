@@ -129,7 +129,7 @@ python manage.py shell
 ### CORS Configuration
 
 Frontend is expected to run on:
-- `http://localhost:3000` (React default)
+- `http://localhost:6000` (React default)
 - `http://localhost:5173` (Vite default)
 
 CORS is configured with credentials support in `settings.py`.

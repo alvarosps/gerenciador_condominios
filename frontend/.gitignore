@@ -38,3 +38,6 @@ next-env.d.ts
 
 # vitest
 coverage/
+
+# OpenAPI generated types
+/lib/api/generated/

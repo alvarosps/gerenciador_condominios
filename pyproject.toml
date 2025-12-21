@@ -1,0 +1,219 @@
+# pyproject.toml - Configuration for Python development tools
+# Condominios Manager - Enterprise Refactoring Project
+
+[tool.black]
+line-length = 100
+target-version = ['py311']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # Directories to exclude
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | venv
+  | ENV
+  | env
+  | _build
+  | buck-out
+  | build
+  | dist
+  | migrations
+  | __pycache__
+  | \.pytest_cache
+  | \.coverage
+  | htmlcov
+  | backups
+  | contracts
+  | metrics
+)/
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 100
+multi_line_output = 3
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+ensure_newline_before_comments = true
+skip_gitignore = true
+skip = ["migrations", ".venv", "venv", "env", "ENV"]
+known_first_party = ["core", "condominios_manager"]
+known_django = ["django", "rest_framework"]
+sections = ["FUTURE", "STDLIB", "DJANGO", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"]
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false  # Start permissive, will be enabled in Phase 2
+disallow_any_unimported = false
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+check_untyped_defs = true
+ignore_missing_imports = true
+exclude = [
+    'migrations/',
+    'venv/',
+    '.venv/',
+    'env/',
+    'ENV/',
+    '__pycache__/',
+    '.pytest_cache/',
+    'build/',
+    'dist/',
+]
+
+# Django-specific settings
+plugins = []  # Will add django-stubs in Phase 2
+
+[[tool.mypy.overrides]]
+module = "*.migrations.*"
+ignore_errors = true
+
+[tool.pylint.master]
+ignore = ["migrations", "venv", ".venv", "env", "ENV"]
+jobs = 4
+persistent = true
+suggestion-mode = true
+unsafe-load-any-extension = false
+
+[tool.pylint.messages_control]
+disable = [
+    "C0330",  # Wrong hanging indentation (conflicts with black)
+    "C0326",  # Bad whitespace (conflicts with black)
+    "missing-module-docstring",  # Will be enabled in Phase 2
+    "missing-class-docstring",   # Will be enabled in Phase 2
+    "missing-function-docstring", # Will be enabled in Phase 2
+    "too-few-public-methods",    # Common in Django models
+    "too-many-ancestors",        # Common in Django views
+]
+
+[tool.pylint.format]
+max-line-length = 100
+
+[tool.pylint.basic]
+good-names = ["i", "j", "k", "ex", "pk", "id", "_", "db"]
+
+[tool.pylint.design]
+max-args = 7
+max-attributes = 10
+max-bool-expr = 5
+max-branches = 15
+max-locals = 20
+max-parents = 7
+max-public-methods = 25
+max-returns = 6
+max-statements = 60
+min-public-methods = 1
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "condominios_manager.settings"
+python_files = ["test_*.py", "*_test.py", "tests.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+testpaths = ["tests"]
+addopts = [
+    "--verbose",
+    "--strict-markers",
+    "--tb=short",
+    "--cov=core",
+    "--cov-report=term-missing",
+    "--cov-report=html",
+    "--cov-report=xml",
+    "--cov-fail-under=0",  # Will increase to 80 in Phase 2
+]
+markers = [
+    "unit: Unit tests (fast, no external dependencies)",
+    "integration: Integration tests (database, external services)",
+    "slow: Tests that take a long time to run",
+    "smoke: Smoke tests for critical functionality",
+]
+
+[tool.coverage.run]
+source = ["core", "condominios_manager"]
+omit = [
+    "*/migrations/*",
+    "*/tests/*",
+    "*/test_*.py",
+    "*/__pycache__/*",
+    "*/venv/*",
+    "*/.venv/*",
+    "manage.py",
+    "*/wsgi.py",
+    "*/asgi.py",
+]
+branch = true
+
+[tool.coverage.report]
+precision = 2
+show_missing = true
+skip_covered = false
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]
+
+[tool.coverage.html]
+directory = "htmlcov"
+
+[tool.bandit]
+exclude_dirs = [
+    "/venv/",
+    "/.venv/",
+    "/env/",
+    "/ENV/",
+    "/migrations/",
+    "/tests/",
+    "/__pycache__/",
+]
+skips = [
+    "B101",  # assert_used - common in tests
+    "B601",  # paramiko_calls - not applicable
+]
+
+[tool.radon]
+exclude = "*/migrations/*,*/venv/*,*/.venv/*,*/env/*,*/ENV/*"
+show_complexity = true
+min = "B"  # Show functions with complexity B or higher
+max = "F"  # Show all complexity grades
+
+# Build system (for future packaging)
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "condominios-manager"
+version = "0.1.0"
+description = "Property management system for rental properties in Brazil"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [
+    {name = "Development Team", email = "dev@condominiosmanager.com"}
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.11",
+    "Framework :: Django :: 5.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/yourusername/condominios_manager"
+Documentation = "https://github.com/yourusername/condominios_manager/docs"
+Repository = "https://github.com/yourusername/condominios_manager"

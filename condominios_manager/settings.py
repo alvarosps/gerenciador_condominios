@@ -12,6 +12,8 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 from pathlib import Path
 
+from decouple import Csv, config
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -20,72 +22,125 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-b7ya%t^1&z1v#af1mlzjsm*$l9o^zj!h9a3*)tf@2k&z8b*^)h'
+SECRET_KEY = config(
+    "SECRET_KEY", default="django-insecure-b7ya%t^1&z1v#af1mlzjsm*$l9o^zj!h9a3*)tf@2k&z8b*^)h"
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = config("DEBUG", default=True, cast=bool)
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="localhost,127.0.0.1", cast=Csv())
 
 
 # Application definition
 
 INSTALLED_APPS = [
-    'django.contrib.admin',
-    'django.contrib.auth',
-    'django.contrib.contenttypes',
-    'django.contrib.sessions',
-    'django.contrib.messages',
-    'django.contrib.staticfiles',
-    'corsheaders',
-    'rest_framework',
-    'core',
+    "django.contrib.admin",
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.sessions",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",
+    "django.contrib.sites",  # Required for django-allauth
+    # Third-party apps
+    "corsheaders",
+    "rest_framework",
+    "rest_framework_simplejwt",  # JWT authentication
+    "rest_framework_simplejwt.token_blacklist",  # Token blacklist for logout
+    "drf_spectacular",  # OpenAPI/Swagger documentation (Phase 8)
+    # Django-allauth for OAuth
+    "allauth",
+    "allauth.account",
+    "allauth.socialaccount",
+    "allauth.socialaccount.providers.google",  # Google OAuth provider
+    # Project apps
+    "core",
 ]
 
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',
-    'django.middleware.security.SecurityMiddleware',
-    'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    "corsheaders.middleware.CorsMiddleware",
+    "core.middleware.RequestResponseLoggingMiddleware",  # Request/response logging
+    "django.middleware.security.SecurityMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "allauth.account.middleware.AccountMiddleware",  # Required for django-allauth
 ]
 
-ROOT_URLCONF = 'condominios_manager.urls'
+ROOT_URLCONF = "condominios_manager.urls"
 
 TEMPLATES = [
     {
-        'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
-        'APP_DIRS': True,
-        'OPTIONS': {
-            'context_processors': [
-                'django.template.context_processors.request',
-                'django.contrib.auth.context_processors.auth',
-                'django.contrib.messages.context_processors.messages',
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [],
+        "APP_DIRS": True,
+        "OPTIONS": {
+            "context_processors": [
+                "django.template.context_processors.request",
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
             ],
         },
     },
 ]
 
-WSGI_APPLICATION = 'condominios_manager.wsgi.application'
+WSGI_APPLICATION = "condominios_manager.wsgi.application"
+
+# Site ID (required for django-allauth)
+SITE_ID = 1
+
+# Authentication Backends
+# Configure both traditional Django auth and OAuth
+AUTHENTICATION_BACKENDS = [
+    # Django's default authentication (username/password)
+    "django.contrib.auth.backends.ModelBackend",
+    # django-allauth authentication (OAuth)
+    "allauth.account.auth_backends.AuthenticationBackend",
+]
 
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'condominio',
-        'USER': 'postgres', 
-        'PASSWORD': 'postgres',
-        'HOST': 'localhost',
-        'PORT': '5432',
+    "default": {
+        "ENGINE": config("DB_ENGINE", default="django.db.backends.postgresql"),
+        "NAME": config("DB_NAME", default="condominio"),
+        "USER": config("DB_USER", default="postgres"),
+        "PASSWORD": config("DB_PASSWORD", default="postgres"),
+        "HOST": config("DB_HOST", default="localhost"),
+        "PORT": config("DB_PORT", default="5432"),
     }
 }
+
+
+# Cache Configuration (Phase 4: Redis Caching)
+# https://docs.djangoproject.com/en/5.0/topics/cache/
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": config("REDIS_URL", default="redis://127.0.0.1:6379/0"),
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+            "CONNECTION_POOL_KWARGS": {
+                "max_connections": 50,
+                "retry_on_timeout": True,
+            },
+            "SOCKET_CONNECT_TIMEOUT": 5,  # seconds
+            "SOCKET_TIMEOUT": 5,  # seconds
+        },
+        "KEY_PREFIX": "condominios",
+        "TIMEOUT": config("CACHE_TIMEOUT", default=300, cast=int),  # 5 minutes default
+    }
+}
+
+# Cache key versioning for invalidation
+CACHE_MIDDLEWARE_ALIAS = "default"
+CACHE_MIDDLEWARE_SECONDS = config("CACHE_MIDDLEWARE_SECONDS", default=300, cast=int)
+CACHE_MIDDLEWARE_KEY_PREFIX = "condominios"
 
 
 # Password validation
@@ -93,16 +148,16 @@ DATABASES = {
 
 AUTH_PASSWORD_VALIDATORS = [
     {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
+        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
+        "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
+        "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
     },
 ]
 
@@ -110,9 +165,9 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = "en-us"
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = "UTC"
 
 USE_I18N = True
 
@@ -122,28 +177,190 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = "static/"
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # CORS settings
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-]
+CORS_ALLOWED_ORIGINS = config(
+    "CORS_ALLOWED_ORIGINS",
+    default="http://localhost:6000,http://127.0.0.1:6000,http://localhost:5173,http://127.0.0.1:5173",
+    cast=Csv(),
+)
 
-CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_CREDENTIALS = config("CORS_ALLOW_CREDENTIALS", default=True, cast=bool)
 
 # REST Framework settings
 REST_FRAMEWORK = {
-    'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.AllowAny',
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework_simplejwt.authentication.JWTAuthentication",  # JWT auth
+        "rest_framework.authentication.SessionAuthentication",  # Session auth for browsable API
     ],
-    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'PAGE_SIZE': 20
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",  # Require authentication by default
+    ],
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "PAGE_SIZE": config("PAGE_SIZE", default=20, cast=int),
+    # OpenAPI/Swagger schema generation (Phase 8)
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
 }
+
+# DRF-Spectacular Settings (Phase 8: OpenAPI/Swagger Documentation)
+SPECTACULAR_SETTINGS = {
+    "TITLE": "Condomínios Manager API",
+    "DESCRIPTION": (
+        "Property management system for rental properties in Brazil.\n\n"
+        "This API provides comprehensive endpoints for managing buildings, apartments, "
+        "tenants, leases, furniture inventory, and contract generation.\n\n"
+        "**Features:**\n"
+        "- Building and apartment management\n"
+        "- Tenant and dependent tracking\n"
+        "- Lease creation and contract PDF generation\n"
+        "- Furniture inventory management\n"
+        "- Late fee and due date calculations\n"
+        "- JWT authentication\n\n"
+        "**Architecture:**\n"
+        "- Phase 4: Infrastructure abstractions (PDF generation, document storage)\n"
+        "- Phase 5: Query optimization with composite indexes\n"
+        "- Redis caching for performance\n"
+    ),
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+    # Authentication
+    "SECURITY": [
+        {
+            "bearerAuth": [],
+        }
+    ],
+    "SECURITY_DEFINITIONS": {
+        "bearerAuth": {
+            "type": "http",
+            "scheme": "bearer",
+            "bearerFormat": "JWT",
+        }
+    },
+    # Schema customization
+    "COMPONENT_SPLIT_REQUEST": True,
+    "SCHEMA_PATH_PREFIX": r"/api/",
+    "SERVERS": [
+        {"url": "http://localhost:8000", "description": "Local development server"},
+        {"url": "http://localhost:8000/api", "description": "Local API base"},
+    ],
+    # UI customization
+    "SWAGGER_UI_SETTINGS": {
+        "deepLinking": True,
+        "persistAuthorization": True,
+        "displayOperationId": True,
+        "filter": True,
+        "tagsSorter": "alpha",
+        "operationsSorter": "alpha",
+    },
+    "REDOC_UI_SETTINGS": {
+        "hideDownloadButton": False,
+        "expandResponses": "200,201",
+    },
+}
+
+# JWT Settings (djangorestframework-simplejwt)
+from datetime import timedelta
+
+SIMPLE_JWT = {
+    # Token lifetimes
+    "ACCESS_TOKEN_LIFETIME": timedelta(
+        minutes=config("JWT_ACCESS_TOKEN_LIFETIME", default=60, cast=int)
+    ),
+    "REFRESH_TOKEN_LIFETIME": timedelta(
+        minutes=config("JWT_REFRESH_TOKEN_LIFETIME", default=1440, cast=int)
+    ),
+    # Token refresh settings
+    "ROTATE_REFRESH_TOKENS": config("JWT_ROTATE_REFRESH_TOKENS", default=True, cast=bool),
+    "BLACKLIST_AFTER_ROTATION": config("JWT_BLACKLIST_AFTER_ROTATION", default=True, cast=bool),
+    # Security settings
+    "ALGORITHM": config("JWT_ALGORITHM", default="HS256"),
+    "SIGNING_KEY": SECRET_KEY,
+    "VERIFYING_KEY": None,
+    "AUTH_HEADER_TYPES": ("Bearer",),
+    "AUTH_HEADER_NAME": "HTTP_AUTHORIZATION",
+    # Token payload
+    "USER_ID_FIELD": "id",
+    "USER_ID_CLAIM": "user_id",
+    "AUTH_TOKEN_CLASSES": ("rest_framework_simplejwt.tokens.AccessToken",),
+    "TOKEN_TYPE_CLAIM": "token_type",
+    # Sliding tokens (not used, but configured for flexibility)
+    "SLIDING_TOKEN_REFRESH_EXP_CLAIM": "refresh_exp",
+    "SLIDING_TOKEN_LIFETIME": timedelta(minutes=5),
+    "SLIDING_TOKEN_REFRESH_LIFETIME": timedelta(days=1),
+}
+
+# Django-allauth Configuration
+ACCOUNT_AUTHENTICATION_METHOD = "username_email"  # Allow login with username or email
+ACCOUNT_EMAIL_REQUIRED = True  # Email is required
+ACCOUNT_EMAIL_VERIFICATION = (
+    "optional"  # Email verification optional (can be 'mandatory' in production)
+)
+ACCOUNT_USERNAME_REQUIRED = True  # Username is required (Django default User model requires it)
+
+# Allow auto-linking of social accounts to existing users by email
+SOCIALACCOUNT_AUTO_SIGNUP = True  # Auto-create accounts from social login
+SOCIALACCOUNT_EMAIL_VERIFICATION = "optional"  # Skip email verification for social accounts
+
+# Google OAuth Provider Settings
+SOCIALACCOUNT_PROVIDERS = {
+    "google": {
+        "SCOPE": [
+            "profile",
+            "email",
+        ],
+        "AUTH_PARAMS": {
+            "access_type": "online",
+        },
+        "APP": {
+            "client_id": config("GOOGLE_CLIENT_ID", default=""),
+            "secret": config("GOOGLE_CLIENT_SECRET", default=""),
+            "key": "",
+        },
+        # Fetch these fields from Google
+        "FIELDS": [
+            "id",
+            "email",
+            "name",
+            "first_name",
+            "last_name",
+            "verified",
+            "locale",
+            "timezone",
+            "link",
+            "gender",
+            "updated_time",
+        ],
+        # Try to match social accounts to existing users by email
+        "VERIFIED_EMAIL": True,
+    }
+}
+
+# OAuth Frontend Redirect Configuration
+FRONTEND_URL = config("FRONTEND_URL", default="http://localhost:6000")
+FRONTEND_AUTH_CALLBACK_PATH = config("FRONTEND_AUTH_CALLBACK_PATH", default="/auth/callback")
+
+# Redirect after OAuth login (will be overridden by custom callback view)
+LOGIN_REDIRECT_URL = f"{FRONTEND_URL}{FRONTEND_AUTH_CALLBACK_PATH}"
+ACCOUNT_LOGOUT_REDIRECT_URL = FRONTEND_URL
+
+# PDF Generation Configuration
+CHROME_EXECUTABLE_PATH = config(
+    "CHROME_EXECUTABLE_PATH", default=r"C:\Program Files\Google\Chrome\Application\chrome.exe"
+)
+PDF_OUTPUT_DIR = config("PDF_OUTPUT_DIR", default="contracts")
+PDF_GENERATION_TIMEOUT = config("PDF_GENERATION_TIMEOUT", default=30, cast=int)
+
+# Application Constants
+DEFAULT_TAG_FEE_SINGLE = config("DEFAULT_TAG_FEE_SINGLE", default=50.00, cast=float)
+DEFAULT_TAG_FEE_MULTIPLE = config("DEFAULT_TAG_FEE_MULTIPLE", default=80.00, cast=float)
+LATE_FEE_PERCENTAGE = config("LATE_FEE_PERCENTAGE", default=0.05, cast=float)
+DAYS_PER_MONTH = config("DAYS_PER_MONTH", default=30, cast=int)
+
+# Logging Configuration
+from .logging_config import LOGGING

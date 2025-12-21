@@ -17,9 +17,7 @@ regras_condominio = [
         f" A <span class='bold'>única exceção</span> é que o LOCADOR permite que <span class='bold'>motocicletas</span>"
         f" sejam deixados na área comum em frente ao condomínio, <span class='bold'>entre os 2 portões de frente na Av. Circular 836</span>."
     ),
-    (
-        f"<span class='bold'>É proíbido deixar qualquer portão do condomínio aberto.</span>"
-    ),
+    (f"<span class='bold'>É proíbido deixar qualquer portão do condomínio aberto.</span>"),
     (
         f"<span class='bold'>É proíbido abrir o portão para não moradores do condomínio, sem consentimento da pessoa que está sendo buscada."
         f" Para receber</span><span class='bold'> visitas ou entregas, SEMPRE INFORME O NÚMERO DO SEU APARTAMENTO,"
@@ -32,5 +30,5 @@ regras_condominio = [
     (
         f"Para <span class='bold'>moradores da Av. Circular 850, é proíbido o uso da garagem</span>"
         f", para deixar <span class='bold'>qualquer tipo de veículo</span>."
-    )
+    ),
 ]

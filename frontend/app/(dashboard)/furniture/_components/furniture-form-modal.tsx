@@ -1,12 +1,33 @@
 'use client';
 
 import { useEffect } from 'react';
-import { Modal, Form, Input, message } from 'antd';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+  FormDescription,
+} from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { toast } from 'sonner';
 import {
   useCreateFurniture,
   useUpdateFurniture,
 } from '@/lib/api/hooks/use-furniture';
-import { Furniture, furnitureSchema } from '@/lib/schemas/furniture.schema';
+import { Furniture } from '@/lib/schemas/furniture.schema';
 
 interface FurnitureFormModalProps {
   open: boolean;
@@ -14,102 +35,100 @@ interface FurnitureFormModalProps {
   onClose: () => void;
 }
 
+const furnitureFormSchema = z.object({
+  name: z.string().min(1, 'O nome deve ter pelo menos 1 caractere').max(200, 'O nome deve ter no máximo 200 caracteres'),
+});
+
+type FurnitureFormValues = z.infer<typeof furnitureFormSchema>;
+
 export function FurnitureFormModal({
   open,
   furniture,
   onClose,
 }: FurnitureFormModalProps) {
-  const [form] = Form.useForm();
   const createMutation = useCreateFurniture();
   const updateMutation = useUpdateFurniture();
 
   const isEditing = !!furniture?.id;
   const isLoading = createMutation.isPending || updateMutation.isPending;
 
+  const formMethods = useForm<FurnitureFormValues>({
+    resolver: zodResolver(furnitureFormSchema),
+    defaultValues: {
+      name: '',
+    },
+  });
+
   useEffect(() => {
-    if (open) {
-      if (furniture) {
-        // Populate form with furniture data for editing
-        form.setFieldsValue(furniture);
-      } else {
-        // Reset form for new furniture
-        form.resetFields();
-      }
+    if (furniture) {
+      formMethods.reset({
+        name: furniture.name,
+      });
+    } else {
+      formMethods.reset();
     }
-  }, [furniture, form, open]);
+  }, [furniture, formMethods]);
 
-  const handleSubmit = async () => {
+  const onSubmit = async (values: FurnitureFormValues) => {
     try {
-      // Validate form fields
-      const values = await form.validateFields();
-
-      // Validate with Zod schema
-      const validated = furnitureSchema.parse(values);
-
       if (isEditing && furniture?.id) {
-        // Update existing furniture
-        await updateMutation.mutateAsync({ ...validated, id: furniture.id });
-        message.success('Móvel atualizado com sucesso');
+        await updateMutation.mutateAsync({ ...values, id: furniture.id });
+        toast.success('Móvel atualizado com sucesso');
       } else {
-        // Create new furniture
-        await createMutation.mutateAsync(validated);
-        message.success('Móvel criado com sucesso');
+        await createMutation.mutateAsync(values);
+        toast.success('Móvel criado com sucesso');
       }
 
-      // Close modal and reset form
       onClose();
-      form.resetFields();
+      formMethods.reset();
     } catch (error) {
-      if (error instanceof Error) {
-        message.error(error.message || 'Erro ao salvar móvel');
-      } else {
-        message.error('Erro ao salvar móvel');
-      }
-      console.error('Form validation error:', error);
+      toast.error('Erro ao salvar móvel');
+      console.error('Save error:', error);
     }
-  };
-
-  const handleCancel = () => {
-    onClose();
-    form.resetFields();
   };
 
   return (
-    <Modal
-      title={isEditing ? 'Editar Móvel' : 'Novo Móvel'}
-      open={open}
-      onOk={handleSubmit}
-      onCancel={handleCancel}
-      confirmLoading={isLoading}
-      okText={isEditing ? 'Atualizar' : 'Criar'}
-      cancelText="Cancelar"
-      destroyOnClose
-      width={500}
-    >
-      <Form
-        form={form}
-        layout="vertical"
-        autoComplete="off"
-        className="mt-4"
-      >
-        <Form.Item
-          name="name"
-          label="Nome do Móvel"
-          rules={[
-            { required: true, message: 'Por favor, informe o nome do móvel' },
-            { min: 1, message: 'O nome deve ter pelo menos 1 caractere' },
-            { max: 200, message: 'O nome deve ter no máximo 200 caracteres' },
-          ]}
-          tooltip="Nome ou descrição do móvel"
-        >
-          <Input
-            placeholder="Ex: Sofá, Cama, Mesa"
-            maxLength={200}
-            showCount
-            disabled={isLoading}
-          />
-        </Form.Item>
-      </Form>
-    </Modal>
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>
+            {isEditing ? 'Editar Móvel' : 'Novo Móvel'}
+          </DialogTitle>
+        </DialogHeader>
+
+        <Form {...formMethods}>
+          <form onSubmit={formMethods.handleSubmit(onSubmit)} className="space-y-4">
+            <FormField
+              control={formMethods.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Nome do Móvel *</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="Ex: Sofá, Cama, Mesa"
+                      maxLength={200}
+                      {...field}
+                      disabled={isLoading}
+                    />
+                  </FormControl>
+                  <FormDescription>Nome ou descrição do móvel</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={isLoading}>
+                {isEditing ? 'Atualizar' : 'Criar'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
   );
 }

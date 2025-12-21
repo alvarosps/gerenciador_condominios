@@ -80,3 +80,119 @@ export function validateCpfCnpj(value: string): boolean {
   if (clean.length === 14) return validateCNPJ(clean);
   return false;
 }
+
+/**
+ * Format CPF for display
+ * @param cpf - CPF string with only digits
+ * @returns Formatted CPF (XXX.XXX.XXX-XX)
+ */
+export function formatCPF(cpf: string): string {
+  const digits = cpf.replace(/\D/g, '');
+  if (digits.length !== 11) return cpf;
+
+  return digits.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+}
+
+/**
+ * Format CNPJ for display
+ * @param cnpj - CNPJ string with only digits
+ * @returns Formatted CNPJ (XX.XXX.XXX/XXXX-XX)
+ */
+export function formatCNPJ(cnpj: string): string {
+  const digits = cnpj.replace(/\D/g, '');
+  if (digits.length !== 14) return cnpj;
+
+  return digits.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
+}
+
+/**
+ * Format CPF or CNPJ based on length
+ * @param value - Document string
+ * @returns Formatted document
+ */
+export function formatCPFOrCNPJ(value: string): string {
+  const digits = value.replace(/\D/g, '');
+
+  if (digits.length <= 11) {
+    return formatCPF(digits);
+  }
+
+  return formatCNPJ(digits);
+}
+
+/**
+ * Validate Brazilian phone number
+ * Accepts formats: (XX) XXXXX-XXXX or (XX) XXXX-XXXX
+ *
+ * @param phone - Phone string with or without formatting
+ * @returns true if valid, false otherwise
+ */
+export function validateBrazilianPhone(phone: string): boolean {
+  const digits = phone.replace(/\D/g, '');
+
+  // Must have 10 (landline) or 11 (mobile) digits
+  if (digits.length !== 10 && digits.length !== 11) return false;
+
+  // First digit must be 1-9 (area code can't start with 0)
+  if (digits[0] === '0') return false;
+
+  // For mobile (11 digits), the third digit must be 9
+  if (digits.length === 11 && digits[2] !== '9') return false;
+
+  return true;
+}
+
+/**
+ * Format Brazilian phone number
+ * @param phone - Phone string with only digits
+ * @returns Formatted phone (XX) XXXXX-XXXX or (XX) XXXX-XXXX
+ */
+export function formatBrazilianPhone(phone: string): string {
+  const digits = phone.replace(/\D/g, '');
+
+  if (digits.length === 11) {
+    // Mobile: (XX) 9XXXX-XXXX
+    return digits.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
+  }
+
+  if (digits.length === 10) {
+    // Landline: (XX) XXXX-XXXX
+    return digits.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3');
+  }
+
+  return phone;
+}
+
+/**
+ * Validate email format
+ * @param email - Email string
+ * @returns true if valid, false otherwise
+ */
+export function validateEmail(email: string): boolean {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+}
+
+/**
+ * Validate Brazilian CEP (postal code)
+ * CEP format: XXXXX-XXX (8 digits)
+ *
+ * @param cep - CEP string with or without formatting
+ * @returns true if valid, false otherwise
+ */
+export function validateCEP(cep: string): boolean {
+  const digits = cep.replace(/\D/g, '');
+  return digits.length === 8;
+}
+
+/**
+ * Format CEP for display
+ * @param cep - CEP string with only digits
+ * @returns Formatted CEP (XXXXX-XXX)
+ */
+export function formatCEP(cep: string): string {
+  const digits = cep.replace(/\D/g, '');
+  if (digits.length !== 8) return cep;
+
+  return digits.replace(/(\d{5})(\d{3})/, '$1-$2');
+}

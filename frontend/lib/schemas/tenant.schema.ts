@@ -14,6 +14,7 @@ export const tenantSchema = z.object({
   rg: z.string().optional().nullable(),
   phone: z.string().min(1, 'Telefone é obrigatório'),
   email: z.string().email('Email inválido').optional().nullable(),
+  phone_alternate: z.string().optional().nullable(),
   marital_status: z.string().min(1, 'Estado civil é obrigatório'),
   profession: z.string().optional().nullable(),
   is_company: z.boolean().default(false),
@@ -23,6 +24,9 @@ export const tenantSchema = z.object({
     .optional()
     .nullable()
     .transform((val) => (val ? Number(val) : null)),
+  cleaning_fee_paid: z.boolean().optional(),
+  tag_deposit_paid: z.boolean().optional(),
+  rent_due_day: z.number().optional(),
   furnitures: z.array(furnitureSchema).default([]),
   furniture_ids: z.array(z.number()).optional(),
   dependents: z.array(dependentSchema).default([]),

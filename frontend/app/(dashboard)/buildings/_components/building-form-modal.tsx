@@ -1,12 +1,34 @@
 'use client';
 
 import { useEffect } from 'react';
-import { Modal, Form, Input, InputNumber, message } from 'antd';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+  FormDescription,
+} from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { toast } from 'sonner';
 import {
   useCreateBuilding,
   useUpdateBuilding,
 } from '@/lib/api/hooks/use-buildings';
-import { Building, buildingSchema } from '@/lib/schemas/building.schema';
+import { Building } from '@/lib/schemas/building.schema';
 
 interface BuildingFormModalProps {
   open: boolean;
@@ -14,142 +36,149 @@ interface BuildingFormModalProps {
   onClose: () => void;
 }
 
+const buildingFormSchema = z.object({
+  street_number: z.number().min(1, 'O número deve ser maior que zero'),
+  name: z.string().min(1, 'O nome deve ter pelo menos 1 caractere').max(200, 'O nome deve ter no máximo 200 caracteres'),
+  address: z.string().min(1, 'O endereço deve ter pelo menos 1 caractere').max(500, 'O endereço deve ter no máximo 500 caracteres'),
+});
+
+type BuildingFormValues = z.infer<typeof buildingFormSchema>;
+
 export function BuildingFormModal({
   open,
   building,
   onClose,
 }: BuildingFormModalProps) {
-  const [form] = Form.useForm();
   const createMutation = useCreateBuilding();
   const updateMutation = useUpdateBuilding();
 
   const isEditing = !!building?.id;
   const isLoading = createMutation.isPending || updateMutation.isPending;
 
+  const formMethods = useForm<BuildingFormValues>({
+    resolver: zodResolver(buildingFormSchema),
+    defaultValues: {
+      street_number: undefined,
+      name: '',
+      address: '',
+    },
+  });
+
   useEffect(() => {
-    if (open) {
-      if (building) {
-        // Populate form with building data for editing
-        form.setFieldsValue(building);
-      } else {
-        // Reset form for new building
-        form.resetFields();
-      }
+    if (building) {
+      formMethods.reset({
+        street_number: building.street_number,
+        name: building.name,
+        address: building.address,
+      });
+    } else {
+      formMethods.reset();
     }
-  }, [building, form, open]);
+  }, [building, formMethods]);
 
-  const handleSubmit = async () => {
+  const onSubmit = async (values: BuildingFormValues) => {
     try {
-      // Validate form fields
-      const values = await form.validateFields();
-
-      // Validate with Zod schema
-      const validated = buildingSchema.parse(values);
-
       if (isEditing && building?.id) {
-        // Update existing building
-        await updateMutation.mutateAsync({ ...validated, id: building.id });
-        message.success('Prédio atualizado com sucesso');
+        await updateMutation.mutateAsync({ ...values, id: building.id });
+        toast.success('Prédio atualizado com sucesso');
       } else {
-        // Create new building
-        await createMutation.mutateAsync(validated);
-        message.success('Prédio criado com sucesso');
+        await createMutation.mutateAsync(values);
+        toast.success('Prédio criado com sucesso');
       }
 
-      // Close modal and reset form
       onClose();
-      form.resetFields();
+      formMethods.reset();
     } catch (error) {
-      if (error instanceof Error) {
-        message.error(error.message || 'Erro ao salvar prédio');
-      } else {
-        message.error('Erro ao salvar prédio');
-      }
-      console.error('Form validation error:', error);
+      toast.error('Erro ao salvar prédio');
+      console.error('Save error:', error);
     }
-  };
-
-  const handleCancel = () => {
-    onClose();
-    form.resetFields();
   };
 
   return (
-    <Modal
-      title={isEditing ? 'Editar Prédio' : 'Novo Prédio'}
-      open={open}
-      onOk={handleSubmit}
-      onCancel={handleCancel}
-      confirmLoading={isLoading}
-      okText={isEditing ? 'Atualizar' : 'Criar'}
-      cancelText="Cancelar"
-      destroyOnClose
-      width={600}
-    >
-      <Form
-        form={form}
-        layout="vertical"
-        autoComplete="off"
-        className="mt-4"
-      >
-        <Form.Item
-          name="street_number"
-          label="Número da Rua"
-          rules={[
-            { required: true, message: 'Por favor, informe o número da rua' },
-            {
-              type: 'number',
-              min: 1,
-              message: 'O número deve ser maior que zero',
-            },
-          ]}
-          tooltip="Número identificador do prédio na rua"
-        >
-          <InputNumber
-            min={1}
-            className="w-full"
-            placeholder="Ex: 836"
-            disabled={isLoading}
-          />
-        </Form.Item>
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>
+            {isEditing ? 'Editar Prédio' : 'Novo Prédio'}
+          </DialogTitle>
+        </DialogHeader>
 
-        <Form.Item
-          name="name"
-          label="Nome do Prédio"
-          rules={[
-            { required: true, message: 'Por favor, informe o nome do prédio' },
-            { min: 1, message: 'O nome deve ter pelo menos 1 caractere' },
-            { max: 200, message: 'O nome deve ter no máximo 200 caracteres' },
-          ]}
-          tooltip="Nome ou identificação do prédio"
-        >
-          <Input
-            placeholder="Ex: Edifício Central"
-            maxLength={200}
-            showCount
-            disabled={isLoading}
-          />
-        </Form.Item>
+        <Form {...formMethods}>
+          <form onSubmit={formMethods.handleSubmit(onSubmit)} className="space-y-4">
+            <FormField
+              control={formMethods.control}
+              name="street_number"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Número da Rua *</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      placeholder="Ex: 836"
+                      {...field}
+                      value={field.value || ''}
+                      onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
+                      disabled={isLoading}
+                    />
+                  </FormControl>
+                  <FormDescription>Número identificador do prédio na rua</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-        <Form.Item
-          name="address"
-          label="Endereço Completo"
-          rules={[
-            { required: true, message: 'Por favor, informe o endereço' },
-            { min: 1, message: 'O endereço deve ter pelo menos 1 caractere' },
-            { max: 500, message: 'O endereço deve ter no máximo 500 caracteres' },
-          ]}
-          tooltip="Endereço completo do prédio"
-        >
-          <Input.TextArea
-            rows={3}
-            placeholder="Ex: Rua das Flores, 836 - Centro - São Paulo/SP"
-            maxLength={500}
-            showCount
-            disabled={isLoading}
-          />
-        </Form.Item>
-      </Form>
-    </Modal>
+            <FormField
+              control={formMethods.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Nome do Prédio *</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="Ex: Edifício Central"
+                      maxLength={200}
+                      {...field}
+                      disabled={isLoading}
+                    />
+                  </FormControl>
+                  <FormDescription>Nome ou identificação do prédio</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={formMethods.control}
+              name="address"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Endereço Completo *</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      rows={3}
+                      placeholder="Ex: Rua das Flores, 836 - Centro - São Paulo/SP"
+                      maxLength={500}
+                      {...field}
+                      disabled={isLoading}
+                    />
+                  </FormControl>
+                  <FormDescription>Endereço completo do prédio</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={isLoading}>
+                {isEditing ? 'Atualizar' : 'Criar'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
   );
 }

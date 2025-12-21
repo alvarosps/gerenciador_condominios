@@ -1,3 +1,6 @@
+// Force dynamic rendering to prevent static generation issues with Ant Design
+export const dynamic = 'force-dynamic';
+
 export default function Home() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center p-24">

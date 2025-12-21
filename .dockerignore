@@ -1,0 +1,79 @@
+# Git files
+.git
+.gitignore
+.gitattributes
+
+# Python files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+*.log
+
+# Documentation
+*.md
+docs/
+*.txt.bak
+
+# Local environment files
+.env
+.env.local
+.env.*.local
+
+# Database
+*.db
+*.sqlite3
+
+# Logs
+logs/
+*.log
+
+# Static and media (will be generated)
+static/
+media/
+
+# Contracts (generated)
+contracts/
+
+# Node modules (if any)
+node_modules/
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+Jenkinsfile
+
+# Backups
+backups/
+*.sql
+*.dump

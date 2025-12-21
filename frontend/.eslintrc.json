@@ -9,7 +9,14 @@
   "rules": {
     "no-console": ["warn", { "allow": ["error", "warn"] }],
     "no-unused-vars": "off",
-    "@typescript-eslint/no-unused-vars": "error",
+    "@typescript-eslint/no-unused-vars": [
+      "error",
+      {
+        "argsIgnorePattern": "^_",
+        "varsIgnorePattern": "^_",
+        "destructuredArrayIgnorePattern": "^_"
+      }
+    ],
     "@typescript-eslint/no-explicit-any": "error",
     "react/no-unescaped-entities": "error",
     "react-hooks/rules-of-hooks": "error",
