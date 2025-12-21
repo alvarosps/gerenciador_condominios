@@ -1,0 +1,170 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: condominios_postgres_prod
+    env_file:
+      - .env.production
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data_prod:/var/lib/postgresql/data
+      - ./backups:/backups
+    networks:
+      - condominios_network_prod
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # Do not expose port in production (access only through internal network)
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: condominios_redis_prod
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-}
+    volumes:
+      - redis_data_prod:/data
+    networks:
+      - condominios_network_prod
+    restart: always
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    # Do not expose port in production
+
+  # Django Application
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+        - VCS_REF=$(git rev-parse --short HEAD)
+    container_name: condominios_web_prod
+    env_file:
+      - .env.production
+    environment:
+      - DJANGO_SETTINGS_MODULE=condominios_manager.settings
+      - DB_HOST=postgres
+      - REDIS_URL=redis://redis:6379/0
+    volumes:
+      - ./logs:/app/logs
+      - ./contracts:/app/contracts
+      - static_volume:/app/static
+      - media_volume:/app/media
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - condominios_network_prod
+    restart: always
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health/', timeout=2)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    # Do not expose port - accessed through nginx
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: condominios_nginx_prod
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - static_volume:/app/static:ro
+      - media_volume:/app/media:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - ./nginx/logs:/var/log/nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - web
+    networks:
+      - condominios_network_prod
+    restart: always
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Celery Worker (for async tasks - optional but recommended)
+  celery_worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: condominios_celery_worker_prod
+    command: celery -A condominios_manager worker --loglevel=info --concurrency=2
+    env_file:
+      - .env.production
+    environment:
+      - DJANGO_SETTINGS_MODULE=condominios_manager.settings
+      - DB_HOST=postgres
+      - REDIS_URL=redis://redis:6379/0
+    volumes:
+      - ./logs:/app/logs
+      - ./contracts:/app/contracts
+      - media_volume:/app/media
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - condominios_network_prod
+    restart: always
+    # Uncomment when Celery is configured in the project
+
+  # Celery Beat (for scheduled tasks - optional)
+  celery_beat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: condominios_celery_beat_prod
+    command: celery -A condominios_manager beat --loglevel=info
+    env_file:
+      - .env.production
+    environment:
+      - DJANGO_SETTINGS_MODULE=condominios_manager.settings
+      - DB_HOST=postgres
+      - REDIS_URL=redis://redis:6379/0
+    volumes:
+      - ./logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - condominios_network_prod
+    restart: always
+    # Uncomment when Celery Beat is configured in the project
+
+volumes:
+  postgres_data_prod:
+    driver: local
+  redis_data_prod:
+    driver: local
+  static_volume:
+    driver: local
+  media_volume:
+    driver: local
+
+networks:
+  condominios_network_prod:
+    driver: bridge

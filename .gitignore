@@ -28,6 +28,7 @@ yarn-error.log*
 
 # local env files
 .env*.local
+.env
 
 # vercel
 .vercel
@@ -35,3 +36,52 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+ENV/
+env/
+.env
+
+# Django
+*.log
+db.sqlite3
+db.sqlite3-journal
+/static/
+/media/
+*.pot
+
+# Database backups
+/backups/
+
+# Template backups
+core/templates/backups/
+
+# Documentation
+docs/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+nul
+
+# Metrics and reports
+/metrics/
+
+# Temporary files
+*.tmp
+*.bak
+*.cache

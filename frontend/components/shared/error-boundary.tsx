@@ -1,7 +1,9 @@
 'use client';
 
 import { Component, ReactNode } from 'react';
-import { Alert, Button } from 'antd';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { AlertTriangle } from 'lucide-react';
 
 interface Props {
   children: ReactNode;
@@ -36,26 +38,25 @@ export class ErrorBoundary extends Component<Props, State> {
       return (
         <div className="flex min-h-screen items-center justify-center p-4">
           <div className="w-full max-w-2xl">
-            <Alert
-              message="Erro inesperado"
-              description={
-                <div>
-                  <p className="mb-4">
-                    Desculpe, algo deu errado. Por favor, tente recarregar a página.
-                  </p>
-                  {this.state.error && (
-                    <pre className="mb-4 overflow-auto rounded bg-gray-100 p-2 text-sm">
-                      {this.state.error.message}
-                    </pre>
-                  )}
-                  <Button type="primary" onClick={this.handleReset}>
-                    Tentar Novamente
-                  </Button>
-                </div>
-              }
-              type="error"
-              showIcon
-            />
+            <Alert variant="destructive">
+              <AlertTriangle className="h-5 w-5" />
+              <AlertTitle className="text-lg font-semibold">
+                Erro inesperado
+              </AlertTitle>
+              <AlertDescription className="mt-4 space-y-4">
+                <p>
+                  Desculpe, algo deu errado. Por favor, tente recarregar a página.
+                </p>
+                {this.state.error && (
+                  <pre className="overflow-auto rounded-md bg-muted p-3 text-sm font-mono">
+                    {this.state.error.message}
+                  </pre>
+                )}
+                <Button onClick={this.handleReset} className="mt-4">
+                  Tentar Novamente
+                </Button>
+              </AlertDescription>
+            </Alert>
           </div>
         </div>
       );

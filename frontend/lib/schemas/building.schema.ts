@@ -5,6 +5,7 @@ export const buildingSchema = z.object({
   street_number: z.number().positive('Número deve ser positivo'),
   name: z.string().min(1, 'Nome é obrigatório'),
   address: z.string().min(1, 'Endereço é obrigatório'),
+  created_at: z.string().optional(),
 });
 
 export type Building = z.infer<typeof buildingSchema>;

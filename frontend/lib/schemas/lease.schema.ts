@@ -12,6 +12,7 @@ export const leaseSchema = z.object({
   tenant_ids: z.array(z.number()).optional(),
   start_date: z.string().min(1, 'Data de início é obrigatória'),
   final_date: z.string().optional().nullable(),
+  next_month_date: z.string().optional().nullable(),
   validity_months: z.number().positive('Validade deve ser positiva'),
   due_day: z.number().min(1).max(31, 'Dia de vencimento deve ser entre 1 e 31'),
   rental_value: z
@@ -26,6 +27,10 @@ export const leaseSchema = z.object({
     .string()
     .or(z.number())
     .transform((val) => Number(val)),
+  contract_generated: z.boolean().optional(),
+  contract_signed: z.boolean().optional(),
+  interfone_configured: z.boolean().optional(),
+  warning_count: z.number().optional(),
   number_of_tenants: z.number().optional(),
   pdf_path: z.string().optional().nullable(),
 });

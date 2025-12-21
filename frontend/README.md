@@ -112,7 +112,7 @@ frontend/
 
 ```bash
 # Development server
-npm run dev                    # Starts at http://localhost:3000
+npm run dev                    # Starts at http://localhost:6000
 
 # Build and production
 npm run build                  # Production build (see known issues below)
@@ -139,7 +139,7 @@ npm install
 npm run dev
 ```
 
-Visit `http://localhost:3000` - The application runs successfully in development mode.
+Visit `http://localhost:6000` - The application runs successfully in development mode.
 
 ### Quality Gates
 
