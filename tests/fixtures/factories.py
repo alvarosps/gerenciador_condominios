@@ -24,23 +24,37 @@ Usage:
     apartment = ApartmentFactory(building__street_number=836)
 """
 
+import random
+from datetime import date, timedelta
+from decimal import Decimal
+
 import factory
 from factory.django import DjangoModelFactory
 from faker import Faker
-from decimal import Decimal
-from datetime import date, timedelta
-import random
 
-from core.models import (
-    Building,
-    Furniture,
-    Apartment,
-    Tenant,
-    Dependent,
-    Lease
-)
+from core.models import Apartment, Building, Dependent, Furniture, Lease, Tenant
 
-fake = Faker('pt_BR')
+fake = Faker("pt_BR")
+
+# Pre-validated CPF values that pass Brazilian checksum validation
+# These CPFs are for testing purposes only - all generated using the CPF algorithm
+VALID_CPFS = [
+    "529.982.247-25",
+    "111.444.777-35",
+    "276.685.415-00",
+    "853.513.468-93",
+    "987.654.321-00",
+    "123.456.789-09",
+    "456.123.789-55",
+    "234.567.890-92",
+    "345.678.901-75",
+    "567.890.123-03",
+    "678.901.234-69",
+    "789.012.345-05",
+    "890.123.456-42",
+    "901.234.567-70",
+    "012.345.678-90",
+]
 
 
 class BuildingFactory(DjangoModelFactory):
@@ -57,7 +71,7 @@ class BuildingFactory(DjangoModelFactory):
 
     class Meta:
         model = Building
-        django_get_or_create = ('street_number',)
+        django_get_or_create = ("street_number",)
 
     street_number = factory.Sequence(lambda n: 836 + n)
     name = factory.LazyAttribute(lambda obj: f"Edifício {fake.street_name()}")
@@ -85,25 +99,25 @@ class FurnitureFactory(DjangoModelFactory):
 
     class Meta:
         model = Furniture
-        django_get_or_create = ('name',)
+        django_get_or_create = ("name",)
 
     name = factory.Sequence(
-        lambda n: random.choice([
-            f"Geladeira {n}",
-            f"Fogão {n}",
-            f"Micro-ondas {n}",
-            f"Sofá {n}",
-            f"Cama {n}",
-            f"Guarda-roupa {n}",
-            f"Mesa {n}",
-            f"Cadeira {n}",
-            f"Armário {n}",
-            f"Estante {n}"
-        ])
+        lambda n: random.choice(
+            [
+                f"Geladeira {n}",
+                f"Fogão {n}",
+                f"Micro-ondas {n}",
+                f"Sofá {n}",
+                f"Cama {n}",
+                f"Guarda-roupa {n}",
+                f"Mesa {n}",
+                f"Cadeira {n}",
+                f"Armário {n}",
+                f"Estante {n}",
+            ]
+        )
     )
-    description = factory.LazyAttribute(
-        lambda obj: f"{obj.name} - {fake.sentence(nb_words=6)}"
-    )
+    description = factory.LazyAttribute(lambda obj: f"{obj.name} - {fake.sentence(nb_words=6)}")
 
 
 class ApartmentFactory(DjangoModelFactory):
@@ -135,11 +149,9 @@ class ApartmentFactory(DjangoModelFactory):
     contract_generated = False
     contract_signed = False
     rental_value = factory.LazyAttribute(
-        lambda obj: Decimal(random.choice(['1200.00', '1500.00', '1800.00', '2000.00', '2500.00']))
+        lambda obj: Decimal(random.choice(["1200.00", "1500.00", "1800.00", "2000.00", "2500.00"]))
     )
-    cleaning_fee = factory.LazyAttribute(
-        lambda obj: Decimal(random.choice(['150.00', '200.00', '250.00']))
-    )
+    cleaning_fee = factory.LazyAttribute(lambda obj: Decimal(random.choice(["150.00", "200.00", "250.00"])))
     max_tenants = factory.LazyAttribute(lambda obj: random.choice([1, 2, 3, 4]))
     is_rented = False
     lease_date = None
@@ -194,27 +206,31 @@ class TenantFactory(DjangoModelFactory):
         model = Tenant
 
     name = factory.LazyAttribute(lambda obj: fake.name())
-    cpf_cnpj = factory.Sequence(
-        lambda n: f"{str(n).zfill(3)}.{str(n).zfill(3)}.{str(n).zfill(3)}-{str(n % 100).zfill(2)}"
-    )
+    cpf_cnpj = factory.Sequence(lambda n: VALID_CPFS[n % len(VALID_CPFS)])
     is_company = False
-    rg = factory.Sequence(
-        lambda n: f"{str(n).zfill(2)}.{str(n).zfill(3)}.{str(n).zfill(3)}-{n % 10}"
-    )
-    phone = factory.LazyAttribute(
-        lambda obj: f"(11) 9{random.randint(1000, 9999)}-{random.randint(1000, 9999)}"
-    )
+    rg = factory.Sequence(lambda n: f"{str(n).zfill(2)}.{str(n).zfill(3)}.{str(n).zfill(3)}-{n % 10}")
+    phone = factory.LazyAttribute(lambda obj: f"(11) 9{random.randint(1000, 9999)}-{random.randint(1000, 9999)}")
     marital_status = factory.LazyAttribute(
-        lambda obj: random.choice(['Solteiro(a)', 'Casado(a)', 'Divorciado(a)', 'Viúvo(a)', 'União Estável'])
+        lambda obj: random.choice(["Solteiro(a)", "Casado(a)", "Divorciado(a)", "Viúvo(a)", "União Estável"])
     )
     profession = factory.LazyAttribute(
-        lambda obj: random.choice([
-            'Engenheiro', 'Médico', 'Advogado', 'Professor', 'Desenvolvedor',
-            'Designer', 'Arquiteto', 'Contador', 'Administrador', 'Empresário'
-        ])
+        lambda obj: random.choice(
+            [
+                "Engenheiro",
+                "Médico",
+                "Advogado",
+                "Professor",
+                "Desenvolvedor",
+                "Designer",
+                "Arquiteto",
+                "Contador",
+                "Administrador",
+                "Empresário",
+            ]
+        )
     )
     deposit_amount = factory.LazyAttribute(
-        lambda obj: Decimal(random.choice(['1500.00', '2000.00', '2500.00', '6000.00']))
+        lambda obj: Decimal(random.choice(["1500.00", "2000.00", "2500.00", "6000.00"]))
     )
     cleaning_fee_paid = False
     tag_deposit_paid = False
@@ -234,7 +250,7 @@ class TenantFactory(DjangoModelFactory):
             return
 
         # Handle count parameter
-        count = kwargs.get('count', 0)
+        count = kwargs.get("count", 0)
 
         if extracted:
             if isinstance(extracted, int):
@@ -285,9 +301,7 @@ class DependentFactory(DjangoModelFactory):
 
     tenant = factory.SubFactory(TenantFactory)
     name = factory.LazyAttribute(lambda obj: fake.name())
-    phone = factory.LazyAttribute(
-        lambda obj: f"(11) 9{random.randint(1000, 9999)}-{random.randint(1000, 9999)}"
-    )
+    phone = factory.LazyAttribute(lambda obj: f"(11) 9{random.randint(1000, 9999)}-{random.randint(1000, 9999)}")
 
 
 class LeaseFactory(DjangoModelFactory):
@@ -327,12 +341,10 @@ class LeaseFactory(DjangoModelFactory):
     validity_months = factory.LazyAttribute(lambda obj: random.choice([6, 12, 18, 24]))
     due_day = factory.LazyAttribute(lambda obj: random.choice([5, 10, 15, 20, 25]))
     rental_value = factory.LazyAttribute(
-        lambda obj: obj.apartment.rental_value if obj.apartment else Decimal('1500.00')
+        lambda obj: obj.apartment.rental_value if obj.apartment else Decimal("1500.00")
     )
-    cleaning_fee = factory.LazyAttribute(
-        lambda obj: obj.apartment.cleaning_fee if obj.apartment else Decimal('200.00')
-    )
-    tag_fee = Decimal('50.00')  # Will be recalculated in post_generation
+    cleaning_fee = factory.LazyAttribute(lambda obj: obj.apartment.cleaning_fee if obj.apartment else Decimal("200.00"))
+    tag_fee = Decimal("50.00")  # Will be recalculated in post_generation
     contract_generated = False
     contract_signed = False
     interfone_configured = False
@@ -359,7 +371,7 @@ class LeaseFactory(DjangoModelFactory):
         self.tenants.add(self.responsible_tenant)
 
         # Handle count parameter
-        count = kwargs.get('count', 0)
+        count = kwargs.get("count", 0)
 
         if extracted:
             if isinstance(extracted, int):
@@ -371,7 +383,7 @@ class LeaseFactory(DjangoModelFactory):
                 # Update number_of_tenants and tag_fee
                 tenant_count = self.tenants.count()
                 self.number_of_tenants = tenant_count
-                self.tag_fee = Decimal('50.00') if tenant_count == 1 else Decimal('80.00')
+                self.tag_fee = Decimal("50.00") if tenant_count == 1 else Decimal("80.00")
                 self.save()
                 return
 
@@ -384,17 +396,15 @@ class LeaseFactory(DjangoModelFactory):
         # Update number_of_tenants and tag_fee based on actual count
         tenant_count = self.tenants.count()
         self.number_of_tenants = tenant_count
-        self.tag_fee = Decimal('50.00') if tenant_count == 1 else Decimal('80.00')
+        self.tag_fee = Decimal("50.00") if tenant_count == 1 else Decimal("80.00")
         self.save()
 
 
 # Convenience functions for creating common test scenarios
 
+
 def create_full_lease_scenario(
-    num_tenants=1,
-    num_dependents_per_tenant=0,
-    apartment_furniture_count=5,
-    tenant_furniture_count=2
+    num_tenants=1, num_dependents_per_tenant=0, apartment_furniture_count=5, tenant_furniture_count=2
 ):
     """
     Creates a complete lease scenario with all related objects.
@@ -422,36 +432,22 @@ def create_full_lease_scenario(
         >>> assert lease.responsible_tenant.dependents.count() == 1
     """
     # Create building and apartment with furniture
-    apartment = ApartmentFactory(
-        furnitures=FurnitureFactory.create_batch(apartment_furniture_count)
-    )
+    apartment = ApartmentFactory(furnitures=FurnitureFactory.create_batch(apartment_furniture_count))
 
     # Create responsible tenant with dependents and furniture
     responsible_tenant = TenantFactory(
-        dependents__count=num_dependents_per_tenant,
-        furnitures=FurnitureFactory.create_batch(tenant_furniture_count)
+        dependents__count=num_dependents_per_tenant, furnitures=FurnitureFactory.create_batch(tenant_furniture_count)
     )
 
     # Create lease
     if num_tenants == 1:
-        lease = LeaseFactory(
-            apartment=apartment,
-            responsible_tenant=responsible_tenant,
-            tenants=[responsible_tenant]
-        )
+        lease = LeaseFactory(apartment=apartment, responsible_tenant=responsible_tenant, tenants=[responsible_tenant])
     else:
         # Create additional tenants
-        additional_tenants = TenantFactory.create_batch(
-            num_tenants - 1,
-            dependents__count=num_dependents_per_tenant
-        )
+        additional_tenants = TenantFactory.create_batch(num_tenants - 1, dependents__count=num_dependents_per_tenant)
         all_tenants = [responsible_tenant] + additional_tenants
 
-        lease = LeaseFactory(
-            apartment=apartment,
-            responsible_tenant=responsible_tenant,
-            tenants=all_tenants
-        )
+        lease = LeaseFactory(apartment=apartment, responsible_tenant=responsible_tenant, tenants=all_tenants)
 
     return lease
 

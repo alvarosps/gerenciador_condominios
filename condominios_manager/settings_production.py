@@ -5,9 +5,24 @@ This file extends the base settings with production-specific configuration.
 Use this by setting: DJANGO_SETTINGS_MODULE=condominios_manager.settings_production
 """
 
-from .settings import *  # noqa
+from datetime import timedelta
+
 import sentry_sdk
+from decouple import config
 from sentry_sdk.integrations.django import DjangoIntegration
+
+from .settings import *  # noqa: F401,F403
+from .settings import (  # noqa: F401
+    ALLOWED_HOSTS,
+    BASE_DIR,
+    CACHES,
+    DATABASES,
+    MIDDLEWARE,
+    REST_FRAMEWORK,
+    SIMPLE_JWT,
+    SPECTACULAR_SETTINGS,
+    TEMPLATES,
+)
 
 # ============================================================
 # SECURITY SETTINGS
@@ -25,29 +40,29 @@ SECURE_HSTS_PRELOAD = config("SECURE_HSTS_PRELOAD", default=True, cast=bool)
 # Cookie security
 SESSION_COOKIE_SECURE = True
 SESSION_COOKIE_HTTPONLY = True
-SESSION_COOKIE_SAMESITE = 'Lax'
+SESSION_COOKIE_SAMESITE = "Lax"
 CSRF_COOKIE_SECURE = True
 CSRF_COOKIE_HTTPONLY = True
-CSRF_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_SAMESITE = "Lax"
 
 # Content Security Policy
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_BROWSER_XSS_FILTER = True
-X_FRAME_OPTIONS = 'DENY'
+X_FRAME_OPTIONS = "DENY"
 
 # ============================================================
 # STATIC & MEDIA FILES
 # ============================================================
 
-STATIC_ROOT = BASE_DIR / 'staticfiles'
-STATIC_URL = '/static/'
+STATIC_ROOT = BASE_DIR / "staticfiles"
+STATIC_URL = "/static/"
 
-MEDIA_ROOT = BASE_DIR / 'media'
-MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / "media"
+MEDIA_URL = "/media/"
 
 # Use WhiteNoise for static file serving
-MIDDLEWARE.insert(1, 'whitenoise.middleware.WhiteNoiseMiddleware')  # noqa
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+MIDDLEWARE.insert(1, "whitenoise.middleware.WhiteNoiseMiddleware")  # noqa
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 # Optional: AWS S3 for media files
 USE_S3 = config("USE_S3", default=False, cast=bool)
@@ -59,12 +74,12 @@ if USE_S3:
     AWS_S3_REGION_NAME = config("AWS_S3_REGION_NAME", default="us-east-1")
     AWS_S3_CUSTOM_DOMAIN = f"{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com"
     AWS_S3_OBJECT_PARAMETERS = {
-        'CacheControl': 'max-age=86400',
+        "CacheControl": "max-age=86400",
     }
-    AWS_DEFAULT_ACL = 'public-read'
+    AWS_DEFAULT_ACL = "public-read"
 
     # S3 Media Settings
-    DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+    DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
     MEDIA_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/media/"
 
 # ============================================================
@@ -75,20 +90,17 @@ if USE_S3:
 # DATABASES['default']['ENGINE'] = 'django_db_geventpool.backends.postgresql_psycopg2'
 
 # Database connection pooling
-DATABASES['default']['CONN_MAX_AGE'] = 600  # 10 minutes
-DATABASES['default']['OPTIONS'] = {
-    'connect_timeout': 10,
-    'options': '-c statement_timeout=30000',  # 30 seconds
+DATABASES["default"]["CONN_MAX_AGE"] = 600  # 10 minutes
+DATABASES["default"]["OPTIONS"] = {
+    "connect_timeout": 10,
+    "options": "-c statement_timeout=30000",  # 30 seconds
 }
 
 # ============================================================
 # EMAIL CONFIGURATION
 # ============================================================
 
-EMAIL_BACKEND = config(
-    "EMAIL_BACKEND",
-    default="django.core.mail.backends.smtp.EmailBackend"
-)
+EMAIL_BACKEND = config("EMAIL_BACKEND", default="django.core.mail.backends.smtp.EmailBackend")
 EMAIL_HOST = config("EMAIL_HOST", default="smtp.gmail.com")
 EMAIL_PORT = config("EMAIL_PORT", default=587, cast=int)
 EMAIL_USE_TLS = config("EMAIL_USE_TLS", default=True, cast=bool)
@@ -99,7 +111,7 @@ SERVER_EMAIL = config("SERVER_EMAIL", default=DEFAULT_FROM_EMAIL)
 
 # Admin email for error notifications
 ADMINS = [
-    ('Admin', config("ADMIN_EMAIL", default="admin@yourdomain.com")),
+    ("Admin", config("ADMIN_EMAIL", default="admin@yourdomain.com")),
 ]
 MANAGERS = ADMINS
 
@@ -108,74 +120,74 @@ MANAGERS = ADMINS
 # ============================================================
 
 LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'formatters': {
-        'verbose': {
-            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
-            'style': '{',
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "verbose": {
+            "format": "{levelname} {asctime} {module} {process:d} {thread:d} {message}",
+            "style": "{",
         },
-        'json': {
-            '()': 'pythonjsonlogger.jsonlogger.JsonFormatter',
-            'format': '%(asctime)s %(name)s %(levelname)s %(message)s'
-        },
-    },
-    'filters': {
-        'require_debug_false': {
-            '()': 'django.utils.log.RequireDebugFalse',
+        "json": {
+            "()": "pythonjsonlogger.jsonlogger.JsonFormatter",
+            "format": "%(asctime)s %(name)s %(levelname)s %(message)s",
         },
     },
-    'handlers': {
-        'console': {
-            'class': 'logging.StreamHandler',
-            'formatter': 'verbose',
-        },
-        'file': {
-            'level': 'INFO',
-            'class': 'logging.handlers.RotatingFileHandler',
-            'filename': BASE_DIR / 'logs' / 'production.log',
-            'maxBytes': 1024 * 1024 * 10,  # 10 MB
-            'backupCount': 10,
-            'formatter': 'verbose',
-        },
-        'error_file': {
-            'level': 'ERROR',
-            'class': 'logging.handlers.RotatingFileHandler',
-            'filename': BASE_DIR / 'logs' / 'errors.log',
-            'maxBytes': 1024 * 1024 * 10,  # 10 MB
-            'backupCount': 10,
-            'formatter': 'verbose',
-        },
-        'mail_admins': {
-            'level': 'ERROR',
-            'class': 'django.utils.log.AdminEmailHandler',
-            'filters': ['require_debug_false'],
+    "filters": {
+        "require_debug_false": {
+            "()": "django.utils.log.RequireDebugFalse",
         },
     },
-    'root': {
-        'handlers': ['console', 'file'],
-        'level': 'INFO',
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "verbose",
+        },
+        "file": {
+            "level": "INFO",
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": BASE_DIR / "logs" / "production.log",
+            "maxBytes": 1024 * 1024 * 10,  # 10 MB
+            "backupCount": 10,
+            "formatter": "verbose",
+        },
+        "error_file": {
+            "level": "ERROR",
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": BASE_DIR / "logs" / "errors.log",
+            "maxBytes": 1024 * 1024 * 10,  # 10 MB
+            "backupCount": 10,
+            "formatter": "verbose",
+        },
+        "mail_admins": {
+            "level": "ERROR",
+            "class": "django.utils.log.AdminEmailHandler",
+            "filters": ["require_debug_false"],
+        },
     },
-    'loggers': {
-        'django': {
-            'handlers': ['console', 'file', 'error_file'],
-            'level': 'INFO',
-            'propagate': False,
+    "root": {
+        "handlers": ["console", "file"],
+        "level": "INFO",
+    },
+    "loggers": {
+        "django": {
+            "handlers": ["console", "file", "error_file"],
+            "level": "INFO",
+            "propagate": False,
         },
-        'django.request': {
-            'handlers': ['error_file', 'mail_admins'],
-            'level': 'ERROR',
-            'propagate': False,
+        "django.request": {
+            "handlers": ["error_file", "mail_admins"],
+            "level": "ERROR",
+            "propagate": False,
         },
-        'django.security': {
-            'handlers': ['error_file', 'mail_admins'],
-            'level': 'ERROR',
-            'propagate': False,
+        "django.security": {
+            "handlers": ["error_file", "mail_admins"],
+            "level": "ERROR",
+            "propagate": False,
         },
-        'core': {
-            'handlers': ['console', 'file', 'error_file'],
-            'level': 'INFO',
-            'propagate': False,
+        "core": {
+            "handlers": ["console", "file", "error_file"],
+            "level": "INFO",
+            "propagate": False,
         },
     },
 }
@@ -200,7 +212,7 @@ if SENTRY_DSN:
 # ============================================================
 
 # Increase cache timeout for production
-CACHES['default']['TIMEOUT'] = 900  # 15 minutes
+CACHES["default"]["TIMEOUT"] = 900  # 15 minutes
 CACHE_MIDDLEWARE_SECONDS = 900
 
 # ============================================================
@@ -211,11 +223,14 @@ CACHE_MIDDLEWARE_SECONDS = 900
 CONN_MAX_AGE = 600
 
 # Template caching
-TEMPLATES[0]['OPTIONS']['loaders'] = [
-    ('django.template.loaders.cached.Loader', [
-        'django.template.loaders.filesystem.Loader',
-        'django.template.loaders.app_directories.Loader',
-    ]),
+TEMPLATES[0]["OPTIONS"]["loaders"] = [
+    (
+        "django.template.loaders.cached.Loader",
+        [
+            "django.template.loaders.filesystem.Loader",
+            "django.template.loaders.app_directories.Loader",
+        ],
+    ),
 ]
 
 # ============================================================
@@ -230,8 +245,8 @@ CORS_ALLOW_ALL_ORIGINS = False
 # REST FRAMEWORK (Production)
 # ============================================================
 
-REST_FRAMEWORK['DEFAULT_RENDERER_CLASSES'] = [
-    'rest_framework.renderers.JSONRenderer',
+REST_FRAMEWORK["DEFAULT_RENDERER_CLASSES"] = [
+    "rest_framework.renderers.JSONRenderer",
     # Remove BrowsableAPIRenderer in production for security
 ]
 
@@ -239,7 +254,7 @@ REST_FRAMEWORK['DEFAULT_RENDERER_CLASSES'] = [
 # SPECTACULAR SETTINGS (Production API Docs)
 # ============================================================
 
-SPECTACULAR_SETTINGS['SERVERS'] = [
+SPECTACULAR_SETTINGS["SERVERS"] = [
     {"url": f"https://{ALLOWED_HOSTS[0]}", "description": "Production server"},
     {"url": f"https://{ALLOWED_HOSTS[0]}/api", "description": "Production API base"},
 ]
@@ -249,12 +264,14 @@ SPECTACULAR_SETTINGS['SERVERS'] = [
 # ============================================================
 
 # Disable browsable API in production
-REST_FRAMEWORK['DEFAULT_RENDERER_CLASSES'] = [
-    'rest_framework.renderers.JSONRenderer',
+REST_FRAMEWORK["DEFAULT_RENDERER_CLASSES"] = [
+    "rest_framework.renderers.JSONRenderer",
 ]
 
 # Increase JWT token security
-SIMPLE_JWT.update({
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=15),  # Shorter in production
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
-})
+SIMPLE_JWT.update(
+    {
+        "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),  # Shorter in production
+        "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+    }
+)

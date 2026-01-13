@@ -9,6 +9,10 @@
 
 # testing
 /coverage
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
 
 # next.js
 /.next/
@@ -51,6 +55,7 @@ env/
 
 # Django
 *.log
+logs/
 db.sqlite3
 db.sqlite3-journal
 /static/
@@ -69,6 +74,7 @@ docs/
 # IDE
 .vscode/
 .idea/
+.claude/
 *.swp
 *.swo
 *~

@@ -13,8 +13,7 @@ import {
 import { useRouter } from 'next/navigation';
 import { useDebounce } from '@/lib/hooks/use-debounce';
 import { apiClient } from '@/lib/api/client';
-import { formatCurrency } from '@/lib/utils/formatters';
-import { formatCPFOrCNPJ, formatBrazilianPhone } from '@/lib/utils/validators';
+import { formatCurrency, formatCPFOrCNPJ, formatBrazilianPhone } from '@/lib/utils/formatters';
 import { Building } from '@/lib/schemas/building.schema';
 import { Apartment } from '@/lib/schemas/apartment.schema';
 import { Tenant } from '@/lib/schemas/tenant.schema';

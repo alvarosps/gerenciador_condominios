@@ -5,20 +5,35 @@ This module provides shared fixtures and configuration for all tests.
 """
 
 import os
-import pytest
-from decimal import Decimal
 from datetime import date, timedelta
+from decimal import Decimal
 from typing import Any, Dict
 
 from django.conf import settings
 from django.core.management import call_command
 from rest_framework.test import APIClient
 
+import pytest
+
 # Ensure test settings are applied
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'condominios_manager.settings')
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "condominios_manager.settings")
 
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope="session", autouse=True)
+def configure_test_cache():
+    """
+    Use in-memory cache for tests instead of Redis.
+    This eliminates Redis connection errors and makes tests faster.
+    """
+    settings.CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "condominios-test-cache",
+        }
+    }
+
+
+@pytest.fixture(scope="session")
 def django_db_setup(django_db_setup, django_db_blocker):
     """
     Custom database setup for test session.
@@ -26,7 +41,7 @@ def django_db_setup(django_db_setup, django_db_blocker):
     """
     with django_db_blocker.unblock():
         # Run migrations
-        call_command('migrate', '--noinput')
+        call_command("migrate", "--noinput")
     yield
     # Cleanup is handled automatically by pytest-django
 
@@ -50,12 +65,12 @@ def admin_user(django_user_model):
     Creates a test admin user with staff and superuser privileges.
     """
     return django_user_model.objects.create_user(
-        username='admin',
-        email='admin@test.com',
-        password='testpass123',
+        username="admin",
+        email="admin@test.com",
+        password="testpass123",
         is_staff=True,
         is_superuser=True,
-        is_active=True
+        is_active=True,
     )
 
 
@@ -65,12 +80,12 @@ def regular_user(django_user_model):
     Creates a test regular user without admin privileges.
     """
     return django_user_model.objects.create_user(
-        username='user',
-        email='user@test.com',
-        password='testpass123',
+        username="user",
+        email="user@test.com",
+        password="testpass123",
         is_staff=False,
         is_superuser=False,
-        is_active=True
+        is_active=True,
     )
 
 
@@ -126,7 +141,7 @@ def mock_pdf_output_dir(tmp_path, monkeypatch):
     """
     pdf_dir = tmp_path / "test_contracts"
     pdf_dir.mkdir(exist_ok=True)
-    monkeypatch.setattr(settings, 'PDF_OUTPUT_DIR', str(pdf_dir))
+    monkeypatch.setattr(settings, "PDF_OUTPUT_DIR", str(pdf_dir))
     return pdf_dir
 
 
@@ -139,11 +154,7 @@ def mock_chrome_path(monkeypatch):
         def test_pdf_config(mock_chrome_path):
             assert settings.CHROME_EXECUTABLE_PATH == 'mock_chrome'
     """
-    monkeypatch.setattr(
-        settings,
-        'CHROME_EXECUTABLE_PATH',
-        'mock_chrome'
-    )
+    monkeypatch.setattr(settings, "CHROME_EXECUTABLE_PATH", "mock_chrome")
 
 
 @pytest.fixture
@@ -159,7 +170,7 @@ def mock_pdf_generation(mocker, mock_pdf_output_dir):
     """
     # Mock asyncio.run to prevent actual pyppeteer execution
     # The mock will allow the code to run but skip the async PDF generation
-    mock_run = mocker.patch('core.views.asyncio.run')
+    mock_run = mocker.patch("core.views.asyncio.run")
     mock_run.return_value = None  # Simulate successful PDF generation
 
     return mock_run
@@ -173,11 +184,7 @@ def sample_building_data() -> Dict[str, Any]:
     Returns:
         Dict containing valid building data
     """
-    return {
-        'street_number': 836,
-        'name': 'Edifício Teste',
-        'address': 'Rua Teste, 836 - Bairro Teste'
-    }
+    return {"street_number": 836, "name": "Edifício Teste", "address": "Rua Teste, 836 - Bairro Teste"}
 
 
 @pytest.fixture
@@ -190,16 +197,16 @@ def sample_apartment_data() -> Dict[str, Any]:
         Dict containing valid apartment data
     """
     return {
-        'number': 101,
-        'interfone_configured': False,
-        'contract_generated': False,
-        'contract_signed': False,
-        'rental_value': Decimal('1500.00'),
-        'cleaning_fee': Decimal('200.00'),
-        'max_tenants': 2,
-        'is_rented': False,
-        'lease_date': None,
-        'last_rent_increase_date': None
+        "number": 101,
+        "interfone_configured": False,
+        "contract_generated": False,
+        "contract_signed": False,
+        "rental_value": Decimal("1500.00"),
+        "cleaning_fee": Decimal("200.00"),
+        "max_tenants": 2,
+        "is_rented": False,
+        "lease_date": None,
+        "last_rent_increase_date": None,
     }
 
 
@@ -211,10 +218,7 @@ def sample_furniture_data() -> Dict[str, Any]:
     Returns:
         Dict containing valid furniture data
     """
-    return {
-        'name': 'Geladeira',
-        'description': 'Geladeira Frost Free 300L'
-    }
+    return {"name": "Geladeira", "description": "Geladeira Frost Free 300L"}
 
 
 @pytest.fixture
@@ -226,17 +230,17 @@ def sample_tenant_data() -> Dict[str, Any]:
         Dict containing valid tenant data
     """
     return {
-        'name': 'João da Silva',
-        'cpf_cnpj': '123.456.789-00',
-        'is_company': False,
-        'rg': '12.345.678-9',
-        'phone': '(11) 98765-4321',
-        'marital_status': 'Casado',
-        'profession': 'Engenheiro',
-        'deposit_amount': Decimal('1500.00'),
-        'cleaning_fee_paid': False,
-        'tag_deposit_paid': False,
-        'rent_due_day': 10
+        "name": "João da Silva",
+        "cpf_cnpj": "529.982.247-25",  # Valid CPF that passes checksum validation
+        "is_company": False,
+        "rg": "12.345.678-9",
+        "phone": "(11) 98765-4321",
+        "marital_status": "Casado(a)",
+        "profession": "Engenheiro",
+        "deposit_amount": Decimal("1500.00"),
+        "cleaning_fee_paid": False,
+        "tag_deposit_paid": False,
+        "rent_due_day": 10,
     }
 
 
@@ -248,10 +252,7 @@ def sample_dependent_data() -> Dict[str, Any]:
     Returns:
         Dict containing valid dependent data
     """
-    return {
-        'name': 'Maria da Silva',
-        'phone': '(11) 91234-5678'
-    }
+    return {"name": "Maria da Silva", "phone": "(11) 91234-5678"}
 
 
 @pytest.fixture
@@ -264,17 +265,17 @@ def sample_lease_data() -> Dict[str, Any]:
         Dict containing valid lease data
     """
     return {
-        'start_date': date.today(),
-        'validity_months': 12,
-        'due_day': 10,
-        'rental_value': Decimal('1500.00'),
-        'cleaning_fee': Decimal('200.00'),
-        'tag_fee': Decimal('80.00'),
-        'contract_generated': False,
-        'contract_signed': False,
-        'interfone_configured': False,
-        'warning_count': 0,
-        'number_of_tenants': 1
+        "start_date": date.today(),
+        "validity_months": 12,
+        "due_day": 10,
+        "rental_value": Decimal("1500.00"),
+        "cleaning_fee": Decimal("200.00"),
+        "tag_fee": Decimal("80.00"),
+        "contract_generated": False,
+        "contract_signed": False,
+        "interfone_configured": False,
+        "warning_count": 0,
+        "number_of_tenants": 1,
     }
 
 
@@ -301,6 +302,7 @@ def freeze_time():
                 pass
     """
     from freezegun import freeze_time as _freeze_time
+
     return _freeze_time
 
 
@@ -316,11 +318,12 @@ def settings_override():
                 pass
     """
     from django.test import override_settings
+
     return override_settings
 
 
 # Performance fixtures
-@pytest.fixture(scope='session')
+@pytest.fixture(scope="session")
 def django_db_keepdb():
     """
     Keep database between test runs for faster execution.
@@ -334,36 +337,16 @@ def pytest_configure(config):
     """
     Register custom markers to avoid warnings.
     """
-    config.addinivalue_line(
-        "markers", "unit: Unit tests (fast, isolated)"
-    )
-    config.addinivalue_line(
-        "markers", "integration: Integration tests (API, database)"
-    )
-    config.addinivalue_line(
-        "markers", "slow: Slow tests (PDF generation, external services)"
-    )
-    config.addinivalue_line(
-        "markers", "pdf: PDF generation tests (require Chrome/Chromium)"
-    )
-    config.addinivalue_line(
-        "markers", "model: Model layer tests"
-    )
-    config.addinivalue_line(
-        "markers", "serializer: Serializer tests"
-    )
-    config.addinivalue_line(
-        "markers", "view: View/API endpoint tests"
-    )
-    config.addinivalue_line(
-        "markers", "util: Utility function tests"
-    )
-    config.addinivalue_line(
-        "markers", "factory: Factory/fixture tests"
-    )
-    config.addinivalue_line(
-        "markers", "infrastructure: Infrastructure abstraction tests (PDF generators, storage)"
-    )
+    config.addinivalue_line("markers", "unit: Unit tests (fast, isolated)")
+    config.addinivalue_line("markers", "integration: Integration tests (API, database)")
+    config.addinivalue_line("markers", "slow: Slow tests (PDF generation, external services)")
+    config.addinivalue_line("markers", "pdf: PDF generation tests (require Chrome/Chromium)")
+    config.addinivalue_line("markers", "model: Model layer tests")
+    config.addinivalue_line("markers", "serializer: Serializer tests")
+    config.addinivalue_line("markers", "view: View/API endpoint tests")
+    config.addinivalue_line("markers", "util: Utility function tests")
+    config.addinivalue_line("markers", "factory: Factory/fixture tests")
+    config.addinivalue_line("markers", "infrastructure: Infrastructure abstraction tests (PDF generators, storage)")
 
 
 def pytest_collection_modifyitems(config, items):

@@ -10,25 +10,23 @@ Handles all business logic related to contract generation including:
 - PDF generation via IPDFGenerator (supports multiple engines)
 - File storage via IDocumentStorage (supports filesystem and cloud)
 """
+
 from __future__ import annotations
 
-import asyncio
 import logging
 import os
+import warnings
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from django.conf import settings
+from django.db import transaction
 
+from asgiref.sync import async_to_sync
 from jinja2 import Environment, FileSystemLoader
 
 from core.contract_rules import regras_condominio
-from core.infrastructure import (
-    FileSystemDocumentStorage,
-    IDocumentStorage,
-    IPDFGenerator,
-    PyppeteerPDFGenerator,
-)
+from core.infrastructure import FileSystemDocumentStorage, IDocumentStorage, IPDFGenerator, PyppeteerPDFGenerator
 from core.models import Furniture, Lease
 from core.utils import format_currency, number_to_words
 
@@ -109,7 +107,8 @@ class ContractService:
         """
         Calculate furniture list for the lease.
 
-        Lease furniture = Apartment furniture - Responsible tenant's furniture
+        Lease furniture = Apartment furniture - ALL tenants' furniture
+        (subtracts furniture from all tenants, not just the responsible tenant)
 
         Args:
             lease: The lease object
@@ -123,12 +122,17 @@ class ContractService:
             >>> print(f"Lease includes {len(furniture)} furniture items")
         """
         apt_furniture = set(lease.apartment.furnitures.all())
-        tenant_furniture = set(lease.responsible_tenant.furnitures.all())
-        lease_furnitures = list(apt_furniture - tenant_furniture)
+
+        # Collect furniture from ALL tenants, not just responsible tenant
+        all_tenant_furniture = set()
+        for tenant in lease.tenants.all():
+            all_tenant_furniture.update(tenant.furnitures.all())
+
+        lease_furnitures = list(apt_furniture - all_tenant_furniture)
 
         logger.debug(
             f"Lease {lease.id}: {len(lease_furnitures)} furniture items "
-            f"({len(apt_furniture)} apt - {len(tenant_furniture)} tenant)"
+            f"({len(apt_furniture)} apt - {len(all_tenant_furniture)} all tenants)"
         )
 
         return lease_furnitures
@@ -243,14 +247,10 @@ class ContractService:
             >>> print(path)  # 'C:/path/contracts/836/contract_apto_101_1.pdf'
         """
         base_dir = settings.BASE_DIR
-        contracts_dir = os.path.join(
-            base_dir, settings.PDF_OUTPUT_DIR, str(lease.apartment.building.street_number)
-        )
+        contracts_dir = os.path.join(base_dir, settings.PDF_OUTPUT_DIR, str(lease.apartment.building.street_number))
         os.makedirs(contracts_dir, exist_ok=True)
 
-        pdf_path = os.path.join(
-            contracts_dir, f"contract_apto_{lease.apartment.number}_{lease.id}.pdf"
-        )
+        pdf_path = os.path.join(contracts_dir, f"contract_apto_{lease.apartment.number}_{lease.id}.pdf")
 
         logger.debug(f"PDF path for lease {lease.id}: {pdf_path}")
         return pdf_path
@@ -315,9 +315,7 @@ class ContractService:
 
         try:
             # Generate PDF using IPDFGenerator
-            await self.pdf_generator.generate_pdf(
-                html_content=html_content, output_path=temp_pdf_path, options=None
-            )
+            await self.pdf_generator.generate_pdf(html_content=html_content, output_path=temp_pdf_path, options=None)
 
             # Read PDF content
             pdf_content = Path(temp_pdf_path).read_bytes()
@@ -456,14 +454,15 @@ class ContractService:
         # Calculate relative path
         relative_path = self.get_contract_relative_path(lease)
 
-        # Generate and store PDF (async operation)
-        stored_path = asyncio.run(
-            self.generate_pdf_with_infrastructure(html_content, relative_path)
-        )
+        # Generate and store PDF (async operation using async_to_sync for ASGI compatibility)
+        generate_pdf_sync = async_to_sync(self.generate_pdf_with_infrastructure)
+        stored_path = generate_pdf_sync(html_content, relative_path)
 
-        # Update lease status
-        lease.contract_generated = True
-        lease.save()
+        # Update lease status atomically
+        with transaction.atomic():
+            lease.refresh_from_db()
+            lease.contract_generated = True
+            lease.save(update_fields=["contract_generated"])
 
         logger.info(f"Contract generation complete for lease {lease.id}: {stored_path}")
         return stored_path
@@ -499,6 +498,14 @@ class ContractService:
             >>> assert os.path.exists(pdf_path)
             >>> assert lease.contract_generated is True
         """
+        # Emit deprecation warning
+        warnings.warn(
+            "ContractService.generate_contract() is deprecated. "
+            "Use ContractService().generate_contract_with_infrastructure() instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
         logger.info(f"Starting contract generation for lease {lease.id} (legacy mode)")
 
         # Prepare context
@@ -510,12 +517,15 @@ class ContractService:
         # Calculate output path
         pdf_path = ContractService.get_contract_pdf_path(lease)
 
-        # Generate PDF (async operation wrapped in asyncio.run)
-        asyncio.run(ContractService.generate_pdf_from_html(html_content, pdf_path, lease.id))
+        # Generate PDF (async operation using async_to_sync for ASGI compatibility)
+        generate_pdf_sync = async_to_sync(ContractService.generate_pdf_from_html)
+        generate_pdf_sync(html_content, pdf_path, lease.id)
 
-        # Update lease status
-        lease.contract_generated = True
-        lease.save()
+        # Update lease status atomically
+        with transaction.atomic():
+            lease.refresh_from_db()
+            lease.contract_generated = True
+            lease.save(update_fields=["contract_generated"])
 
         logger.info(f"Contract generation complete for lease {lease.id}")
         return pdf_path

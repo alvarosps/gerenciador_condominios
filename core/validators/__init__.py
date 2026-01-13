@@ -4,6 +4,7 @@ Validators package for Condomínios Manager.
 This package provides validators for Brazilian-specific data formats
 and model-level validation logic.
 """
+
 from .brazilian import (
     BrazilianPhoneValidator,
     CNPJValidator,

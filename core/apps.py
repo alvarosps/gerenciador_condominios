@@ -17,7 +17,7 @@ class CoreConfig(AppConfig):
         """
         try:
             # Import signals to register them
-            from . import signals
+            from . import signals  # noqa: F401
 
             logger.info("Core app signals registered successfully")
         except Exception as e:

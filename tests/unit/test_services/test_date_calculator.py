@@ -3,8 +3,10 @@ Unit tests for DateCalculatorService.
 
 Tests all date calculation business logic in isolation, including leap year edge cases.
 """
-import pytest
+
 from datetime import date
+
+import pytest
 
 from core.services.date_calculator import DateCalculatorService
 
@@ -53,23 +55,17 @@ class TestCalculateFinalDate:
 
     def test_final_date_regular_case(self):
         """Test final date calculation for regular case."""
-        result = DateCalculatorService.calculate_final_date(
-            date(2025, 1, 15), 12
-        )
+        result = DateCalculatorService.calculate_final_date(date(2025, 1, 15), 12)
         assert result == date(2026, 1, 15)
 
     def test_final_date_6_months(self):
         """Test final date calculation for 6 months."""
-        result = DateCalculatorService.calculate_final_date(
-            date(2025, 1, 15), 6
-        )
+        result = DateCalculatorService.calculate_final_date(date(2025, 1, 15), 6)
         assert result == date(2025, 7, 15)
 
     def test_final_date_24_months(self):
         """Test final date calculation for 24 months."""
-        result = DateCalculatorService.calculate_final_date(
-            date(2025, 1, 15), 24
-        )
+        result = DateCalculatorService.calculate_final_date(date(2025, 1, 15), 24)
         assert result == date(2027, 1, 15)
 
     def test_final_date_leap_year_edge_case(self):
@@ -77,47 +73,35 @@ class TestCalculateFinalDate:
         # Start on Feb 29, 2024 (leap year)
         # 12 months later would be Feb 29, 2025, but 2025 is not a leap year
         # So it becomes Feb 28, 2025, and we adjust to March 1, 2025
-        result = DateCalculatorService.calculate_final_date(
-            date(2024, 2, 29), 12
-        )
+        result = DateCalculatorService.calculate_final_date(date(2024, 2, 29), 12)
         assert result == date(2025, 3, 1)
 
     def test_final_date_leap_year_to_leap_year(self):
         """Test final date from leap year to leap year."""
         # Feb 29, 2024 + 48 months = Feb 29, 2028 (both leap years)
-        result = DateCalculatorService.calculate_final_date(
-            date(2024, 2, 29), 48
-        )
+        result = DateCalculatorService.calculate_final_date(date(2024, 2, 29), 48)
         assert result == date(2028, 2, 29)
 
     def test_final_date_leap_year_24_months(self):
         """Test final date for 24 months from leap year."""
         # Feb 29, 2024 + 24 months = Feb 29, 2026
         # But 2026 is not leap year, so -> Feb 28, 2026 -> March 1, 2026
-        result = DateCalculatorService.calculate_final_date(
-            date(2024, 2, 29), 24
-        )
+        result = DateCalculatorService.calculate_final_date(date(2024, 2, 29), 24)
         assert result == date(2026, 3, 1)
 
     def test_final_date_month_end_to_month_end(self):
         """Test final date from month end to month end."""
-        result = DateCalculatorService.calculate_final_date(
-            date(2025, 1, 31), 12
-        )
+        result = DateCalculatorService.calculate_final_date(date(2025, 1, 31), 12)
         assert result == date(2026, 1, 31)
 
     def test_final_date_short_lease(self):
         """Test final date for short lease (1 month)."""
-        result = DateCalculatorService.calculate_final_date(
-            date(2025, 1, 15), 1
-        )
+        result = DateCalculatorService.calculate_final_date(date(2025, 1, 15), 1)
         assert result == date(2025, 2, 15)
 
     def test_final_date_long_lease(self):
         """Test final date for long lease (36 months)."""
-        result = DateCalculatorService.calculate_final_date(
-            date(2025, 1, 15), 36
-        )
+        result = DateCalculatorService.calculate_final_date(date(2025, 1, 15), 36)
         assert result == date(2028, 1, 15)
 
 
@@ -126,36 +110,30 @@ class TestCalculateLeaseDates:
 
     def test_lease_dates_standard(self):
         """Test complete lease dates calculation."""
-        result = DateCalculatorService.calculate_lease_dates(
-            date(2025, 1, 15), 12
-        )
+        result = DateCalculatorService.calculate_lease_dates(date(2025, 1, 15), 12)
 
-        assert result['start_date'] == date(2025, 1, 15)
-        assert result['next_month_date'] == date(2025, 2, 15)
-        assert result['final_date'] == date(2026, 1, 15)
-        assert result['validity_months'] == 12
+        assert result["start_date"] == date(2025, 1, 15)
+        assert result["next_month_date"] == date(2025, 2, 15)
+        assert result["final_date"] == date(2026, 1, 15)
+        assert result["validity_months"] == 12
 
     def test_lease_dates_leap_year_edge_case(self):
         """Test lease dates with leap year edge case."""
-        result = DateCalculatorService.calculate_lease_dates(
-            date(2024, 2, 29), 12
-        )
+        result = DateCalculatorService.calculate_lease_dates(date(2024, 2, 29), 12)
 
-        assert result['start_date'] == date(2024, 2, 29)
-        assert result['next_month_date'] == date(2024, 3, 29)
-        assert result['final_date'] == date(2025, 3, 1)  # Adjusted edge case
-        assert result['validity_months'] == 12
+        assert result["start_date"] == date(2024, 2, 29)
+        assert result["next_month_date"] == date(2024, 3, 29)
+        assert result["final_date"] == date(2025, 3, 1)  # Adjusted edge case
+        assert result["validity_months"] == 12
 
     def test_lease_dates_short_lease(self):
         """Test lease dates for short lease."""
-        result = DateCalculatorService.calculate_lease_dates(
-            date(2025, 6, 1), 6
-        )
+        result = DateCalculatorService.calculate_lease_dates(date(2025, 6, 1), 6)
 
-        assert result['start_date'] == date(2025, 6, 1)
-        assert result['next_month_date'] == date(2025, 7, 1)
-        assert result['final_date'] == date(2025, 12, 1)
-        assert result['validity_months'] == 6
+        assert result["start_date"] == date(2025, 6, 1)
+        assert result["next_month_date"] == date(2025, 7, 1)
+        assert result["final_date"] == date(2025, 12, 1)
+        assert result["validity_months"] == 6
 
 
 class TestIsRentDue:
@@ -251,33 +229,27 @@ class TestFormatLeaseDatesForContract:
 
     def test_format_lease_dates_for_contract_standard(self):
         """Test formatting all lease dates for contract."""
-        result = DateCalculatorService.format_lease_dates_for_contract(
-            date(2025, 1, 15), 12
-        )
+        result = DateCalculatorService.format_lease_dates_for_contract(date(2025, 1, 15), 12)
 
-        assert result['start_date_formatted'] == "15/01/2025"
-        assert result['next_month_date_formatted'] == "15/02/2025"
-        assert result['final_date_formatted'] == "15/01/2026"
+        assert result["start_date_formatted"] == "15/01/2025"
+        assert result["next_month_date_formatted"] == "15/02/2025"
+        assert result["final_date_formatted"] == "15/01/2026"
 
     def test_format_lease_dates_for_contract_leap_year(self):
         """Test formatting lease dates with leap year edge case."""
-        result = DateCalculatorService.format_lease_dates_for_contract(
-            date(2024, 2, 29), 12
-        )
+        result = DateCalculatorService.format_lease_dates_for_contract(date(2024, 2, 29), 12)
 
-        assert result['start_date_formatted'] == "29/02/2024"
-        assert result['next_month_date_formatted'] == "29/03/2024"
-        assert result['final_date_formatted'] == "01/03/2025"  # Adjusted edge case
+        assert result["start_date_formatted"] == "29/02/2024"
+        assert result["next_month_date_formatted"] == "29/03/2024"
+        assert result["final_date_formatted"] == "01/03/2025"  # Adjusted edge case
 
     def test_format_lease_dates_for_contract_short_lease(self):
         """Test formatting dates for short lease."""
-        result = DateCalculatorService.format_lease_dates_for_contract(
-            date(2025, 6, 1), 6
-        )
+        result = DateCalculatorService.format_lease_dates_for_contract(date(2025, 6, 1), 6)
 
-        assert result['start_date_formatted'] == "01/06/2025"
-        assert result['next_month_date_formatted'] == "01/07/2025"
-        assert result['final_date_formatted'] == "01/12/2025"
+        assert result["start_date_formatted"] == "01/06/2025"
+        assert result["next_month_date_formatted"] == "01/07/2025"
+        assert result["final_date_formatted"] == "01/12/2025"
 
 
 class TestDateCalculatorServiceIntegration:
@@ -291,16 +263,16 @@ class TestDateCalculatorServiceIntegration:
         # Get all lease dates
         lease_dates = DateCalculatorService.calculate_lease_dates(start_date, validity_months)
 
-        assert lease_dates['start_date'] == date(2025, 1, 15)
-        assert lease_dates['next_month_date'] == date(2025, 2, 15)
-        assert lease_dates['final_date'] == date(2026, 1, 15)
+        assert lease_dates["start_date"] == date(2025, 1, 15)
+        assert lease_dates["next_month_date"] == date(2025, 2, 15)
+        assert lease_dates["final_date"] == date(2026, 1, 15)
 
         # Format for contract
         formatted = DateCalculatorService.format_lease_dates_for_contract(start_date, validity_months)
 
-        assert formatted['start_date_formatted'] == "15/01/2025"
-        assert formatted['next_month_date_formatted'] == "15/02/2025"
-        assert formatted['final_date_formatted'] == "15/01/2026"
+        assert formatted["start_date_formatted"] == "15/01/2025"
+        assert formatted["next_month_date_formatted"] == "15/02/2025"
+        assert formatted["final_date_formatted"] == "15/01/2026"
 
         # Check rent due status on various dates
         assert DateCalculatorService.is_rent_due(10, date(2025, 1, 5)) is False
@@ -316,13 +288,13 @@ class TestDateCalculatorServiceIntegration:
         lease_dates = DateCalculatorService.calculate_lease_dates(start_date, validity_months)
 
         # Verify edge case handling: Feb 29 -> Feb 28 -> March 1
-        assert lease_dates['start_date'] == date(2024, 2, 29)
-        assert lease_dates['next_month_date'] == date(2024, 3, 29)
-        assert lease_dates['final_date'] == date(2025, 3, 1)  # Not Feb 28!
+        assert lease_dates["start_date"] == date(2024, 2, 29)
+        assert lease_dates["next_month_date"] == date(2024, 3, 29)
+        assert lease_dates["final_date"] == date(2025, 3, 1)  # Not Feb 28!
 
         # Verify formatting works correctly
         formatted = DateCalculatorService.format_lease_dates_for_contract(start_date, validity_months)
-        assert formatted['final_date_formatted'] == "01/03/2025"
+        assert formatted["final_date_formatted"] == "01/03/2025"
 
     def test_edge_case_multiple_validity_periods(self):
         """Test leap year edge case with different validity periods."""

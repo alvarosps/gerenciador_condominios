@@ -14,6 +14,7 @@ Usage:
     file_path = storage.save("document.pdf", pdf_bytes)
     pdf_bytes = storage.retrieve("document.pdf")
 """
+
 from __future__ import annotations
 
 import logging
@@ -24,6 +25,7 @@ from typing import Optional
 # Try to import boto3 for S3 support (optional dependency)
 try:
     import boto3
+
     HAS_BOTO3 = True
 except ImportError:
     boto3 = None
@@ -380,8 +382,8 @@ class S3DocumentStorage(IDocumentStorage):
 
         except Exception as e:
             # Check if it's a NoSuchKey error
-            error_code = getattr(e, 'response', {}).get('Error', {}).get('Code', '')
-            if error_code == '404' or error_code == 'NoSuchKey':
+            error_code = getattr(e, "response", {}).get("Error", {}).get("Code", "")
+            if error_code == "404" or error_code == "NoSuchKey":
                 raise FileNotFoundError(f"Document not found in S3: {file_path}")
             logger.error(f"Failed to retrieve from S3 {file_path}: {e}")
             raise StorageError(f"Failed to retrieve document from S3: {e}") from e
@@ -423,8 +425,8 @@ class S3DocumentStorage(IDocumentStorage):
             return True
         except Exception as e:
             # Check if it's a 404/NoSuchKey error
-            error_code = getattr(e, 'response', {}).get('Error', {}).get('Code', '')
-            if error_code == '404' or error_code == 'NoSuchKey':
+            error_code = getattr(e, "response", {}).get("Error", {}).get("Code", "")
+            if error_code == "404" or error_code == "NoSuchKey":
                 return False
             return False
 

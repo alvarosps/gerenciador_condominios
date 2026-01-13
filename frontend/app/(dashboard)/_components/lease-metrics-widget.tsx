@@ -129,12 +129,11 @@ export function LeaseMetricsWidget() {
           />
 
           <MetricItem
-            title="Validade Média"
-            value={parseFloat(data.avg_validity_months.toFixed(1))}
-            suffix="meses"
+            title="Contratos Pendentes"
+            value={data.contracts_pending}
             icon={<CheckCircle />}
-            valueColor="text-blue-500"
-            description="Duração média dos contratos"
+            valueColor={data.contracts_pending > 0 ? 'text-orange-500' : 'text-green-500'}
+            description="Locações sem contrato gerado"
           />
         </div>
 

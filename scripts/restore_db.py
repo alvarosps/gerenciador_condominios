@@ -29,19 +29,20 @@ Date: 2025-10-19
 import os
 import subprocess
 import sys
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 
 # Add project root to Python path to import settings
 project_root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(project_root))
 
 # Import Django settings
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'condominios_manager.settings')
-import django
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "condominios_manager.settings")
+import django  # noqa: E402
+
 django.setup()
 
-from django.conf import settings
+from django.conf import settings  # noqa: E402
 
 
 def list_backup_contents(backup_file, db_password):
@@ -60,22 +61,12 @@ def list_backup_contents(backup_file, db_password):
     print("=" * 60)
 
     env = os.environ.copy()
-    env['PGPASSWORD'] = db_password
+    env["PGPASSWORD"] = db_password
 
-    cmd = [
-        'pg_restore',
-        '--list',
-        backup_file
-    ]
+    cmd = ["pg_restore", "--list", backup_file]
 
     try:
-        result = subprocess.run(
-            cmd,
-            env=env,
-            check=True,
-            capture_output=True,
-            text=True
-        )
+        result = subprocess.run(cmd, env=env, check=True, capture_output=True, text=True)
 
         print(result.stdout)
         print("=" * 60)
@@ -88,7 +79,7 @@ def list_backup_contents(backup_file, db_password):
         return False
 
 
-def restore_database(backup_file, clean=True):
+def restore_database(backup_file, clean=True):  # noqa: C901
     """
     Restore PostgreSQL database from backup file.
 
@@ -108,23 +99,23 @@ def restore_database(backup_file, clean=True):
     if not backup_path.exists():
         print(f"\n✗ Error: Backup file not found: {backup_file}")
         print("\nAvailable backups:")
-        backup_dir = project_root / 'backups'
+        backup_dir = project_root / "backups"
         if backup_dir.exists():
-            backups = sorted(backup_dir.glob('backup_*.backup'), reverse=True)
+            backups = sorted(backup_dir.glob("backup_*.backup"), reverse=True)
             for i, b in enumerate(backups[:10], 1):
                 file_size = b.stat().st_size / (1024 * 1024)
                 print(f"  {i}. {b.name} ({file_size:.2f} MB)")
         return False
 
     # Get database configuration
-    db_config = settings.DATABASES['default']
-    db_name = db_config['NAME']
-    db_user = db_config['USER']
-    db_host = db_config['HOST']
-    db_port = db_config['PORT']
-    db_password = db_config['PASSWORD']
+    db_config = settings.DATABASES["default"]
+    db_name = db_config["NAME"]
+    db_user = db_config["USER"]
+    db_host = db_config["HOST"]
+    db_port = db_config["PORT"]
+    db_password = db_config["PASSWORD"]
 
-    print(f"\nDatabase Configuration:")
+    print("\nDatabase Configuration:")
     print(f"  Host: {db_host}:{db_port}")
     print(f"  Database: {db_name}")
     print(f"  User: {db_user}")
@@ -140,7 +131,7 @@ def restore_database(backup_file, clean=True):
 
     # Prompt for confirmation
     response = input("\nDo you want to proceed? (yes/no): ").strip().lower()
-    if response not in ['yes', 'y']:
+    if response not in ["yes", "y"]:
         print("\n✗ Restore cancelled by user")
         return False
 
@@ -148,20 +139,24 @@ def restore_database(backup_file, clean=True):
 
     # Set password environment variable
     env = os.environ.copy()
-    env['PGPASSWORD'] = db_password
+    env["PGPASSWORD"] = db_password
 
     # Construct pg_restore command
     cmd = [
-        'pg_restore',
-        '-h', db_host,
-        '-p', str(db_port),
-        '-U', db_user,
-        '-d', db_name,
-        '-v',  # Verbose output
+        "pg_restore",
+        "-h",
+        db_host,
+        "-p",
+        str(db_port),
+        "-U",
+        db_user,
+        "-d",
+        db_name,
+        "-v",  # Verbose output
     ]
 
     if clean:
-        cmd.append('-c')  # Clean (drop) database objects before recreating
+        cmd.append("-c")  # Clean (drop) database objects before recreating
         print("Mode: Clean restore (existing objects will be dropped)")
     else:
         print("Mode: Additive restore (existing objects will be kept)")
@@ -170,13 +165,7 @@ def restore_database(backup_file, clean=True):
 
     try:
         # Execute pg_restore
-        result = subprocess.run(
-            cmd,
-            env=env,
-            check=True,
-            capture_output=True,
-            text=True
-        )
+        subprocess.run(cmd, env=env, check=True, capture_output=True, text=True)
 
         print("\n" + "=" * 60)
         print("✓ RESTORE SUCCESSFUL")
@@ -247,9 +236,9 @@ def main():
         print("=" * 60)
 
         # List available backups
-        backup_dir = project_root / 'backups'
+        backup_dir = project_root / "backups"
         if backup_dir.exists():
-            backups = sorted(backup_dir.glob('backup_*.backup'), reverse=True)
+            backups = sorted(backup_dir.glob("backup_*.backup"), reverse=True)
             if backups:
                 print(f"\nAvailable backups ({len(backups)}):")
                 for i, backup in enumerate(backups[:10], 1):
@@ -261,12 +250,12 @@ def main():
         sys.exit(1)
 
     backup_file = sys.argv[1]
-    clean = '--no-clean' not in sys.argv
-    list_only = '--list' in sys.argv
+    clean = "--no-clean" not in sys.argv
+    list_only = "--list" in sys.argv
 
     # Get database password
-    db_config = settings.DATABASES['default']
-    db_password = db_config['PASSWORD']
+    db_config = settings.DATABASES["default"]
+    db_password = db_config["PASSWORD"]
 
     # List contents if requested
     if list_only:
@@ -280,5 +269,5 @@ def main():
     sys.exit(0 if success else 1)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

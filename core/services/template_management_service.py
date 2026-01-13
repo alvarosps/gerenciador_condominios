@@ -6,17 +6,18 @@ Handles all business logic related to contract template management including:
 - Saving template with automatic backup
 - Rendering template preview with sample data
 """
+
 from __future__ import annotations
 
 import logging
 import os
 import shutil
 from datetime import datetime
-from pathlib import Path
 from typing import Dict, Optional
 
 from django.conf import settings
-from jinja2 import Environment, BaseLoader
+
+from jinja2 import BaseLoader, Environment
 
 from core.models import Lease
 from core.utils import format_currency, number_to_words
@@ -50,9 +51,7 @@ class TemplateManagementService:
         Raises:
             FileNotFoundError: If template file doesn't exist
         """
-        template_path = os.path.join(
-            settings.BASE_DIR, "core", "templates", "contract_template.html"
-        )
+        template_path = os.path.join(settings.BASE_DIR, "core", "templates", "contract_template.html")
 
         if not os.path.exists(template_path):
             raise FileNotFoundError(f"Template file not found at {template_path}")
@@ -174,16 +173,20 @@ class TemplateManagementService:
         try:
             # Get sample lease
             if lease_id:
-                sample_lease = Lease.objects.select_related(
-                    "apartment",
-                    "apartment__building",
-                    "responsible_tenant",
-                ).prefetch_related(
-                    "tenants",
-                    "tenants__dependents",
-                    "tenants__furnitures",
-                    "apartment__furnitures",
-                ).get(pk=lease_id)
+                sample_lease = (
+                    Lease.objects.select_related(
+                        "apartment",
+                        "apartment__building",
+                        "responsible_tenant",
+                    )
+                    .prefetch_related(
+                        "tenants",
+                        "tenants__dependents",
+                        "tenants__furnitures",
+                        "apartment__furnitures",
+                    )
+                    .get(pk=lease_id)
+                )
             else:
                 sample_lease = (
                     Lease.objects.select_related(
@@ -202,8 +205,7 @@ class TemplateManagementService:
 
             if not sample_lease:
                 raise ValueError(
-                    "Nenhuma locação encontrada no sistema. "
-                    "Crie uma locação para visualizar o preview."
+                    "Nenhuma locação encontrada no sistema. " "Crie uma locação para visualizar o preview."
                 )
 
             # Import ContractService to reuse context preparation
@@ -242,9 +244,7 @@ class TemplateManagementService:
             backups = []
 
             for filename in sorted(os.listdir(backup_dir), reverse=True):
-                if filename.startswith("contract_template_backup_") and filename.endswith(
-                    ".html"
-                ):
+                if filename.startswith("contract_template_backup_") and filename.endswith(".html"):
                     file_path = os.path.join(backup_dir, filename)
                     stat_info = os.stat(file_path)
 

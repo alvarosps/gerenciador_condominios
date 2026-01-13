@@ -70,13 +70,18 @@ export function BuildingStatisticsChart() {
     );
   }
 
-  const chartData: ChartDataItem[] = data.map((stat) => ({
-    name: stat.building_name,
-    'Ocupação (%)': Number(stat.occupancy_rate.toFixed(1)),
-    'Receita (R$ mil)': Number((stat.total_revenue / 1000).toFixed(2)),
-    apartamentos: stat.total_apartments,
-    alugados: stat.rented_apartments,
-  }));
+  const chartData: ChartDataItem[] = data.map((stat) => {
+    const revenue = typeof stat.total_revenue === 'string'
+      ? parseFloat(stat.total_revenue)
+      : stat.total_revenue;
+    return {
+      name: `Prédio ${stat.building_number}`,
+      'Ocupação (%)': Number(stat.occupancy_rate.toFixed(1)),
+      'Receita (R$ mil)': Number((revenue / 1000).toFixed(2)),
+      apartamentos: stat.total_apartments,
+      alugados: stat.rented_apartments,
+    };
+  });
 
   const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
@@ -183,7 +188,14 @@ export function BuildingStatisticsChart() {
             </div>
             <div>
               <div className="text-2xl font-bold text-purple-500">
-                {formatCurrency(data.reduce((sum, b) => sum + b.total_revenue, 0))}
+                {formatCurrency(
+                  data.reduce((sum, b) => {
+                    const revenue = typeof b.total_revenue === 'string'
+                      ? parseFloat(b.total_revenue)
+                      : b.total_revenue;
+                    return sum + revenue;
+                  }, 0)
+                )}
               </div>
               <div className="text-xs text-muted-foreground">Receita Total</div>
             </div>

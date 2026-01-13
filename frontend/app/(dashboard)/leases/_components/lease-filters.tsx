@@ -1,0 +1,160 @@
+'use client';
+
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Apartment } from '@/lib/schemas/apartment.schema';
+import { Tenant } from '@/lib/schemas/tenant.schema';
+
+export interface LeaseFilters {
+  apartment_id: number | undefined;
+  responsible_tenant_id: number | undefined;
+  is_active: boolean | undefined;
+  is_expired: boolean | undefined;
+  expiring_soon: boolean | undefined;
+}
+
+interface Props {
+  filters: LeaseFilters;
+  onFiltersChange: (filters: LeaseFilters) => void;
+  apartments: Apartment[] | undefined;
+  tenants: Tenant[] | undefined;
+}
+
+export function LeaseFiltersCard({ filters, onFiltersChange, apartments, tenants }: Props) {
+  const hasActiveFilters = Object.values(filters).some((value) => value !== undefined);
+
+  const clearFilters = () => {
+    onFiltersChange({
+      apartment_id: undefined,
+      responsible_tenant_id: undefined,
+      is_active: undefined,
+      is_expired: undefined,
+      expiring_soon: undefined,
+    });
+  };
+
+  const handleStatusChange = (value: string) => {
+    if (value === 'active') {
+      onFiltersChange({
+        ...filters,
+        is_active: true,
+        is_expired: undefined,
+        expiring_soon: undefined,
+      });
+    } else if (value === 'expired') {
+      onFiltersChange({
+        ...filters,
+        is_active: undefined,
+        is_expired: true,
+        expiring_soon: undefined,
+      });
+    } else if (value === 'expiring') {
+      onFiltersChange({
+        ...filters,
+        is_active: undefined,
+        is_expired: undefined,
+        expiring_soon: true,
+      });
+    } else {
+      onFiltersChange({
+        ...filters,
+        is_active: undefined,
+        is_expired: undefined,
+        expiring_soon: undefined,
+      });
+    }
+  };
+
+  const getStatusValue = () => {
+    if (filters.is_active !== undefined) return 'active';
+    if (filters.is_expired !== undefined) return 'expired';
+    if (filters.expiring_soon !== undefined) return 'expiring';
+    return '';
+  };
+
+  return (
+    <Card className="mb-4">
+      <CardContent className="pt-6">
+        <div className="flex gap-4 flex-wrap items-end">
+          <div className="flex-1 min-w-[200px]">
+            <label className="block text-sm font-medium mb-2">Apartamento</label>
+            <Select
+              value={filters.apartment_id ? String(filters.apartment_id) : ''}
+              onValueChange={(value) =>
+                onFiltersChange({
+                  ...filters,
+                  apartment_id: value === '' ? undefined : Number(value),
+                })
+              }
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Todos os apartamentos" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Todos os apartamentos</SelectItem>
+                {apartments?.map((apt) => (
+                  <SelectItem key={apt.id} value={String(apt.id)}>
+                    {apt.building?.name} - Apto {apt.number}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex-1 min-w-[200px]">
+            <label className="block text-sm font-medium mb-2">Inquilino</label>
+            <Select
+              value={filters.responsible_tenant_id ? String(filters.responsible_tenant_id) : ''}
+              onValueChange={(value) =>
+                onFiltersChange({
+                  ...filters,
+                  responsible_tenant_id: value === '' ? undefined : Number(value),
+                })
+              }
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Todos os inquilinos" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Todos os inquilinos</SelectItem>
+                {tenants?.map((t) => (
+                  <SelectItem key={t.id} value={String(t.id!)}>
+                    {t.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex-1 min-w-[150px]">
+            <label className="block text-sm font-medium mb-2">Status</label>
+            <Select value={getStatusValue()} onValueChange={handleStatusChange}>
+              <SelectTrigger>
+                <SelectValue placeholder="Todos" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Todos</SelectItem>
+                <SelectItem value="active">Ativo</SelectItem>
+                <SelectItem value="expired">Expirado</SelectItem>
+                <SelectItem value="expiring">Expirando em breve</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {hasActiveFilters && (
+            <Button variant="outline" onClick={clearFilters}>
+              Limpar Filtros
+            </Button>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}

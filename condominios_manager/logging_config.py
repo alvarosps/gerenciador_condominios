@@ -9,8 +9,9 @@ Enterprise-grade logging with:
 - Performance tracking
 - Windows-safe file rotation (handles permission errors)
 """
-import sys
+
 import logging.handlers
+import sys
 from pathlib import Path
 
 
@@ -45,12 +46,12 @@ class WindowsSafeRotatingFileHandler(logging.handlers.RotatingFileHandler):
 
 
 # Determine which handler to use based on platform
-if sys.platform == 'win32':
+if sys.platform == "win32":
     # Use Windows-safe handler on Windows
-    ROTATING_HANDLER_CLASS = 'condominios_manager.logging_config.WindowsSafeRotatingFileHandler'
+    ROTATING_HANDLER_CLASS = "condominios_manager.logging_config.WindowsSafeRotatingFileHandler"
 else:
     # Use standard handler on Unix/Linux/Mac
-    ROTATING_HANDLER_CLASS = 'logging.handlers.RotatingFileHandler'
+    ROTATING_HANDLER_CLASS = "logging.handlers.RotatingFileHandler"
 
 
 # Base directory for logs

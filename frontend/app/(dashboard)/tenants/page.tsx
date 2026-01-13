@@ -48,16 +48,12 @@ import {
   useDeleteTenant,
 } from '@/lib/api/hooks/use-tenants';
 import { Tenant } from '@/lib/schemas/tenant.schema';
-import { formatCPFOrCNPJ, formatBrazilianPhone } from '@/lib/utils/validators';
-import { useExport, tenantExportColumns } from '@/lib/hooks/use-export';
-import { useBulkOperations } from '@/lib/hooks/use-bulk-operations';
+import { formatCPFOrCNPJ, formatBrazilianPhone } from '@/lib/utils/formatters';
+import { tenantExportColumns } from '@/lib/hooks/use-export';
+import { useCrudPage } from '@/lib/hooks/use-crud-page';
 
 export default function TenantsPage() {
-  const [isWizardOpen, setIsWizardOpen] = useState(false);
-  const [editingTenant, setEditingTenant] = useState<Tenant | null>(null);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [deleteId, setDeleteId] = useState<number | null>(null);
-  const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
+  // Page-specific filters state
   const [filters, setFilters] = useState({
     is_company: undefined as boolean | undefined,
     has_dependents: undefined as boolean | undefined,
@@ -67,39 +63,17 @@ export default function TenantsPage() {
 
   const { data: tenants, isLoading, error } = useTenants(filters);
   const deleteMutation = useDeleteTenant();
-  const { exportToExcel, exportToCSV, isExporting } = useExport();
-  const bulkOps = useBulkOperations({
+
+  // Use the consolidated CRUD hook for all state management
+  const crud = useCrudPage<Tenant>({
     entityName: 'inquilino',
     entityNamePlural: 'inquilinos',
+    deleteMutation,
+    exportColumns: tenantExportColumns,
+    exportFilename: 'inquilinos',
+    exportSheetName: 'Inquilinos',
+    deleteErrorMessage: 'Erro ao excluir inquilino. Verifique se não há locações vinculadas.',
   });
-
-  const handleEdit = (tenant: Tenant) => {
-    setEditingTenant(tenant);
-    setIsWizardOpen(true);
-  };
-
-  const handleDeleteClick = (id: number) => {
-    setDeleteId(id);
-    setDeleteDialogOpen(true);
-  };
-
-  const handleDelete = async () => {
-    if (!deleteId) return;
-    try {
-      await deleteMutation.mutateAsync(deleteId);
-      toast.success('Inquilino excluído com sucesso');
-      setDeleteDialogOpen(false);
-      setDeleteId(null);
-    } catch (error) {
-      toast.error('Erro ao excluir inquilino. Verifique se não há locações vinculadas.');
-      console.error('Delete error:', error);
-    }
-  };
-
-  const handleWizardClose = () => {
-    setIsWizardOpen(false);
-    setEditingTenant(null);
-  };
 
   const clearFilters = () => {
     setFilters({
@@ -110,39 +84,6 @@ export default function TenantsPage() {
     });
   };
 
-  const handleExport = async (format: 'excel' | 'csv') => {
-    if (!tenants || tenants.length === 0) {
-      toast.warning('Não há dados para exportar');
-      return;
-    }
-
-    try {
-      if (format === 'excel') {
-        await exportToExcel(tenants, tenantExportColumns, {
-          filename: 'inquilinos',
-          sheetName: 'Inquilinos',
-        });
-        toast.success('Arquivo Excel exportado com sucesso!');
-      } else {
-        await exportToCSV(tenants, tenantExportColumns, {
-          filename: 'inquilinos',
-        });
-        toast.success('Arquivo CSV exportado com sucesso!');
-      }
-    } catch {
-      toast.error('Erro ao exportar arquivo');
-    }
-  };
-
-  const handleBulkDeleteClick = () => {
-    setBulkDeleteDialogOpen(true);
-  };
-
-  const handleBulkDelete = () => {
-    bulkOps.handleBulkDelete(deleteMutation.mutateAsync);
-    setBulkDeleteDialogOpen(false);
-  };
-
   const columns: Column<Tenant>[] = [
     {
       title: 'Nome / Razão Social',
@@ -150,7 +91,7 @@ export default function TenantsPage() {
       key: 'name',
       width: 250,
       sorter: (a: Tenant, b: Tenant) => a.name.localeCompare(b.name),
-      render: (value, record: Tenant, _index) => (
+      render: (value, record: Tenant) => (
         <div>
           <div className="font-medium">{value as string}</div>
           <div className="text-xs text-gray-500">
@@ -211,7 +152,7 @@ export default function TenantsPage() {
       key: 'dependents',
       width: 120,
       align: 'center',
-      render: (_, record: Tenant, _index) => {
+      render: (_, record: Tenant) => {
         const count = record.dependents?.length || 0;
         return (
           <div className="flex items-center gap-2 justify-center">
@@ -232,7 +173,7 @@ export default function TenantsPage() {
       key: 'furnitures',
       width: 100,
       align: 'center',
-      render: (_, record: Tenant, _index) => {
+      render: (_, record: Tenant) => {
         const count = record.furnitures?.length || 0;
         return (
           <div className="flex items-center gap-2 justify-center">
@@ -252,12 +193,12 @@ export default function TenantsPage() {
       key: 'actions',
       width: 150,
       fixed: 'right',
-      render: (_, record: Tenant, _index) => (
+      render: (_, record: Tenant) => (
         <div className="flex items-center gap-2">
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => handleEdit(record)}
+            onClick={() => crud.openEditModal(record)}
           >
             <Pencil className="h-4 w-4 mr-1" />
             Editar
@@ -265,8 +206,11 @@ export default function TenantsPage() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => handleDeleteClick(record.id!)}
-            disabled={deleteMutation.isPending}
+            onClick={() => {
+              crud.setItemToDelete(record);
+              crud.handleDeleteClick(record.id!);
+            }}
+            disabled={crud.isDeleting}
           >
             <Trash2 className="h-4 w-4 mr-1" />
             Excluir
@@ -300,43 +244,43 @@ export default function TenantsPage() {
             <DropdownMenuTrigger asChild>
               <Button
                 variant="outline"
-                disabled={isExporting || !tenants || tenants.length === 0}
+                disabled={crud.isExporting || !tenants || tenants.length === 0}
               >
                 <Download className="h-4 w-4 mr-2" />
                 Exportar
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
-              <DropdownMenuItem onClick={() => handleExport('excel')}>
+              <DropdownMenuItem onClick={() => crud.handleExport('excel', tenants || [])}>
                 <FileSpreadsheet className="h-4 w-4 mr-2" />
                 Exportar para Excel
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleExport('csv')}>
+              <DropdownMenuItem onClick={() => crud.handleExport('csv', tenants || [])}>
                 <FileText className="h-4 w-4 mr-2" />
                 Exportar para CSV
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button onClick={() => setIsWizardOpen(true)}>
+          <Button onClick={crud.openCreateModal}>
             <Plus className="h-4 w-4 mr-2" />
             Novo Inquilino
           </Button>
         </div>
       </div>
 
-      {bulkOps.hasSelection && (
+      {crud.bulkOps.hasSelection && (
         <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded flex justify-between items-center">
           <span className="text-blue-700 font-medium">
-            {bulkOps.selectionCount} {bulkOps.selectionCount === 1 ? 'inquilino selecionado' : 'inquilinos selecionados'}
+            {crud.bulkOps.selectionCount} {crud.bulkOps.selectionCount === 1 ? 'inquilino selecionado' : 'inquilinos selecionados'}
           </span>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={bulkOps.clearSelection}>
+            <Button variant="outline" onClick={crud.bulkOps.clearSelection}>
               Cancelar Seleção
             </Button>
             <Button
               variant="destructive"
-              onClick={handleBulkDeleteClick}
-              disabled={deleteMutation.isPending}
+              onClick={() => crud.setBulkDeleteDialogOpen(true)}
+              disabled={crud.isBulkDeleting}
             >
               <Trash2 className="h-4 w-4 mr-2" />
               Excluir Selecionados
@@ -444,52 +388,54 @@ export default function TenantsPage() {
         dataSource={tenants}
         loading={isLoading}
         rowKey="id"
-        rowSelection={bulkOps.rowSelection}
+        rowSelection={crud.bulkOps.rowSelection}
       />
 
       <TenantFormWizard
-        open={isWizardOpen}
-        tenant={editingTenant}
-        onClose={handleWizardClose}
+        open={crud.isModalOpen}
+        tenant={crud.editingItem}
+        onClose={crud.closeModal}
       />
 
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+      <AlertDialog open={crud.deleteDialogOpen} onOpenChange={crud.setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir inquilino</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja excluir este inquilino? Esta ação não pode ser desfeita.
+              Tem certeza que deseja excluir {crud.itemToDelete?.name ? `"${crud.itemToDelete.name}"` : 'este inquilino'}? Esta ação não pode ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleDelete}
+              onClick={crud.handleDelete}
+              disabled={crud.isDeleting}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Excluir
+              {crud.isDeleting ? 'Excluindo...' : 'Excluir'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog open={bulkDeleteDialogOpen} onOpenChange={setBulkDeleteDialogOpen}>
+      <AlertDialog open={crud.bulkDeleteDialogOpen} onOpenChange={crud.setBulkDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir inquilinos selecionados</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja excluir {bulkOps.selectionCount}{' '}
-              {bulkOps.selectionCount === 1 ? 'inquilino' : 'inquilinos'}? Esta ação não pode
+              Tem certeza que deseja excluir {crud.bulkOps.selectionCount}{' '}
+              {crud.bulkOps.selectionCount === 1 ? 'inquilino' : 'inquilinos'}? Esta ação não pode
               ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleBulkDelete}
+              onClick={crud.handleBulkDelete}
+              disabled={crud.isBulkDeleting}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Excluir
+              {crud.isBulkDeleting ? 'Excluindo...' : 'Excluir'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

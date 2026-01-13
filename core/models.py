@@ -9,19 +9,173 @@ This module defines the core domain models for property management:
 - Dependent: Tenant dependents
 - Lease: Rental contracts
 """
+
 from __future__ import annotations
 
 from decimal import Decimal
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.db import models
+from django.utils import timezone
 
 # Import validators (note: we don't enforce these on existing data)
-from core.validators import validate_due_day
+from core.validators import validate_brazilian_phone, validate_cnpj, validate_cpf, validate_due_day
+
+# =============================================================================
+# BASE MIXINS
+# =============================================================================
 
 
-class Building(models.Model):
+class SoftDeleteManager(models.Manager):
+    """
+    Custom manager that excludes soft-deleted objects by default.
+
+    Provides additional methods to access deleted and all objects.
+    """
+
+    def get_queryset(self):
+        """Return queryset excluding soft-deleted objects."""
+        return super().get_queryset().filter(is_deleted=False)
+
+    def with_deleted(self):
+        """Return queryset including soft-deleted objects."""
+        return super().get_queryset()
+
+    def deleted_only(self):
+        """Return queryset with only soft-deleted objects."""
+        return super().get_queryset().filter(is_deleted=True)
+
+
+class AuditMixin(models.Model):
+    """
+    Abstract mixin providing audit trail fields for tracking creation and modification.
+
+    Attributes:
+        created_at: Timestamp when the record was created
+        updated_at: Timestamp when the record was last modified
+        created_by: User who created the record
+        updated_by: User who last modified the record
+    """
+
+    created_at = models.DateTimeField(
+        default=timezone.now,
+        editable=False,
+        help_text="Data/hora de criação do registro",
+    )
+    updated_at = models.DateTimeField(
+        default=timezone.now,
+        editable=False,
+        help_text="Data/hora da última modificação",
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="%(class)s_created",
+        editable=False,
+        help_text="Usuário que criou o registro",
+    )
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="%(class)s_updated",
+        editable=False,
+        help_text="Usuário que modificou o registro",
+    )
+
+    class Meta:
+        abstract = True
+
+    def save(self, *args, **kwargs):
+        """Override save to automatically update updated_at timestamp."""
+        if self.pk:  # If updating existing record
+            self.updated_at = timezone.now()
+        super().save(*args, **kwargs)
+
+
+class SoftDeleteMixin(models.Model):
+    """
+    Abstract mixin providing soft delete functionality.
+
+    Instead of permanently deleting records, marks them as deleted
+    and excludes them from default queries.
+
+    Attributes:
+        is_deleted: Flag indicating if the record is soft-deleted
+        deleted_at: Timestamp when the record was soft-deleted
+        deleted_by: User who soft-deleted the record
+    """
+
+    is_deleted = models.BooleanField(
+        default=False,
+        editable=False,
+        db_index=True,
+        help_text="Indica se o registro foi excluído",
+    )
+    deleted_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        editable=False,
+        help_text="Data/hora da exclusão",
+    )
+    deleted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="%(class)s_deleted",
+        editable=False,
+        help_text="Usuário que excluiu o registro",
+    )
+
+    class Meta:
+        abstract = True
+
+    def delete(self, using=None, keep_parents=False, hard_delete=False, deleted_by=None):
+        """
+        Soft delete the record or perform hard delete if explicitly requested.
+
+        Args:
+            using: Database alias to use
+            keep_parents: Whether to keep parent model instances
+            hard_delete: If True, permanently delete the record
+            deleted_by: User performing the deletion (for audit)
+        """
+        if hard_delete:
+            super().delete(using=using, keep_parents=keep_parents)
+        else:
+            self.is_deleted = True
+            self.deleted_at = timezone.now()
+            if deleted_by:
+                self.deleted_by = deleted_by
+            self.save(update_fields=["is_deleted", "deleted_at", "deleted_by"])
+
+    def restore(self, restored_by=None):
+        """
+        Restore a soft-deleted record.
+
+        Args:
+            restored_by: User performing the restoration (for audit)
+        """
+        self.is_deleted = False
+        self.deleted_at = None
+        self.deleted_by = None
+        if restored_by:
+            self.updated_by = restored_by
+        self.save(update_fields=["is_deleted", "deleted_at", "deleted_by", "updated_by"])
+
+
+# =============================================================================
+# DOMAIN MODELS
+# =============================================================================
+
+
+class Building(AuditMixin, SoftDeleteMixin, models.Model):
     """
     Represents a building/property managed by the system.
 
@@ -29,39 +183,49 @@ class Building(models.Model):
         street_number: Unique identifier number for the building
         name: Display name of the building
         address: Full address of the building
+
+    Inherits audit fields (created_at, updated_at, created_by, updated_by)
+    and soft delete capability (is_deleted, deleted_at, deleted_by).
     """
 
-    street_number = models.PositiveIntegerField(
-        unique=True, help_text="Número da rua (ex.: 836 ou 850)"
-    )
+    street_number = models.PositiveIntegerField(unique=True, help_text="Número da rua (ex.: 836 ou 850)")
     name = models.CharField(max_length=100, help_text="Nome do prédio")
     address = models.CharField(max_length=200, help_text="Endereço completo do prédio")
+
+    # Custom manager that excludes soft-deleted objects
+    objects = SoftDeleteManager()
+    all_objects = models.Manager()  # Access all objects including deleted
 
     def __str__(self) -> str:
         """Return string representation of building."""
         return f"{self.name} - {self.street_number}"
 
 
-class Furniture(models.Model):
+class Furniture(AuditMixin, SoftDeleteMixin, models.Model):
     """
     Represents furniture items that can be associated with apartments or tenants.
 
     Attributes:
         name: Unique name of the furniture item
         description: Optional detailed description
+
+    Inherits audit fields (created_at, updated_at, created_by, updated_by)
+    and soft delete capability (is_deleted, deleted_at, deleted_by).
     """
 
-    name = models.CharField(
-        max_length=100, unique=True, help_text="Nome do móvel (ex.: Fogão, Geladeira, etc.)"
-    )
+    name = models.CharField(max_length=100, unique=True, help_text="Nome do móvel (ex.: Fogão, Geladeira, etc.)")
     description = models.TextField(blank=True, null=True)
+
+    # Custom manager that excludes soft-deleted objects
+    objects = SoftDeleteManager()
+    all_objects = models.Manager()  # Access all objects including deleted
 
     def __str__(self) -> str:
         """Return string representation of furniture."""
         return self.name
 
 
-class Apartment(models.Model):
+class Apartment(AuditMixin, SoftDeleteMixin, models.Model):
     """
     Represents an individual apartment unit within a building.
 
@@ -78,13 +242,14 @@ class Apartment(models.Model):
         lease_date: Date when current lease started
         last_rent_increase_date: Date of most recent rent increase
         furnitures: Furniture items included with apartment
+
+    Inherits audit fields (created_at, updated_at, created_by, updated_by)
+    and soft delete capability (is_deleted, deleted_at, deleted_by).
     """
 
     building = models.ForeignKey(Building, on_delete=models.CASCADE, related_name="apartments")
     number = models.PositiveIntegerField(help_text="Número único do apartamento no prédio")
-    interfone_configured = models.BooleanField(
-        default=False, help_text="Indica se o interfone está configurado"
-    )
+    interfone_configured = models.BooleanField(default=False, help_text="Indica se o interfone está configurado")
     contract_generated = models.BooleanField(default=False, help_text="Contrato foi gerado?")
     contract_signed = models.BooleanField(default=False, help_text="Contrato foi assinado?")
 
@@ -101,9 +266,7 @@ class Apartment(models.Model):
 
     is_rented = models.BooleanField(default=False, help_text="Apartamento alugado ou não")
     lease_date = models.DateField(blank=True, null=True, help_text="Data da locação (caso alugado)")
-    last_rent_increase_date = models.DateField(
-        blank=True, null=True, help_text="Data do último reajuste do aluguel"
-    )
+    last_rent_increase_date = models.DateField(blank=True, null=True, help_text="Data do último reajuste do aluguel")
 
     # Relação com móveis disponíveis no apartamento
     furnitures = models.ManyToManyField(
@@ -112,6 +275,10 @@ class Apartment(models.Model):
         related_name="apartments",
         help_text="Móveis presentes no apartamento",
     )
+
+    # Custom manager that excludes soft-deleted objects
+    objects = SoftDeleteManager()
+    all_objects = models.Manager()  # Access all objects including deleted
 
     class Meta:
         unique_together = ("building", "number")
@@ -128,11 +295,12 @@ class Apartment(models.Model):
         return f"Apto {self.number} - {self.building.street_number}"
 
 
-class Tenant(models.Model):
+class Tenant(AuditMixin, SoftDeleteMixin, models.Model):
     """
     Represents a tenant (individual or company) renting an apartment.
 
     Attributes:
+        user: Associated user account for tenant portal access (optional)
         name: Full name or company name
         cpf_cnpj: Brazilian tax ID (CPF for individuals, CNPJ for companies)
         is_company: Whether tenant is a company (PJ) or individual (PF)
@@ -145,7 +313,20 @@ class Tenant(models.Model):
         tag_deposit_paid: Whether tag deposit has been paid
         rent_due_day: Day of month when rent is due
         furnitures: Furniture items owned by tenant
+
+    Inherits audit fields (created_at, updated_at, created_by, updated_by)
+    and soft delete capability (is_deleted, deleted_at, deleted_by).
     """
+
+    # Associated user account for tenant portal access
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="tenant_profile",
+        help_text="Conta de usuário associada para acesso ao portal do inquilino",
+    )
 
     # Brazilian marital status choices
     MARITAL_STATUS_CHOICES = [
@@ -165,13 +346,13 @@ class Tenant(models.Model):
         db_index=True,  # Add index for faster lookups
     )
     is_company = models.BooleanField(default=False, help_text="Indica se é Pessoa Jurídica")
-    rg = models.CharField(
-        max_length=20, blank=True, null=True, help_text="RG (não obrigatório para empresas)"
+    rg = models.CharField(max_length=20, blank=True, null=True, help_text="RG (não obrigatório para empresas)")
+    phone = models.CharField(
+        max_length=20,
+        help_text="Telefone de contato",
+        validators=[validate_brazilian_phone],
     )
-    phone = models.CharField(max_length=20, help_text="Telefone de contato")
-    marital_status = models.CharField(
-        max_length=50, choices=MARITAL_STATUS_CHOICES, help_text="Estado civil"
-    )
+    marital_status = models.CharField(max_length=50, choices=MARITAL_STATUS_CHOICES, help_text="Estado civil")
     profession = models.CharField(max_length=100, help_text="Profissão")
 
     # Dados financeiros e administrativos
@@ -182,18 +363,18 @@ class Tenant(models.Model):
         blank=True,
         help_text="Valor da caução, se houver",
     )
-    cleaning_fee_paid = models.BooleanField(
-        default=False, help_text="Indica se pagou a taxa de limpeza"
-    )
-    tag_deposit_paid = models.BooleanField(
-        default=False, help_text="Indica se o caução das tags já foi pago"
-    )
+    cleaning_fee_paid = models.BooleanField(default=False, help_text="Indica se pagou a taxa de limpeza")
+    tag_deposit_paid = models.BooleanField(default=False, help_text="Indica se o caução das tags já foi pago")
     rent_due_day = models.PositiveIntegerField(help_text="Dia do vencimento do aluguel", default=1)
 
     # Relação com móveis próprios do inquilino
     furnitures = models.ManyToManyField(
         Furniture, blank=True, related_name="tenants", help_text="Móveis próprios do inquilino"
     )
+
+    # Custom manager that excludes soft-deleted objects
+    objects = SoftDeleteManager()
+    all_objects = models.Manager()  # Access all objects including deleted
 
     class Meta:
         indexes = [
@@ -206,8 +387,34 @@ class Tenant(models.Model):
         """Return string representation of tenant."""
         return self.name
 
+    def clean(self) -> None:
+        """
+        Validate tenant data.
 
-class Dependent(models.Model):
+        Validates:
+        - CPF format when is_company=False
+        - CNPJ format when is_company=True
+
+        Note: This is only called when full_clean() is explicitly invoked.
+        """
+        super().clean()
+
+        if self.cpf_cnpj:
+            try:
+                if self.is_company:
+                    validate_cnpj(self.cpf_cnpj)
+                else:
+                    validate_cpf(self.cpf_cnpj)
+            except ValidationError as e:
+                raise ValidationError({"cpf_cnpj": e.message})
+
+    def save(self, *args, **kwargs):
+        """Override save to enforce validation before persisting."""
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+
+class Dependent(AuditMixin, SoftDeleteMixin, models.Model):
     """
     Represents a dependent of a tenant.
 
@@ -215,20 +422,34 @@ class Dependent(models.Model):
         tenant: Parent tenant who has this dependent
         name: Full name of dependent
         phone: Contact phone number for dependent
+
+    Inherits audit fields (created_at, updated_at, created_by, updated_by)
+    and soft delete capability (is_deleted, deleted_at, deleted_by).
     """
 
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name="dependents")
     name = models.CharField(max_length=150, help_text="Nome do dependente")
-    phone = models.CharField(max_length=20, help_text="Telefone do dependente")
+    phone = models.CharField(
+        max_length=20,
+        help_text="Telefone do dependente",
+        validators=[validate_brazilian_phone],
+    )
+
+    # Custom manager that excludes soft-deleted objects
+    objects = SoftDeleteManager()
+    all_objects = models.Manager()  # Access all objects including deleted
 
     def __str__(self) -> str:
         """Return string representation of dependent."""
         return f"{self.name} (dependente de {self.tenant.name})"
 
 
-class Lease(models.Model):
+class Lease(AuditMixin, SoftDeleteMixin, models.Model):
     """
     Represents a rental lease/contract for an apartment.
+
+    Inherits from AuditMixin (created_at, updated_at, created_by, updated_by)
+    and SoftDeleteMixin (is_deleted, deleted_at, deleted_by, soft delete support).
 
     Attributes:
         apartment: Apartment being rented
@@ -256,9 +477,7 @@ class Lease(models.Model):
         related_name="leases_responsible",
         help_text="Inquilino responsável pela locação",
     )
-    tenants = models.ManyToManyField(
-        Tenant, related_name="leases", help_text="Inquilinos que residem no apartamento"
-    )
+    tenants = models.ManyToManyField(Tenant, related_name="leases", help_text="Inquilinos que residem no apartamento")
     number_of_tenants = models.PositiveIntegerField(
         help_text="Número de ocupantes (para cálculo de taxa de tag). "
         "Pode ser maior que o número de inquilinos registrados.",
@@ -274,29 +493,21 @@ class Lease(models.Model):
         validators=[validate_due_day],  # Validate 1-31 range
     )
 
-    rental_value = models.DecimalField(
-        max_digits=10, decimal_places=2, help_text="Valor do aluguel"
-    )
-    cleaning_fee = models.DecimalField(
-        max_digits=10, decimal_places=2, help_text="Valor da taxa de limpeza"
-    )
-    tag_fee = models.DecimalField(
-        max_digits=10, decimal_places=2, help_text="Valor da caução da tag", default=0
-    )
+    rental_value = models.DecimalField(max_digits=10, decimal_places=2, help_text="Valor do aluguel")
+    cleaning_fee = models.DecimalField(max_digits=10, decimal_places=2, help_text="Valor da taxa de limpeza")
+    tag_fee = models.DecimalField(max_digits=10, decimal_places=2, help_text="Valor da caução da tag", default=0)
 
-    contract_generated = models.BooleanField(
-        default=False, help_text="Indica se o contrato foi gerado"
-    )
-    contract_signed = models.BooleanField(
-        default=False, help_text="Indica se o contrato foi assinado"
-    )
-    interfone_configured = models.BooleanField(
-        default=False, help_text="Indica se o interfone foi configurado"
-    )
+    contract_generated = models.BooleanField(default=False, help_text="Indica se o contrato foi gerado")
+    contract_signed = models.BooleanField(default=False, help_text="Indica se o contrato foi assinado")
+    interfone_configured = models.BooleanField(default=False, help_text="Indica se o interfone foi configurado")
 
     warning_count = models.PositiveIntegerField(
         default=0, help_text="Número de avisos do inquilino por descumprimento das regras"
     )
+
+    # Managers
+    objects = SoftDeleteManager()
+    all_objects = models.Manager()  # Access all objects including deleted
 
     class Meta:
         indexes = [
@@ -341,6 +552,11 @@ class Lease(models.Model):
             except ValidationError:
                 # Re-raise to preserve error structure
                 raise
+
+    def save(self, *args, **kwargs):
+        """Override save to enforce validation before persisting."""
+        self.full_clean()
+        super().save(*args, **kwargs)
 
     def __str__(self) -> str:
         """Return string representation of lease."""

@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
@@ -34,84 +33,23 @@ import {
   useDeleteBuilding,
 } from '@/lib/api/hooks/use-buildings';
 import { Building } from '@/lib/schemas/building.schema';
-import { useExport, buildingExportColumns } from '@/lib/hooks/use-export';
-import { useBulkOperations } from '@/lib/hooks/use-bulk-operations';
+import { buildingExportColumns } from '@/lib/hooks/use-export';
+import { useCrudPage } from '@/lib/hooks/use-crud-page';
 
 export default function BuildingsPage() {
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingBuilding, setEditingBuilding] = useState<Building | null>(null);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [deleteId, setDeleteId] = useState<number | null>(null);
-  const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
-
   const { data: buildings, isLoading, error } = useBuildings();
   const deleteMutation = useDeleteBuilding();
-  const { exportToExcel, exportToCSV, isExporting } = useExport();
-  const bulkOps = useBulkOperations({
+
+  // Use the consolidated CRUD hook for all state management
+  const crud = useCrudPage<Building>({
     entityName: 'prédio',
     entityNamePlural: 'prédios',
+    deleteMutation,
+    exportColumns: buildingExportColumns,
+    exportFilename: 'predios',
+    exportSheetName: 'Prédios',
+    deleteErrorMessage: 'Erro ao excluir prédio. Verifique se não há apartamentos vinculados.',
   });
-
-  const handleEdit = (building: Building) => {
-    setEditingBuilding(building);
-    setIsModalOpen(true);
-  };
-
-  const handleDeleteClick = (id: number) => {
-    setDeleteId(id);
-    setDeleteDialogOpen(true);
-  };
-
-  const handleDelete = async () => {
-    if (!deleteId) return;
-    try {
-      await deleteMutation.mutateAsync(deleteId);
-      toast.success('Prédio excluído com sucesso');
-      setDeleteDialogOpen(false);
-      setDeleteId(null);
-    } catch (error) {
-      toast.error('Erro ao excluir prédio. Verifique se não há apartamentos vinculados.');
-      console.error('Delete error:', error);
-    }
-  };
-
-  const handleModalClose = () => {
-    setIsModalOpen(false);
-    setEditingBuilding(null);
-  };
-
-  const handleExport = async (format: 'excel' | 'csv') => {
-    if (!buildings || buildings.length === 0) {
-      toast.warning('Não há dados para exportar');
-      return;
-    }
-
-    try {
-      if (format === 'excel') {
-        await exportToExcel(buildings, buildingExportColumns, {
-          filename: 'predios',
-          sheetName: 'Prédios',
-        });
-        toast.success('Arquivo Excel exportado com sucesso!');
-      } else {
-        await exportToCSV(buildings, buildingExportColumns, {
-          filename: 'predios',
-        });
-        toast.success('Arquivo CSV exportado com sucesso!');
-      }
-    } catch {
-      toast.error('Erro ao exportar arquivo');
-    }
-  };
-
-  const handleBulkDeleteClick = () => {
-    setBulkDeleteDialogOpen(true);
-  };
-
-  const handleBulkDelete = () => {
-    bulkOps.handleBulkDelete(deleteMutation.mutateAsync);
-    setBulkDeleteDialogOpen(false);
-  };
 
   const columns: Column<Building>[] = [
     {
@@ -137,12 +75,12 @@ export default function BuildingsPage() {
       key: 'actions',
       width: 150,
       fixed: 'right',
-      render: (_, record: Building, _index) => (
+      render: (_, record: Building) => (
         <div className="flex items-center gap-2">
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => handleEdit(record)}
+            onClick={() => crud.openEditModal(record)}
           >
             <Pencil className="h-4 w-4 mr-1" />
             Editar
@@ -150,8 +88,11 @@ export default function BuildingsPage() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => handleDeleteClick(record.id!)}
-            disabled={deleteMutation.isPending}
+            onClick={() => {
+              crud.setItemToDelete(record);
+              crud.handleDeleteClick(record.id!);
+            }}
+            disabled={crud.isDeleting}
           >
             <Trash2 className="h-4 w-4 mr-1" />
             Excluir
@@ -179,43 +120,43 @@ export default function BuildingsPage() {
             <DropdownMenuTrigger asChild>
               <Button
                 variant="outline"
-                disabled={isExporting || !buildings || buildings.length === 0}
+                disabled={crud.isExporting || !buildings || buildings.length === 0}
               >
                 <Download className="h-4 w-4 mr-2" />
                 Exportar
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
-              <DropdownMenuItem onClick={() => handleExport('excel')}>
+              <DropdownMenuItem onClick={() => crud.handleExport('excel', buildings || [])}>
                 <FileSpreadsheet className="h-4 w-4 mr-2" />
                 Exportar para Excel
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleExport('csv')}>
+              <DropdownMenuItem onClick={() => crud.handleExport('csv', buildings || [])}>
                 <FileText className="h-4 w-4 mr-2" />
                 Exportar para CSV
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button onClick={() => setIsModalOpen(true)}>
+          <Button onClick={crud.openCreateModal}>
             <Plus className="h-4 w-4 mr-2" />
             Novo Prédio
           </Button>
         </div>
       </div>
 
-      {bulkOps.hasSelection && (
+      {crud.bulkOps.hasSelection && (
         <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded flex justify-between items-center">
           <span className="text-blue-700 font-medium">
-            {bulkOps.selectionCount} {bulkOps.selectionCount === 1 ? 'prédio selecionado' : 'prédios selecionados'}
+            {crud.bulkOps.selectionCount} {crud.bulkOps.selectionCount === 1 ? 'prédio selecionado' : 'prédios selecionados'}
           </span>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={bulkOps.clearSelection}>
+            <Button variant="outline" onClick={crud.bulkOps.clearSelection}>
               Cancelar Seleção
             </Button>
             <Button
               variant="destructive"
-              onClick={handleBulkDeleteClick}
-              disabled={deleteMutation.isPending}
+              onClick={() => crud.setBulkDeleteDialogOpen(true)}
+              disabled={crud.isBulkDeleting}
             >
               <Trash2 className="h-4 w-4 mr-2" />
               Excluir Selecionados
@@ -229,52 +170,54 @@ export default function BuildingsPage() {
         dataSource={buildings}
         loading={isLoading}
         rowKey="id"
-        rowSelection={bulkOps.rowSelection}
+        rowSelection={crud.bulkOps.rowSelection}
       />
 
       <BuildingFormModal
-        open={isModalOpen}
-        building={editingBuilding}
-        onClose={handleModalClose}
+        open={crud.isModalOpen}
+        building={crud.editingItem}
+        onClose={crud.closeModal}
       />
 
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+      <AlertDialog open={crud.deleteDialogOpen} onOpenChange={crud.setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir prédio</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja excluir este prédio? Esta ação não pode ser desfeita.
+              Tem certeza que deseja excluir {crud.itemToDelete?.name ? `"${crud.itemToDelete.name}"` : 'este prédio'}? Esta ação não pode ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleDelete}
+              onClick={crud.handleDelete}
+              disabled={crud.isDeleting}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Excluir
+              {crud.isDeleting ? 'Excluindo...' : 'Excluir'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog open={bulkDeleteDialogOpen} onOpenChange={setBulkDeleteDialogOpen}>
+      <AlertDialog open={crud.bulkDeleteDialogOpen} onOpenChange={crud.setBulkDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir prédios selecionados</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja excluir {bulkOps.selectionCount}{' '}
-              {bulkOps.selectionCount === 1 ? 'prédio' : 'prédios'}? Esta ação não pode
+              Tem certeza que deseja excluir {crud.bulkOps.selectionCount}{' '}
+              {crud.bulkOps.selectionCount === 1 ? 'prédio' : 'prédios'}? Esta ação não pode
               ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleBulkDelete}
+              onClick={crud.handleBulkDelete}
+              disabled={crud.isBulkDeleting}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Excluir
+              {crud.isBulkDeleting ? 'Excluindo...' : 'Excluir'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

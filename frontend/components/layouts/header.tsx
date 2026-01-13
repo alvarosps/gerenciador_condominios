@@ -3,8 +3,11 @@
 import { Bell, LogOut, Settings } from 'lucide-react';
 import { useLogout } from '@/lib/api/hooks/use-auth';
 import { useAuthStore } from '@/store/auth-store';
+import { useHydration } from '@/lib/hooks/use-hydration';
 import { GlobalSearch } from '@/components/search/global-search';
+import { MobileNav } from '@/components/layouts/mobile-nav';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,9 +18,33 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 
+/**
+ * Skeleton component shown during hydration to prevent flash
+ */
+function HeaderSkeleton() {
+  return (
+    <header className="flex items-center justify-between border-b bg-white px-4 md:px-6 py-4">
+      <div className="flex items-center gap-4 flex-1">
+        <Skeleton className="h-10 w-10 rounded-md md:hidden" />
+        <Skeleton className="h-10 flex-1 max-w-md" />
+      </div>
+      <div className="flex items-center gap-4">
+        <Skeleton className="h-10 w-10 rounded-md" />
+        <Skeleton className="h-8 w-8 rounded-full" />
+      </div>
+    </header>
+  );
+}
+
 export function Header() {
+  const hydrated = useHydration();
   const logoutMutation = useLogout();
   const user = useAuthStore((state) => state.user);
+
+  // Show skeleton during hydration to prevent flash of unauthenticated state
+  if (!hydrated) {
+    return <HeaderSkeleton />;
+  }
 
   const handleLogout = (): void => {
     logoutMutation.mutate();
@@ -28,12 +55,16 @@ export function Header() {
     : user?.email?.[0]?.toUpperCase() || 'U';
 
   return (
-    <header className="flex items-center justify-between border-b bg-white px-6 py-4">
-      <div className="flex-1 max-w-md">
-        <GlobalSearch />
+    <header className="flex items-center justify-between border-b bg-white px-4 md:px-6 py-4">
+      <div className="flex items-center gap-4 flex-1">
+        {/* Mobile hamburger menu */}
+        <MobileNav />
+        <div className="flex-1 max-w-md">
+          <GlobalSearch />
+        </div>
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2 md:gap-4">
         {/* Notifications Badge */}
         <Button variant="ghost" size="icon" className="relative">
           <Bell className="h-5 w-5" />

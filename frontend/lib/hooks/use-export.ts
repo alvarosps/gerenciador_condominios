@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
-import { formatCurrency } from '@/lib/utils/formatters';
-import { formatCPFOrCNPJ, formatBrazilianPhone } from '@/lib/utils/validators';
+import { formatCurrency, formatCPFOrCNPJ, formatBrazilianPhone } from '@/lib/utils/formatters';
 
 interface ExportOptions {
   filename?: string;

@@ -15,6 +15,7 @@ Models and their cache invalidation relationships:
 - Furniture: Invalidates Furniture, Apartment, Tenant caches
 - Dependent: Invalidates Dependent, Tenant caches
 """
+
 from __future__ import annotations
 
 import logging

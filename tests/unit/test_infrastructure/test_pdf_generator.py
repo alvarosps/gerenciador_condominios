@@ -6,16 +6,13 @@ they correctly implement the IPDFGenerator interface.
 """
 
 import os
-import pytest
 import tempfile
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from core.infrastructure.pdf_generator import (
-    IPDFGenerator,
-    PDFGenerationError,
-    PyppeteerPDFGenerator,
-)
+import pytest
+
+from core.infrastructure.pdf_generator import IPDFGenerator, PDFGenerationError, PyppeteerPDFGenerator
 
 try:
     from core.infrastructure.pdf_generator import WeasyPrintPDFGenerator
@@ -151,7 +148,6 @@ class TestPyppeteerPDFGenerator:
                 assert output_path.parent.exists()
 
 
-@pytest.mark.skipif(not HAS_WEASYPRINT, reason="WeasyPrint not installed")
 @pytest.mark.unit
 @pytest.mark.infrastructure
 class TestWeasyPrintPDFGenerator:
@@ -160,7 +156,10 @@ class TestWeasyPrintPDFGenerator:
     @pytest.fixture
     def pdf_generator(self):
         """Create a WeasyPrintPDFGenerator instance."""
-        return WeasyPrintPDFGenerator()
+        pytest.importorskip("weasyprint")
+        from core.infrastructure.pdf_generator import WeasyPrintPDFGenerator as WPPDF
+
+        return WPPDF()
 
     @pytest.fixture
     def temp_output_file(self):
@@ -198,9 +197,7 @@ class TestWeasyPrintPDFGenerator:
         """Test PDF generation handles WeasyPrint errors."""
         html_content = "<html><body><h1>Test PDF</h1></body></html>"
 
-        with patch(
-            "weasyprint.HTML", side_effect=Exception("WeasyPrint failed")
-        ):
+        with patch("weasyprint.HTML", side_effect=Exception("WeasyPrint failed")):
             with pytest.raises(PDFGenerationError, match="WeasyPrint PDF generation failed"):
                 await pdf_generator.generate_pdf(html_content, temp_output_file)
 

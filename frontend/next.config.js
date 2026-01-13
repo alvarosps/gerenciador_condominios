@@ -1,10 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  reactStrictMode: false, // Disable strict mode to prevent double rendering issues with Ant Design
+  reactStrictMode: true,
   output: 'standalone', // Use Node.js server mode instead of static export
-  transpilePackages: ['antd', '@ant-design/cssinjs', '@ant-design/icons'],
   experimental: {
-    optimizePackageImports: ['antd', '@ant-design/icons'],
+    optimizePackageImports: ['lucide-react'],
   },
   async rewrites() {
     return [

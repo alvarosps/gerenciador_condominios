@@ -5,6 +5,7 @@ Provides validation for CPF, CNPJ, and Brazilian phone numbers.
 These validators handle formatting, length checks, and checksum validation
 according to Brazilian government standards.
 """
+
 from __future__ import annotations
 
 import re
@@ -290,9 +291,7 @@ class BrazilianPhoneValidator(RegexValidator):
         if len(cleaned) >= 2:
             area_code = int(cleaned[:2])
             if area_code < 11 or area_code > 99:
-                raise ValidationError(
-                    "Código de área inválido. Deve estar entre 11 e 99.", code="invalid_area_code"
-                )
+                raise ValidationError("Código de área inválido. Deve estar entre 11 e 99.", code="invalid_area_code")
 
         return value
 

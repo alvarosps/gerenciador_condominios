@@ -2,32 +2,46 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 /**
+ * List of public paths that don't require authentication
+ */
+const PUBLIC_PATHS = ['/login', '/register'];
+
+/**
  * Middleware to protect routes that require authentication
  *
  * This runs before rendering any page, checking if the user is authenticated.
  * Redirects to /login if accessing protected pages without authentication.
- * Redirects to /dashboard if accessing /login while already authenticated.
+ * Redirects to / (dashboard) if accessing /login while already authenticated.
+ *
+ * Protected routes (under (dashboard) route group):
+ * - / (root/dashboard)
+ * - /buildings
+ * - /apartments
+ * - /tenants
+ * - /leases
+ * - /furniture
+ * - /contract-template
  */
 export function middleware(request: NextRequest) {
-  // Check for access token in cookies or check localStorage hint
+  // Check for access token in cookies (synced from localStorage on login)
   const hasToken = request.cookies.has('access_token');
 
   // Get current path
   const path = request.nextUrl.pathname;
 
-  // Dashboard routes (protected)
-  const isProtectedPage = path.startsWith('/dashboard');
+  // Check if this is a public path
+  const isPublicPath = PUBLIC_PATHS.some((publicPath) => path === publicPath || path.startsWith(`${publicPath}/`));
 
-  // If trying to access protected page without token, redirect to login
-  if (isProtectedPage && !hasToken) {
+  // If accessing protected page without token, redirect to login
+  if (!isPublicPath && !hasToken) {
     const loginUrl = new URL('/login', request.url);
-    loginUrl.searchParams.set('redirect', path); // Save redirect path
+    loginUrl.searchParams.set('redirect', path); // Save redirect path for after login
     return NextResponse.redirect(loginUrl);
   }
 
-  // If trying to access login/register while authenticated, redirect to dashboard
-  if ((path === '/login' || path === '/register') && hasToken) {
-    return NextResponse.redirect(new URL('/dashboard', request.url));
+  // If accessing login/register while authenticated, redirect to dashboard
+  if (isPublicPath && hasToken) {
+    return NextResponse.redirect(new URL('/', request.url));
   }
 
   // Allow the request to proceed

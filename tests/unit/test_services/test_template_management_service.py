@@ -7,17 +7,19 @@ Tests all template management operations including:
 - Preview rendering with sample data
 - Listing and restoring backups
 """
-import pytest
+
 import os
 import shutil
 from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import MagicMock, Mock, patch
+
+import pytest
 from freezegun import freeze_time
 
+from core.models import Apartment, Building, Furniture, Lease, Tenant
 from core.services.template_management_service import TemplateManagementService
-from core.models import Building, Apartment, Tenant, Lease, Furniture
 
 
 @pytest.fixture
@@ -38,46 +40,34 @@ def mock_template_path(tmp_path, monkeypatch):
     <p>Valor: {{ rental_value | currency }}</p>
 </body>
 </html>"""
-    template_file.write_text(template_content, encoding='utf-8')
+    template_file.write_text(template_content, encoding="utf-8")
 
     # Mock get_template_path to return our temp file
     monkeypatch.setattr(
-        'core.services.template_management_service.TemplateManagementService.get_template_path',
-        lambda: str(template_file)
+        "core.services.template_management_service.TemplateManagementService.get_template_path",
+        lambda: str(template_file),
     )
 
     # Mock get_backup_directory
     backup_dir = template_dir / "backups"
     backup_dir.mkdir(exist_ok=True)
     monkeypatch.setattr(
-        'core.services.template_management_service.TemplateManagementService.get_backup_directory',
-        lambda: str(backup_dir)
+        "core.services.template_management_service.TemplateManagementService.get_backup_directory",
+        lambda: str(backup_dir),
     )
 
-    return {
-        'template_file': template_file,
-        'backup_dir': backup_dir,
-        'content': template_content
-    }
+    return {"template_file": template_file, "backup_dir": backup_dir, "content": template_content}
 
 
 @pytest.fixture
 def sample_lease_for_preview():
     """Create a complete lease with all related objects for preview testing."""
     # Create building
-    building = Building.objects.create(
-        street_number=836,
-        name="Test Building",
-        address="Test Street, 836"
-    )
+    building = Building.objects.create(street_number=836, name="Test Building", address="Test Street, 836")
 
     # Create apartment
     apartment = Apartment.objects.create(
-        building=building,
-        number=101,
-        rental_value=Decimal('1500.00'),
-        cleaning_fee=Decimal('200.00'),
-        max_tenants=2
+        building=building, number=101, rental_value=Decimal("1500.00"), cleaning_fee=Decimal("200.00"), max_tenants=2
     )
 
     # Create furniture
@@ -88,10 +78,10 @@ def sample_lease_for_preview():
     # Create tenant
     tenant = Tenant.objects.create(
         name="John Doe",
-        cpf_cnpj="12345678901",
+        cpf_cnpj="529.982.247-25",
         phone="11999999999",
-        marital_status="Single",
-        profession="Engineer"
+        marital_status="Solteiro(a)",
+        profession="Engineer",
     )
 
     # Create lease
@@ -101,10 +91,10 @@ def sample_lease_for_preview():
         start_date=datetime(2025, 1, 15).date(),
         validity_months=12,
         due_day=10,
-        rental_value=Decimal('1500.00'),
-        cleaning_fee=Decimal('200.00'),
-        tag_fee=Decimal('50.00'),
-        contract_generated=False
+        rental_value=Decimal("1500.00"),
+        cleaning_fee=Decimal("200.00"),
+        tag_fee=Decimal("50.00"),
+        contract_generated=False,
     )
     lease.tenants.add(tenant)
 
@@ -122,7 +112,7 @@ class TestGetTemplatePath:
         template_dir = tmp_path / "core" / "templates"
         template_dir.mkdir(parents=True, exist_ok=True)
         template_file = template_dir / "contract_template.html"
-        template_file.write_text("test", encoding='utf-8')
+        template_file.write_text("test", encoding="utf-8")
 
         path = TemplateManagementService.get_template_path()
 
@@ -175,7 +165,7 @@ class TestGetTemplate:
         """Test that get_template returns the template content."""
         content = TemplateManagementService.get_template()
 
-        assert content == mock_template_path['content']
+        assert content == mock_template_path["content"]
         assert "<!DOCTYPE html>" in content
         assert "{{ tenant.name }}" in content
 
@@ -184,7 +174,7 @@ class TestGetTemplate:
         # Add some Portuguese characters
         template_file = Path(TemplateManagementService.get_template_path())
         template_content = "<!DOCTYPE html>\n<html><body>Locação: R$ 1.500,00</body></html>"
-        template_file.write_text(template_content, encoding='utf-8')
+        template_file.write_text(template_content, encoding="utf-8")
 
         content = TemplateManagementService.get_template()
 
@@ -195,8 +185,8 @@ class TestGetTemplate:
         """Test that IOError is raised if template cannot be read."""
         # Mock get_template_path to return non-existent file
         monkeypatch.setattr(
-            'core.services.template_management_service.TemplateManagementService.get_template_path',
-            lambda: '/nonexistent/path/template.html'
+            "core.services.template_management_service.TemplateManagementService.get_template_path",
+            lambda: "/nonexistent/path/template.html",
         )
 
         with pytest.raises(Exception):
@@ -211,18 +201,18 @@ class TestSaveTemplate:
         """Test that save_template creates a timestamped backup."""
         new_content = "<html><body>New Template</body></html>"
 
-        result = TemplateManagementService.save_template(new_content)
+        _result = TemplateManagementService.save_template(new_content)  # noqa: F841
 
         # Verify backup was created
-        backup_dir = Path(mock_template_path['backup_dir'])
+        backup_dir = Path(mock_template_path["backup_dir"])
         backup_files = list(backup_dir.glob("contract_template_backup_*.html"))
 
         assert len(backup_files) == 1
         assert "contract_template_backup_20250115_143000.html" in str(backup_files[0])
 
         # Verify backup contains old content
-        backup_content = backup_files[0].read_text(encoding='utf-8')
-        assert backup_content == mock_template_path['content']
+        backup_content = backup_files[0].read_text(encoding="utf-8")
+        assert backup_content == mock_template_path["content"]
 
     def test_save_template_updates_file(self, mock_template_path):
         """Test that save_template updates the template file."""
@@ -232,7 +222,7 @@ class TestSaveTemplate:
 
         # Verify template was updated
         template_file = Path(TemplateManagementService.get_template_path())
-        current_content = template_file.read_text(encoding='utf-8')
+        current_content = template_file.read_text(encoding="utf-8")
 
         assert current_content == new_content
 
@@ -242,11 +232,11 @@ class TestSaveTemplate:
 
         result = TemplateManagementService.save_template(new_content)
 
-        assert 'message' in result
-        assert 'backup_path' in result
-        assert 'backup_filename' in result
-        assert "sucesso" in result['message'].lower()
-        assert "20250115_143000" in result['backup_filename']
+        assert "message" in result
+        assert "backup_path" in result
+        assert "backup_filename" in result
+        assert "sucesso" in result["message"].lower()
+        assert "20250115_143000" in result["backup_filename"]
 
     def test_save_template_rejects_empty_content(self, mock_template_path):
         """Test that save_template rejects empty content."""
@@ -264,7 +254,7 @@ class TestSaveTemplate:
 
         # Verify content was saved correctly
         template_file = Path(TemplateManagementService.get_template_path())
-        saved_content = template_file.read_text(encoding='utf-8')
+        saved_content = template_file.read_text(encoding="utf-8")
 
         assert saved_content == new_content
         assert "Locação" in saved_content
@@ -274,10 +264,8 @@ class TestSaveTemplate:
 class TestPreviewTemplate:
     """Test template preview rendering."""
 
-    @patch('core.services.template_management_service.Environment')
-    def test_preview_template_renders_with_sample_lease(
-        self, mock_env_class, sample_lease_for_preview
-    ):
+    @patch("core.services.template_management_service.Environment")
+    def test_preview_template_renders_with_sample_lease(self, mock_env_class, sample_lease_for_preview):
         """Test that preview_template renders with sample lease data."""
         # Mock Jinja2 environment
         mock_env = Mock()
@@ -296,10 +284,8 @@ class TestPreviewTemplate:
         mock_env.from_string.assert_called_once_with(content)
         mock_template.render.assert_called_once()
 
-    @patch('core.services.template_management_service.Environment')
-    def test_preview_template_uses_specific_lease(
-        self, mock_env_class, sample_lease_for_preview
-    ):
+    @patch("core.services.template_management_service.Environment")
+    def test_preview_template_uses_specific_lease(self, mock_env_class, sample_lease_for_preview):
         """Test that preview_template can use a specific lease."""
         # Mock Jinja2 environment
         mock_env = Mock()
@@ -318,7 +304,7 @@ class TestPreviewTemplate:
         # Verify rendering happened
         mock_template.render.assert_called_once()
 
-    @patch('core.services.template_management_service.Environment')
+    @patch("core.services.template_management_service.Environment")
     def test_preview_template_registers_filters(self, mock_env_class):
         """Test that preview_template registers custom Jinja2 filters."""
         # Mock Jinja2 environment
@@ -330,24 +316,12 @@ class TestPreviewTemplate:
         mock_env_class.return_value = mock_env
 
         # Create minimal lease for testing
-        building = Building.objects.create(
-            street_number=100,
-            name="Test",
-            address="Test"
-        )
+        building = Building.objects.create(street_number=100, name="Test", address="Test")
         apartment = Apartment.objects.create(
-            building=building,
-            number=1,
-            rental_value=Decimal('100.00'),
-            cleaning_fee=Decimal('10.00'),
-            max_tenants=1
+            building=building, number=1, rental_value=Decimal("100.00"), cleaning_fee=Decimal("10.00"), max_tenants=1
         )
         tenant = Tenant.objects.create(
-            name="Test",
-            cpf_cnpj="123",
-            phone="123",
-            marital_status="Single",
-            profession="Test"
+            name="Test", cpf_cnpj="520.998.780-99", phone="11999999998", marital_status="Solteiro(a)", profession="Test"
         )
         lease = Lease.objects.create(
             apartment=apartment,
@@ -355,17 +329,17 @@ class TestPreviewTemplate:
             start_date=datetime(2025, 1, 1).date(),
             validity_months=12,
             due_day=10,
-            rental_value=Decimal('100.00'),
-            cleaning_fee=Decimal('10.00'),
-            tag_fee=Decimal('50.00')
+            rental_value=Decimal("100.00"),
+            cleaning_fee=Decimal("10.00"),
+            tag_fee=Decimal("50.00"),
         )
         lease.tenants.add(tenant)
 
         TemplateManagementService.preview_template("<html>Test</html>", lease.id)
 
         # Verify filters were registered
-        assert 'currency' in mock_env.filters
-        assert 'extenso' in mock_env.filters
+        assert "currency" in mock_env.filters
+        assert "extenso" in mock_env.filters
 
     def test_preview_template_raises_if_no_lease(self):
         """Test that preview_template raises error if no lease exists."""
@@ -395,13 +369,13 @@ class TestListBackups:
     def test_list_backups_returns_backup_info(self, mock_template_path):
         """Test that list_backups returns backup information."""
         # Create some backups
-        backup_dir = Path(mock_template_path['backup_dir'])
+        backup_dir = Path(mock_template_path["backup_dir"])
 
         backup1 = backup_dir / "contract_template_backup_20250115_120000.html"
-        backup1.write_text("backup 1", encoding='utf-8')
+        backup1.write_text("backup 1", encoding="utf-8")
 
         backup2 = backup_dir / "contract_template_backup_20250115_130000.html"
-        backup2.write_text("backup 2", encoding='utf-8')
+        backup2.write_text("backup 2", encoding="utf-8")
 
         backups = TemplateManagementService.list_backups()
 
@@ -409,60 +383,60 @@ class TestListBackups:
 
         # Verify backup info structure
         for backup in backups:
-            assert 'filename' in backup
-            assert 'path' in backup
-            assert 'size' in backup
-            assert 'created_at' in backup
-            assert backup['filename'].startswith('contract_template_backup_')
-            assert backup['filename'].endswith('.html')
+            assert "filename" in backup
+            assert "path" in backup
+            assert "size" in backup
+            assert "created_at" in backup
+            assert backup["filename"].startswith("contract_template_backup_")
+            assert backup["filename"].endswith(".html")
 
     def test_list_backups_sorted_by_date_descending(self, mock_template_path):
         """Test that backups are sorted by date (newest first)."""
         # Create backups with different timestamps
-        backup_dir = Path(mock_template_path['backup_dir'])
+        backup_dir = Path(mock_template_path["backup_dir"])
 
         backup1 = backup_dir / "contract_template_backup_20250115_100000.html"
-        backup1.write_text("old", encoding='utf-8')
+        backup1.write_text("old", encoding="utf-8")
 
         backup2 = backup_dir / "contract_template_backup_20250115_140000.html"
-        backup2.write_text("new", encoding='utf-8')
+        backup2.write_text("new", encoding="utf-8")
 
         backups = TemplateManagementService.list_backups()
 
         # Newest should be first
-        assert backups[0]['filename'] == "contract_template_backup_20250115_140000.html"
-        assert backups[1]['filename'] == "contract_template_backup_20250115_100000.html"
+        assert backups[0]["filename"] == "contract_template_backup_20250115_140000.html"
+        assert backups[1]["filename"] == "contract_template_backup_20250115_100000.html"
 
     def test_list_backups_includes_file_size(self, mock_template_path):
         """Test that backup info includes file size."""
-        backup_dir = Path(mock_template_path['backup_dir'])
+        backup_dir = Path(mock_template_path["backup_dir"])
 
         backup = backup_dir / "contract_template_backup_20250115_120000.html"
         content = "A" * 1000  # 1000 bytes
-        backup.write_text(content, encoding='utf-8')
+        backup.write_text(content, encoding="utf-8")
 
         backups = TemplateManagementService.list_backups()
 
         assert len(backups) == 1
-        assert backups[0]['size'] >= 1000  # Should be at least 1000 bytes
+        assert backups[0]["size"] >= 1000  # Should be at least 1000 bytes
 
     def test_list_backups_ignores_non_backup_files(self, mock_template_path):
         """Test that list_backups ignores non-backup files."""
-        backup_dir = Path(mock_template_path['backup_dir'])
+        backup_dir = Path(mock_template_path["backup_dir"])
 
         # Create valid backup
         valid_backup = backup_dir / "contract_template_backup_20250115_120000.html"
-        valid_backup.write_text("valid", encoding='utf-8')
+        valid_backup.write_text("valid", encoding="utf-8")
 
         # Create invalid files
-        (backup_dir / "other_file.html").write_text("not a backup", encoding='utf-8')
-        (backup_dir / "template.txt").write_text("wrong extension", encoding='utf-8')
+        (backup_dir / "other_file.html").write_text("not a backup", encoding="utf-8")
+        (backup_dir / "template.txt").write_text("wrong extension", encoding="utf-8")
 
         backups = TemplateManagementService.list_backups()
 
         # Should only return the valid backup
         assert len(backups) == 1
-        assert backups[0]['filename'] == "contract_template_backup_20250115_120000.html"
+        assert backups[0]["filename"] == "contract_template_backup_20250115_120000.html"
 
 
 @freeze_time("2025-01-15 16:00:00")
@@ -472,59 +446,59 @@ class TestRestoreBackup:
     def test_restore_backup_replaces_template(self, mock_template_path):
         """Test that restore_backup replaces current template."""
         # Create a backup
-        backup_dir = Path(mock_template_path['backup_dir'])
+        backup_dir = Path(mock_template_path["backup_dir"])
         backup_file = backup_dir / "contract_template_backup_20250115_120000.html"
         backup_content = "<html><body>Old Template</body></html>"
-        backup_file.write_text(backup_content, encoding='utf-8')
+        backup_file.write_text(backup_content, encoding="utf-8")
 
         # Modify current template
         template_file = Path(TemplateManagementService.get_template_path())
-        template_file.write_text("<html><body>New Template</body></html>", encoding='utf-8')
+        template_file.write_text("<html><body>New Template</body></html>", encoding="utf-8")
 
         # Restore backup
         TemplateManagementService.restore_backup("contract_template_backup_20250115_120000.html")
 
         # Verify template was restored
-        restored_content = template_file.read_text(encoding='utf-8')
+        restored_content = template_file.read_text(encoding="utf-8")
         assert restored_content == backup_content
 
     def test_restore_backup_creates_safety_backup(self, mock_template_path):
         """Test that restore_backup creates a safety backup of current template."""
         # Create a backup
-        backup_dir = Path(mock_template_path['backup_dir'])
+        backup_dir = Path(mock_template_path["backup_dir"])
         backup_file = backup_dir / "contract_template_backup_20250115_120000.html"
-        backup_file.write_text("<html><body>Old Template</body></html>", encoding='utf-8')
+        backup_file.write_text("<html><body>Old Template</body></html>", encoding="utf-8")
 
         # Set current template
         template_file = Path(TemplateManagementService.get_template_path())
         current_content = "<html><body>Current Template</body></html>"
-        template_file.write_text(current_content, encoding='utf-8')
+        template_file.write_text(current_content, encoding="utf-8")
 
         # Restore backup
         result = TemplateManagementService.restore_backup("contract_template_backup_20250115_120000.html")
 
         # Verify safety backup was created
-        safety_backup = backup_dir / result['safety_backup']
+        safety_backup = backup_dir / result["safety_backup"]
         assert safety_backup.exists()
-        assert "before_restore_20250115_160000" in result['safety_backup']
+        assert "before_restore_20250115_160000" in result["safety_backup"]
 
         # Verify safety backup contains current content
-        safety_content = safety_backup.read_text(encoding='utf-8')
+        safety_content = safety_backup.read_text(encoding="utf-8")
         assert safety_content == current_content
 
     def test_restore_backup_returns_result(self, mock_template_path):
         """Test that restore_backup returns success message."""
         # Create a backup
-        backup_dir = Path(mock_template_path['backup_dir'])
+        backup_dir = Path(mock_template_path["backup_dir"])
         backup_file = backup_dir / "contract_template_backup_20250115_120000.html"
-        backup_file.write_text("<html>Test</html>", encoding='utf-8')
+        backup_file.write_text("<html>Test</html>", encoding="utf-8")
 
         result = TemplateManagementService.restore_backup("contract_template_backup_20250115_120000.html")
 
-        assert 'message' in result
-        assert 'safety_backup' in result
-        assert "restaurado com sucesso" in result['message'].lower()
-        assert "contract_template_backup_20250115_120000.html" in result['message']
+        assert "message" in result
+        assert "safety_backup" in result
+        assert "restaurado com sucesso" in result["message"].lower()
+        assert "contract_template_backup_20250115_120000.html" in result["message"]
 
     def test_restore_backup_raises_if_not_found(self, mock_template_path):
         """Test that restore_backup raises error if backup not found."""
@@ -534,17 +508,17 @@ class TestRestoreBackup:
     def test_restore_backup_handles_utf8(self, mock_template_path):
         """Test that restore_backup handles UTF-8 correctly."""
         # Create backup with UTF-8 content
-        backup_dir = Path(mock_template_path['backup_dir'])
+        backup_dir = Path(mock_template_path["backup_dir"])
         backup_file = backup_dir / "contract_template_backup_20250115_120000.html"
         backup_content = "<html><body>Locação em São Paulo - R$ 1.500,00</body></html>"
-        backup_file.write_text(backup_content, encoding='utf-8')
+        backup_file.write_text(backup_content, encoding="utf-8")
 
         # Restore backup
         TemplateManagementService.restore_backup("contract_template_backup_20250115_120000.html")
 
         # Verify UTF-8 was preserved
         template_file = Path(TemplateManagementService.get_template_path())
-        restored_content = template_file.read_text(encoding='utf-8')
+        restored_content = template_file.read_text(encoding="utf-8")
 
         assert "Locação" in restored_content
         assert "São Paulo" in restored_content
@@ -563,13 +537,13 @@ class TestTemplateManagementServiceIntegration:
         # 2. Save new version (creates backup)
         new_content_v1 = "<html><body>Version 1</body></html>"
         result1 = TemplateManagementService.save_template(new_content_v1)
-        backup_filename_v1 = result1['backup_filename']
+        backup_filename_v1 = result1["backup_filename"]
 
         # 3. Save another version
         with freeze_time("2025-01-15 11:00:00"):
             new_content_v2 = "<html><body>Version 2</body></html>"
             result2 = TemplateManagementService.save_template(new_content_v2)
-            backup_filename_v2 = result2['backup_filename']
+            _backup_filename_v2 = result2["backup_filename"]  # noqa: F841
 
         # 4. List backups (should have 2)
         backups = TemplateManagementService.list_backups()
@@ -577,7 +551,7 @@ class TestTemplateManagementServiceIntegration:
 
         # 5. Restore first backup (contains original content)
         with freeze_time("2025-01-15 12:00:00"):
-            restore_result = TemplateManagementService.restore_backup(backup_filename_v1)
+            _restore_result = TemplateManagementService.restore_backup(backup_filename_v1)  # noqa: F841
 
         # 6. Verify content was restored to original (backup_v1 has original)
         current_content = TemplateManagementService.get_template()
@@ -589,12 +563,12 @@ class TestTemplateManagementServiceIntegration:
         assert len(backups) == 2  # 2 manual backups (safety backup uses different naming)
 
         # Verify safety backup file exists
-        backup_dir = Path(mock_template_path['backup_dir'])
+        backup_dir = Path(mock_template_path["backup_dir"])
         safety_files = list(backup_dir.glob("contract_template_before_restore_*.html"))
         assert len(safety_files) == 1  # Safety backup was created
 
-    @patch('core.services.contract_service.ContractService.prepare_contract_context')
-    @patch('core.services.template_management_service.Environment')
+    @patch("core.services.contract_service.ContractService.prepare_contract_context")
+    @patch("core.services.template_management_service.Environment")
     def test_preview_uses_contract_service_context(
         self, mock_env_class, mock_prepare_context, sample_lease_for_preview
     ):
@@ -609,9 +583,9 @@ class TestTemplateManagementServiceIntegration:
 
         # Mock context preparation
         mock_context = {
-            'tenant': sample_lease_for_preview.responsible_tenant,
-            'building_number': 836,
-            'apartment_number': 101,
+            "tenant": sample_lease_for_preview.responsible_tenant,
+            "building_number": 836,
+            "apartment_number": 101,
         }
         mock_prepare_context.return_value = mock_context
 

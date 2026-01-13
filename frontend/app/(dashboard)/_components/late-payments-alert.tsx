@@ -14,7 +14,7 @@ export function LatePaymentsAlert() {
 
   if (isLoading) return null;
 
-  if (!data || data.length === 0) {
+  if (!data || data.total_late_leases === 0) {
     return (
       <Alert className="border-green-200 bg-green-50">
         <CheckCircle2 className="h-4 w-4 text-green-600" />
@@ -25,7 +25,7 @@ export function LatePaymentsAlert() {
     );
   }
 
-  const totalLateFees = data.reduce((sum, item) => sum + item.late_fee, 0);
+  const totalLateFees = parseFloat(data.total_late_fees) || 0;
 
   return (
     <Card className="border-red-200">
@@ -34,7 +34,7 @@ export function LatePaymentsAlert() {
           <div className="flex items-center gap-2">
             <AlertTriangle className="h-5 w-5 text-red-500" />
             <CardTitle className="text-lg">Pagamentos em Atraso</CardTitle>
-            <Badge variant="destructive">{data.length}</Badge>
+            <Badge variant="destructive">{data.total_late_leases}</Badge>
           </div>
           <div className="text-right">
             <div className="text-xs text-muted-foreground">Total em Multas</div>
@@ -46,7 +46,7 @@ export function LatePaymentsAlert() {
       </CardHeader>
       <CardContent>
         <div className="space-y-3">
-          {data.map((item, index) => (
+          {data.late_leases.map((item, index) => (
             <div
               key={index}
               className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
@@ -55,22 +55,22 @@ export function LatePaymentsAlert() {
                 <div className="flex items-center gap-2">
                   <span className="font-medium">{item.tenant_name}</span>
                   <Badge variant="destructive">
-                    {item.days_late} dias de atraso
+                    {item.late_days} dias de atraso
                   </Badge>
                 </div>
                 <div className="text-sm text-muted-foreground">
                   <span className="font-medium">
-                    {item.building} - Apto {item.apartment_number}
+                    Prédio {item.building_number} - Apto {item.apartment_number}
                   </span>
                 </div>
                 <div className="text-sm">
                   <span className="text-muted-foreground">Multa: </span>
                   <span className="font-bold text-red-600">
-                    {formatCurrency(item.late_fee)}
+                    {formatCurrency(parseFloat(item.late_fee) || 0)}
                   </span>
                 </div>
               </div>
-              <Link href="/dashboard/leases">
+              <Link href="/leases">
                 <Button variant="ghost" size="sm">
                   <Eye className="h-4 w-4 mr-2" />
                   Ver Locação
@@ -80,9 +80,9 @@ export function LatePaymentsAlert() {
           ))}
         </div>
 
-        {data.length > 5 && (
+        {data.late_leases.length > 5 && (
           <div className="mt-4 text-center">
-            <Link href="/dashboard/leases">
+            <Link href="/leases">
               <Button variant="link">Ver todas as locações</Button>
             </Link>
           </div>

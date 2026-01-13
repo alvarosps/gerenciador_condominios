@@ -349,16 +349,16 @@ import { BuildingForm } from './BuildingForm';
 import { useBuildings } from './hooks/useBuildings';
 
 export const Buildings: React.FC = () => {
-  const { 
-    buildings, 
-    loading, 
+  const {
+    buildings,
+    loading,
     createBuilding,
     updateBuilding,
-    deleteBuilding 
+    deleteBuilding
   } = useBuildings();
 
   return (
-    <Card 
+    <Card
       title="Prédios"
       extra={
         <Button type="primary" icon={<PlusOutlined />}>
@@ -479,9 +479,9 @@ export const BuildingForm: React.FC<BuildingFormProps> = ({
           label="Endereço"
           rules={[{ required: true, message: 'Campo obrigatório' }]}
         >
-          <Input.TextArea 
+          <Input.TextArea
             rows={3}
-            placeholder="Rua Example, 123 - Centro" 
+            placeholder="Rua Example, 123 - Centro"
           />
         </Form.Item>
       </Form>

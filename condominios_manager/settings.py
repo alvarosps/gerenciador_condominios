@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+import os
 from pathlib import Path
 
 from decouple import Csv, config
@@ -22,9 +23,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = config(
-    "SECRET_KEY", default="django-insecure-b7ya%t^1&z1v#af1mlzjsm*$l9o^zj!h9a3*)tf@2k&z8b*^)h"
-)
+SECRET_KEY = config("SECRET_KEY", default="django-insecure-b7ya%t^1&z1v#af1mlzjsm*$l9o^zj!h9a3*)tf@2k&z8b*^)h")
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config("DEBUG", default=True, cast=bool)
@@ -187,7 +186,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # CORS settings
 CORS_ALLOWED_ORIGINS = config(
     "CORS_ALLOWED_ORIGINS",
-    default="http://localhost:6000,http://127.0.0.1:6000,http://localhost:5173,http://127.0.0.1:5173",
+    default="http://localhost:3000,http://127.0.0.1:3000,http://localhost:6000,http://127.0.0.1:6000,http://localhost:5173,http://127.0.0.1:5173",
     cast=Csv(),
 )
 
@@ -269,12 +268,8 @@ from datetime import timedelta
 
 SIMPLE_JWT = {
     # Token lifetimes
-    "ACCESS_TOKEN_LIFETIME": timedelta(
-        minutes=config("JWT_ACCESS_TOKEN_LIFETIME", default=60, cast=int)
-    ),
-    "REFRESH_TOKEN_LIFETIME": timedelta(
-        minutes=config("JWT_REFRESH_TOKEN_LIFETIME", default=1440, cast=int)
-    ),
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=config("JWT_ACCESS_TOKEN_LIFETIME", default=60, cast=int)),
+    "REFRESH_TOKEN_LIFETIME": timedelta(minutes=config("JWT_REFRESH_TOKEN_LIFETIME", default=1440, cast=int)),
     # Token refresh settings
     "ROTATE_REFRESH_TOKENS": config("JWT_ROTATE_REFRESH_TOKENS", default=True, cast=bool),
     "BLACKLIST_AFTER_ROTATION": config("JWT_BLACKLIST_AFTER_ROTATION", default=True, cast=bool),
@@ -298,9 +293,7 @@ SIMPLE_JWT = {
 # Django-allauth Configuration
 ACCOUNT_AUTHENTICATION_METHOD = "username_email"  # Allow login with username or email
 ACCOUNT_EMAIL_REQUIRED = True  # Email is required
-ACCOUNT_EMAIL_VERIFICATION = (
-    "optional"  # Email verification optional (can be 'mandatory' in production)
-)
+ACCOUNT_EMAIL_VERIFICATION = "optional"  # Email verification optional (can be 'mandatory' in production)
 ACCOUNT_USERNAME_REQUIRED = True  # Username is required (Django default User model requires it)
 
 # Allow auto-linking of social accounts to existing users by email
@@ -349,10 +342,82 @@ FRONTEND_AUTH_CALLBACK_PATH = config("FRONTEND_AUTH_CALLBACK_PATH", default="/au
 LOGIN_REDIRECT_URL = f"{FRONTEND_URL}{FRONTEND_AUTH_CALLBACK_PATH}"
 ACCOUNT_LOGOUT_REDIRECT_URL = FRONTEND_URL
 
+
 # PDF Generation Configuration
-CHROME_EXECUTABLE_PATH = config(
-    "CHROME_EXECUTABLE_PATH", default=r"C:\Program Files\Google\Chrome\Application\chrome.exe"
-)
+def _detect_chrome_executable() -> str:
+    """
+    Detect Chrome/Chromium executable path based on the operating system.
+
+    Checks common installation paths on Windows, macOS, and Linux.
+    Returns the first valid path found, or raises an error if none found.
+
+    Returns:
+        Path to Chrome/Chromium executable
+
+    Raises:
+        FileNotFoundError: If no Chrome/Chromium installation is found
+    """
+    import platform
+    import shutil
+
+    system = platform.system().lower()
+
+    # Common Chrome/Chromium paths by OS
+    paths_by_os = {
+        "windows": [
+            r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+            r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+            r"C:\Program Files\Chromium\Application\chrome.exe",
+            r"C:\Program Files (x86)\Chromium\Application\chrome.exe",
+            # User-installed Chrome
+            os.path.expandvars(r"%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe"),
+            os.path.expandvars(r"%PROGRAMFILES%\Google\Chrome\Application\chrome.exe"),
+        ],
+        "darwin": [  # macOS
+            "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+            "/Applications/Chromium.app/Contents/MacOS/Chromium",
+            "/usr/local/bin/chromium",
+            "/opt/homebrew/bin/chromium",
+            # User-installed Chrome
+            os.path.expanduser("~/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"),
+        ],
+        "linux": [
+            "/usr/bin/google-chrome",
+            "/usr/bin/google-chrome-stable",
+            "/usr/bin/chromium",
+            "/usr/bin/chromium-browser",
+            "/snap/bin/chromium",
+            "/usr/local/bin/chromium",
+            # Flatpak installations
+            "/var/lib/flatpak/app/com.google.Chrome/current/active/files/bin/chrome",
+        ],
+    }
+
+    # Get paths for current OS
+    paths = paths_by_os.get(system, paths_by_os["linux"])
+
+    # Check each path
+    for path in paths:
+        if os.path.isfile(path):
+            return path
+
+    # Also check PATH environment
+    chrome_in_path = shutil.which("google-chrome") or shutil.which("chromium") or shutil.which("chromium-browser")
+    if chrome_in_path:
+        return chrome_in_path
+
+    # Return a default that will fail gracefully with a clear error message
+    default_paths = {
+        "windows": r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+        "darwin": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+        "linux": "/usr/bin/chromium",
+    }
+    return default_paths.get(system, "/usr/bin/chromium")
+
+
+# Chrome path from environment or auto-detected
+_env_chrome_path = config("CHROME_EXECUTABLE_PATH", default="")
+CHROME_EXECUTABLE_PATH = _env_chrome_path if _env_chrome_path else _detect_chrome_executable()
 PDF_OUTPUT_DIR = config("PDF_OUTPUT_DIR", default="contracts")
 PDF_GENERATION_TIMEOUT = config("PDF_GENERATION_TIMEOUT", default=30, cast=int)
 
@@ -363,4 +428,5 @@ LATE_FEE_PERCENTAGE = config("LATE_FEE_PERCENTAGE", default=0.05, cast=float)
 DAYS_PER_MONTH = config("DAYS_PER_MONTH", default=30, cast=int)
 
 # Logging Configuration
-from .logging_config import LOGGING
+# LOGGING is imported and used automatically by Django when present in settings module
+from .logging_config import LOGGING  # noqa: F401

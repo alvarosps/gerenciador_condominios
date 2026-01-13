@@ -112,9 +112,7 @@ class GoogleOAuthCallbackView:
             }
 
             # Construct the full redirect URL
-            redirect_url = (
-                f"{settings.FRONTEND_URL}{settings.FRONTEND_AUTH_CALLBACK_PATH}?{urlencode(params)}"
-            )
+            redirect_url = f"{settings.FRONTEND_URL}{settings.FRONTEND_AUTH_CALLBACK_PATH}?{urlencode(params)}"
 
             return redirect(redirect_url)
 
@@ -171,9 +169,7 @@ def link_oauth_account(request):
         google_account = SocialAccount.objects.filter(user=user, provider="google").first()
 
         if google_account:
-            return JsonResponse(
-                {"success": True, "message": "Google account already linked", "user_id": user.id}
-            )
+            return JsonResponse({"success": True, "message": "Google account already linked", "user_id": user.id})
 
         return JsonResponse(
             {
@@ -207,16 +203,10 @@ def oauth_status(request):
         JSON response with configuration status
     """
     google_client_id = (
-        getattr(settings, "SOCIALACCOUNT_PROVIDERS", {})
-        .get("google", {})
-        .get("APP", {})
-        .get("client_id", "")
+        getattr(settings, "SOCIALACCOUNT_PROVIDERS", {}).get("google", {}).get("APP", {}).get("client_id", "")
     )
     google_client_secret = (
-        getattr(settings, "SOCIALACCOUNT_PROVIDERS", {})
-        .get("google", {})
-        .get("APP", {})
-        .get("secret", "")
+        getattr(settings, "SOCIALACCOUNT_PROVIDERS", {}).get("google", {}).get("APP", {}).get("secret", "")
     )
 
     return JsonResponse(

@@ -19,6 +19,7 @@ Usage:
     # Invalidate cache
     CacheManager.invalidate_model('Lease', lease_id)
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -304,9 +305,7 @@ class CacheManager:
                 "keyspace_hits": info.get("keyspace_hits", 0),
                 "keyspace_misses": info.get("keyspace_misses", 0),
                 "hit_rate": (
-                    info.get("keyspace_hits", 0)
-                    / (info.get("keyspace_hits", 0) + info.get("keyspace_misses", 1))
-                    * 100
+                    info.get("keyspace_hits", 0) / (info.get("keyspace_hits", 0) + info.get("keyspace_misses", 1)) * 100
                 ),
             }
         except Exception as e:

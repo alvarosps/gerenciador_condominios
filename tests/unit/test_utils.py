@@ -9,15 +9,16 @@ Tests all utility functions in core/utils.py including:
 Coverage target: 100% of utils.py
 """
 
-import pytest
 from decimal import Decimal
 
-from core.utils import format_currency, number_to_words
+import pytest
 
+from core.utils import format_currency, number_to_words
 
 # ============================================================================
 # format_currency Tests
 # ============================================================================
+
 
 @pytest.mark.unit
 @pytest.mark.util
@@ -27,50 +28,51 @@ class TestFormatCurrency:
     def test_format_currency_integer(self):
         """Test formatting integer values"""
         result = format_currency(1500)
-        assert result == "R$1,500.00"
+        assert result == "R$1.500,00"  # Brazilian format: period for thousands, comma for decimals
 
     def test_format_currency_float(self):
         """Test formatting float values"""
         result = format_currency(1500.50)
-        assert result == "R$1,500.50"
+        assert result == "R$1.500,50"
 
     def test_format_currency_decimal(self):
         """Test formatting Decimal values"""
-        result = format_currency(Decimal('1500.00'))
-        assert result == "R$1,500.00"
+        result = format_currency(Decimal("1500.00"))
+        assert result == "R$1.500,00"
 
     def test_format_currency_large_value(self):
         """Test formatting large values with thousands separator"""
         result = format_currency(1234567.89)
-        assert result == "R$1,234,567.89"
+        assert result == "R$1.234.567,89"
 
     def test_format_currency_zero(self):
         """Test formatting zero value"""
         result = format_currency(0)
-        assert result == "R$0.00"
+        assert result == "R$0,00"
 
     def test_format_currency_negative(self):
         """Test formatting negative values"""
         result = format_currency(-500.50)
         # Format may vary, but should include minus sign
         assert "-" in result or "(" in result
-        assert "500.50" in result
+        assert "500,50" in result  # Brazilian format
 
     def test_format_currency_small_decimal(self):
         """Test formatting values with many decimal places"""
         result = format_currency(10.999)
         # Should round to 2 decimal places
-        assert "11.00" in result
+        assert "11,00" in result  # Brazilian format
 
     def test_format_currency_string_number(self):
         """Test formatting string numbers"""
         result = format_currency(float("1500.00"))
-        assert result == "R$1,500.00"
+        assert result == "R$1.500,00"
 
 
 # ============================================================================
 # number_to_words Tests
 # ============================================================================
+
 
 @pytest.mark.unit
 @pytest.mark.util
@@ -94,7 +96,7 @@ class TestNumberToWords:
 
     def test_number_to_words_decimal(self):
         """Test converting Decimal to words"""
-        result = number_to_words(Decimal('2000.00'))
+        result = number_to_words(Decimal("2000.00"))
         assert isinstance(result, str)
         assert len(result) > 0
         # Should contain "dois mil" or similar
@@ -157,6 +159,7 @@ class TestNumberToWords:
 # Integration Tests (using both functions together)
 # ============================================================================
 
+
 @pytest.mark.unit
 @pytest.mark.util
 class TestUtilsIntegration:
@@ -164,67 +167,73 @@ class TestUtilsIntegration:
 
     def test_format_and_words_rental_value(self):
         """Test formatting typical rental values"""
-        value = Decimal('1500.00')
+        value = Decimal("1500.00")
 
         formatted = format_currency(value)
         words = number_to_words(value)
 
-        assert "1,500.00" in formatted
+        assert "1.500,00" in formatted  # Brazilian format
         assert isinstance(words, str)
         assert len(words) > 0
 
     def test_format_and_words_tag_fee(self):
         """Test formatting tag fees"""
-        value = Decimal('50.00')
+        value = Decimal("50.00")
 
         formatted = format_currency(value)
         words = number_to_words(value)
 
-        assert "50.00" in formatted
+        assert "50,00" in formatted  # Brazilian format
         assert isinstance(words, str)
 
     def test_format_and_words_cleaning_fee(self):
         """Test formatting cleaning fees"""
-        value = Decimal('200.00')
+        value = Decimal("200.00")
 
         formatted = format_currency(value)
         words = number_to_words(value)
 
-        assert "200.00" in formatted
+        assert "200,00" in formatted  # Brazilian format
         assert isinstance(words, str)
 
     def test_format_and_words_total_value(self):
         """Test formatting total contract values"""
-        rental = Decimal('1500.00')
-        cleaning = Decimal('200.00')
-        tag = Decimal('80.00')
+        rental = Decimal("1500.00")
+        cleaning = Decimal("200.00")
+        tag = Decimal("80.00")
         total = rental + cleaning + tag
 
         formatted = format_currency(total)
         words = number_to_words(total)
 
-        assert "1,780.00" in formatted
+        assert "1.780,00" in formatted  # Brazilian format
         assert isinstance(words, str)
 
-    @pytest.mark.parametrize("value,expected_in_formatted", [
-        (Decimal('1200.00'), "1,200.00"),
-        (Decimal('1500.00'), "1,500.00"),
-        (Decimal('1800.00'), "1,800.00"),
-        (Decimal('2000.00'), "2,000.00"),
-        (Decimal('2500.00'), "2,500.00"),
-    ])
+    @pytest.mark.parametrize(
+        "value,expected_in_formatted",
+        [
+            (Decimal("1200.00"), "1.200,00"),  # Brazilian format
+            (Decimal("1500.00"), "1.500,00"),
+            (Decimal("1800.00"), "1.800,00"),
+            (Decimal("2000.00"), "2.000,00"),
+            (Decimal("2500.00"), "2.500,00"),
+        ],
+    )
     def test_common_rental_values(self, value, expected_in_formatted):
         """Test formatting common rental values"""
         formatted = format_currency(value)
         assert expected_in_formatted in formatted
 
-    @pytest.mark.parametrize("value", [
-        Decimal('50.00'),   # Single tenant tag fee
-        Decimal('80.00'),   # Multiple tenant tag fee
-        Decimal('150.00'),  # Low cleaning fee
-        Decimal('200.00'),  # Standard cleaning fee
-        Decimal('250.00'),  # High cleaning fee
-    ])
+    @pytest.mark.parametrize(
+        "value",
+        [
+            Decimal("50.00"),  # Single tenant tag fee
+            Decimal("80.00"),  # Multiple tenant tag fee
+            Decimal("150.00"),  # Low cleaning fee
+            Decimal("200.00"),  # Standard cleaning fee
+            Decimal("250.00"),  # High cleaning fee
+        ],
+    )
     def test_common_fee_values(self, value):
         """Test formatting common fee values"""
         formatted = format_currency(value)
@@ -239,6 +248,7 @@ class TestUtilsIntegration:
 # Edge Cases and Error Handling
 # ============================================================================
 
+
 @pytest.mark.unit
 @pytest.mark.util
 class TestUtilsEdgeCases:
@@ -247,12 +257,12 @@ class TestUtilsEdgeCases:
     def test_format_currency_very_small_value(self):
         """Test formatting very small values"""
         result = format_currency(0.01)
-        assert "0.01" in result
+        assert "0,01" in result  # Brazilian format
 
     def test_format_currency_very_large_value(self):
         """Test formatting very large values"""
         result = format_currency(9999999.99)
-        assert "9,999,999.99" in result
+        assert "9.999.999,99" in result  # Brazilian format
 
     def test_number_to_words_decimal_precision(self):
         """Test number to words with high decimal precision"""
@@ -262,7 +272,7 @@ class TestUtilsEdgeCases:
     def test_format_currency_precision(self):
         """Test that format_currency maintains 2 decimal places"""
         result = format_currency(1500.1)
-        assert ".10" in result  # Should pad to 2 decimals
+        assert ",10" in result  # Brazilian format - Should pad to 2 decimals
 
     def test_number_to_words_boundary_values(self):
         """Test number to words with boundary values"""

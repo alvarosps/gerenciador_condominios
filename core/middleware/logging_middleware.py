@@ -7,10 +7,9 @@ Logs all HTTP requests and responses with:
 - User information (if authenticated)
 - Request body (for non-GET requests)
 """
-import json
+
 import logging
 import time
-from typing import Callable
 
 from django.http import HttpRequest, HttpResponse
 from django.utils.deprecation import MiddlewareMixin

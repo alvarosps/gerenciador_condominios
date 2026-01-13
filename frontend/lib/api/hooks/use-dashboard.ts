@@ -1,48 +1,70 @@
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '../client';
 
-// Dashboard API Response Types
+// Dashboard API Response Types - matching backend DashboardService
+
 interface FinancialSummary {
-  total_revenue: number;
-  avg_rental_value: number;
-  total_cleaning_fees: number;
-  total_late_fees: number;
+  total_revenue: string;
+  total_cleaning_fees: string;
+  total_tag_fees: string;
+  total_income: string;
   occupancy_rate: number;
+  total_apartments: number;
+  rented_apartments: number;
+  vacant_apartments: number;
+  revenue_per_apartment: string;
 }
 
 interface LeaseMetrics {
   total_leases: number;
   active_leases: number;
-  expired_leases: number;
+  inactive_leases: number;
+  contracts_generated: number;
+  contracts_pending: number;
   expiring_soon: number;
-  avg_validity_months: number;
+  expired_leases: number;
 }
 
 interface BuildingStatistic {
   building_id: number;
-  building_name: string;
+  building_number: string;
   total_apartments: number;
   rented_apartments: number;
+  vacant_apartments: number;
   occupancy_rate: number;
-  total_revenue: number;
+  total_revenue: string;
 }
 
-interface LatePayment {
+interface LateLeaseInfo {
   lease_id: number;
-  tenant_name: string;
-  building: string;
   apartment_number: number;
-  days_late: number;
-  late_fee: number;
+  building_number: string;
+  tenant_name: string;
+  rental_value: string;
+  due_day: number;
+  late_days: number;
+  late_fee: string;
+}
+
+interface LatePaymentSummary {
+  total_late_leases: number;
+  total_late_fees: string;
+  average_late_days: number;
+  late_leases: LateLeaseInfo[];
+}
+
+interface MaritalStatusDistribution {
+  marital_status: string;
+  count: number;
 }
 
 interface TenantStatistics {
   total_tenants: number;
-  tenants_with_dependents: number;
-  avg_dependents: number;
-  tenants_with_furniture: number;
+  individual_tenants: number;
   company_tenants: number;
-  person_tenants: number;
+  tenants_with_dependents: number;
+  total_dependents: number;
+  marital_status_distribution: MaritalStatusDistribution[];
 }
 
 /**
@@ -51,10 +73,10 @@ interface TenantStatistics {
  */
 export function useDashboardFinancialSummary() {
   return useQuery({
-    queryKey: ['dashboard', 'financial-summary'],
+    queryKey: ['dashboard', 'financial_summary'],
     queryFn: async () => {
       const { data } = await apiClient.get<FinancialSummary>(
-        '/dashboard/financial-summary/'
+        '/dashboard/financial_summary/'
       );
       return data;
     },
@@ -69,9 +91,9 @@ export function useDashboardFinancialSummary() {
  */
 export function useDashboardLeaseMetrics() {
   return useQuery({
-    queryKey: ['dashboard', 'lease-metrics'],
+    queryKey: ['dashboard', 'lease_metrics'],
     queryFn: async () => {
-      const { data } = await apiClient.get<LeaseMetrics>('/dashboard/lease-metrics/');
+      const { data } = await apiClient.get<LeaseMetrics>('/dashboard/lease_metrics/');
       return data;
     },
     staleTime: 1000 * 60 * 5,
@@ -85,10 +107,10 @@ export function useDashboardLeaseMetrics() {
  */
 export function useDashboardBuildingStatistics() {
   return useQuery({
-    queryKey: ['dashboard', 'building-statistics'],
+    queryKey: ['dashboard', 'building_statistics'],
     queryFn: async () => {
       const { data } = await apiClient.get<BuildingStatistic[]>(
-        '/dashboard/building-statistics/'
+        '/dashboard/building_statistics/'
       );
       return data;
     },
@@ -98,14 +120,16 @@ export function useDashboardBuildingStatistics() {
 }
 
 /**
- * Hook to fetch late payments
- * Returns list of tenants with late payments
+ * Hook to fetch late payment summary
+ * Returns summary and list of late payments
  */
 export function useDashboardLatePayments() {
   return useQuery({
-    queryKey: ['dashboard', 'late-payments'],
+    queryKey: ['dashboard', 'late_payment_summary'],
     queryFn: async () => {
-      const { data } = await apiClient.get<LatePayment[]>('/dashboard/late-payments/');
+      const { data } = await apiClient.get<LatePaymentSummary>(
+        '/dashboard/late_payment_summary/'
+      );
       return data;
     },
     refetchInterval: 1000 * 60 * 5, // Refetch every 5 minutes for real-time alerts
@@ -114,14 +138,14 @@ export function useDashboardLatePayments() {
 
 /**
  * Hook to fetch tenant statistics
- * Returns statistics about tenants (dependents, furniture, type)
+ * Returns statistics about tenants (dependents, type, marital status)
  */
 export function useDashboardTenantStatistics() {
   return useQuery({
-    queryKey: ['dashboard', 'tenant-statistics'],
+    queryKey: ['dashboard', 'tenant_statistics'],
     queryFn: async () => {
       const { data } = await apiClient.get<TenantStatistics>(
-        '/dashboard/tenant-statistics/'
+        '/dashboard/tenant_statistics/'
       );
       return data;
     },
@@ -135,6 +159,8 @@ export type {
   FinancialSummary,
   LeaseMetrics,
   BuildingStatistic,
-  LatePayment,
+  LateLeaseInfo,
+  LatePaymentSummary,
   TenantStatistics,
+  MaritalStatusDistribution,
 };

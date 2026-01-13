@@ -6,11 +6,26 @@ Tests complete authentication workflows:
 - Permission-based access control
 - Protected endpoint access
 """
+
 import pytest
+
 from tests.e2e.base import BaseE2ETest
 
 
+def redis_available():
+    """Check if Redis is available for testing."""
+    try:
+        import redis
+
+        r = redis.Redis(host="127.0.0.1", port=6379, socket_connect_timeout=1)
+        r.ping()
+        return True
+    except Exception:
+        return False
+
+
 @pytest.mark.django_db
+@pytest.mark.skipif(not redis_available(), reason="Redis is not available")
 class TestJWTTokenOperations(BaseE2ETest):
     """Test JWT token generation, refresh, and blacklist operations."""
 
@@ -23,16 +38,13 @@ class TestJWTTokenOperations(BaseE2ETest):
         2. Verify tokens are returned
         """
         # Login with credentials
-        response = self.client.post('/api/auth/token/', {
-            'username': 'admin_e2e',
-            'password': 'AdminPass123!'
-        })
+        response = self.client.post("/api/auth/token/", {"username": "admin_e2e", "password": "AdminPass123!"})
         self.assert_response_success(response, 200)
 
         tokens = response.json()
-        self.assert_has_keys(tokens, 'access', 'refresh')
-        assert len(tokens['access']) > 0
-        assert len(tokens['refresh']) > 0
+        self.assert_has_keys(tokens, "access", "refresh")
+        assert len(tokens["access"]) > 0
+        assert len(tokens["refresh"]) > 0
 
     def test_jwt_token_refresh(self):
         """
@@ -44,23 +56,18 @@ class TestJWTTokenOperations(BaseE2ETest):
         3. Verify new token is different
         """
         # Get initial tokens
-        response = self.client.post('/api/auth/token/', {
-            'username': 'admin_e2e',
-            'password': 'AdminPass123!'
-        })
+        response = self.client.post("/api/auth/token/", {"username": "admin_e2e", "password": "AdminPass123!"})
         tokens = response.json()
-        initial_access = tokens['access']
-        refresh_token = tokens['refresh']
+        initial_access = tokens["access"]
+        refresh_token = tokens["refresh"]
 
         # Refresh token
-        response = self.client.post('/api/auth/token/refresh/', {
-            'refresh': refresh_token
-        })
+        response = self.client.post("/api/auth/token/refresh/", {"refresh": refresh_token})
         self.assert_response_success(response, 200)
 
         new_tokens = response.json()
-        self.assert_has_keys(new_tokens, 'access')
-        assert new_tokens['access'] != initial_access
+        self.assert_has_keys(new_tokens, "access")
+        assert new_tokens["access"] != initial_access
 
     def test_jwt_token_blacklist(self):
         """
@@ -72,23 +79,16 @@ class TestJWTTokenOperations(BaseE2ETest):
         3. Attempt to refresh blacklisted token → 401
         """
         # Get tokens
-        response = self.client.post('/api/auth/token/', {
-            'username': 'admin_e2e',
-            'password': 'AdminPass123!'
-        })
+        response = self.client.post("/api/auth/token/", {"username": "admin_e2e", "password": "AdminPass123!"})
         tokens = response.json()
-        refresh_token = tokens['refresh']
+        refresh_token = tokens["refresh"]
 
         # Blacklist token
-        response = self.client.post('/api/auth/token/blacklist/', {
-            'refresh': refresh_token
-        })
+        response = self.client.post("/api/auth/token/blacklist/", {"refresh": refresh_token})
         self.assert_response_success(response, 200)
 
         # Attempt to refresh blacklisted token
-        response = self.client.post('/api/auth/token/refresh/', {
-            'refresh': refresh_token
-        })
+        response = self.client.post("/api/auth/token/refresh/", {"refresh": refresh_token})
         self.assert_response_error(response, 401)
 
     def test_invalid_credentials(self):
@@ -100,21 +100,16 @@ class TestJWTTokenOperations(BaseE2ETest):
         2. Attempt login with non-existent user → 401
         """
         # Wrong password
-        response = self.client.post('/api/auth/token/', {
-            'username': 'admin_e2e',
-            'password': 'WrongPassword'
-        })
+        response = self.client.post("/api/auth/token/", {"username": "admin_e2e", "password": "WrongPassword"})
         self.assert_response_error(response, 401)
 
         # Non-existent user
-        response = self.client.post('/api/auth/token/', {
-            'username': 'nonexistent',
-            'password': 'SomePassword'
-        })
+        response = self.client.post("/api/auth/token/", {"username": "nonexistent", "password": "SomePassword"})
         self.assert_response_error(response, 401)
 
 
 @pytest.mark.django_db
+@pytest.mark.skipif(not redis_available(), reason="Redis is not available")
 class TestAuthenticationFlow(BaseE2ETest):
     """Test authentication and authorization workflows."""
 
@@ -125,7 +120,7 @@ class TestAuthenticationFlow(BaseE2ETest):
         Workflow:
         1. Attempt to access protected endpoint without auth → 401
         """
-        response = self.client.get('/api/buildings/')
+        response = self.client.get("/api/buildings/")
         self.assert_response_error(response, 401)
 
     def test_authenticated_access(self):
@@ -137,7 +132,7 @@ class TestAuthenticationFlow(BaseE2ETest):
         2. Access protected endpoint → 200
         """
         self.authenticate_as_user()
-        response = self.client.get('/api/buildings/')
+        response = self.client.get("/api/buildings/")
         self.assert_response_success(response, 200)
 
     def test_permission_levels_flow(self):
@@ -153,19 +148,19 @@ class TestAuthenticationFlow(BaseE2ETest):
         # Step 1: Admin creates building
         self.authenticate_as_admin()
         building = self.create_building(street_number=999)
-        assert building['street_number'] == 999
+        assert building["street_number"] == 999
 
         # Step 2: Regular user attempts to create building
         self.authenticate_as_user()
-        response = self.client.post('/api/buildings/', {
-            'street_number': 1000,
-            'name': 'Unauthorized Building',
-            'address': 'Test Address'
-        }, format='json')
+        response = self.client.post(
+            "/api/buildings/",
+            {"street_number": 1000, "name": "Unauthorized Building", "address": "Test Address"},
+            format="json",
+        )
         self.assert_response_error(response, 403)
 
         # Step 3: Regular user can list buildings
-        response = self.client.get('/api/buildings/')
+        response = self.client.get("/api/buildings/")
         self.assert_response_success(response, 200)
 
         # Step 4: Regular user can view building detail
@@ -174,6 +169,7 @@ class TestAuthenticationFlow(BaseE2ETest):
 
 
 @pytest.mark.django_db
+@pytest.mark.skipif(not redis_available(), reason="Redis is not available")
 class TestOAuthFlow(BaseE2ETest):
     """Test OAuth authentication flows."""
 
@@ -186,18 +182,18 @@ class TestOAuthFlow(BaseE2ETest):
         2. Verify response contains OAuth configuration
         """
         # Step 1: Access OAuth status (public endpoint)
-        response = self.client.get('/api/auth/oauth/status/')
+        response = self.client.get("/api/auth/oauth/status/")
         self.assert_response_success(response, 200)
 
         # Step 2: Verify configuration keys
         data = response.json()
         self.assert_has_keys(
             data,
-            'google_oauth_configured',
-            'google_client_id_present',
-            'google_client_secret_present',
-            'frontend_url',
-            'oauth_callback_path'
+            "google_oauth_configured",
+            "google_client_id_present",
+            "google_client_secret_present",
+            "frontend_url",
+            "oauth_callback_path",
         )
 
     def test_oauth_link_account_flow(self):
@@ -210,21 +206,17 @@ class TestOAuthFlow(BaseE2ETest):
         3. Successfully link existing user → 200
         """
         # Step 1: No email provided
-        response = self.client.post('/api/auth/oauth/link/', {}, format='json')
+        response = self.client.post("/api/auth/oauth/link/", {}, format="json")
         self.assert_response_error(response, 400)
-        assert 'Email is required' in response.json()['error']
+        assert "Email is required" in response.json()["error"]
 
         # Step 2: Non-existent user
-        response = self.client.post('/api/auth/oauth/link/', {
-            'email': 'nonexistent@test.com'
-        }, format='json')
+        response = self.client.post("/api/auth/oauth/link/", {"email": "nonexistent@test.com"}, format="json")
         self.assert_response_error(response, 404)
 
         # Step 3: Existing user
-        response = self.client.post('/api/auth/oauth/link/', {
-            'email': self.admin_user.email
-        }, format='json')
+        response = self.client.post("/api/auth/oauth/link/", {"email": self.admin_user.email}, format="json")
         self.assert_response_success(response, 200)
         data = response.json()
-        assert data['success'] is True
-        assert data['user_id'] == self.admin_user.id
+        assert data["success"] is True
+        assert data["user_id"] == self.admin_user.id
