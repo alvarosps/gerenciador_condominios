@@ -13,6 +13,7 @@ Usage:
     generator: IPDFGenerator = PyppeteerPDFGenerator()
     pdf_path = await generator.generate_pdf(html_content, output_path)
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -120,17 +121,13 @@ class PyppeteerPDFGenerator(IPDFGenerator):
                 asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
             # Get Chrome path from settings or constructor
-            chrome_executable = self.chrome_path or getattr(
-                settings, "CHROME_EXECUTABLE_PATH", None
-            )
+            chrome_executable = self.chrome_path or getattr(settings, "CHROME_EXECUTABLE_PATH", None)
 
             if not chrome_executable:
                 raise ValueError("Chrome executable path not configured")
 
             # Create temporary HTML file
-            with tempfile.NamedTemporaryFile(
-                mode="w", suffix=".html", delete=False, encoding="utf-8"
-            ) as temp_html:
+            with tempfile.NamedTemporaryFile(mode="w", suffix=".html", delete=False, encoding="utf-8") as temp_html:
                 temp_html.write(html_content)
                 temp_html_path = temp_html.name
 
@@ -231,9 +228,7 @@ class WeasyPrintPDFGenerator(IPDFGenerator):
         try:
             from weasyprint import CSS, HTML
         except ImportError:
-            raise PDFGenerationError(
-                "WeasyPrint not installed. Install with: pip install weasyprint"
-            )
+            raise PDFGenerationError("WeasyPrint not installed. Install with: pip install weasyprint")
 
         try:
             # Prepare options

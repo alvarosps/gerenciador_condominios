@@ -4,6 +4,7 @@ Base service class for common CRUD operations.
 Provides a foundation for domain-specific services with generic
 database operations using Django ORM.
 """
+
 from __future__ import annotations
 
 import logging
@@ -203,7 +204,5 @@ class BaseService(Generic[ModelType]):
             >>> active_leases = service.filter(contract_generated=True)
         """
         instances = list(self.get_queryset().filter(**kwargs))
-        self.logger.debug(
-            f"Filtered {len(instances)} {self.model.__name__} instances with {kwargs}"
-        )
+        self.logger.debug(f"Filtered {len(instances)} {self.model.__name__} instances with {kwargs}")
         return instances

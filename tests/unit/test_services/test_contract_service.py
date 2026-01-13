@@ -3,24 +3,22 @@ Unit tests for ContractService.
 
 Tests all contract generation business logic with mocked PDF generation.
 """
-import pytest
+
+import os
 from datetime import date
 from decimal import Decimal
-from unittest.mock import Mock, patch, AsyncMock, call, MagicMock
-import os
+from unittest.mock import AsyncMock, MagicMock, Mock, call, patch
 
+import pytest
+
+from core.models import Apartment, Building, Furniture, Lease, Tenant
 from core.services.contract_service import ContractService
-from core.models import Building, Apartment, Tenant, Lease, Furniture
 
 
 @pytest.fixture
 def building():
     """Create a test building."""
-    return Building.objects.create(
-        street_number=836,
-        name="Test Building",
-        address="Test Street, 836"
-    )
+    return Building.objects.create(street_number=836, name="Test Building", address="Test Street, 836")
 
 
 @pytest.fixture
@@ -30,21 +28,17 @@ def furniture_items():
     table = Furniture.objects.create(name="Table")
     chair = Furniture.objects.create(name="Chair")
     sofa = Furniture.objects.create(name="Sofa")
-    return {'bed': bed, 'table': table, 'chair': chair, 'sofa': sofa}
+    return {"bed": bed, "table": table, "chair": chair, "sofa": sofa}
 
 
 @pytest.fixture
 def apartment(building, furniture_items):
     """Create a test apartment with furniture."""
     apt = Apartment.objects.create(
-        building=building,
-        number=101,
-        rental_value=Decimal('1500.00'),
-        cleaning_fee=Decimal('200.00'),
-        max_tenants=2
+        building=building, number=101, rental_value=Decimal("1500.00"), cleaning_fee=Decimal("200.00"), max_tenants=2
     )
     # Apartment has bed, table, chair
-    apt.furnitures.add(furniture_items['bed'], furniture_items['table'], furniture_items['chair'])
+    apt.furnitures.add(furniture_items["bed"], furniture_items["table"], furniture_items["chair"])
     return apt
 
 
@@ -53,13 +47,13 @@ def tenant(furniture_items):
     """Create a test tenant with own furniture."""
     tenant = Tenant.objects.create(
         name="John Doe",
-        cpf_cnpj="12345678901",
+        cpf_cnpj="529.982.247-25",
         phone="11999999999",
-        marital_status="Single",
-        profession="Engineer"
+        marital_status="Solteiro(a)",
+        profession="Engineer",
     )
     # Tenant brings their own chair
-    tenant.furnitures.add(furniture_items['chair'])
+    tenant.furnitures.add(furniture_items["chair"])
     return tenant
 
 
@@ -72,10 +66,10 @@ def lease(apartment, tenant):
         start_date=date(2025, 1, 15),
         validity_months=12,
         due_day=10,
-        rental_value=Decimal('1500.00'),
-        cleaning_fee=Decimal('200.00'),
-        tag_fee=Decimal('50.00'),
-        contract_generated=False
+        rental_value=Decimal("1500.00"),
+        cleaning_fee=Decimal("200.00"),
+        tag_fee=Decimal("50.00"),
+        contract_generated=False,
     )
     lease.tenants.add(tenant)
     return lease
@@ -94,9 +88,9 @@ class TestCalculateLeaseFurniture:
         furniture_names = [f.name for f in furniture]
 
         assert len(furniture) == 2
-        assert 'Bed' in furniture_names
-        assert 'Table' in furniture_names
-        assert 'Chair' not in furniture_names
+        assert "Bed" in furniture_names
+        assert "Table" in furniture_names
+        assert "Chair" not in furniture_names
 
     def test_calculate_lease_furniture_tenant_no_furniture(self, lease, tenant, furniture_items):
         """Test when tenant brings no furniture."""
@@ -108,14 +102,14 @@ class TestCalculateLeaseFurniture:
         furniture_names = [f.name for f in furniture]
 
         assert len(furniture) == 3
-        assert 'Bed' in furniture_names
-        assert 'Table' in furniture_names
-        assert 'Chair' in furniture_names
+        assert "Bed" in furniture_names
+        assert "Table" in furniture_names
+        assert "Chair" in furniture_names
 
     def test_calculate_lease_furniture_tenant_has_all(self, lease, apartment, tenant, furniture_items):
         """Test when tenant brings all apartment furniture."""
         # Tenant has all apartment furniture
-        tenant.furnitures.add(furniture_items['bed'], furniture_items['table'])
+        tenant.furnitures.add(furniture_items["bed"], furniture_items["table"])
 
         # No apartment furniture in lease
         furniture = ContractService.calculate_lease_furniture(lease)
@@ -141,73 +135,73 @@ class TestPrepareContractContext:
         context = ContractService.prepare_contract_context(lease)
 
         # Verify all required keys are present
-        assert 'tenant' in context
-        assert 'building_number' in context
-        assert 'apartment_number' in context
-        assert 'furnitures' in context
-        assert 'validity' in context
-        assert 'start_date' in context
-        assert 'final_date' in context
-        assert 'rental_value' in context
-        assert 'next_month_date' in context
-        assert 'tag_fee' in context
-        assert 'cleaning_fee' in context
-        assert 'valor_total' in context
-        assert 'rules' in context
-        assert 'lease' in context
-        assert 'valor_tags' in context
+        assert "tenant" in context
+        assert "building_number" in context
+        assert "apartment_number" in context
+        assert "furnitures" in context
+        assert "validity" in context
+        assert "start_date" in context
+        assert "final_date" in context
+        assert "rental_value" in context
+        assert "next_month_date" in context
+        assert "tag_fee" in context
+        assert "cleaning_fee" in context
+        assert "valor_total" in context
+        assert "rules" in context
+        assert "lease" in context
+        assert "valor_tags" in context
 
     def test_prepare_contract_context_values(self, lease):
         """Test context values are correct."""
         context = ContractService.prepare_contract_context(lease)
 
         # Verify basic values
-        assert context['tenant'] == lease.responsible_tenant
-        assert context['building_number'] == 836
-        assert context['apartment_number'] == 101
-        assert context['validity'] == 12
-        assert context['rental_value'] == Decimal('1500.00')
-        assert context['tag_fee'] == Decimal('50.00')
-        assert context['cleaning_fee'] == Decimal('200.00')
+        assert context["tenant"] == lease.responsible_tenant
+        assert context["building_number"] == 836
+        assert context["apartment_number"] == 101
+        assert context["validity"] == 12
+        assert context["rental_value"] == Decimal("1500.00")
+        assert context["tag_fee"] == Decimal("50.00")
+        assert context["cleaning_fee"] == Decimal("200.00")
 
     def test_prepare_contract_context_date_formatting(self, lease):
         """Test that dates are formatted correctly."""
         context = ContractService.prepare_contract_context(lease)
 
         # Verify Brazilian date format (DD/MM/YYYY)
-        assert context['start_date'] == "15/01/2025"
-        assert context['next_month_date'] == "15/02/2025"
-        assert context['final_date'] == "15/01/2026"
+        assert context["start_date"] == "15/01/2025"
+        assert context["next_month_date"] == "15/02/2025"
+        assert context["final_date"] == "15/01/2026"
 
     def test_prepare_contract_context_fee_calculations(self, lease):
         """Test that fees are calculated correctly."""
         context = ContractService.prepare_contract_context(lease)
 
         # Tag fee for 1 tenant should be 50
-        assert context['valor_tags'] == Decimal('50.00')
+        assert context["valor_tags"] == Decimal("50.00")
 
         # Total = rental + cleaning + tags = 1500 + 200 + 50 = 1750
-        assert context['valor_total'] == Decimal('1750.00')
+        assert context["valor_total"] == Decimal("1750.00")
 
     def test_prepare_contract_context_multiple_tenants(self, lease, tenant):
         """Test context with multiple tenants."""
         # Add another tenant
         tenant2 = Tenant.objects.create(
             name="Jane Doe",
-            cpf_cnpj="98765432109",
+            cpf_cnpj="191.503.098-62",
             phone="11988888888",
-            marital_status="Single",
-            profession="Doctor"
+            marital_status="Solteiro(a)",
+            profession="Doctor",
         )
         lease.tenants.add(tenant2)
 
         context = ContractService.prepare_contract_context(lease)
 
         # Tag fee for 2+ tenants should be 80
-        assert context['valor_tags'] == Decimal('80.00')
+        assert context["valor_tags"] == Decimal("80.00")
 
         # Total = 1500 + 200 + 80 = 1780
-        assert context['valor_total'] == Decimal('1780.00')
+        assert context["valor_total"] == Decimal("1780.00")
 
 
 @pytest.mark.django_db
@@ -231,7 +225,7 @@ class TestGetContractPdfPath:
         settings.BASE_DIR = str(tmp_path)
         settings.PDF_OUTPUT_DIR = "contracts"
 
-        pdf_path = ContractService.get_contract_pdf_path(lease)
+        _pdf_path = ContractService.get_contract_pdf_path(lease)  # noqa: F841
 
         # Verify directory was created
         contracts_dir = tmp_path / "contracts" / "836"
@@ -257,7 +251,7 @@ class TestGetContractPdfPath:
 class TestRenderContractTemplate:
     """Test contract template rendering."""
 
-    @patch('core.services.contract_service.Environment')
+    @patch("core.services.contract_service.Environment")
     def test_render_contract_template_standard(self, mock_env_class, lease):
         """Test template rendering with standard context."""
         # Mock the Jinja2 environment
@@ -273,11 +267,11 @@ class TestRenderContractTemplate:
         html = ContractService.render_contract_template(context)
 
         # Verify template was loaded and rendered
-        mock_env.get_template.assert_called_once_with('contract_template.html')
+        mock_env.get_template.assert_called_once_with("contract_template.html")
         mock_template.render.assert_called_once_with(context)
         assert html == "<html>Contract</html>"
 
-    @patch('core.services.contract_service.Environment')
+    @patch("core.services.contract_service.Environment")
     def test_render_contract_template_filters_registered(self, mock_env_class):
         """Test that custom filters are registered."""
         mock_env = Mock()
@@ -291,8 +285,8 @@ class TestRenderContractTemplate:
         ContractService.render_contract_template({})
 
         # Verify filters were set
-        assert 'currency' in mock_env.filters
-        assert 'extenso' in mock_env.filters
+        assert "currency" in mock_env.filters
+        assert "extenso" in mock_env.filters
 
 
 @pytest.mark.django_db
@@ -307,7 +301,7 @@ class TestGeneratePdfFromHtml:
         mock_page = AsyncMock()
         mock_browser.newPage.return_value = mock_page
 
-        with patch('pyppeteer.launch', return_value=mock_browser):
+        with patch("pyppeteer.launch", return_value=mock_browser):
             html_content = "<html><body>Test Contract</body></html>"
             pdf_path = str(tmp_path / "test_contract.pdf")
 
@@ -325,7 +319,7 @@ class TestGeneratePdfFromHtml:
 
     async def test_generate_pdf_from_html_browser_args(self, tmp_path, settings):
         """Test that browser is launched with correct arguments."""
-        settings.CHROME_EXECUTABLE_PATH = '/usr/bin/chrome'
+        settings.CHROME_EXECUTABLE_PATH = "/usr/bin/chrome"
 
         mock_launch = AsyncMock()
         mock_browser = AsyncMock()
@@ -333,7 +327,7 @@ class TestGeneratePdfFromHtml:
         mock_browser.newPage.return_value = mock_page
         mock_launch.return_value = mock_browser
 
-        with patch('pyppeteer.launch', mock_launch):
+        with patch("pyppeteer.launch", mock_launch):
             html_content = "<html>Test</html>"
             pdf_path = str(tmp_path / "test.pdf")
 
@@ -343,12 +337,12 @@ class TestGeneratePdfFromHtml:
             mock_launch.assert_called_once()
             call_kwargs = mock_launch.call_args[1]
 
-            assert call_kwargs['handleSIGINT'] is False
-            assert call_kwargs['handleSIGTERM'] is False
-            assert call_kwargs['handleSIGHUP'] is False
-            assert call_kwargs['options']['executablePath'] == '/usr/bin/chrome'
-            assert call_kwargs['options']['headless'] is True
-            assert '--no-sandbox' in call_kwargs['options']['args']
+            assert call_kwargs["handleSIGINT"] is False
+            assert call_kwargs["handleSIGTERM"] is False
+            assert call_kwargs["handleSIGHUP"] is False
+            assert call_kwargs["options"]["executablePath"] == "/usr/bin/chrome"
+            assert call_kwargs["options"]["headless"] is True
+            assert "--no-sandbox" in call_kwargs["options"]["args"]
 
     async def test_generate_pdf_from_html_temp_file_cleanup(self, tmp_path):
         """Test that temporary HTML file is created and cleaned up."""
@@ -356,7 +350,7 @@ class TestGeneratePdfFromHtml:
         mock_page = AsyncMock()
         mock_browser.newPage.return_value = mock_page
 
-        with patch('pyppeteer.launch', return_value=mock_browser):
+        with patch("pyppeteer.launch", return_value=mock_browser):
             html_content = "<html>Test</html>"
             pdf_path = str(tmp_path / "test.pdf")
 
@@ -367,7 +361,7 @@ class TestGeneratePdfFromHtml:
             # Instead, verify that open was called with temp path
             mock_page.goto.assert_called_once()
             goto_url = mock_page.goto.call_args[0][0]
-            assert 'temp_contract_123.html' in goto_url
+            assert "temp_contract_123.html" in goto_url
 
     async def test_generate_pdf_from_html_browser_closes_on_error(self, tmp_path):
         """Test that browser is closed even if PDF generation fails."""
@@ -376,7 +370,7 @@ class TestGeneratePdfFromHtml:
         mock_page.pdf.side_effect = Exception("PDF generation failed")
         mock_browser.newPage.return_value = mock_page
 
-        with patch('pyppeteer.launch', return_value=mock_browser):
+        with patch("pyppeteer.launch", return_value=mock_browser):
             html_content = "<html>Test</html>"
             pdf_path = str(tmp_path / "test.pdf")
 
@@ -401,8 +395,11 @@ class TestGenerateContract:
         mock_page = AsyncMock()
         mock_browser.newPage.return_value = mock_page
 
-        with patch('pyppeteer.launch', return_value=mock_browser):
-            with patch('core.services.contract_service.ContractService.render_contract_template', return_value="<html>Test</html>"):
+        with patch("pyppeteer.launch", return_value=mock_browser):
+            with patch(
+                "core.services.contract_service.ContractService.render_contract_template",
+                return_value="<html>Test</html>",
+            ):
                 pdf_path = ContractService.generate_contract(lease)
 
                 # Verify PDF path is correct
@@ -429,8 +426,11 @@ class TestGenerateContract:
         mock_page = AsyncMock()
         mock_browser.newPage.return_value = mock_page
 
-        with patch('pyppeteer.launch', return_value=mock_browser):
-            with patch('core.services.contract_service.ContractService.render_contract_template', return_value="<html>Test</html>"):
+        with patch("pyppeteer.launch", return_value=mock_browser):
+            with patch(
+                "core.services.contract_service.ContractService.render_contract_template",
+                return_value="<html>Test</html>",
+            ):
                 ContractService.generate_contract(lease)
 
                 # Verify status changed
@@ -447,17 +447,24 @@ class TestGenerateContract:
         mock_page = AsyncMock()
         mock_browser.newPage.return_value = mock_page
 
-        with patch('pyppeteer.launch', return_value=mock_browser):
-            with patch('core.services.contract_service.ContractService.render_contract_template', return_value="<html>Test</html>"):
-                with patch('core.services.contract_service.DateCalculatorService.format_lease_dates_for_contract') as mock_date_service:
-                    with patch('core.services.contract_service.FeeCalculatorService.calculate_tag_fee') as mock_fee_service:
+        with patch("pyppeteer.launch", return_value=mock_browser):
+            with patch(
+                "core.services.contract_service.ContractService.render_contract_template",
+                return_value="<html>Test</html>",
+            ):
+                with patch(
+                    "core.services.contract_service.DateCalculatorService.format_lease_dates_for_contract"
+                ) as mock_date_service:
+                    with patch(
+                        "core.services.contract_service.FeeCalculatorService.calculate_tag_fee"
+                    ) as mock_fee_service:
                         # Set up return values
                         mock_date_service.return_value = {
-                            'start_date_formatted': '15/01/2025',
-                            'next_month_date_formatted': '15/02/2025',
-                            'final_date_formatted': '15/01/2026'
+                            "start_date_formatted": "15/01/2025",
+                            "next_month_date_formatted": "15/02/2025",
+                            "final_date_formatted": "15/01/2026",
                         }
-                        mock_fee_service.return_value = Decimal('50.00')
+                        mock_fee_service.return_value = Decimal("50.00")
 
                         ContractService.generate_contract(lease)
 
@@ -476,24 +483,24 @@ class TestContractServiceIntegration:
         context = ContractService.prepare_contract_context(lease)
 
         # Verify tenant information
-        assert context['tenant'].name == "John Doe"
-        assert context['building_number'] == 836
-        assert context['apartment_number'] == 101
+        assert context["tenant"].name == "John Doe"
+        assert context["building_number"] == 836
+        assert context["apartment_number"] == 101
 
         # Verify dates are formatted
-        assert '/' in context['start_date']
-        assert '/' in context['next_month_date']
-        assert '/' in context['final_date']
+        assert "/" in context["start_date"]
+        assert "/" in context["next_month_date"]
+        assert "/" in context["final_date"]
 
         # Verify fees are calculated
-        assert context['valor_tags'] == Decimal('50.00')
-        assert context['valor_total'] == Decimal('1750.00')
+        assert context["valor_tags"] == Decimal("50.00")
+        assert context["valor_total"] == Decimal("1750.00")
 
         # Verify furniture calculation
-        furniture_names = [f.name for f in context['furnitures']]
-        assert 'Bed' in furniture_names
-        assert 'Table' in furniture_names
-        assert 'Chair' not in furniture_names  # Tenant's furniture
+        furniture_names = [f.name for f in context["furnitures"]]
+        assert "Bed" in furniture_names
+        assert "Table" in furniture_names
+        assert "Chair" not in furniture_names  # Tenant's furniture
 
     def test_pdf_path_consistency(self, lease, settings, tmp_path):
         """Test that PDF path is consistent across calls."""
@@ -510,8 +517,8 @@ class TestContractServiceIntegration:
         context = ContractService.prepare_contract_context(lease)
 
         # Verify all critical lease data is present
-        assert context['lease'].id == lease.id
-        assert context['rental_value'] == lease.rental_value
-        assert context['cleaning_fee'] == lease.cleaning_fee
-        assert context['tag_fee'] == lease.tag_fee
-        assert context['validity'] == lease.validity_months
+        assert context["lease"].id == lease.id
+        assert context["rental_value"] == lease.rental_value
+        assert context["cleaning_fee"] == lease.cleaning_fee
+        assert context["tag_fee"] == lease.tag_fee
+        assert context["validity"] == lease.validity_months

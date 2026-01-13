@@ -1,5 +1,7 @@
 from rest_framework import serializers
 
+from core.validators import BrazilianPhoneValidator, CNPJValidator, CPFValidator
+
 from .models import Apartment, Building, Dependent, Furniture, Lease, Tenant
 
 
@@ -17,6 +19,9 @@ class FurnitureSerializer(serializers.ModelSerializer):
 
 class ApartmentSerializer(serializers.ModelSerializer):
     furnitures = FurnitureSerializer(many=True, read_only=True)
+    furniture_ids = serializers.PrimaryKeyRelatedField(
+        queryset=Furniture.objects.all(), many=True, write_only=True, required=False
+    )
     building = BuildingSerializer(read_only=True)
     building_id = serializers.PrimaryKeyRelatedField(
         queryset=Building.objects.all(), source="building", write_only=True
@@ -39,14 +44,43 @@ class ApartmentSerializer(serializers.ModelSerializer):
             "lease_date",
             "last_rent_increase_date",
             "furnitures",
+            "furniture_ids",
         ]
+
+    def create(self, validated_data):
+        """Create apartment with furniture relationships."""
+        furniture_ids = validated_data.pop("furniture_ids", [])
+        apartment = Apartment.objects.create(**validated_data)
+        if furniture_ids:
+            apartment.furnitures.set(furniture_ids)
+        return apartment
+
+    def update(self, instance, validated_data):
+        """Update apartment with furniture relationships."""
+        furniture_ids = validated_data.pop("furniture_ids", None)
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+
+        if furniture_ids is not None:
+            instance.furnitures.set(furniture_ids)
+        return instance
 
 
 class DependentSerializer(serializers.ModelSerializer):
+    # Make id writable for update operations (allows identifying existing dependents)
+    id = serializers.IntegerField(required=False, allow_null=True)
+
     class Meta:
         model = Dependent
         fields = ["id", "tenant", "name", "phone"]
-        read_only_fields = ["id", "tenant"]  # tenant is read-only, set by parent in nested creation
+        read_only_fields = ["tenant"]  # tenant is set by parent in nested creation
+
+    def validate_phone(self, value):
+        """Validate Brazilian phone number format."""
+        if value:
+            BrazilianPhoneValidator()(value)
+        return value
 
 
 class TenantSerializer(serializers.ModelSerializer):
@@ -76,6 +110,30 @@ class TenantSerializer(serializers.ModelSerializer):
             "furniture_ids",
         ]
 
+    def validate_phone(self, value):
+        """Validate Brazilian phone number format."""
+        if value:
+            BrazilianPhoneValidator()(value)
+        return value
+
+    def validate(self, attrs):
+        """Cross-field validation for CPF/CNPJ based on is_company flag."""
+        attrs = super().validate(attrs)
+
+        cpf_cnpj = attrs.get("cpf_cnpj", getattr(self.instance, "cpf_cnpj", None) if self.instance else None)
+        is_company = attrs.get("is_company", getattr(self.instance, "is_company", False) if self.instance else False)
+
+        if cpf_cnpj:
+            try:
+                if is_company:
+                    CNPJValidator()(cpf_cnpj)
+                else:
+                    CPFValidator()(cpf_cnpj)
+            except Exception as e:
+                raise serializers.ValidationError({"cpf_cnpj": str(e)})
+
+        return attrs
+
     def create(self, validated_data):
         dependents_data = validated_data.pop("dependents", [])
         furniture_ids = validated_data.pop("furniture_ids", [])
@@ -95,11 +153,27 @@ class TenantSerializer(serializers.ModelSerializer):
 
         if furniture_ids is not None:
             instance.furnitures.set(furniture_ids)
+
         if dependents_data is not None:
-            # Remover dependentes antigos e criar novos (pode ser aprimorado)
-            instance.dependents.all().delete()
+            # Smart update: only delete removed dependents, update existing, create new
+            existing_ids = {d.id for d in instance.dependents.all()}
+            provided_ids = {d.get("id") for d in dependents_data if d.get("id")}
+
+            # Delete only dependents that were removed (not in provided list)
+            to_delete = existing_ids - provided_ids
+            if to_delete:
+                instance.dependents.filter(id__in=to_delete).delete()
+
+            # Update existing or create new dependents
             for dep_data in dependents_data:
-                Dependent.objects.create(tenant=instance, **dep_data)
+                dep_id = dep_data.pop("id", None)
+                if dep_id and dep_id in existing_ids:
+                    # Update existing dependent
+                    instance.dependents.filter(id=dep_id).update(**dep_data)
+                else:
+                    # Create new dependent
+                    Dependent.objects.create(tenant=instance, **dep_data)
+
         return instance
 
 
@@ -127,6 +201,7 @@ class LeaseSerializer(serializers.ModelSerializer):
             "responsible_tenant_id",
             "tenants",
             "tenant_ids",
+            "number_of_tenants",
             "start_date",
             "validity_months",
             "due_day",

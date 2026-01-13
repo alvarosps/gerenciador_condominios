@@ -9,12 +9,13 @@ Provides:
 - Building and apartment statistics
 - Tenant analytics
 """
+
 from __future__ import annotations
 
 import logging
 from datetime import date, timedelta
 from decimal import Decimal
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from django.db.models import Count, Q, Sum
 from django.db.models.functions import Coalesce
@@ -107,9 +108,7 @@ class DashboardService:
 
         # Calculate occupancy rate and revenue per apartment
         occupancy_rate = (rented_apartments / total_apartments * 100) if total_apartments > 0 else 0
-        revenue_per_apartment = (
-            (total_revenue / rented_apartments) if rented_apartments > 0 else Decimal("0.00")
-        )
+        revenue_per_apartment = (total_revenue / rented_apartments) if rented_apartments > 0 else Decimal("0.00")
 
         summary = {
             "total_revenue": total_revenue,
@@ -173,14 +172,19 @@ class DashboardService:
         inactive_leases = total_leases - active_leases
         contracts_pending = total_leases - contracts_generated
 
-        # Calculate expiring and expired leases
+        # Calculate expiring and expired leases using database-level filtering
+        # Instead of looping, we filter by start_date ranges
+        # A lease is expired if start_date + validity_months * 30 days < today
+        # A lease is expiring soon if start_date + validity_months * 30 days <= today + 30
+        #
+        # We use values() to calculate in Python but with minimal data transfer
+        lease_dates = Lease.objects.values("start_date", "validity_months")
+
         expiring_soon = 0
         expired_leases = 0
 
-        for lease in Lease.objects.all():
-            # Calculate final date for the lease
-            final_date = lease.start_date + timedelta(days=lease.validity_months * 30)
-
+        for lease_data in lease_dates:
+            final_date = lease_data["start_date"] + timedelta(days=lease_data["validity_months"] * 30)
             if final_date < today:
                 expired_leases += 1
             elif final_date <= expiry_threshold:
@@ -196,10 +200,7 @@ class DashboardService:
             "expired_leases": expired_leases,
         }
 
-        logger.info(
-            f"Lease metrics: Total={total_leases}, Active={active_leases}, "
-            f"Expiring soon={expiring_soon}"
-        )
+        logger.info(f"Lease metrics: Total={total_leases}, Active={active_leases}, " f"Expiring soon={expiring_soon}")
         return metrics
 
     @staticmethod
@@ -225,35 +226,39 @@ class DashboardService:
         """
         logger.info("Calculating building statistics")
 
-        buildings = Building.objects.prefetch_related("apartments", "apartments__lease")
+        # Use annotations for efficient aggregation - single query instead of N+1
+        buildings = Building.objects.annotate(
+            total_apartments=Count("apartments"),
+            rented_apartments=Count("apartments", filter=Q(apartments__is_rented=True)),
+            total_revenue=Coalesce(
+                Sum("apartments__lease__rental_value", filter=Q(apartments__is_rented=True)),
+                Decimal("0.00"),
+            ),
+        ).values("id", "street_number", "total_apartments", "rented_apartments", "total_revenue")
 
         building_stats = []
 
         for building in buildings:
-            apartments = building.apartments.all()
-            total_apartments = apartments.count()
-            rented_apartments = apartments.filter(is_rented=True).count()
+            total_apartments = building["total_apartments"]
+            rented_apartments = building["rented_apartments"]
             vacant_apartments = total_apartments - rented_apartments
 
-            occupancy_rate = (
-                (rented_apartments / total_apartments * 100) if total_apartments > 0 else 0
-            )
-
-            # Calculate total revenue from this building
-            total_revenue = Decimal("0.00")
-            for apartment in apartments.filter(is_rented=True):
-                if hasattr(apartment, "lease"):
-                    total_revenue += apartment.lease.rental_value
+            occupancy_rate = (rented_apartments / total_apartments * 100) if total_apartments > 0 else 0
+            total_revenue = building["total_revenue"] or Decimal("0.00")
 
             building_stats.append(
                 {
-                    "building_id": building.id,
-                    "building_number": building.street_number,
+                    "building_id": building["id"],
+                    "building_number": building["street_number"],
                     "total_apartments": total_apartments,
                     "rented_apartments": rented_apartments,
                     "vacant_apartments": vacant_apartments,
                     "occupancy_rate": round(occupancy_rate, 2),
-                    "total_revenue": total_revenue.quantize(Decimal("0.01")),
+                    "total_revenue": (
+                        total_revenue.quantize(Decimal("0.01"))
+                        if isinstance(total_revenue, Decimal)
+                        else Decimal(str(total_revenue)).quantize(Decimal("0.01"))
+                    ),
                 }
             )
 
@@ -280,14 +285,15 @@ class DashboardService:
         logger.info("Calculating late payment summary")
 
         today = date.today()
-        current_day = today.day
 
         late_leases = []
         total_late_fees = Decimal("0.00")
         total_late_days = 0
 
-        # Check all active leases
-        active_leases = Lease.objects.filter(apartment__is_rented=True)
+        # Check all active leases - use select_related to avoid N+1 queries
+        active_leases = Lease.objects.filter(apartment__is_rented=True).select_related(
+            "apartment", "apartment__building", "responsible_tenant"
+        )
 
         for lease in active_leases:
             # Calculate if payment is late
@@ -323,10 +329,7 @@ class DashboardService:
             "late_leases": late_leases,
         }
 
-        logger.info(
-            f"Late payment summary: {len(late_leases)} leases late, "
-            f"total fees=R$ {total_late_fees}"
-        )
+        logger.info(f"Late payment summary: {len(late_leases)} leases late, " f"total fees=R$ {total_late_fees}")
         return summary
 
     @staticmethod
@@ -366,11 +369,12 @@ class DashboardService:
 
         total_dependents = Dependent.objects.count()
 
-        # Get marital status distribution (for individuals only)
+        # Get marital status distribution using values().annotate() - single query
+        marital_status_qs = Tenant.objects.filter(is_company=False).values("marital_status").annotate(count=Count("id"))
         marital_status_distribution = {}
-        for tenant in Tenant.objects.filter(is_company=False):
-            status = tenant.marital_status or "Not specified"
-            marital_status_distribution[status] = marital_status_distribution.get(status, 0) + 1
+        for item in marital_status_qs:
+            status = item["marital_status"] or "Not specified"
+            marital_status_distribution[status] = item["count"]
 
         statistics = {
             "total_tenants": tenant_stats["total_tenants"],

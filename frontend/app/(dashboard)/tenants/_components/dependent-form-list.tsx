@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Plus, Trash2, User, Phone } from 'lucide-react';
-import { formatBrazilianPhone } from '@/lib/utils/validators';
+import { formatBrazilianPhone } from '@/lib/utils/formatters';
 
 interface TenantFormValues {
   name: string;

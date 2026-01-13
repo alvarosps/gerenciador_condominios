@@ -38,7 +38,7 @@ export function TenantStatisticsWidget() {
   }
 
   const pieData = [
-    { name: 'Pessoas Físicas', value: data.person_tenants, color: '#3b82f6' },
+    { name: 'Pessoas Físicas', value: data.individual_tenants, color: '#3b82f6' },
     { name: 'Empresas', value: data.company_tenants, color: '#10b981' },
   ];
 
@@ -72,8 +72,10 @@ export function TenantStatisticsWidget() {
   const dependentsPercentage =
     data.total_tenants > 0 ? (data.tenants_with_dependents / data.total_tenants) * 100 : 0;
 
-  const furniturePercentage =
-    data.total_tenants > 0 ? (data.tenants_with_furniture / data.total_tenants) * 100 : 0;
+  const avgDependents =
+    data.tenants_with_dependents > 0
+      ? data.total_dependents / data.tenants_with_dependents
+      : 0;
 
   return (
     <Card className="hover:shadow-md transition-shadow">
@@ -136,18 +138,15 @@ export function TenantStatisticsWidget() {
 
               <div className="flex justify-between items-center">
                 <span className="text-sm text-muted-foreground">Média de Dependentes</span>
-                <span className="font-bold text-lg">{data.avg_dependents.toFixed(1)}</span>
+                <span className="font-bold text-lg">{avgDependents.toFixed(1)}</span>
               </div>
 
               <div className="flex justify-between items-center pt-3 border-t">
                 <span className="text-sm text-muted-foreground flex items-center gap-2">
-                  <Home className="h-4 w-4" /> Com Móveis
+                  <Home className="h-4 w-4" /> Total de Dependentes
                 </span>
                 <span className="font-bold">
-                  {data.tenants_with_furniture}
-                  <span className="text-xs text-muted-foreground ml-2">
-                    ({furniturePercentage.toFixed(1)}%)
-                  </span>
+                  {data.total_dependents}
                 </span>
               </div>
             </div>
@@ -157,7 +156,7 @@ export function TenantStatisticsWidget() {
         {/* Bottom Summary */}
         <div className="mt-6 pt-4 border-t grid grid-cols-2 gap-4">
           <div className="text-center">
-            <div className="text-2xl font-bold text-blue-500">{data.person_tenants}</div>
+            <div className="text-2xl font-bold text-blue-500">{data.individual_tenants}</div>
             <div className="text-xs text-muted-foreground flex items-center justify-center gap-1 mt-1">
               <User className="h-3 w-3" /> Pessoas Físicas
             </div>

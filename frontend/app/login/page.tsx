@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useForm, ControllerRenderProps } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Mail, Lock, User } from 'lucide-react';
+import { Lock, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
@@ -29,8 +29,8 @@ export const dynamic = 'force-dynamic';
  * Login form validation schema
  */
 const loginSchema = z.object({
-  email: z.string().email('Email inválido'),
-  password: z.string().min(6, 'Senha deve ter no mínimo 6 caracteres'),
+  username: z.string().min(1, 'Nome de usuário é obrigatório'),
+  password: z.string().min(1, 'Senha é obrigatória'),
 });
 
 type LoginFormData = z.infer<typeof loginSchema>;
@@ -49,7 +49,7 @@ export default function LoginPage() {
   const form = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: '',
+      username: '',
       password: '',
     },
   });
@@ -65,12 +65,12 @@ export default function LoginPage() {
       await loginMutation.mutateAsync(values);
 
       toast.success('Login realizado com sucesso!');
-      router.push('/dashboard');
+      router.push('/');
     } catch (err) {
       if (err instanceof z.ZodError) {
         toast.error('Por favor, preencha todos os campos corretamente');
       } else {
-        setError('Credenciais inválidas. Verifique seu email e senha.');
+        setError('Credenciais inválidas. Verifique seu usuário e senha.');
       }
     }
   };
@@ -115,18 +115,18 @@ export default function LoginPage() {
             <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
               <FormField
                 control={form.control}
-                name="email"
-                render={({ field }: { field: ControllerRenderProps<LoginFormData, 'email'> }) => (
+                name="username"
+                render={({ field }: { field: ControllerRenderProps<LoginFormData, 'username'> }) => (
                   <FormItem>
-                    <FormLabel>Email</FormLabel>
+                    <FormLabel>Usuário</FormLabel>
                     <FormControl>
                       <div className="relative">
-                        <Mail className="absolute left-3 top-3 h-5 w-5 text-muted-foreground" />
+                        <User className="absolute left-3 top-3 h-5 w-5 text-muted-foreground" />
                         <Input
                           {...field}
-                          type="email"
-                          placeholder="seu@email.com"
-                          autoComplete="email"
+                          type="text"
+                          placeholder="seu_usuario"
+                          autoComplete="username"
                           className="pl-10 h-11"
                         />
                       </div>

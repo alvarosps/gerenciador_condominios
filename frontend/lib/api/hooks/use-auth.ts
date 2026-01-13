@@ -6,7 +6,7 @@ import { useAuthStore, type User } from '@/store/auth-store';
  * Login credentials interface
  */
 export interface LoginCredentials {
-  email: string;
+  username: string;
   password: string;
 }
 
@@ -22,12 +22,11 @@ export interface RegisterData {
 }
 
 /**
- * Authentication response from backend
+ * Authentication response from backend (JWT token endpoint)
  */
 export interface AuthResponse {
   access: string;
   refresh: string;
-  user: User;
 }
 
 /**
@@ -41,21 +40,24 @@ export interface RefreshTokenResponse {
  * Hook for user login with JWT
  */
 export function useLogin() {
-  const setAuth = useAuthStore((state) => state.setAuth);
+  const setTokens = useAuthStore((state) => state.setTokens);
 
   return useMutation({
     mutationFn: async (credentials: LoginCredentials) => {
-      const { data } = await apiClient.post<AuthResponse>('/auth/login/', credentials);
+      const { data } = await apiClient.post<AuthResponse>('/auth/token/', credentials);
       return data;
     },
     onSuccess: (data) => {
-      // Store tokens and user in Zustand store
-      setAuth(data.access, data.refresh, data.user);
+      // Store tokens in Zustand store
+      setTokens(data.access, data.refresh);
 
       // Also store in localStorage for API client interceptor
       if (typeof window !== 'undefined') {
         localStorage.setItem('access_token', data.access);
         localStorage.setItem('refresh_token', data.refresh);
+
+        // Set cookie for middleware auth check (24 hour expiry)
+        document.cookie = `access_token=${data.access}; path=/; max-age=86400; SameSite=Lax`;
       }
     },
   });
@@ -89,10 +91,13 @@ export function useLogout() {
       // Clear auth state
       clearAuth();
 
-      // Clear tokens from localStorage
+      // Clear tokens from localStorage and cookie
       if (typeof window !== 'undefined') {
         localStorage.removeItem('access_token');
         localStorage.removeItem('refresh_token');
+
+        // Clear cookie by setting expired date
+        document.cookie = 'access_token=; path=/; max-age=0; SameSite=Lax';
       }
 
       // Clear all cached queries
@@ -108,6 +113,9 @@ export function useLogout() {
       if (typeof window !== 'undefined') {
         localStorage.removeItem('access_token');
         localStorage.removeItem('refresh_token');
+
+        // Clear cookie by setting expired date
+        document.cookie = 'access_token=; path=/; max-age=0; SameSite=Lax';
       }
 
       queryClient.clear();
@@ -133,9 +141,12 @@ export function useRefreshToken() {
       // Update token in store
       setToken(data.access);
 
-      // Update token in localStorage
+      // Update token in localStorage and cookie
       if (typeof window !== 'undefined') {
         localStorage.setItem('access_token', data.access);
+
+        // Update cookie for middleware auth check (24 hour expiry)
+        document.cookie = `access_token=${data.access}; path=/; max-age=86400; SameSite=Lax`;
       }
     },
   });

@@ -7,6 +7,7 @@ This service handles all date-related business logic:
 - Rent due date checking
 - Days until due calculations
 """
+
 from __future__ import annotations
 
 import logging
@@ -86,9 +87,7 @@ class DateCalculatorService:
                     f"(start: {start_date}, original end: {calculated_final - timedelta(days=1)})"
                 )
 
-        logger.info(
-            f"Final date calculated: {start_date} + {validity_months} months = {calculated_final}"
-        )
+        logger.info(f"Final date calculated: {start_date} + {validity_months} months = {calculated_final}")
         return calculated_final
 
     @staticmethod
@@ -237,13 +236,7 @@ class DateCalculatorService:
         dates = DateCalculatorService.calculate_lease_dates(start_date, validity_months)
 
         return {
-            "start_date_formatted": DateCalculatorService.format_date_brazilian(
-                dates["start_date"]
-            ),
-            "next_month_date_formatted": DateCalculatorService.format_date_brazilian(
-                dates["next_month_date"]
-            ),
-            "final_date_formatted": DateCalculatorService.format_date_brazilian(
-                dates["final_date"]
-            ),
+            "start_date_formatted": DateCalculatorService.format_date_brazilian(dates["start_date"]),
+            "next_month_date_formatted": DateCalculatorService.format_date_brazilian(dates["next_month_date"]),
+            "final_date_formatted": DateCalculatorService.format_date_brazilian(dates["final_date"]),
         }

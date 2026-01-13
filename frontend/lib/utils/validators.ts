@@ -82,45 +82,6 @@ export function validateCpfCnpj(value: string): boolean {
 }
 
 /**
- * Format CPF for display
- * @param cpf - CPF string with only digits
- * @returns Formatted CPF (XXX.XXX.XXX-XX)
- */
-export function formatCPF(cpf: string): string {
-  const digits = cpf.replace(/\D/g, '');
-  if (digits.length !== 11) return cpf;
-
-  return digits.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
-}
-
-/**
- * Format CNPJ for display
- * @param cnpj - CNPJ string with only digits
- * @returns Formatted CNPJ (XX.XXX.XXX/XXXX-XX)
- */
-export function formatCNPJ(cnpj: string): string {
-  const digits = cnpj.replace(/\D/g, '');
-  if (digits.length !== 14) return cnpj;
-
-  return digits.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
-}
-
-/**
- * Format CPF or CNPJ based on length
- * @param value - Document string
- * @returns Formatted document
- */
-export function formatCPFOrCNPJ(value: string): string {
-  const digits = value.replace(/\D/g, '');
-
-  if (digits.length <= 11) {
-    return formatCPF(digits);
-  }
-
-  return formatCNPJ(digits);
-}
-
-/**
  * Validate Brazilian phone number
  * Accepts formats: (XX) XXXXX-XXXX or (XX) XXXX-XXXX
  *
@@ -140,27 +101,6 @@ export function validateBrazilianPhone(phone: string): boolean {
   if (digits.length === 11 && digits[2] !== '9') return false;
 
   return true;
-}
-
-/**
- * Format Brazilian phone number
- * @param phone - Phone string with only digits
- * @returns Formatted phone (XX) XXXXX-XXXX or (XX) XXXX-XXXX
- */
-export function formatBrazilianPhone(phone: string): string {
-  const digits = phone.replace(/\D/g, '');
-
-  if (digits.length === 11) {
-    // Mobile: (XX) 9XXXX-XXXX
-    return digits.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
-  }
-
-  if (digits.length === 10) {
-    // Landline: (XX) XXXX-XXXX
-    return digits.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3');
-  }
-
-  return phone;
 }
 
 /**

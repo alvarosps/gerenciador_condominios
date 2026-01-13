@@ -83,7 +83,7 @@ describe('useContractTemplate', () => {
 
     expect(result.current.data).toEqual(mockTemplate);
     expect(result.current.data?.content).toContain('Test Template');
-    expect(apiClient.get).toHaveBeenCalledWith('/leases/get_contract_template/');
+    expect(apiClient.get).toHaveBeenCalledWith('/templates/current/');
     expect(apiClient.get).toHaveBeenCalledTimes(1);
   });
 
@@ -167,7 +167,7 @@ describe('useSaveContractTemplate', () => {
     });
 
     expect(result.current.data).toEqual(mockResponse);
-    expect(apiClient.post).toHaveBeenCalledWith('/leases/save_contract_template/', {
+    expect(apiClient.post).toHaveBeenCalledWith('/templates/save/', {
       content: newContent,
     });
   });
@@ -246,7 +246,7 @@ describe('useSaveContractTemplate', () => {
 
     // Cache should be invalidated - template query should refetch
     await waitFor(() => {
-      expect(apiClient.get).toHaveBeenCalledWith('/leases/get_contract_template/');
+      expect(apiClient.get).toHaveBeenCalledWith('/templates/current/');
     });
   });
 });
@@ -280,7 +280,7 @@ describe('usePreviewContractTemplate', () => {
     });
 
     expect(result.current.data).toEqual(mockPreview);
-    expect(apiClient.post).toHaveBeenCalledWith('/leases/preview_contract_template/', {
+    expect(apiClient.post).toHaveBeenCalledWith('/templates/preview/', {
       content,
     });
   });
@@ -305,7 +305,7 @@ describe('usePreviewContractTemplate', () => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    expect(apiClient.post).toHaveBeenCalledWith('/leases/preview_contract_template/', {
+    expect(apiClient.post).toHaveBeenCalledWith('/templates/preview/', {
       content,
       lease_id,
     });
@@ -397,7 +397,7 @@ describe('useTemplateBackups', () => {
 
     expect(result.current.data).toEqual(mockBackups);
     expect(result.current.data).toHaveLength(2);
-    expect(apiClient.get).toHaveBeenCalledWith('/leases/list_template_backups/');
+    expect(apiClient.get).toHaveBeenCalledWith('/templates/backups/');
   });
 
   it('should return empty array when no backups exist', async () => {
@@ -497,7 +497,7 @@ describe('useRestoreTemplateBackup', () => {
     });
 
     expect(result.current.data).toEqual(mockResponse);
-    expect(apiClient.post).toHaveBeenCalledWith('/leases/restore_template_backup/', {
+    expect(apiClient.post).toHaveBeenCalledWith('/templates/restore/', {
       backup_filename,
     });
   });
@@ -534,10 +534,10 @@ describe('useRestoreTemplateBackup', () => {
 
     // Mock get endpoints
     vi.mocked(apiClient.get).mockImplementation((url: string) => {
-      if (url === '/leases/get_contract_template/') {
+      if (url === '/templates/current/') {
         return Promise.resolve({ data: { content: 'Template' } });
       }
-      if (url === '/leases/list_template_backups/') {
+      if (url === '/templates/backups/') {
         return Promise.resolve({ data: [] });
       }
       return Promise.reject(new Error('Unknown endpoint'));
@@ -583,8 +583,8 @@ describe('useRestoreTemplateBackup', () => {
 
     // Both caches should be invalidated
     await waitFor(() => {
-      expect(apiClient.get).toHaveBeenCalledWith('/leases/get_contract_template/');
-      expect(apiClient.get).toHaveBeenCalledWith('/leases/list_template_backups/');
+      expect(apiClient.get).toHaveBeenCalledWith('/templates/current/');
+      expect(apiClient.get).toHaveBeenCalledWith('/templates/backups/');
     });
 
     // Should have been called twice (once for each query)
@@ -604,12 +604,12 @@ describe('Hooks Integration', () => {
   it('should work together: save template → see new backup → restore backup', async () => {
     // Setup mocks
     vi.mocked(apiClient.get).mockImplementation((url: string) => {
-      if (url === '/leases/get_contract_template/') {
+      if (url === '/templates/current/') {
         return Promise.resolve({
           data: { content: '<html>Current</html>' },
         });
       }
-      if (url === '/leases/list_template_backups/') {
+      if (url === '/templates/backups/') {
         return Promise.resolve({
           data: [
             {
@@ -625,7 +625,7 @@ describe('Hooks Integration', () => {
     });
 
     vi.mocked(apiClient.post).mockImplementation((url: string, _data: unknown) => {
-      if (url === '/leases/save_contract_template/') {
+      if (url === '/templates/save/') {
         return Promise.resolve({
           data: {
             message: 'Saved',
@@ -634,7 +634,7 @@ describe('Hooks Integration', () => {
           },
         });
       }
-      if (url === '/leases/restore_template_backup/') {
+      if (url === '/templates/restore/') {
         return Promise.resolve({
           data: {
             message: 'Restored',

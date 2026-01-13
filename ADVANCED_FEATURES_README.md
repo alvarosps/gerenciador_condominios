@@ -394,10 +394,10 @@ const handleBulkDelete = async (ids: string[]) => {
     const results = await Promise.allSettled(
       ids.map(id => deleteItem(id))
     );
-    
+
     const succeeded = results.filter(r => r.status === 'fulfilled').length;
     const failed = results.filter(r => r.status === 'rejected').length;
-    
+
     return {
       success: succeeded,
       failed: failed,
@@ -418,16 +418,16 @@ const handleFileUpload = async (file) => {
   try {
     const formData = new FormData();
     formData.append('file', file.file);
-    
+
     const response = await fetch('/api/upload', {
       method: 'POST',
       body: formData
     });
-    
+
     if (!response.ok) {
       throw new Error('Upload failed');
     }
-    
+
     const data = await response.json();
     return { url: data.url, metadata: data.metadata };
   } catch (error) {
@@ -517,15 +517,15 @@ test('bulk operations work correctly', async () => {
       />
     </NotificationProvider>
   );
-  
+
   // Test bulk selection
   const checkboxes = screen.getAllByRole('checkbox');
   fireEvent.click(checkboxes[1]); // Select first item
-  
+
   // Test bulk delete
   const deleteButton = screen.getByText('Excluir');
   fireEvent.click(deleteButton);
-  
+
   expect(mockBulkDelete).toHaveBeenCalledWith(['1']);
 });
 ```

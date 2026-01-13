@@ -11,28 +11,30 @@ Tests all model functionality including:
 Coverage target: 100% of models.py
 """
 
-import pytest
-from decimal import Decimal
 from datetime import date, timedelta
-from django.db import IntegrityError
+from decimal import Decimal
+
 from django.core.exceptions import ValidationError
+from django.db import IntegrityError
 
-from core.models import Building, Furniture, Apartment, Tenant, Dependent, Lease
+import pytest
+
+from core.models import Apartment, Building, Dependent, Furniture, Lease, Tenant
 from tests.fixtures.factories import (
-    BuildingFactory,
-    FurnitureFactory,
     ApartmentFactory,
-    TenantFactory,
+    BuildingFactory,
     DependentFactory,
+    FurnitureFactory,
     LeaseFactory,
+    TenantFactory,
     create_full_lease_scenario,
-    create_rented_apartment
+    create_rented_apartment,
 )
-
 
 # ============================================================================
 # Building Model Tests
 # ============================================================================
+
 
 @pytest.mark.unit
 @pytest.mark.model
@@ -41,11 +43,7 @@ class TestBuildingModel:
 
     def test_create_building(self):
         """Test creating a building with valid data"""
-        building = BuildingFactory(
-            street_number=836,
-            name="Edifício Test",
-            address="Rua Test, 836 - São Paulo/SP"
-        )
+        building = BuildingFactory(street_number=836, name="Edifício Test", address="Rua Test, 836 - São Paulo/SP")
 
         assert building.id is not None
         assert building.street_number == 836
@@ -67,11 +65,7 @@ class TestBuildingModel:
         # Force create with same street_number (bypass factory sequence)
         with pytest.raises(IntegrityError):
             with transaction.atomic():
-                Building.objects.create(
-                    street_number=999,
-                    name="Duplicate Building",
-                    address="Duplicate Address"
-                )
+                Building.objects.create(street_number=999, name="Duplicate Building", address="Duplicate Address")
 
     def test_building_apartments_relationship(self):
         """Test one-to-many relationship with apartments"""
@@ -84,12 +78,13 @@ class TestBuildingModel:
         assert apt2 in building.apartments.all()
 
     def test_building_cascade_delete(self):
-        """Test that deleting building cascades to apartments"""
+        """Test that hard deleting building cascades to apartments"""
         building = BuildingFactory()
         apartment = ApartmentFactory(building=building)
         apartment_id = apartment.id
 
-        building.delete()
+        # Use hard_delete=True to test cascade (soft delete doesn't cascade)
+        building.delete(hard_delete=True)
 
         assert not Apartment.objects.filter(id=apartment_id).exists()
 
@@ -103,16 +98,17 @@ class TestBuildingModel:
         apartments = [
             ApartmentFactory(building=building1),
             ApartmentFactory(building=building2),
-            ApartmentFactory(building=building3)
+            ApartmentFactory(building=building3),
         ]
 
-        ordered_apts = Apartment.objects.all().order_by('building__street_number')
+        ordered_apts = Apartment.objects.all().order_by("building__street_number")
         assert list(ordered_apts) == [apartments[1], apartments[0], apartments[2]]
 
 
 # ============================================================================
 # Furniture Model Tests
 # ============================================================================
+
 
 @pytest.mark.unit
 @pytest.mark.model
@@ -121,10 +117,7 @@ class TestFurnitureModel:
 
     def test_create_furniture(self):
         """Test creating furniture with valid data"""
-        furniture = FurnitureFactory(
-            name="Geladeira",
-            description="Geladeira Frost Free 300L"
-        )
+        furniture = FurnitureFactory(name="Geladeira", description="Geladeira Frost Free 300L")
 
         assert furniture.id is not None
         assert furniture.name == "Geladeira"
@@ -181,6 +174,7 @@ class TestFurnitureModel:
 # Apartment Model Tests
 # ============================================================================
 
+
 @pytest.mark.unit
 @pytest.mark.model
 class TestApartmentModel:
@@ -192,16 +186,16 @@ class TestApartmentModel:
         apartment = ApartmentFactory(
             building=building,
             number=101,
-            rental_value=Decimal('1500.00'),
-            cleaning_fee=Decimal('200.00'),
-            max_tenants=2
+            rental_value=Decimal("1500.00"),
+            cleaning_fee=Decimal("200.00"),
+            max_tenants=2,
         )
 
         assert apartment.id is not None
         assert apartment.building == building
         assert apartment.number == 101
-        assert apartment.rental_value == Decimal('1500.00')
-        assert apartment.cleaning_fee == Decimal('200.00')
+        assert apartment.rental_value == Decimal("1500.00")
+        assert apartment.cleaning_fee == Decimal("200.00")
         assert apartment.max_tenants == 2
 
     def test_apartment_str_representation(self):
@@ -254,12 +248,12 @@ class TestApartmentModel:
         assert apartment.is_rented is False
         assert apartment.lease_date is None
         assert apartment.last_rent_increase_date is None
-        assert apartment.cleaning_fee == Decimal('0.00') or apartment.cleaning_fee > Decimal('0.00')
+        assert apartment.cleaning_fee == Decimal("0.00") or apartment.cleaning_fee > Decimal("0.00")
 
     def test_apartment_rental_value_validation(self):
         """Test that rental_value must be positive"""
-        apartment = ApartmentFactory(rental_value=Decimal('1500.00'))
-        assert apartment.rental_value > Decimal('0.00')
+        apartment = ApartmentFactory(rental_value=Decimal("1500.00"))
+        assert apartment.rental_value > Decimal("0.00")
 
         # Note: MinValueValidator is on the field, but doesn't raise on save
         # It raises during form validation or serializer validation
@@ -281,13 +275,14 @@ class TestApartmentModel:
         apt2 = ApartmentFactory(building=building1, number=101)
         apt3 = ApartmentFactory(building=building2, number=102)
 
-        apartments = Apartment.objects.all().order_by('building__street_number', 'number')
+        apartments = Apartment.objects.all().order_by("building__street_number", "number")
         assert list(apartments) == [apt2, apt1, apt3]
 
 
 # ============================================================================
 # Tenant Model Tests
 # ============================================================================
+
 
 @pytest.mark.unit
 @pytest.mark.model
@@ -298,19 +293,19 @@ class TestTenantModel:
         """Test creating tenant with valid data"""
         tenant = TenantFactory(
             name="João da Silva",
-            cpf_cnpj="123.456.789-00",
+            cpf_cnpj="529.982.247-25",  # Valid CPF
             is_company=False,
             phone="(11) 98765-4321",
-            marital_status="Casado",
-            profession="Engenheiro"
+            marital_status="Casado(a)",
+            profession="Engenheiro",
         )
 
         assert tenant.id is not None
         assert tenant.name == "João da Silva"
-        assert tenant.cpf_cnpj == "123.456.789-00"
+        assert tenant.cpf_cnpj == "529.982.247-25"
         assert tenant.is_company is False
         assert tenant.phone == "(11) 98765-4321"
-        assert tenant.marital_status == "Casado"
+        assert tenant.marital_status == "Casado(a)"
         assert tenant.profession == "Engenheiro"
 
     def test_tenant_str_representation(self):
@@ -320,10 +315,11 @@ class TestTenantModel:
 
     def test_cpf_cnpj_unique_constraint(self):
         """Test that cpf_cnpj must be unique"""
-        TenantFactory(cpf_cnpj="123.456.789-00")
+        TenantFactory(cpf_cnpj="529.982.247-25")  # Valid CPF
 
-        with pytest.raises(IntegrityError):
-            TenantFactory(cpf_cnpj="123.456.789-00")
+        # The model's full_clean() catches duplicates before database constraint
+        with pytest.raises((IntegrityError, ValidationError)):
+            TenantFactory(cpf_cnpj="529.982.247-25")  # Same CPF should fail
 
     def test_tenant_dependents_relationship(self):
         """Test one-to-many relationship with dependents"""
@@ -359,21 +355,22 @@ class TestTenantModel:
         """Test creating a company (PJ) tenant"""
         tenant = TenantFactory(
             name="Empresa XYZ Ltda",
-            cpf_cnpj="12.345.678/0001-00",
+            cpf_cnpj="11.222.333/0001-81",
             is_company=True,
-            rg=None  # Companies don't have RG
+            rg=None,  # Valid CNPJ, companies don't have RG
         )
 
         assert tenant.is_company is True
         assert tenant.rg is None
 
     def test_tenant_cascade_delete_dependents(self):
-        """Test that deleting tenant cascades to dependents"""
+        """Test that hard deleting tenant cascades to dependents"""
         tenant = TenantFactory()
         dependent = DependentFactory(tenant=tenant)
         dependent_id = dependent.id
 
-        tenant.delete()
+        # Use hard_delete=True to test cascade (soft delete doesn't cascade)
+        tenant.delete(hard_delete=True)
 
         assert not Dependent.objects.filter(id=dependent_id).exists()
 
@@ -381,7 +378,7 @@ class TestTenantModel:
         """Test many-to-many relationship with leases"""
         tenant = TenantFactory()
         apartment1 = ApartmentFactory()
-        apartment2 = ApartmentFactory()
+        _apartment2 = ApartmentFactory()  # noqa: F841
 
         lease1 = LeaseFactory(apartment=apartment1, responsible_tenant=tenant, tenants=[tenant])
         # Note: Can't create second lease for same tenant as responsible (business logic)
@@ -395,6 +392,7 @@ class TestTenantModel:
 # Dependent Model Tests
 # ============================================================================
 
+
 @pytest.mark.unit
 @pytest.mark.model
 class TestDependentModel:
@@ -403,11 +401,7 @@ class TestDependentModel:
     def test_create_dependent(self):
         """Test creating dependent with valid data"""
         tenant = TenantFactory()
-        dependent = DependentFactory(
-            tenant=tenant,
-            name="Maria Silva",
-            phone="(11) 91234-5678"
-        )
+        dependent = DependentFactory(tenant=tenant, name="Maria Silva", phone="(11) 91234-5678")
 
         assert dependent.id is not None
         assert dependent.tenant == tenant
@@ -445,6 +439,7 @@ class TestDependentModel:
 # Lease Model Tests
 # ============================================================================
 
+
 @pytest.mark.unit
 @pytest.mark.model
 class TestLeaseModel:
@@ -461,9 +456,9 @@ class TestLeaseModel:
             start_date=date(2025, 1, 15),
             validity_months=12,
             due_day=10,
-            rental_value=Decimal('1500.00'),
-            cleaning_fee=Decimal('200.00'),
-            tag_fee=Decimal('50.00')
+            rental_value=Decimal("1500.00"),
+            cleaning_fee=Decimal("200.00"),
+            tag_fee=Decimal("50.00"),
         )
 
         assert lease.id is not None
@@ -472,9 +467,9 @@ class TestLeaseModel:
         assert lease.start_date == date(2025, 1, 15)
         assert lease.validity_months == 12
         assert lease.due_day == 10
-        assert lease.rental_value == Decimal('1500.00')
-        assert lease.cleaning_fee == Decimal('200.00')
-        assert lease.tag_fee == Decimal('50.00')
+        assert lease.rental_value == Decimal("1500.00")
+        assert lease.cleaning_fee == Decimal("200.00")
+        assert lease.tag_fee == Decimal("50.00")
 
     def test_lease_str_representation(self):
         """Test __str__ method returns expected format"""
@@ -490,20 +485,17 @@ class TestLeaseModel:
         apartment = ApartmentFactory()
         LeaseFactory(apartment=apartment)
 
-        with pytest.raises(IntegrityError):
+        # The model's full_clean() catches duplicates before database constraint
+        with pytest.raises((IntegrityError, ValidationError)):
             LeaseFactory(apartment=apartment)
 
     def test_lease_multiple_tenants(self):
         """Test lease with multiple tenants"""
         apartment = ApartmentFactory()
-        tenant1 = TenantFactory(cpf_cnpj="111.111.111-11")
-        tenant2 = TenantFactory(cpf_cnpj="222.222.222-22")
+        tenant1 = TenantFactory(cpf_cnpj="529.982.247-25")  # Valid CPF
+        tenant2 = TenantFactory(cpf_cnpj="111.444.777-35")  # Valid CPF
 
-        lease = LeaseFactory(
-            apartment=apartment,
-            responsible_tenant=tenant1,
-            tenants=[tenant1, tenant2]
-        )
+        lease = LeaseFactory(apartment=apartment, responsible_tenant=tenant1, tenants=[tenant1, tenant2])
 
         assert lease.tenants.count() == 2
         assert tenant1 in lease.tenants.all()
@@ -513,51 +505,39 @@ class TestLeaseModel:
     def test_lease_tenants_relationship(self):
         """Test many-to-many relationship with tenants"""
         apartment = ApartmentFactory()
-        tenant1 = TenantFactory(cpf_cnpj="111.111.111-11")
-        tenant2 = TenantFactory(cpf_cnpj="222.222.222-22")
-        tenant3 = TenantFactory(cpf_cnpj="333.333.333-33")
+        tenant1 = TenantFactory(cpf_cnpj="234.567.890-92")  # Valid CPF
+        tenant2 = TenantFactory(cpf_cnpj="345.678.901-75")  # Valid CPF
+        tenant3 = TenantFactory(cpf_cnpj="276.685.415-00")  # Valid CPF
 
-        lease = LeaseFactory(
-            apartment=apartment,
-            responsible_tenant=tenant1,
-            tenants=[tenant1, tenant2, tenant3]
-        )
+        lease = LeaseFactory(apartment=apartment, responsible_tenant=tenant1, tenants=[tenant1, tenant2, tenant3])
 
         assert lease.tenants.count() == 3
         assert lease.number_of_tenants == 3
         # Tag fee should be 80 for multiple tenants
-        assert lease.tag_fee == Decimal('80.00')
+        assert lease.tag_fee == Decimal("80.00")
 
     def test_lease_tag_fee_single_tenant(self):
         """Test tag fee calculation for single tenant"""
         apartment = ApartmentFactory()
         tenant = TenantFactory()
 
-        lease = LeaseFactory(
-            apartment=apartment,
-            responsible_tenant=tenant,
-            tenants=[tenant]
-        )
+        lease = LeaseFactory(apartment=apartment, responsible_tenant=tenant, tenants=[tenant])
 
         assert lease.tenants.count() == 1
         assert lease.number_of_tenants == 1
-        assert lease.tag_fee == Decimal('50.00')
+        assert lease.tag_fee == Decimal("50.00")
 
     def test_lease_tag_fee_multiple_tenants(self):
         """Test tag fee calculation for multiple tenants"""
         apartment = ApartmentFactory()
-        tenant1 = TenantFactory(cpf_cnpj="111.111.111-11")
-        tenant2 = TenantFactory(cpf_cnpj="222.222.222-22")
+        tenant1 = TenantFactory(cpf_cnpj="567.890.123-03")  # Valid CPF
+        tenant2 = TenantFactory(cpf_cnpj="678.901.234-69")  # Valid CPF
 
-        lease = LeaseFactory(
-            apartment=apartment,
-            responsible_tenant=tenant1,
-            tenants=[tenant1, tenant2]
-        )
+        lease = LeaseFactory(apartment=apartment, responsible_tenant=tenant1, tenants=[tenant1, tenant2])
 
         assert lease.tenants.count() == 2
         assert lease.number_of_tenants == 2
-        assert lease.tag_fee == Decimal('80.00')
+        assert lease.tag_fee == Decimal("80.00")
 
     def test_lease_default_values(self):
         """Test that default values are set correctly"""
@@ -579,21 +559,13 @@ class TestLeaseModel:
         tenant_furniture2 = FurnitureFactory(name="Fogão Apt")  # Same as apartment
 
         # Create apartment with furniture
-        apartment = ApartmentFactory(
-            furnitures=[apt_furniture1, apt_furniture2, apt_furniture3]
-        )
+        apartment = ApartmentFactory(furnitures=[apt_furniture1, apt_furniture2, apt_furniture3])
 
         # Create tenant with furniture (including one that's in the apartment)
-        tenant = TenantFactory(
-            furnitures=[tenant_furniture1, tenant_furniture2]
-        )
+        tenant = TenantFactory(furnitures=[tenant_furniture1, tenant_furniture2])
 
         # Create lease
-        lease = LeaseFactory(
-            apartment=apartment,
-            responsible_tenant=tenant,
-            tenants=[tenant]
-        )
+        _lease = LeaseFactory(apartment=apartment, responsible_tenant=tenant, tenants=[tenant])  # noqa: F841
 
         # Lease should have apartment furniture minus tenant furniture
         apt_furn_set = set(apartment.furnitures.all())
@@ -607,26 +579,22 @@ class TestLeaseModel:
         assert tenant_furniture1 not in lease_furniture  # Tenant's own furniture
 
     def test_lease_protect_tenant_deletion(self):
-        """Test that responsible tenant cannot be deleted while lease exists"""
+        """Test that responsible tenant cannot be hard-deleted while lease exists"""
         apartment = ApartmentFactory()
         tenant = TenantFactory()
-        lease = LeaseFactory(apartment=apartment, responsible_tenant=tenant)
+        _lease = LeaseFactory(apartment=apartment, responsible_tenant=tenant)  # noqa: F841
 
-        # Django's PROTECT should prevent deletion
-        # This test may vary based on database backend
-        # Some backends raise ProtectedError, others raise IntegrityError
+        # Django's PROTECT should prevent hard deletion
+        # Note: Soft delete (default) would work fine - this tests actual FK protection
         from django.db.models import ProtectedError
 
         with pytest.raises((ProtectedError, IntegrityError)):
-            tenant.delete()
+            tenant.delete(hard_delete=True)
 
     def test_full_lease_scenario(self):
         """Test creating a complete lease scenario with all related objects"""
         lease = create_full_lease_scenario(
-            num_tenants=2,
-            num_dependents_per_tenant=1,
-            apartment_furniture_count=5,
-            tenant_furniture_count=2
+            num_tenants=2, num_dependents_per_tenant=1, apartment_furniture_count=5, tenant_furniture_count=2
         )
 
         assert lease is not None

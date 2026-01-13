@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 
 interface StatisticCardProps {
   title: string;
-  value: number;
+  value: number | string;
   prefix?: string;
   suffix?: string;
   icon?: React.ReactNode;
@@ -26,6 +26,10 @@ function StatisticCard({
   valueColor,
   description,
 }: StatisticCardProps) {
+  // Handle both number and string values (backend returns Decimal as string)
+  const numValue = typeof value === 'string' ? parseFloat(value) : value;
+  const displayValue = isNaN(numValue) ? '0.00' : numValue.toFixed(2);
+
   return (
     <Card className="hover:shadow-md transition-shadow">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -35,7 +39,7 @@ function StatisticCard({
       <CardContent>
         <div className={cn('text-3xl font-bold', valueColor)}>
           {prefix}
-          {value.toFixed(2)}
+          {displayValue}
           {suffix}
         </div>
         {description && (
@@ -83,18 +87,18 @@ export function FinancialSummaryWidget() {
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
       <StatisticCard
         title="Receita Total"
-        value={data.total_revenue}
+        value={data.total_income}
         prefix="R$ "
         icon={<DollarSign />}
         valueColor="text-green-600"
-        description="Soma de todos os aluguéis ativos"
+        description="Soma de aluguéis + taxas"
       />
 
       <StatisticCard
-        title="Valor Médio de Aluguel"
-        value={data.avg_rental_value}
+        title="Receita por Apartamento"
+        value={data.revenue_per_apartment}
         prefix="R$ "
-        description="Média dos valores de aluguel"
+        description="Média por apartamento alugado"
       />
 
       <StatisticCard
@@ -103,16 +107,15 @@ export function FinancialSummaryWidget() {
         suffix="%"
         icon={<Home />}
         valueColor={getOccupancyColor(data.occupancy_rate)}
-        description="Percentual de apartamentos alugados"
+        description={`${data.rented_apartments} de ${data.total_apartments} apartamentos`}
       />
 
       <StatisticCard
-        title="Multas por Atraso"
-        value={data.total_late_fees}
-        prefix="R$ "
+        title="Apartamentos Vagos"
+        value={data.vacant_apartments}
         icon={<AlertTriangle />}
-        valueColor="text-red-600"
-        description="Total de multas calculadas"
+        valueColor={data.vacant_apartments > 0 ? 'text-orange-500' : 'text-green-600'}
+        description="Disponíveis para locação"
       />
     </div>
   );

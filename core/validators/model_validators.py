@@ -3,6 +3,7 @@ Model-level validators for business logic validation.
 
 Provides validators for model fields and cross-field validation.
 """
+
 from __future__ import annotations
 
 from datetime import date
@@ -33,9 +34,7 @@ def validate_due_day(value: int) -> None:
         raise ValidationError("Due day must be an integer.")
 
     if value < 1 or value > 31:
-        raise ValidationError(
-            f"Due day must be between 1 and 31. Got: {value}", code="invalid_due_day"
-        )
+        raise ValidationError(f"Due day must be between 1 and 31. Got: {value}", code="invalid_due_day")
 
 
 def validate_date_range(start_date: date, end_date: date, field_name: str = "end_date") -> None:
@@ -56,10 +55,7 @@ def validate_date_range(start_date: date, end_date: date, field_name: str = "end
     """
     if end_date <= start_date:
         raise ValidationError(
-            {
-                field_name: f"{field_name} must be after start date. "
-                f"Start: {start_date}, End: {end_date}"
-            },
+            {field_name: f"{field_name} must be after start date. " f"Start: {start_date}, End: {end_date}"},
             code="invalid_date_range",
         )
 
@@ -154,11 +150,7 @@ def validate_rental_value(value: float) -> None:
         raise ValidationError("Rental value cannot be negative.")
 
     if value < 100:
-        raise ValidationError(
-            "Rental value seems too low. Minimum: R$ 100.00", code="rental_value_too_low"
-        )
+        raise ValidationError("Rental value seems too low. Minimum: R$ 100.00", code="rental_value_too_low")
 
     if value > 100000:
-        raise ValidationError(
-            "Rental value seems too high. Maximum: R$ 100,000.00", code="rental_value_too_high"
-        )
+        raise ValidationError("Rental value seems too high. Maximum: R$ 100,000.00", code="rental_value_too_high")

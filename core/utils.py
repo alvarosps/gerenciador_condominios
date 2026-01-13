@@ -5,10 +5,14 @@ This module provides helper functions for:
 - Currency formatting (Brazilian Real)
 - Number to words conversion (Portuguese)
 """
+
+import logging
 from decimal import Decimal
 from typing import Union
 
 from num2words import num2words
+
+logger = logging.getLogger(__name__)
 
 
 def number_to_words(value: Union[int, float, Decimal]) -> str:
@@ -30,7 +34,7 @@ def number_to_words(value: Union[int, float, Decimal]) -> str:
     try:
         return str(num2words(float(value), lang="pt_BR"))
     except Exception as e:
-        print(f"Erro ao converter número para extenso: {e}")
+        logger.error(f"Erro ao converter número para extenso: {e}")
         return str(value)
 
 
@@ -52,4 +56,8 @@ def format_currency(value: Union[int, float, Decimal]) -> str:
         >>> format_currency(Decimal('1500.00'))
         'R$1.500,00'
     """
-    return f"R${value:,.2f}"
+    # Format with US-style separators, then swap to Brazilian format
+    # US: 1,500.00 -> Brazilian: 1.500,00
+    formatted = f"{value:,.2f}"
+    # Swap: , -> X, . -> ,, X -> .
+    return f"R${formatted.replace(',', 'X').replace('.', ',').replace('X', '.')}"

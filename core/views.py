@@ -2,33 +2,18 @@
 import logging
 from datetime import date
 
+from django.core.exceptions import PermissionDenied, ValidationError
+from django.db import DatabaseError, IntegrityError
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-logger = logging.getLogger(__name__)
-
 from .models import Apartment, Building, Furniture, Lease, Tenant
-from .permissions import (
-    CanGenerateContract,
-    CanModifyLease,
-    IsAdminUser,
-    IsTenantOrAdmin,
-    ReadOnlyForNonAdmin,
-)
-from .serializers import (
-    ApartmentSerializer,
-    BuildingSerializer,
-    FurnitureSerializer,
-    LeaseSerializer,
-    TenantSerializer,
-)
-from .services import (
-    ContractService,
-    DashboardService,
-    FeeCalculatorService,
-    TemplateManagementService,
-)
+from .permissions import CanGenerateContract, CanModifyLease, IsAdminUser, IsTenantOrAdmin, ReadOnlyForNonAdmin
+from .serializers import ApartmentSerializer, BuildingSerializer, FurnitureSerializer, LeaseSerializer, TenantSerializer
+from .services import ContractService, DashboardService, FeeCalculatorService
+
+logger = logging.getLogger(__name__)
 
 
 class BuildingViewSet(viewsets.ModelViewSet):
@@ -103,9 +88,7 @@ class ApartmentViewSet(viewsets.ModelViewSet):
         queryset = super().get_queryset()
 
         if self.action in ["list", "retrieve"]:
-            queryset = queryset.select_related(
-                "building"  # ForeignKey: Apartment -> Building
-            ).prefetch_related(
+            queryset = queryset.select_related("building").prefetch_related(  # ForeignKey: Apartment -> Building
                 "furnitures"  # ManyToMany: Apartment -> Furnitures
             )
 
@@ -189,9 +172,7 @@ class LeaseViewSet(viewsets.ModelViewSet):
             # Optimize for detail view: same as list but for single object
             queryset = queryset.select_related(
                 "apartment", "apartment__building", "responsible_tenant"
-            ).prefetch_related(
-                "tenants", "tenants__dependents", "tenants__furnitures", "apartment__furnitures"
-            )
+            ).prefetch_related("tenants", "tenants__dependents", "tenants__furnitures", "apartment__furnitures")
 
         return queryset
 
@@ -219,8 +200,28 @@ class LeaseViewSet(viewsets.ModelViewSet):
                 {"message": "Contrato gerado com sucesso!", "pdf_path": pdf_path},
                 status=status.HTTP_200_OK,
             )
-        except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        except ValidationError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except PermissionDenied as e:
+            return Response({"error": str(e)}, status=status.HTTP_403_FORBIDDEN)
+        except FileNotFoundError as e:
+            logger.error(f"Template not found during contract generation: {e}")
+            return Response(
+                {"error": "Template de contrato não encontrado"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        except (DatabaseError, IntegrityError) as e:
+            logger.error(f"Database error during contract generation: {e}")
+            return Response(
+                {"error": "Erro ao salvar dados do contrato"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+        except Exception:
+            logger.exception("Unexpected error during contract generation")
+            return Response(
+                {"error": "Erro interno ao gerar contrato"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
     # Endpoint para cálculo de multa de atraso
     @action(detail=True, methods=["get"], permission_classes=[IsTenantOrAdmin])
@@ -262,9 +263,7 @@ class LeaseViewSet(viewsets.ModelViewSet):
         new_due_day = request.data.get("new_due_day")
 
         if not new_due_day:
-            return Response(
-                {"error": "Campo new_due_day é obrigatório."}, status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"error": "Campo new_due_day é obrigatório."}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             new_due_day = int(new_due_day)
@@ -289,172 +288,20 @@ class LeaseViewSet(viewsets.ModelViewSet):
                 {"error": f"Valor inválido para new_due_day: {str(e)}"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-    # Template Management Endpoints (Phase 6)
-    @action(detail=False, methods=["get"], permission_classes=[IsAdminUser])
-    def get_contract_template(self, request):
-        """
-        Get current contract template HTML.
-
-        Permissions: Admin only
-
-        Returns the HTML content of the current contract template used for
-        PDF generation. Used by the template editor frontend.
-
-        Returns:
-            Response: {"content": "<html>...</html>"}
-        """
-        try:
-            content = TemplateManagementService.get_template()
-            return Response({"content": content}, status=status.HTTP_200_OK)
-        except FileNotFoundError as e:
-            return Response({"error": str(e)}, status=status.HTTP_404_NOT_FOUND)
-        except Exception as e:
-            logger.error(f"Error getting template: {str(e)}")
-            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-    @action(detail=False, methods=["post"], permission_classes=[IsAdminUser])
-    def save_contract_template(self, request):
-        """
-        Save contract template HTML with automatic backup.
-
-        Permissions: Admin only
-
-        Creates a timestamped backup of the current template before saving
-        the new content. Backups are stored in core/templates/backups/
-
-        Request Body:
-            {
-                "content": "<html>...</html>"
-            }
-
-        Returns:
-            Response: {
-                "message": "Template salvo com sucesso!",
-                "backup_path": "path/to/backup",
-                "backup_filename": "backup_filename.html"
-            }
-        """
-        content = request.data.get("content")
-
-        if not content:
-            return Response(
-                {"error": "O campo 'content' é obrigatório."}, status=status.HTTP_400_BAD_REQUEST
-            )
-
-        try:
-            result = TemplateManagementService.save_template(content)
-            return Response(result, status=status.HTTP_200_OK)
-        except ValueError as e:
+        except ValidationError as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        except Exception as e:
-            logger.error(f"Error saving template: {str(e)}")
-            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-    @action(detail=False, methods=["post"], permission_classes=[IsAdminUser])
-    def preview_contract_template(self, request):
-        """
-        Render template with sample data for preview.
-
-        Permissions: Admin only
-
-        Renders the provided template content with sample lease data to
-        generate a preview. Uses the first available lease or a specific
-        lease if lease_id is provided.
-
-        Request Body:
-            {
-                "content": "<html>...</html>",
-                "lease_id": 123  // Optional
-            }
-
-        Returns:
-            Response: {"html": "<rendered html>"}
-        """
-        content = request.data.get("content")
-        lease_id = request.data.get("lease_id")
-
-        if not content:
+        except (DatabaseError, IntegrityError) as e:
+            logger.error(f"Database error during due date change: {e}")
             return Response(
-                {"error": "O campo 'content' é obrigatório."}, status=status.HTTP_400_BAD_REQUEST
+                {"error": "Erro ao salvar alteração de vencimento"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
-
-        try:
-            html_content = TemplateManagementService.preview_template(content, lease_id)
-            return Response({"html": html_content}, status=status.HTTP_200_OK)
-        except ValueError as e:
-            return Response({"error": str(e)}, status=status.HTTP_404_NOT_FOUND)
-        except Exception as e:
-            logger.error(f"Error previewing template: {str(e)}")
-            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-    @action(detail=False, methods=["get"], permission_classes=[IsAdminUser])
-    def list_template_backups(self, request):
-        """
-        List all template backups.
-
-        Permissions: Admin only
-
-        Returns a list of all template backups with metadata including
-        filename, size, and creation timestamp.
-
-        Returns:
-            Response: [
-                {
-                    "filename": "backup_filename.html",
-                    "path": "absolute/path",
-                    "size": 12345,
-                    "created_at": "2025-01-19T14:30:00"
-                },
-                ...
-            ]
-        """
-        try:
-            backups = TemplateManagementService.list_backups()
-            return Response(backups, status=status.HTTP_200_OK)
-        except Exception as e:
-            logger.error(f"Error listing backups: {str(e)}")
-            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-    @action(detail=False, methods=["post"], permission_classes=[IsAdminUser])
-    def restore_template_backup(self, request):
-        """
-        Restore a template from backup.
-
-        Permissions: Admin only
-
-        Restores a specific backup file. Creates a safety backup of the
-        current template before restoring.
-
-        Request Body:
-            {
-                "backup_filename": "contract_template_backup_20250119_143000.html"
-            }
-
-        Returns:
-            Response: {
-                "message": "Template restaurado com sucesso",
-                "safety_backup": "safety_backup_filename.html"
-            }
-        """
-        backup_filename = request.data.get("backup_filename")
-
-        if not backup_filename:
+        except Exception:
+            logger.exception("Unexpected error during due date change")
             return Response(
-                {"error": "O campo 'backup_filename' é obrigatório."},
-                status=status.HTTP_400_BAD_REQUEST,
+                {"error": "Erro interno ao alterar vencimento"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
-
-        try:
-            result = TemplateManagementService.restore_backup(backup_filename)
-            return Response(result, status=status.HTTP_200_OK)
-        except FileNotFoundError as e:
-            return Response({"error": str(e)}, status=status.HTTP_404_NOT_FOUND)
-        except Exception as e:
-            logger.error(f"Error restoring backup: {str(e)}")
-            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class DashboardViewSet(viewsets.ViewSet):

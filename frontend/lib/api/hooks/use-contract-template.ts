@@ -35,7 +35,7 @@ export function useContractTemplate() {
     queryKey: ['contract-template'],
     queryFn: async () => {
       const { data } = await apiClient.get<TemplateResponse>(
-        '/leases/get_contract_template/'
+        '/templates/current/'
       );
       return data;
     },
@@ -52,7 +52,7 @@ export function useSaveContractTemplate() {
   return useMutation({
     mutationFn: async (content: string) => {
       const { data } = await apiClient.post<SaveTemplateResponse>(
-        '/leases/save_contract_template/',
+        '/templates/save/',
         { content }
       );
       return data;
@@ -71,7 +71,7 @@ export function usePreviewContractTemplate() {
   return useMutation({
     mutationFn: async (params: { content: string; lease_id?: number }) => {
       const { data } = await apiClient.post<PreviewResponse>(
-        '/leases/preview_contract_template/',
+        '/templates/preview/',
         params
       );
       return data;
@@ -87,7 +87,7 @@ export function useTemplateBackups() {
     queryKey: ['template-backups'],
     queryFn: async () => {
       const { data } = await apiClient.get<Backup[]>(
-        '/leases/list_template_backups/'
+        '/templates/backups/'
       );
       return data;
     },
@@ -103,8 +103,8 @@ export function useRestoreTemplateBackup() {
 
   return useMutation({
     mutationFn: async (backup_filename: string) => {
-      const { data} = await apiClient.post<RestoreResponse>(
-        '/leases/restore_template_backup/',
+      const { data } = await apiClient.post<RestoreResponse>(
+        '/templates/restore/',
         { backup_filename }
       );
       return data;

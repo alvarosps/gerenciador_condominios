@@ -6,17 +6,13 @@ they correctly implement the IDocumentStorage interface.
 """
 
 import os
-import pytest
 import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from core.infrastructure.storage import (
-    IDocumentStorage,
-    StorageError,
-    FileSystemDocumentStorage,
-    S3DocumentStorage,
-)
+import pytest
+
+from core.infrastructure.storage import FileSystemDocumentStorage, IDocumentStorage, S3DocumentStorage, StorageError
 
 
 @pytest.mark.unit
@@ -166,9 +162,7 @@ class TestFileSystemDocumentStorage:
 
         # Verify file is within base_path
         full_path = Path(result)
-        assert full_path.is_relative_to(storage.base_path) or str(storage.base_path) in str(
-            full_path
-        )
+        assert full_path.is_relative_to(storage.base_path) or str(storage.base_path) in str(full_path)
 
 
 @pytest.mark.unit

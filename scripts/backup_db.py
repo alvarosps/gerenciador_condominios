@@ -28,12 +28,12 @@ project_root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(project_root))
 
 # Import Django settings
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'condominios_manager.settings')
-import django
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "condominios_manager.settings")
+import django  # noqa: E402
+
 django.setup()
 
-from django.conf import settings
-from decouple import config
+from django.conf import settings  # noqa: E402
 
 
 def backup_database():
@@ -48,56 +48,55 @@ def backup_database():
     print("=" * 60)
 
     # Get database configuration
-    db_config = settings.DATABASES['default']
-    db_name = db_config['NAME']
-    db_user = db_config['USER']
-    db_host = db_config['HOST']
-    db_port = db_config['PORT']
-    db_password = db_config['PASSWORD']
+    db_config = settings.DATABASES["default"]
+    db_name = db_config["NAME"]
+    db_user = db_config["USER"]
+    db_host = db_config["HOST"]
+    db_port = db_config["PORT"]
+    db_password = db_config["PASSWORD"]
 
-    print(f"\nDatabase Configuration:")
+    print("\nDatabase Configuration:")
     print(f"  Host: {db_host}:{db_port}")
     print(f"  Database: {db_name}")
     print(f"  User: {db_user}")
 
     # Create backup directory
-    backup_dir = project_root / 'backups'
+    backup_dir = project_root / "backups"
     backup_dir.mkdir(exist_ok=True)
     print(f"\nBackup Directory: {backup_dir}")
 
     # Generate backup filename with timestamp
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    backup_file = backup_dir / f'backup_{db_name}_{timestamp}.backup'
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    backup_file = backup_dir / f"backup_{db_name}_{timestamp}.backup"
 
     print(f"Backup File: {backup_file}")
     print("\nStarting backup process...")
 
     # Set password environment variable for pg_dump
     env = os.environ.copy()
-    env['PGPASSWORD'] = db_password
+    env["PGPASSWORD"] = db_password
 
     # Construct pg_dump command
     cmd = [
-        'pg_dump',
-        '-h', db_host,
-        '-p', str(db_port),
-        '-U', db_user,
-        '-F', 'c',  # Custom format (compressed)
-        '-b',       # Include large objects (blobs)
-        '-v',       # Verbose output
-        '-f', str(backup_file),
-        db_name
+        "pg_dump",
+        "-h",
+        db_host,
+        "-p",
+        str(db_port),
+        "-U",
+        db_user,
+        "-F",
+        "c",  # Custom format (compressed)
+        "-b",  # Include large objects (blobs)
+        "-v",  # Verbose output
+        "-f",
+        str(backup_file),
+        db_name,
     ]
 
     try:
         # Execute pg_dump
-        result = subprocess.run(
-            cmd,
-            env=env,
-            check=True,
-            capture_output=True,
-            text=True
-        )
+        subprocess.run(cmd, env=env, check=True, capture_output=True, text=True)
 
         # Check if backup file was created
         if backup_file.exists():
@@ -133,7 +132,7 @@ def backup_database():
         print("=" * 60)
         return None
 
-    except FileNotFoundError as e:
+    except FileNotFoundError:
         print("\n" + "=" * 60)
         print("✗ BACKUP FAILED")
         print("=" * 60)
@@ -156,11 +155,11 @@ def backup_database():
 
 def list_existing_backups():
     """List all existing backup files"""
-    backup_dir = project_root / 'backups'
+    backup_dir = project_root / "backups"
     if not backup_dir.exists():
         return []
 
-    backups = sorted(backup_dir.glob('backup_*.backup'), reverse=True)
+    backups = sorted(backup_dir.glob("backup_*.backup"), reverse=True)
     return backups
 
 
@@ -187,5 +186,5 @@ def main():
         sys.exit(1)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

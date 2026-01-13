@@ -9,12 +9,7 @@ Provides:
 - Future: Email service, notification service, etc.
 """
 
-from .pdf_generator import (
-    IPDFGenerator,
-    PDFGenerationError,
-    PyppeteerPDFGenerator,
-    WeasyPrintPDFGenerator,
-)
+from .pdf_generator import IPDFGenerator, PDFGenerationError, PyppeteerPDFGenerator, WeasyPrintPDFGenerator
 from .storage import FileSystemDocumentStorage, IDocumentStorage, S3DocumentStorage, StorageError
 
 __all__ = [

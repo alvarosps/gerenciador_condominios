@@ -4,15 +4,19 @@ Unit tests for BaseService generic CRUD operations.
 Tests all standard CRUD methods provided by the base service class
 using a concrete implementation with the Tenant model.
 """
-import pytest
+
 import logging
-from core.services.base import BaseService
+
+import pytest
+
 from core.models import Tenant
+from core.services.base import BaseService
 
 
 # Create a concrete service for testing
 class TenantTestService(BaseService[Tenant]):
     """Concrete service implementation for testing BaseService."""
+
     model = Tenant
 
 
@@ -27,12 +31,20 @@ def sample_tenant(db):
     """Create a sample tenant for testing."""
     return Tenant.objects.create(
         name="John Doe",
-        cpf_cnpj="12345678901",
+        cpf_cnpj="529.982.247-25",  # Valid CPF with proper format
         phone="11999999999",
         marital_status="Casado(a)",
         profession="Engineer",
-        is_company=False
+        is_company=False,
     )
+
+
+# Valid CPFs for testing (pass Receita Federal checksum validation)
+VALID_CPFS = [
+    "529.982.247-25",  # Verified valid checksum
+    "987.654.321-00",  # Verified valid checksum
+    "111.222.333-96",  # Verified valid checksum
+]
 
 
 @pytest.fixture
@@ -42,11 +54,11 @@ def multiple_tenants(db):
     for i in range(3):
         tenant = Tenant.objects.create(
             name=f"Tenant {i+1}",
-            cpf_cnpj=f"1234567890{i}",
+            cpf_cnpj=VALID_CPFS[i],  # Use valid CPFs
             phone=f"1199999999{i}",
             marital_status="Solteiro(a)",
             profession=f"Profession {i+1}",
-            is_company=False
+            is_company=False,
         )
         tenants.append(tenant)
     return tenants
@@ -58,9 +70,9 @@ class TestBaseServiceInit:
 
     def test_init_creates_logger(self, service):
         """Test that initialization creates a logger with correct name."""
-        assert hasattr(service, 'logger')
+        assert hasattr(service, "logger")
         assert isinstance(service.logger, logging.Logger)
-        assert service.logger.name == 'TenantTestService'
+        assert service.logger.name == "TenantTestService"
 
 
 @pytest.mark.django_db
@@ -141,16 +153,16 @@ class TestCreate:
         """Test creating a new object."""
         result = service.create(
             name="New Tenant",
-            cpf_cnpj="98765432100",
+            cpf_cnpj="123.456.780-62",  # Valid CPF with checksum
             phone="11888888888",
             marital_status="Solteiro(a)",
             profession="Doctor",
-            is_company=False
+            is_company=False,
         )
 
         assert result.id is not None
         assert result.name == "New Tenant"
-        assert result.cpf_cnpj == "98765432100"
+        assert result.cpf_cnpj == "123.456.780-62"
 
         # Verify it was saved to database
         assert Tenant.objects.filter(id=result.id).exists()
@@ -160,11 +172,11 @@ class TestCreate:
         with caplog.at_level(logging.INFO):
             result = service.create(
                 name="Test",
-                cpf_cnpj="11111111111",
+                cpf_cnpj="111.444.777-35",  # Valid CPF (from docs example)
                 phone="11999999999",
                 marital_status="Solteiro(a)",
                 profession="Test",
-                is_company=False
+                is_company=False,
             )
 
         assert f"Created Tenant with id {result.id}" in caplog.text
@@ -176,11 +188,7 @@ class TestUpdate:
 
     def test_update_object(self, service, sample_tenant):
         """Test updating an existing object."""
-        result = service.update(
-            sample_tenant,
-            name="Updated Name",
-            phone="11777777777"
-        )
+        result = service.update(sample_tenant, name="Updated Name", phone="11777777777")
 
         assert result.id == sample_tenant.id
         assert result.name == "Updated Name"
@@ -295,10 +303,7 @@ class TestFilter:
 
     def test_filter_by_multiple_fields(self, service, multiple_tenants):
         """Test filtering by multiple fields."""
-        result = service.filter(
-            marital_status="Solteiro(a)",
-            is_company=False
-        )
+        result = service.filter(marital_status="Solteiro(a)", is_company=False)
 
         assert len(result) == 3
         assert all(t.marital_status == "Solteiro(a)" for t in result)
@@ -327,11 +332,11 @@ class TestBaseServiceIntegration:
         # Create
         tenant = service.create(
             name="Workflow Test",
-            cpf_cnpj="55555555555",
+            cpf_cnpj="222.333.444-05",  # Valid CPF with checksum
             phone="11555555555",
             marital_status="Casado(a)",
             profession="Tester",
-            is_company=False
+            is_company=False,
         )
         assert tenant.id is not None
 

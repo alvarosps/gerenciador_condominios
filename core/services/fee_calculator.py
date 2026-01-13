@@ -7,6 +7,7 @@ This service handles all fee-related business logic:
 - Tag fee calculations based on tenant count
 - Total value calculations
 """
+
 from __future__ import annotations
 
 from datetime import date
@@ -169,9 +170,7 @@ class FeeCalculatorService:
             return Decimal(str(settings.DEFAULT_TAG_FEE_MULTIPLE))
 
     @staticmethod
-    def calculate_total_value(
-        rental_value: Decimal, cleaning_fee: Decimal, tag_fee: Decimal
-    ) -> Decimal:
+    def calculate_total_value(rental_value: Decimal, cleaning_fee: Decimal, tag_fee: Decimal) -> Decimal:
         """
         Calculate total initial payment value.
 
