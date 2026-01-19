@@ -39,6 +39,34 @@ django.setup()
 from django.conf import settings  # noqa: E402
 
 
+def verify_utf8_encoding(file_path):
+    """
+    Verify that a file contains valid UTF-8 content.
+
+    Args:
+        file_path: Path to the file to verify
+
+    Returns:
+        bool: True if file is valid UTF-8, False otherwise
+    """
+    try:
+        with open(file_path, "rb") as f:
+            content = f.read()
+
+        # Try to decode as UTF-8
+        content.decode("utf-8")
+
+        # Check for common encoding issues (replacement characters)
+        decoded = content.decode("utf-8")
+        if "\ufffd" in decoded:
+            # Contains replacement characters - indicates encoding issues
+            return False
+
+        return True
+    except UnicodeDecodeError:
+        return False
+
+
 def backup_database():
     """
     Create PostgreSQL database backup using pg_dump.
@@ -79,7 +107,14 @@ def backup_database():
     env = os.environ.copy()
     env["PGPASSWORD"] = db_password
     env["PGCLIENTENCODING"] = "UTF8"  # Force UTF-8 client encoding
-    env["LC_ALL"] = "en_US.UTF-8"  # Set locale for proper encoding
+
+    # Platform-specific locale settings
+    if sys.platform == "win32":
+        # On Windows, LC_ALL might not work as expected
+        # Use PYTHONIOENCODING as additional safeguard
+        env["PYTHONIOENCODING"] = "utf-8"
+    else:
+        env["LC_ALL"] = "en_US.UTF-8"  # Set locale for proper encoding on Linux/macOS
 
     # Construct pg_dump command
     cmd = [
@@ -115,6 +150,11 @@ def backup_database():
                 # Write psql encoding directive first (this is a psql meta-command)
                 f.write(b"\\encoding UTF8\n\n")
                 f.write(original_content)
+
+            # Verify the backup file is valid UTF-8
+            if not verify_utf8_encoding(backup_file):
+                print("\n[WARNING] Backup file may have encoding issues")
+                print("         This could indicate corrupted data in the database")
 
             file_size = backup_file.stat().st_size
             file_size_mb = file_size / (1024 * 1024)
