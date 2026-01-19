@@ -15,7 +15,7 @@ Condomínios Manager is a comprehensive property management system for rental pr
 ## Tech Stack
 
 ### Backend
-- **Framework**: Django 5.0.2, Django REST Framework 3.14.0
+- **Framework**: Django 5.2+, Django REST Framework 3.14.0
 - **Database**: PostgreSQL 15+
 - **Authentication**: JWT (SimpleJWT) + Google OAuth2 (django-allauth)
 - **PDF Generation**: Pyppeteer (Chrome headless)
@@ -398,7 +398,7 @@ cd frontend
 npm install
 
 # Development
-npm run dev  # http://localhost:3000
+npm run dev  # http://localhost:4000
 
 # Build
 npm run build
@@ -503,7 +503,7 @@ DATABASES = {
 ### CORS Configuration
 
 Frontend allowed origins in `settings.py`:
-- `http://localhost:3000` (Next.js default)
+- `http://localhost:4000` (Next.js frontend)
 - `http://localhost:6000` (Alternative)
 
 ---

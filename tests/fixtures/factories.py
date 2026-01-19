@@ -142,6 +142,7 @@ class ApartmentFactory(DjangoModelFactory):
 
     class Meta:
         model = Apartment
+        skip_postgeneration_save = True
 
     building = factory.SubFactory(BuildingFactory)
     number = factory.Sequence(lambda n: 101 + n)
@@ -204,6 +205,7 @@ class TenantFactory(DjangoModelFactory):
 
     class Meta:
         model = Tenant
+        skip_postgeneration_save = True
 
     name = factory.LazyAttribute(lambda obj: fake.name())
     cpf_cnpj = factory.Sequence(lambda n: VALID_CPFS[n % len(VALID_CPFS)])
@@ -334,6 +336,7 @@ class LeaseFactory(DjangoModelFactory):
 
     class Meta:
         model = Lease
+        skip_postgeneration_save = True
 
     apartment = factory.SubFactory(ApartmentFactory)
     responsible_tenant = factory.SubFactory(TenantFactory)

@@ -128,7 +128,7 @@ npm run dev
 
 ### 4. Access the Application
 
-- **Frontend**: http://localhost:3000
+- **Frontend**: http://localhost:4000
 - **Backend API**: http://localhost:8000/api/
 - **Django Admin**: http://localhost:8000/admin/
 

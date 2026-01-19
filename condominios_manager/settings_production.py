@@ -62,7 +62,17 @@ MEDIA_URL = "/media/"
 
 # Use WhiteNoise for static file serving
 MIDDLEWARE.insert(1, "whitenoise.middleware.WhiteNoiseMiddleware")  # noqa
-STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+
+# Storage configuration (Django 4.2+ format)
+# This replaces deprecated STATICFILES_STORAGE and DEFAULT_FILE_STORAGE
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
 
 # Optional: AWS S3 for media files
 USE_S3 = config("USE_S3", default=False, cast=bool)
@@ -78,8 +88,10 @@ if USE_S3:
     }
     AWS_DEFAULT_ACL = "public-read"
 
-    # S3 Media Settings
-    DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
+    # S3 Media Settings (Django 4.2+ format)
+    STORAGES["default"] = {
+        "BACKEND": "storages.backends.s3boto3.S3Boto3Storage",
+    }
     MEDIA_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/media/"
 
 # ============================================================
@@ -128,7 +140,7 @@ LOGGING = {
             "style": "{",
         },
         "json": {
-            "()": "pythonjsonlogger.jsonlogger.JsonFormatter",
+            "()": "pythonjsonlogger.json.JsonFormatter",
             "format": "%(asctime)s %(name)s %(levelname)s %(message)s",
         },
     },
