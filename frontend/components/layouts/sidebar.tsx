@@ -9,6 +9,7 @@ import {
   Package,
   FileEdit,
   BookOpen,
+  Settings,
 } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
 import { ROUTES } from '@/lib/utils/constants';
@@ -60,6 +61,11 @@ export function Sidebar() {
       key: ROUTES.CONTRACT_TEMPLATE,
       icon: <FileEdit className="h-5 w-5" />,
       label: 'Template de Contrato',
+    },
+    {
+      key: ROUTES.SETTINGS,
+      icon: <Settings className="h-5 w-5" />,
+      label: 'Configurações',
     },
   ];
 

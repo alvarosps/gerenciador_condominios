@@ -74,6 +74,17 @@ export function DataTable<T extends Record<string, unknown>>({
   const end = start + pageSize;
   const paginatedData = dataSource.slice(start, end);
 
+  // Define getRowKey before it's used
+  const getRowKey = (record: T, index: number): string => {
+    if (typeof rowKey === 'function') {
+      return rowKey(record);
+    }
+    if (typeof rowKey === 'string' && rowKey in record) {
+      return String(record[rowKey as keyof T]);
+    }
+    return `row-${index}`;
+  };
+
   const selectedKeys = rowSelection?.selectedRowKeys || [];
   const allCurrentPageKeys: React.Key[] = paginatedData.map((_record, index) =>
     getRowKey(_record, start + index)
@@ -94,16 +105,6 @@ export function DataTable<T extends Record<string, unknown>>({
     setPageSize(size);
     setCurrentPage(1);
     paginationConfig.onChange?.(1, size);
-  };
-
-  const getRowKey = (record: T, index: number): string => {
-    if (typeof rowKey === 'function') {
-      return rowKey(record);
-    }
-    if (typeof rowKey === 'string' && rowKey in record) {
-      return String(record[rowKey as keyof T]);
-    }
-    return `row-${index}`;
   };
 
   const getCellValue = (record: T, column: Column<T>): unknown => {

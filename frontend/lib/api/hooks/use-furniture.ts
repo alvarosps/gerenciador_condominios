@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
 import { Furniture, furnitureSchema } from '@/lib/schemas/furniture.schema';
+import { PaginatedResponse, extractResults } from '@/lib/types/api';
 
 /**
  * Hook to fetch all furniture items
@@ -9,9 +10,13 @@ export function useFurniture() {
   return useQuery({
     queryKey: ['furniture'],
     queryFn: async () => {
-      const { data } = await apiClient.get<Furniture[]>('/furnitures/');
+      const { data } = await apiClient.get<PaginatedResponse<Furniture> | Furniture[]>('/furnitures/', {
+        params: { page_size: 10000 },
+      });
+      // Handle both paginated and non-paginated responses
+      const furnitures = extractResults(data);
       // Validate each furniture item with Zod schema
-      return data.map((furniture) => furnitureSchema.parse(furniture));
+      return furnitures.map((furniture) => furnitureSchema.parse(furniture));
     },
   });
 }

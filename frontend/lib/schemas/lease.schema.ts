@@ -4,9 +4,10 @@ import { tenantSchema } from './tenant.schema';
 
 export const leaseSchema = z.object({
   id: z.number().optional(),
-  apartment_id: z.number().positive('Selecione um apartamento'),
+  // These IDs are only used for creating/updating, not returned by API
+  apartment_id: z.number().positive('Selecione um apartamento').optional(),
   apartment: apartmentSchema.optional(),
-  responsible_tenant_id: z.number().positive('Selecione o inquilino responsável'),
+  responsible_tenant_id: z.number().positive('Selecione o inquilino responsável').optional(),
   responsible_tenant: tenantSchema.optional(),
   tenants: z.array(tenantSchema).default([]),
   tenant_ids: z.array(z.number()).optional(),
@@ -33,6 +34,14 @@ export const leaseSchema = z.object({
   warning_count: z.number().optional(),
   number_of_tenants: z.number().optional(),
   pdf_path: z.string().optional().nullable(),
+  status: z.string().optional(),
+  created_at: z.string().optional(),
+  updated_at: z.string().optional(),
+  is_deleted: z.boolean().optional(),
+  deleted_at: z.string().nullable().optional(),
+  created_by: z.number().nullable().optional(),
+  updated_by: z.number().nullable().optional(),
+  deleted_by: z.number().nullable().optional(),
 });
 
 export type Lease = z.infer<typeof leaseSchema>;

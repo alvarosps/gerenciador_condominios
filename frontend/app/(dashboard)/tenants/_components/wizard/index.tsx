@@ -95,7 +95,7 @@ export function TenantFormWizard({ open, tenant, onClose }: Props) {
         email: tenant.email || '',
         phone_alternate: tenant.phone_alternate || '',
         profession: tenant.profession || '',
-        marital_status: tenant.marital_status,
+        marital_status: tenant.marital_status || '',
         dependents: tenant.dependents || [],
         furniture_ids:
           tenant.furnitures
@@ -104,7 +104,7 @@ export function TenantFormWizard({ open, tenant, onClose }: Props) {
         deposit_amount: tenant.deposit_amount,
         cleaning_fee_paid: tenant.cleaning_fee_paid,
         tag_deposit_paid: tenant.tag_deposit_paid,
-        rent_due_day: tenant.rent_due_day,
+        rent_due_day: tenant.rent_due_day ?? 1,
       });
     } else if (!tenant && open) {
       formMethods.reset();

@@ -4,7 +4,8 @@ import { furnitureSchema } from './furniture.schema';
 
 export const apartmentSchema = z.object({
   id: z.number().optional(),
-  building_id: z.number().positive('Selecione um prédio'),
+  // building_id is only used for creating/updating, not returned by API
+  building_id: z.number().positive('Selecione um prédio').optional(),
   building: buildingSchema.optional(),
   number: z.number().positive('Número deve ser positivo'),
   interfone_configured: z.boolean().default(false),

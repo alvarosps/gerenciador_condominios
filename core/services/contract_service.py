@@ -143,20 +143,24 @@ class ContractService:
         Prepare the context dictionary for contract template rendering.
 
         Calculates all necessary data for the contract including dates,
-        fees, furniture, and lease details using other service classes.
+        fees, furniture, lease details, and landlord information using
+        other service classes.
 
         Args:
             lease: The lease object
 
         Returns:
-            Dictionary containing all template variables
+            Dictionary containing all template variables including landlord
 
         Examples:
             >>> lease = Lease.objects.get(pk=1)
             >>> context = ContractService.prepare_contract_context(lease)
             >>> print(context['tenant'])  # Responsible tenant
+            >>> print(context['landlord'])  # Active landlord
             >>> print(context['rental_value'])  # Monthly rent
         """
+        from core.models import Landlord
+
         start_date = lease.start_date
         validity = lease.validity_months
 
@@ -178,7 +182,11 @@ class ContractService:
         # Calculate lease furniture
         lease_furnitures = ContractService.calculate_lease_furniture(lease)
 
+        # Get active landlord for contract
+        landlord = Landlord.get_active()
+
         context = {
+            "landlord": landlord,
             "tenant": lease.responsible_tenant,
             "building_number": lease.apartment.building.street_number,
             "apartment_number": lease.apartment.number,

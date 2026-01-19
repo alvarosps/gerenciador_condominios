@@ -27,7 +27,7 @@ class BuildingViewSet(viewsets.ModelViewSet):
     Buildings are reference data managed by administrators.
     """
 
-    queryset = Building.objects.all()
+    queryset = Building.objects.all().order_by("id")
     serializer_class = BuildingSerializer
     permission_classes = [ReadOnlyForNonAdmin]
 
@@ -57,7 +57,7 @@ class FurnitureViewSet(viewsets.ModelViewSet):
     Furniture catalog is reference data managed by administrators.
     """
 
-    queryset = Furniture.objects.all()
+    queryset = Furniture.objects.all().order_by("id")
     serializer_class = FurnitureSerializer
     permission_classes = [ReadOnlyForNonAdmin]
 
@@ -73,7 +73,7 @@ class ApartmentViewSet(viewsets.ModelViewSet):
     Apartment data (units, rental values, etc.) is managed by administrators.
     """
 
-    queryset = Apartment.objects.all()
+    queryset = Apartment.objects.all().order_by("id")
     serializer_class = ApartmentSerializer
     permission_classes = [ReadOnlyForNonAdmin]
 
@@ -106,7 +106,7 @@ class TenantViewSet(viewsets.ModelViewSet):
     Tenant personal data should be protected and only manageable by administrators.
     """
 
-    queryset = Tenant.objects.all()
+    queryset = Tenant.objects.all().order_by("id")
     serializer_class = TenantSerializer
     permission_classes = [ReadOnlyForNonAdmin]
 
@@ -140,7 +140,7 @@ class LeaseViewSet(viewsets.ModelViewSet):
     and perform specific actions like viewing late fees.
     """
 
-    queryset = Lease.objects.all()
+    queryset = Lease.objects.all().order_by("id")
     serializer_class = LeaseSerializer
     permission_classes = [CanModifyLease]
 

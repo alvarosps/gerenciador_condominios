@@ -561,3 +561,110 @@ class Lease(AuditMixin, SoftDeleteMixin, models.Model):
     def __str__(self) -> str:
         """Return string representation of lease."""
         return f"Locação do Apto {self.apartment.number} - {self.apartment.building.street_number}"
+
+
+class Landlord(AuditMixin, SoftDeleteMixin, models.Model):
+    """
+    Represents the property owner/landlord (LOCADOR).
+
+    Singleton pattern: Only one active landlord at a time.
+    All contract generation uses the active landlord's data.
+
+    Attributes:
+        name: Full name or company name
+        nationality: Nationality (default: Brasileira)
+        marital_status: Marital status
+        cpf_cnpj: Brazilian tax ID (CPF or CNPJ)
+        rg: Brazilian national ID (optional)
+        phone: Contact phone number
+        email: Email address (optional)
+        street: Street/Avenue name
+        street_number: Street number
+        complement: Address complement (optional)
+        neighborhood: Neighborhood
+        city: City
+        state: State
+        zip_code: ZIP/Postal code
+        country: Country (default: Brasil)
+        is_active: Active status (only one can be active)
+
+    Inherits audit fields (created_at, updated_at, created_by, updated_by)
+    and soft delete capability (is_deleted, deleted_at, deleted_by).
+    """
+
+    # Personal Information
+    name = models.CharField(max_length=200, help_text="Nome completo ou razão social")
+    nationality = models.CharField(
+        max_length=100, default="Brasileira", help_text="Nacionalidade"
+    )
+    marital_status = models.CharField(
+        max_length=50,
+        choices=Tenant.MARITAL_STATUS_CHOICES,
+        help_text="Estado civil",
+    )
+    cpf_cnpj = models.CharField(max_length=20, help_text="CPF ou CNPJ")
+    rg = models.CharField(
+        max_length=20, blank=True, null=True, help_text="RG (opcional)"
+    )
+
+    # Contact Information
+    phone = models.CharField(
+        max_length=20,
+        help_text="Telefone de contato",
+        validators=[validate_brazilian_phone],
+    )
+    email = models.EmailField(blank=True, null=True, help_text="Email de contato")
+
+    # Address
+    street = models.CharField(max_length=200, help_text="Rua/Avenida")
+    street_number = models.CharField(max_length=20, help_text="Número")
+    complement = models.CharField(
+        max_length=100, blank=True, null=True, help_text="Complemento"
+    )
+    neighborhood = models.CharField(max_length=100, help_text="Bairro")
+    city = models.CharField(max_length=100, help_text="Cidade")
+    state = models.CharField(max_length=50, help_text="Estado")
+    zip_code = models.CharField(max_length=10, help_text="CEP")
+    country = models.CharField(max_length=100, default="Brasil", help_text="País")
+
+    # Status
+    is_active = models.BooleanField(
+        default=True, help_text="Locador ativo (apenas um pode estar ativo)"
+    )
+
+    # Managers
+    objects = SoftDeleteManager()
+    all_objects = models.Manager()
+
+    class Meta:
+        verbose_name = "Locador"
+        verbose_name_plural = "Locadores"
+
+    def __str__(self) -> str:
+        """Return string representation of landlord."""
+        return self.name
+
+    @property
+    def full_address(self) -> str:
+        """Return formatted full address."""
+        parts = [f"{self.street} {self.street_number}"]
+        if self.complement:
+            parts.append(self.complement)
+        parts.append(f"Bairro {self.neighborhood}")
+        parts.append(f"{self.city}, {self.state}, {self.country}")
+        parts.append(f"CEP {self.zip_code}")
+        return ", ".join(parts)
+
+    def save(self, *args, **kwargs):
+        """Ensure only one active landlord exists."""
+        if self.is_active:
+            # Deactivate other landlords
+            Landlord.objects.filter(is_active=True).exclude(pk=self.pk).update(
+                is_active=False
+            )
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def get_active(cls) -> "Landlord | None":
+        """Get the currently active landlord."""
+        return cls.objects.filter(is_active=True).first()

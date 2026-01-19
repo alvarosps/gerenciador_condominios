@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
 import { Tenant, tenantSchema } from '@/lib/schemas/tenant.schema';
+import { PaginatedResponse, extractResults } from '@/lib/types/api';
 
 /**
  * Hook to fetch all tenants with optional filters
@@ -14,11 +15,13 @@ export function useTenants(filters?: {
   return useQuery({
     queryKey: ['tenants', filters],
     queryFn: async () => {
-      const { data } = await apiClient.get<Tenant[]>('/tenants/', {
-        params: filters,
+      const { data } = await apiClient.get<PaginatedResponse<Tenant> | Tenant[]>('/tenants/', {
+        params: { ...filters, page_size: 10000 },
       });
+      // Handle both paginated and non-paginated responses
+      const tenants = extractResults(data);
       // Validate each tenant with Zod schema
-      return data.map((tenant) => tenantSchema.parse(tenant));
+      return tenants.map((tenant) => tenantSchema.parse(tenant));
     },
   });
 }
