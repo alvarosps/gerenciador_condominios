@@ -2,16 +2,19 @@
 Database backup utility for Condominios Manager
 
 This script creates a PostgreSQL database backup using pg_dump.
-The backup is saved in custom format (-F c) which provides:
-- Compression
-- Selective restore capabilities
-- Cross-platform compatibility
+The backup is saved in plain SQL format which provides:
+- Human-readable SQL statements
+- Easy restoration with psql
+- Maximum portability across PostgreSQL versions
 
 Usage:
     python scripts/backup_db.py
 
 Output:
     backups/backup_{db_name}_{timestamp}.sql
+
+Restore:
+    psql -h localhost -U postgres -d database_name < backup_file.sql
 
 Author: Development Team
 Date: 2025-10-19
@@ -67,14 +70,16 @@ def backup_database():
 
     # Generate backup filename with timestamp
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    backup_file = backup_dir / f"backup_{db_name}_{timestamp}.backup"
+    backup_file = backup_dir / f"backup_{db_name}_{timestamp}.sql"
 
     print(f"Backup File: {backup_file}")
     print("\nStarting backup process...")
 
-    # Set password environment variable for pg_dump
+    # Set environment variables for pg_dump
     env = os.environ.copy()
     env["PGPASSWORD"] = db_password
+    env["PGCLIENTENCODING"] = "UTF8"  # Force UTF-8 client encoding
+    env["LC_ALL"] = "en_US.UTF-8"  # Set locale for proper encoding
 
     # Construct pg_dump command
     cmd = [
@@ -86,9 +91,10 @@ def backup_database():
         "-U",
         db_user,
         "-F",
-        "c",  # Custom format (compressed)
-        "-b",  # Include large objects (blobs)
-        "-v",  # Verbose output
+        "p",  # Plain SQL format (human-readable, portable)
+        "--encoding=UTF8",  # Explicit UTF-8 encoding
+        "--no-owner",  # Don't output ownership commands
+        "--no-acl",  # Don't output access privilege commands
         "-f",
         str(backup_file),
         db_name,
@@ -100,17 +106,27 @@ def backup_database():
 
         # Check if backup file was created
         if backup_file.exists():
+            # Prepend \encoding UTF8 command for psql to ensure proper encoding on restore
+            # This must be at the very beginning so psql reads the file in UTF-8
+            with open(backup_file, "rb") as f:
+                original_content = f.read()
+
+            with open(backup_file, "wb") as f:
+                # Write psql encoding directive first (this is a psql meta-command)
+                f.write(b"\\encoding UTF8\n\n")
+                f.write(original_content)
+
             file_size = backup_file.stat().st_size
             file_size_mb = file_size / (1024 * 1024)
 
             print("\n" + "=" * 60)
-            print("✓ BACKUP SUCCESSFUL")
+            print("[OK] BACKUP SUCCESSFUL")
             print("=" * 60)
             print(f"Backup File: {backup_file}")
             print(f"File Size: {file_size_mb:.2f} MB")
             print(f"Timestamp: {timestamp}")
             print("\nTo restore this backup, run:")
-            print(f"  python scripts/restore_db.py {backup_file}")
+            print(f"  psql -h {db_host} -p {db_port} -U {db_user} -d {db_name} < {backup_file}")
             print("=" * 60)
 
             return backup_file
@@ -119,7 +135,7 @@ def backup_database():
 
     except subprocess.CalledProcessError as e:
         print("\n" + "=" * 60)
-        print("✗ BACKUP FAILED")
+        print("[FAILED] BACKUP FAILED")
         print("=" * 60)
         print(f"Error: {e}")
         if e.stderr:
@@ -134,7 +150,7 @@ def backup_database():
 
     except FileNotFoundError:
         print("\n" + "=" * 60)
-        print("✗ BACKUP FAILED")
+        print("[FAILED] BACKUP FAILED")
         print("=" * 60)
         print("Error: pg_dump command not found")
         print("\nInstallation instructions:")
@@ -146,7 +162,7 @@ def backup_database():
 
     except Exception as e:
         print("\n" + "=" * 60)
-        print("✗ BACKUP FAILED")
+        print("[FAILED] BACKUP FAILED")
         print("=" * 60)
         print(f"Unexpected error: {e}")
         print("=" * 60)
@@ -159,7 +175,10 @@ def list_existing_backups():
     if not backup_dir.exists():
         return []
 
-    backups = sorted(backup_dir.glob("backup_*.backup"), reverse=True)
+    # Include both .sql and legacy .backup files
+    sql_backups = list(backup_dir.glob("backup_*.sql"))
+    legacy_backups = list(backup_dir.glob("backup_*.backup"))
+    backups = sorted(sql_backups + legacy_backups, key=lambda f: f.stat().st_mtime, reverse=True)
     return backups
 
 
