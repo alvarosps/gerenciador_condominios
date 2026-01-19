@@ -62,7 +62,7 @@ export function LeaseFiltersCard({ filters, onFiltersChange, apartments, tenants
         is_expired: undefined,
         expiring_soon: true,
       });
-    } else {
+    } else if (value === 'all') {
       onFiltersChange({
         ...filters,
         is_active: undefined,
@@ -76,7 +76,7 @@ export function LeaseFiltersCard({ filters, onFiltersChange, apartments, tenants
     if (filters.is_active !== undefined) return 'active';
     if (filters.is_expired !== undefined) return 'expired';
     if (filters.expiring_soon !== undefined) return 'expiring';
-    return '';
+    return 'all';
   };
 
   return (
@@ -86,11 +86,11 @@ export function LeaseFiltersCard({ filters, onFiltersChange, apartments, tenants
           <div className="flex-1 min-w-[200px]">
             <label className="block text-sm font-medium mb-2">Apartamento</label>
             <Select
-              value={filters.apartment_id ? String(filters.apartment_id) : ''}
+              value={filters.apartment_id ? String(filters.apartment_id) : 'all'}
               onValueChange={(value) =>
                 onFiltersChange({
                   ...filters,
-                  apartment_id: value === '' ? undefined : Number(value),
+                  apartment_id: value === 'all' ? undefined : Number(value),
                 })
               }
             >
@@ -98,7 +98,7 @@ export function LeaseFiltersCard({ filters, onFiltersChange, apartments, tenants
                 <SelectValue placeholder="Todos os apartamentos" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todos os apartamentos</SelectItem>
+                <SelectItem value="all">Todos os apartamentos</SelectItem>
                 {apartments?.map((apt) => (
                   <SelectItem key={apt.id} value={String(apt.id)}>
                     {apt.building?.name} - Apto {apt.number}
@@ -111,11 +111,11 @@ export function LeaseFiltersCard({ filters, onFiltersChange, apartments, tenants
           <div className="flex-1 min-w-[200px]">
             <label className="block text-sm font-medium mb-2">Inquilino</label>
             <Select
-              value={filters.responsible_tenant_id ? String(filters.responsible_tenant_id) : ''}
+              value={filters.responsible_tenant_id ? String(filters.responsible_tenant_id) : 'all'}
               onValueChange={(value) =>
                 onFiltersChange({
                   ...filters,
-                  responsible_tenant_id: value === '' ? undefined : Number(value),
+                  responsible_tenant_id: value === 'all' ? undefined : Number(value),
                 })
               }
             >
@@ -123,7 +123,7 @@ export function LeaseFiltersCard({ filters, onFiltersChange, apartments, tenants
                 <SelectValue placeholder="Todos os inquilinos" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todos os inquilinos</SelectItem>
+                <SelectItem value="all">Todos os inquilinos</SelectItem>
                 {tenants?.map((t) => (
                   <SelectItem key={t.id} value={String(t.id!)}>
                     {t.name}
@@ -140,7 +140,7 @@ export function LeaseFiltersCard({ filters, onFiltersChange, apartments, tenants
                 <SelectValue placeholder="Todos" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todos</SelectItem>
+                <SelectItem value="all">Todos</SelectItem>
                 <SelectItem value="active">Ativo</SelectItem>
                 <SelectItem value="expired">Expirado</SelectItem>
                 <SelectItem value="expiring">Expirando em breve</SelectItem>

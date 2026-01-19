@@ -30,11 +30,12 @@ export const DAYS_PER_MONTH = 30;
 
 export const ROUTES = {
   HOME: '/',
-  DASHBOARD: '/dashboard',
-  BUILDINGS: '/dashboard/buildings',
-  APARTMENTS: '/dashboard/apartments',
-  TENANTS: '/dashboard/tenants',
-  LEASES: '/dashboard/leases',
-  FURNITURE: '/dashboard/furniture',
-  CONTRACT_TEMPLATE: '/dashboard/contract-template',
+  DASHBOARD: '/',
+  BUILDINGS: '/buildings',
+  APARTMENTS: '/apartments',
+  TENANTS: '/tenants',
+  LEASES: '/leases',
+  FURNITURE: '/furniture',
+  CONTRACT_TEMPLATE: '/contract-template',
+  SETTINGS: '/settings',
 };

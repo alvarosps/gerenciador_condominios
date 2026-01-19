@@ -311,11 +311,11 @@ export default function TenantsPage() {
             <div className="flex-1 min-w-[150px]">
               <label className="block text-sm font-medium mb-2">Tipo</label>
               <Select
-                value={filters.is_company === undefined ? '' : String(filters.is_company)}
+                value={filters.is_company === undefined ? 'all' : String(filters.is_company)}
                 onValueChange={(value) =>
                   setFilters({
                     ...filters,
-                    is_company: value === '' ? undefined : value === 'true',
+                    is_company: value === 'all' ? undefined : value === 'true',
                   })
                 }
               >
@@ -323,7 +323,7 @@ export default function TenantsPage() {
                   <SelectValue placeholder="Todos" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todos</SelectItem>
+                  <SelectItem value="all">Todos</SelectItem>
                   <SelectItem value="false">Pessoa Física</SelectItem>
                   <SelectItem value="true">Empresa</SelectItem>
                 </SelectContent>
@@ -333,11 +333,11 @@ export default function TenantsPage() {
             <div className="flex-1 min-w-[150px]">
               <label className="block text-sm font-medium mb-2">Dependentes</label>
               <Select
-                value={filters.has_dependents === undefined ? '' : String(filters.has_dependents)}
+                value={filters.has_dependents === undefined ? 'all' : String(filters.has_dependents)}
                 onValueChange={(value) =>
                   setFilters({
                     ...filters,
-                    has_dependents: value === '' ? undefined : value === 'true',
+                    has_dependents: value === 'all' ? undefined : value === 'true',
                   })
                 }
               >
@@ -345,7 +345,7 @@ export default function TenantsPage() {
                   <SelectValue placeholder="Todos" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todos</SelectItem>
+                  <SelectItem value="all">Todos</SelectItem>
                   <SelectItem value="true">Com Dependentes</SelectItem>
                   <SelectItem value="false">Sem Dependentes</SelectItem>
                 </SelectContent>
@@ -355,11 +355,11 @@ export default function TenantsPage() {
             <div className="flex-1 min-w-[150px]">
               <label className="block text-sm font-medium mb-2">Móveis</label>
               <Select
-                value={filters.has_furniture === undefined ? '' : String(filters.has_furniture)}
+                value={filters.has_furniture === undefined ? 'all' : String(filters.has_furniture)}
                 onValueChange={(value) =>
                   setFilters({
                     ...filters,
-                    has_furniture: value === '' ? undefined : value === 'true',
+                    has_furniture: value === 'all' ? undefined : value === 'true',
                   })
                 }
               >
@@ -367,7 +367,7 @@ export default function TenantsPage() {
                   <SelectValue placeholder="Todos" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todos</SelectItem>
+                  <SelectItem value="all">Todos</SelectItem>
                   <SelectItem value="true">Com Móveis</SelectItem>
                   <SelectItem value="false">Sem Móveis</SelectItem>
                 </SelectContent>

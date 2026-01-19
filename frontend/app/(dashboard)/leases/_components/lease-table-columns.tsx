@@ -19,7 +19,7 @@ import { cn } from '@/lib/utils';
 import { Column } from '@/components/tables/data-table';
 import { Lease } from '@/lib/schemas/lease.schema';
 import { formatCurrency } from '@/lib/utils/formatters';
-import { format, isPast, isFuture, differenceInDays, parseISO } from 'date-fns';
+import { format, isPast, isFuture, differenceInDays, differenceInMonths, parseISO } from 'date-fns';
 
 export interface LeaseActionHandlers {
   onEdit: (lease: Lease) => void;
@@ -53,12 +53,51 @@ export function getLeaseStatus(lease: Lease) {
   return { status: 'Ativo', color: 'green' };
 }
 
+export function getMinimumPeriodStatus(lease: Lease) {
+  const startDate = parseISO(lease.start_date);
+  const today = new Date();
+  const minimumMonths = lease.validity_months;
+
+  // If the lease hasn't started yet
+  if (isFuture(startDate)) {
+    return {
+      completed: false,
+      monthsElapsed: 0,
+      monthsRemaining: minimumMonths,
+      label: `Faltam ${minimumMonths} meses`,
+      color: 'yellow',
+    };
+  }
+
+  const monthsElapsed = differenceInMonths(today, startDate);
+  const monthsRemaining = minimumMonths - monthsElapsed;
+
+  if (monthsElapsed >= minimumMonths) {
+    return {
+      completed: true,
+      monthsElapsed,
+      monthsRemaining: 0,
+      label: 'Período completo',
+      color: 'green',
+    };
+  }
+
+  return {
+    completed: false,
+    monthsElapsed,
+    monthsRemaining,
+    label: `Faltam ${monthsRemaining} ${monthsRemaining === 1 ? 'mês' : 'meses'}`,
+    color: 'yellow',
+  };
+}
+
 export function createLeaseColumns(handlers: LeaseActionHandlers): Column<Lease>[] {
   const badgeVariants: Record<string, string> = {
     blue: 'bg-blue-100 text-blue-800 hover:bg-blue-200',
     red: 'bg-red-100 text-red-800 hover:bg-red-200',
     orange: 'bg-orange-100 text-orange-800 hover:bg-orange-200',
     green: 'bg-green-100 text-green-800 hover:bg-green-200',
+    yellow: 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200',
   };
 
   return [
@@ -117,6 +156,31 @@ export function createLeaseColumns(handlers: LeaseActionHandlers): Column<Lease>
           <Badge className={cn(badgeVariants[color] || 'bg-gray-100 text-gray-800')}>
             {status}
           </Badge>
+        );
+      },
+    },
+    {
+      title: 'Período Mínimo',
+      key: 'minimum_period',
+      width: 150,
+      render: (_, record: Lease) => {
+        const { label, color, monthsElapsed } = getMinimumPeriodStatus(record);
+        return (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Badge className={cn(badgeVariants[color] || 'bg-gray-100 text-gray-800', 'cursor-help')}>
+                  {label}
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent>
+                <div className="text-sm">
+                  <div>Mínimo: {record.validity_months} meses</div>
+                  <div>Decorridos: {monthsElapsed} meses</div>
+                </div>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         );
       },
     },

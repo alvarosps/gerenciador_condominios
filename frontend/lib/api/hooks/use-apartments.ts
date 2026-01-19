@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
 import { Apartment, apartmentSchema } from '@/lib/schemas/apartment.schema';
+import { PaginatedResponse, extractResults } from '@/lib/types/api';
 
 /**
  * Hook to fetch all apartments
@@ -14,11 +15,13 @@ export function useApartments(filters?: {
   return useQuery({
     queryKey: ['apartments', filters],
     queryFn: async () => {
-      const { data } = await apiClient.get<Apartment[]>('/apartments/', {
-        params: filters,
+      const { data } = await apiClient.get<PaginatedResponse<Apartment> | Apartment[]>('/apartments/', {
+        params: { ...filters, page_size: 10000 },
       });
+      // Handle both paginated and non-paginated responses
+      const apartments = extractResults(data);
       // Validate each apartment with Zod schema
-      return data.map((apartment) => apartmentSchema.parse(apartment));
+      return apartments.map((apartment) => apartmentSchema.parse(apartment));
     },
   });
 }

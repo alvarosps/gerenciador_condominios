@@ -283,6 +283,25 @@ export default function ContractTemplatePage() {
 
             <TabsContent value="variables" className="mt-0">
               <div style={{ height: '65vh', overflow: 'auto' }} className="p-4">
+                <h3 className="text-lg font-semibold mb-3">Variáveis do Locador</h3>
+                <ul className="list-disc pl-6 mb-6 space-y-1">
+                  <li><code className="bg-gray-100 px-1 py-0.5 rounded text-sm">{'{{ landlord.name }}'}</code> - Nome do locador</li>
+                  <li><code className="bg-gray-100 px-1 py-0.5 rounded text-sm">{'{{ landlord.cpf_cnpj }}'}</code> - CPF ou CNPJ</li>
+                  <li><code className="bg-gray-100 px-1 py-0.5 rounded text-sm">{'{{ landlord.rg }}'}</code> - RG</li>
+                  <li><code className="bg-gray-100 px-1 py-0.5 rounded text-sm">{'{{ landlord.nationality }}'}</code> - Nacionalidade</li>
+                  <li><code className="bg-gray-100 px-1 py-0.5 rounded text-sm">{'{{ landlord.marital_status }}'}</code> - Estado civil</li>
+                  <li><code className="bg-gray-100 px-1 py-0.5 rounded text-sm">{'{{ landlord.phone }}'}</code> - Telefone</li>
+                  <li><code className="bg-gray-100 px-1 py-0.5 rounded text-sm">{'{{ landlord.email }}'}</code> - Email</li>
+                  <li><code className="bg-gray-100 px-1 py-0.5 rounded text-sm">{'{{ landlord.street }}'}</code> - Rua</li>
+                  <li><code className="bg-gray-100 px-1 py-0.5 rounded text-sm">{'{{ landlord.street_number }}'}</code> - Número</li>
+                  <li><code className="bg-gray-100 px-1 py-0.5 rounded text-sm">{'{{ landlord.neighborhood }}'}</code> - Bairro</li>
+                  <li><code className="bg-gray-100 px-1 py-0.5 rounded text-sm">{'{{ landlord.city }}'}</code> - Cidade</li>
+                  <li><code className="bg-gray-100 px-1 py-0.5 rounded text-sm">{'{{ landlord.state }}'}</code> - Estado</li>
+                  <li><code className="bg-gray-100 px-1 py-0.5 rounded text-sm">{'{{ landlord.zip_code }}'}</code> - CEP</li>
+                  <li><code className="bg-gray-100 px-1 py-0.5 rounded text-sm">{'{{ landlord.country }}'}</code> - País</li>
+                  <li><code className="bg-gray-100 px-1 py-0.5 rounded text-sm">{'{{ landlord.full_address }}'}</code> - Endereço completo</li>
+                </ul>
+
                 <h3 className="text-lg font-semibold mb-3">Variáveis de Inquilino</h3>
                 <ul className="list-disc pl-6 mb-6 space-y-1">
                   <li><code className="bg-gray-100 px-1 py-0.5 rounded text-sm">{'{{ tenant.name }}'}</code> - Nome completo</li>

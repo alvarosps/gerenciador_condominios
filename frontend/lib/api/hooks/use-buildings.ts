@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
 import { Building, buildingSchema } from '@/lib/schemas/building.schema';
+import { PaginatedResponse } from '@/lib/types/api';
 
 /**
  * Hook to fetch all buildings
@@ -9,9 +10,13 @@ export function useBuildings() {
   return useQuery({
     queryKey: ['buildings'],
     queryFn: async () => {
-      const { data } = await apiClient.get<Building[]>('/buildings/');
+      const { data } = await apiClient.get<PaginatedResponse<Building> | Building[]>('/buildings/', {
+        params: { page_size: 10000 },
+      });
+      // Handle both paginated and non-paginated responses
+      const buildings = Array.isArray(data) ? data : data.results;
       // Validate each building with Zod schema
-      return data.map((building) => buildingSchema.parse(building));
+      return buildings.map((building) => buildingSchema.parse(building));
     },
   });
 }

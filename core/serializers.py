@@ -2,7 +2,7 @@ from rest_framework import serializers
 
 from core.validators import BrazilianPhoneValidator, CNPJValidator, CPFValidator
 
-from .models import Apartment, Building, Dependent, Furniture, Lease, Tenant
+from .models import Apartment, Building, Dependent, Furniture, Landlord, Lease, Tenant
 
 
 class BuildingSerializer(serializers.ModelSerializer):
@@ -213,3 +213,59 @@ class LeaseSerializer(serializers.ModelSerializer):
             "interfone_configured",
             "warning_count",
         ]
+
+
+class LandlordSerializer(serializers.ModelSerializer):
+    """
+    Serializer for Landlord model with full address property.
+
+    Used for landlord (LOCADOR) configuration management.
+    Provides validation for CPF/CNPJ fields.
+    """
+
+    full_address = serializers.CharField(read_only=True)
+
+    class Meta:
+        model = Landlord
+        fields = [
+            "id",
+            "name",
+            "nationality",
+            "marital_status",
+            "cpf_cnpj",
+            "rg",
+            "phone",
+            "email",
+            "street",
+            "street_number",
+            "complement",
+            "neighborhood",
+            "city",
+            "state",
+            "zip_code",
+            "country",
+            "is_active",
+            "full_address",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "created_at", "updated_at", "full_address"]
+
+    def validate_cpf_cnpj(self, value):
+        """Validate CPF or CNPJ format."""
+        if value:
+            # Try CPF first, then CNPJ
+            try:
+                CPFValidator()(value)
+            except serializers.ValidationError:
+                try:
+                    CNPJValidator()(value)
+                except serializers.ValidationError:
+                    raise serializers.ValidationError("CPF ou CNPJ inválido")
+        return value
+
+    def validate_phone(self, value):
+        """Validate Brazilian phone number format."""
+        if value:
+            BrazilianPhoneValidator()(value)
+        return value

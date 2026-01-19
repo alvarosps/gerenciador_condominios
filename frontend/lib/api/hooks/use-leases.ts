@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
 import { Lease, leaseSchema } from '@/lib/schemas/lease.schema';
+import { PaginatedResponse, extractResults } from '@/lib/types/api';
 
 /**
  * Hook to fetch all leases with optional filters
@@ -15,11 +16,13 @@ export function useLeases(filters?: {
   return useQuery({
     queryKey: ['leases', filters],
     queryFn: async () => {
-      const { data } = await apiClient.get<Lease[]>('/leases/', {
-        params: filters,
+      const { data } = await apiClient.get<PaginatedResponse<Lease> | Lease[]>('/leases/', {
+        params: { ...filters, page_size: 10000 },
       });
+      // Handle both paginated and non-paginated responses
+      const leases = extractResults(data);
       // Validate each lease with Zod schema
-      return data.map((lease) => leaseSchema.parse(lease));
+      return leases.map((lease) => leaseSchema.parse(lease));
     },
   });
 }
