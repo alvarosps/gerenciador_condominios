@@ -131,6 +131,16 @@ export function LeaseFormModal({ open, lease, onClose }: Props) {
     }
   }, [selectedApartment, formMethods, lease]);
 
+  // Watch responsible_tenant_id to auto-sync with tenant_ids for single-tenant apartments
+  const responsibleTenantId = formMethods.watch('responsible_tenant_id');
+
+  // Auto-select responsible tenant in tenant_ids when apartment only supports 1 person
+  useEffect(() => {
+    if (selectedApartment?.max_tenants === 1 && responsibleTenantId) {
+      formMethods.setValue('tenant_ids', [responsibleTenantId]);
+    }
+  }, [selectedApartment?.max_tenants, responsibleTenantId, formMethods]);
+
   const handleSubmit = async (values: LeaseFormValues) => {
     try {
       const payload = {
@@ -244,46 +254,48 @@ export function LeaseFormModal({ open, lease, onClose }: Props) {
               )}
             />
 
-            {/* All Tenants - Note: shadcn Select doesn't have native multiple mode, using comma-separated approach */}
-            <FormField
-              control={formMethods.control}
-              name="tenant_ids"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Todos os Inquilinos</FormLabel>
-                  <div className="space-y-2">
-                    {tenants?.map((t) => (
-                      <div key={t.id} className="flex items-center space-x-2">
-                        <input
-                          type="checkbox"
-                          id={`tenant-${t.id}`}
-                          checked={field.value?.includes(t.id!)}
-                          onChange={(e) => {
-                            const currentValue = field.value || [];
-                            if (e.target.checked) {
-                              field.onChange([...currentValue, t.id!]);
-                            } else {
-                              field.onChange(currentValue.filter((id) => id !== t.id));
-                            }
-                          }}
-                          className="h-4 w-4 rounded border-gray-300"
-                        />
-                        <label
-                          htmlFor={`tenant-${t.id}`}
-                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                        >
-                          {t.name} - {t.cpf_cnpj}
-                        </label>
-                      </div>
-                    ))}
-                  </div>
-                  <FormDescription>
-                    Todos os inquilinos que morarão no apartamento (incluindo o responsável)
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {/* All Tenants - Only show when apartment supports 2+ tenants */}
+            {selectedApartment && selectedApartment.max_tenants > 1 && (
+              <FormField
+                control={formMethods.control}
+                name="tenant_ids"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Todos os Inquilinos</FormLabel>
+                    <div className="space-y-2 max-h-[200px] overflow-y-auto border rounded-md p-3">
+                      {tenants?.map((t) => (
+                        <div key={t.id} className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            id={`tenant-${t.id}`}
+                            checked={field.value?.includes(t.id!)}
+                            onChange={(e) => {
+                              const currentValue = field.value || [];
+                              if (e.target.checked) {
+                                field.onChange([...currentValue, t.id!]);
+                              } else {
+                                field.onChange(currentValue.filter((id) => id !== t.id));
+                              }
+                            }}
+                            className="h-4 w-4 rounded border-gray-300"
+                          />
+                          <label
+                            htmlFor={`tenant-${t.id}`}
+                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                          >
+                            {t.name} - {t.cpf_cnpj}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                    <FormDescription>
+                      Todos os inquilinos que morarão no apartamento (incluindo o responsável). Máximo: {selectedApartment.max_tenants}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
             <Separator />
             <div className="text-sm font-medium">Período e Valores</div>

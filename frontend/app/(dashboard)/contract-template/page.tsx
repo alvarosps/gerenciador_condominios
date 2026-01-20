@@ -28,6 +28,8 @@ import {
   Undo,
   History,
   Info,
+  Code,
+  FileText,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import Editor from '@monaco-editor/react';
@@ -38,11 +40,16 @@ import {
   useTemplateBackups,
   useRestoreTemplateBackup,
 } from '@/lib/api/hooks/use-contract-template';
+import { WysiwygEditor } from '@/components/contract-editor';
+import { RulesEditor } from '@/components/contract-editor/rules-editor';
+
+type EditorMode = 'wysiwyg' | 'code';
 
 export default function ContractTemplatePage() {
   const [content, setContent] = useState('');
   const [previewHtml, setPreviewHtml] = useState('');
   const [activeTab, setActiveTab] = useState('editor');
+  const [editorMode, setEditorMode] = useState<EditorMode>('wysiwyg');
   const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
   const [restoreBackupFilename, setRestoreBackupFilename] = useState<string | null>(null);
 
@@ -155,6 +162,23 @@ export default function ContractTemplatePage() {
               <Button
                 variant="outline"
                 size="sm"
+                onClick={() => setEditorMode((prev) => (prev === 'wysiwyg' ? 'code' : 'wysiwyg'))}
+              >
+                {editorMode === 'wysiwyg' ? (
+                  <>
+                    <Code className="h-4 w-4 mr-2" />
+                    Código
+                  </>
+                ) : (
+                  <>
+                    <FileText className="h-4 w-4 mr-2" />
+                    Visual
+                  </>
+                )}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => setIsBackupModalOpen(true)}
               >
                 <History className="h-4 w-4 mr-2" />
@@ -228,6 +252,7 @@ export default function ContractTemplatePage() {
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="mb-4">
               <TabsTrigger value="editor">Editor</TabsTrigger>
+              <TabsTrigger value="rules">Regras</TabsTrigger>
               <TabsTrigger value="preview">Preview</TabsTrigger>
               <TabsTrigger value="variables">Variáveis</TabsTrigger>
             </TabsList>
@@ -238,6 +263,12 @@ export default function ContractTemplatePage() {
                   <div className="flex items-center justify-center h-full">
                     <p className="text-muted-foreground">Carregando template...</p>
                   </div>
+                ) : editorMode === 'wysiwyg' ? (
+                  <WysiwygEditor
+                    value={content}
+                    onChange={setContent}
+                    className="h-full"
+                  />
                 ) : (
                   <Editor
                     height="100%"
@@ -256,6 +287,12 @@ export default function ContractTemplatePage() {
                     }}
                   />
                 )}
+              </div>
+            </TabsContent>
+
+            <TabsContent value="rules" className="mt-0">
+              <div style={{ height: '65vh', overflow: 'auto' }}>
+                <RulesEditor />
               </div>
             </TabsContent>
 
@@ -369,10 +406,25 @@ export default function ContractTemplatePage() {
               backups.map((backup) => (
                 <div
                   key={backup.filename}
-                  className="flex items-center justify-between p-3 border rounded hover:bg-gray-50"
+                  className={`flex items-center justify-between p-3 border rounded hover:bg-gray-50 ${
+                    backup.is_default ? 'border-blue-300 bg-blue-50' : ''
+                  }`}
                 >
                   <div className="flex-1">
-                    <div className="font-medium text-sm">{backup.filename}</div>
+                    <div className="font-medium text-sm flex items-center gap-2">
+                      {backup.is_default ? (
+                        <>
+                          <Badge variant="default" className="bg-blue-600">
+                            Template Original
+                          </Badge>
+                          <span className="text-muted-foreground">
+                            {backup.filename}
+                          </span>
+                        </>
+                      ) : (
+                        backup.filename
+                      )}
+                    </div>
                     <div className="text-xs text-gray-600">
                       Tamanho: {formatBytes(backup.size)}
                     </div>
@@ -381,7 +433,7 @@ export default function ContractTemplatePage() {
                     </div>
                   </div>
                   <Button
-                    variant="link"
+                    variant={backup.is_default ? 'default' : 'link'}
                     onClick={() => setRestoreBackupFilename(backup.filename)}
                     disabled={restoreMutation.isPending}
                   >

@@ -7,12 +7,11 @@ import {
 } from '@/lib/utils/validators';
 
 export const MARITAL_STATUS_OPTIONS = [
-  'Solteiro',
-  'Casado',
-  'Divorciado',
-  'Viúvo',
+  'Solteiro(a)',
+  'Casado(a)',
+  'Divorciado(a)',
+  'Viúvo(a)',
   'União Estável',
-  'Separado',
 ];
 
 export const tenantFormSchema = z.object({

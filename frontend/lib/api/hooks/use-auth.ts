@@ -57,7 +57,7 @@ export function useLogin() {
         localStorage.setItem('refresh_token', data.refresh);
 
         // Set cookie for middleware auth check (24 hour expiry)
-        document.cookie = `access_token=${data.access}; path=/; max-age=86400; SameSite=Lax`;
+        document.cookie = `access_token=${data.access}; path=/; max-age=31536000; SameSite=Lax`;
       }
     },
   });
@@ -146,7 +146,7 @@ export function useRefreshToken() {
         localStorage.setItem('access_token', data.access);
 
         // Update cookie for middleware auth check (24 hour expiry)
-        document.cookie = `access_token=${data.access}; path=/; max-age=86400; SameSite=Lax`;
+        document.cookie = `access_token=${data.access}; path=/; max-age=31536000; SameSite=Lax`;
       }
     },
   });

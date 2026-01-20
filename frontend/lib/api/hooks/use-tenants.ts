@@ -12,11 +12,16 @@ export function useTenants(filters?: {
   has_furniture?: boolean;
   search?: string;
 }) {
+  // Clean filters: remove undefined values for proper query key comparison
+  const cleanFilters = filters
+    ? Object.fromEntries(Object.entries(filters).filter(([, v]) => v !== undefined))
+    : {};
+
   return useQuery({
-    queryKey: ['tenants', filters],
+    queryKey: ['tenants', cleanFilters],
     queryFn: async () => {
       const { data } = await apiClient.get<PaginatedResponse<Tenant> | Tenant[]>('/tenants/', {
-        params: { ...filters, page_size: 10000 },
+        params: { ...cleanFilters, page_size: 10000 },
       });
       // Handle both paginated and non-paginated responses
       const tenants = extractResults(data);

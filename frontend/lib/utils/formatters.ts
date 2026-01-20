@@ -1,14 +1,17 @@
 /**
  * Format a number as Brazilian currency (R$)
+ * Rounds to 2 decimal places to avoid floating-point precision issues (e.g., 699.99 instead of 700)
  */
 export function formatCurrency(value: number | string | null | undefined): string {
   if (value === null || value === undefined) return 'R$ 0,00';
   const numValue = typeof value === 'string' ? parseFloat(value) : value;
   if (isNaN(numValue)) return 'R$ 0,00';
+  // Round to 2 decimal places to fix floating-point precision issues
+  const roundedValue = Math.round(numValue * 100) / 100;
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
     currency: 'BRL',
-  }).format(numValue);
+  }).format(roundedValue);
 }
 
 /**

@@ -27,7 +27,7 @@ from jinja2 import Environment, FileSystemLoader
 
 from core.contract_rules import regras_condominio
 from core.infrastructure import FileSystemDocumentStorage, IDocumentStorage, IPDFGenerator, PyppeteerPDFGenerator
-from core.models import Furniture, Lease
+from core.models import ContractRule, Furniture, Lease
 from core.utils import format_currency, number_to_words
 
 from .date_calculator import DateCalculatorService
@@ -185,6 +185,10 @@ class ContractService:
         # Get active landlord for contract
         landlord = Landlord.get_active()
 
+        # Get rules from database, fallback to hardcoded rules if none exist
+        db_rules = ContractRule.get_active_rules()
+        rules = db_rules if db_rules else regras_condominio
+
         context = {
             "landlord": landlord,
             "tenant": lease.responsible_tenant,
@@ -199,7 +203,7 @@ class ContractService:
             "tag_fee": lease.tag_fee,
             "cleaning_fee": lease.cleaning_fee,
             "valor_total": valor_total,
-            "rules": regras_condominio,
+            "rules": rules,
             "lease": lease,
             "valor_tags": valor_tags,
         }
@@ -407,7 +411,18 @@ class ContractService:
             # Generate PDF
             file_url = f"file:///{temp_html_path}"
             await page.goto(file_url, {"waitUntil": "networkidle2"})
-            await page.pdf({"path": pdf_path, "format": "A4"})
+            await page.pdf({
+                "path": pdf_path,
+                "format": "A4",
+                "printBackground": True,
+                "margin": {
+                    "top": "1cm",
+                    "right": "1.5cm",
+                    "bottom": "1cm",
+                    "left": "1.5cm"
+                },
+                "preferCSSPageSize": False
+            })
 
             # Clean up temporary file
             os.remove(temp_html_path)

@@ -148,11 +148,18 @@ class PyppeteerPDFGenerator(IPDFGenerator):
                 )
 
                 # Merge default options with custom options
+                # Centered margins for better layout
                 pdf_options = {
                     "path": str(output_path),
                     "format": "A4",
                     "printBackground": True,
-                    "margin": {"top": "1cm", "right": "1cm", "bottom": "1cm", "left": "1cm"},
+                    "preferCSSPageSize": False,
+                    "margin": {
+                        "top": "1cm",
+                        "right": "1.5cm",
+                        "bottom": "1cm",
+                        "left": "1.5cm"
+                    },
                 }
                 if options:
                     pdf_options.update(options)

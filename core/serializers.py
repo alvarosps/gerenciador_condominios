@@ -2,7 +2,7 @@ from rest_framework import serializers
 
 from core.validators import BrazilianPhoneValidator, CNPJValidator, CPFValidator
 
-from .models import Apartment, Building, Dependent, Furniture, Landlord, Lease, Tenant
+from .models import Apartment, Building, ContractRule, Dependent, Furniture, Landlord, Lease, Tenant
 
 
 class BuildingSerializer(serializers.ModelSerializer):
@@ -56,14 +56,35 @@ class ApartmentSerializer(serializers.ModelSerializer):
         return apartment
 
     def update(self, instance, validated_data):
-        """Update apartment with furniture relationships."""
+        """Update apartment with furniture relationships and sync rental_value to lease."""
         furniture_ids = validated_data.pop("furniture_ids", None)
+
+        # Track if rental_value or cleaning_fee changed for lease sync
+        rental_value_changed = "rental_value" in validated_data and validated_data["rental_value"] != instance.rental_value
+        cleaning_fee_changed = "cleaning_fee" in validated_data and validated_data["cleaning_fee"] != instance.cleaning_fee
+
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
 
         if furniture_ids is not None:
             instance.furnitures.set(furniture_ids)
+
+        # Sync rental_value and cleaning_fee to active lease if changed
+        if (rental_value_changed or cleaning_fee_changed) and hasattr(instance, "lease"):
+            lease = instance.lease
+            if rental_value_changed:
+                lease.rental_value = instance.rental_value
+            if cleaning_fee_changed:
+                lease.cleaning_fee = instance.cleaning_fee
+            # Use update_fields to avoid triggering lease validation
+            update_fields = []
+            if rental_value_changed:
+                update_fields.append("rental_value")
+            if cleaning_fee_changed:
+                update_fields.append("cleaning_fee")
+            Lease.objects.filter(pk=lease.pk).update(**{f: getattr(lease, f) for f in update_fields})
+
         return instance
 
 
@@ -214,6 +235,48 @@ class LeaseSerializer(serializers.ModelSerializer):
             "warning_count",
         ]
 
+    def create(self, validated_data):
+        """Create lease and sync rental_value/cleaning_fee to apartment."""
+        tenants = validated_data.pop("tenants", [])
+        lease = Lease.objects.create(**validated_data)
+        if tenants:
+            lease.tenants.set(tenants)
+
+        # Sync rental_value and cleaning_fee to apartment
+        apartment = lease.apartment
+        Apartment.objects.filter(pk=apartment.pk).update(
+            rental_value=lease.rental_value,
+            cleaning_fee=lease.cleaning_fee,
+        )
+
+        return lease
+
+    def update(self, instance, validated_data):
+        """Update lease and sync rental_value/cleaning_fee to apartment."""
+        tenants = validated_data.pop("tenants", None)
+
+        # Track if rental_value or cleaning_fee changed for apartment sync
+        rental_value_changed = "rental_value" in validated_data and validated_data["rental_value"] != instance.rental_value
+        cleaning_fee_changed = "cleaning_fee" in validated_data and validated_data["cleaning_fee"] != instance.cleaning_fee
+
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+
+        if tenants is not None:
+            instance.tenants.set(tenants)
+
+        # Sync rental_value and cleaning_fee to apartment if changed
+        if rental_value_changed or cleaning_fee_changed:
+            update_data = {}
+            if rental_value_changed:
+                update_data["rental_value"] = instance.rental_value
+            if cleaning_fee_changed:
+                update_data["cleaning_fee"] = instance.cleaning_fee
+            Apartment.objects.filter(pk=instance.apartment_id).update(**update_data)
+
+        return instance
+
 
 class LandlordSerializer(serializers.ModelSerializer):
     """
@@ -269,3 +332,34 @@ class LandlordSerializer(serializers.ModelSerializer):
         if value:
             BrazilianPhoneValidator()(value)
         return value
+
+
+class ContractRuleSerializer(serializers.ModelSerializer):
+    """
+    Serializer for ContractRule model.
+
+    Used for managing condominium rules that appear in rental contracts.
+    """
+
+    class Meta:
+        model = ContractRule
+        fields = [
+            "id",
+            "content",
+            "order",
+            "is_active",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "created_at", "updated_at"]
+
+
+class ContractRuleReorderSerializer(serializers.Serializer):
+    """
+    Serializer for bulk reordering of contract rules.
+    """
+
+    rule_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        help_text="Lista ordenada de IDs das regras"
+    )

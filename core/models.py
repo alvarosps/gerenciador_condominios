@@ -328,13 +328,19 @@ class Tenant(AuditMixin, SoftDeleteMixin, models.Model):
         help_text="Conta de usuário associada para acesso ao portal do inquilino",
     )
 
-    # Brazilian marital status choices
+    # Brazilian marital status choices (includes legacy values without "(a)" for backward compatibility)
     MARITAL_STATUS_CHOICES = [
         ("Solteiro(a)", "Solteiro(a)"),
         ("Casado(a)", "Casado(a)"),
         ("Divorciado(a)", "Divorciado(a)"),
         ("Viúvo(a)", "Viúvo(a)"),
         ("União Estável", "União Estável"),
+        # Legacy values (backward compatibility)
+        ("Solteiro", "Solteiro"),
+        ("Casado", "Casado"),
+        ("Divorciado", "Divorciado"),
+        ("Viúvo", "Viúvo"),
+        ("Separado", "Separado"),
     ]
 
     # Dados básicos
@@ -668,3 +674,66 @@ class Landlord(AuditMixin, SoftDeleteMixin, models.Model):
     def get_active(cls) -> "Landlord | None":
         """Get the currently active landlord."""
         return cls.objects.filter(is_active=True).first()
+
+
+class ContractRule(AuditMixin, SoftDeleteMixin, models.Model):
+    """
+    Represents a condominium rule that appears in rental contracts.
+
+    Rules are displayed in the contract's "Regras do prédio/Regras de Convivência"
+    section and can be managed through the admin interface.
+
+    Attributes:
+        content: HTML content of the rule (supports <strong> for emphasis)
+        order: Display order (lower numbers appear first)
+        is_active: Whether the rule should be included in contracts
+
+    Inherits audit fields (created_at, updated_at, created_by, updated_by)
+    and soft delete capability (is_deleted, deleted_at, deleted_by).
+    """
+
+    content = models.TextField(
+        help_text="Conteúdo HTML da regra (use <strong> para negrito)"
+    )
+    order = models.PositiveIntegerField(
+        default=0,
+        db_index=True,
+        help_text="Ordem de exibição (menores valores aparecem primeiro)"
+    )
+    is_active = models.BooleanField(
+        default=True,
+        db_index=True,
+        help_text="Se a regra deve ser incluída nos contratos"
+    )
+
+    # Managers
+    objects = SoftDeleteManager()
+    all_objects = models.Manager()
+
+    class Meta:
+        ordering = ["order", "id"]
+        verbose_name = "Regra do Condomínio"
+        verbose_name_plural = "Regras do Condomínio"
+        indexes = [
+            models.Index(fields=["is_active", "order"], name="rule_active_order_idx"),
+        ]
+
+    def __str__(self) -> str:
+        """Return truncated rule content for display."""
+        # Strip HTML and truncate
+        import re
+        clean_text = re.sub(r"<[^>]+>", "", self.content)
+        return clean_text[:50] + "..." if len(clean_text) > 50 else clean_text
+
+    @classmethod
+    def get_active_rules(cls) -> list[str]:
+        """
+        Get all active rules as a list of HTML strings.
+
+        Returns list suitable for passing to contract template context.
+        """
+        return list(
+            cls.objects.filter(is_active=True)
+            .order_by("order", "id")
+            .values_list("content", flat=True)
+        )

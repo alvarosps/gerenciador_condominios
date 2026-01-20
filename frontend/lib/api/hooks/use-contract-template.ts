@@ -20,6 +20,7 @@ interface Backup {
   path: string;
   size: number;
   created_at: string;
+  is_default?: boolean;
 }
 
 interface RestoreResponse {
