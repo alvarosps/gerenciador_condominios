@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
@@ -11,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { SearchableSelect, SearchableSelectOption } from '@/components/ui/searchable-select';
 import { Input } from '@/components/ui/input';
 import {
   AlertDialog,
@@ -75,6 +76,17 @@ export default function ApartmentsPage() {
     exportSheetName: 'Apartamentos',
     deleteErrorMessage: 'Erro ao excluir apartamento. Verifique se não há locações vinculadas.',
   });
+
+  const buildingOptions: SearchableSelectOption[] = useMemo(() => {
+    const options: SearchableSelectOption[] = [{ value: 'all', label: 'Todos os prédios' }];
+    buildings?.forEach((b) => {
+      options.push({
+        value: String(b.id),
+        label: `${b.name} - ${b.street_number}`,
+      });
+    });
+    return options;
+  }, [buildings]);
 
   const clearFilters = () => {
     setFilters({
@@ -282,23 +294,15 @@ export default function ApartmentsPage() {
         <div className="flex gap-4 flex-wrap items-end">
           <div className="flex-1 min-w-[200px]">
             <label className="block text-sm font-medium mb-2">Prédio</label>
-            <Select
-              value={filters.building_id ? String(filters.building_id) : undefined}
+            <SearchableSelect
+              value={filters.building_id ? String(filters.building_id) : 'all'}
               onValueChange={(value) =>
-                setFilters({ ...filters, building_id: value ? Number(value) : undefined })
+                setFilters({ ...filters, building_id: value === 'all' ? undefined : Number(value) })
               }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Todos os prédios" />
-              </SelectTrigger>
-              <SelectContent>
-                {buildings?.map((b) => (
-                  <SelectItem key={b.id} value={String(b.id)}>
-                    {b.name} - {b.street_number}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              options={buildingOptions}
+              placeholder="Todos os prédios"
+              searchPlaceholder="Buscar prédio..."
+            />
           </div>
 
           <div className="flex-1 min-w-[150px]">

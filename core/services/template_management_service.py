@@ -73,9 +73,39 @@ class TemplateManagementService:
         return backup_dir
 
     @classmethod
+    def ensure_default_backup(cls) -> Optional[str]:
+        """
+        Ensure a default backup exists.
+
+        Creates a backup named 'contract_template_DEFAULT.html' from the current
+        template if it doesn't already exist. This serves as the original template
+        that can always be restored.
+
+        Returns:
+            str: Path to default backup file, or None if already exists
+        """
+        try:
+            backup_dir = cls.get_backup_directory()
+            default_backup_path = os.path.join(backup_dir, "contract_template_DEFAULT.html")
+
+            if not os.path.exists(default_backup_path):
+                template_path = cls.get_template_path()
+                shutil.copy2(template_path, default_backup_path)
+                logger.info(f"Default backup created: {default_backup_path}")
+                return default_backup_path
+
+            return None
+
+        except Exception as e:
+            logger.error(f"Error creating default backup: {str(e)}")
+            return None
+
+    @classmethod
     def get_template(cls) -> str:
         """
         Read current contract template content.
+
+        Ensures a default backup exists before returning the template.
 
         Returns:
             str: Template HTML content
@@ -86,6 +116,9 @@ class TemplateManagementService:
         """
         try:
             template_path = cls.get_template_path()
+
+            # Ensure default backup exists on first access
+            cls.ensure_default_backup()
 
             with open(template_path, "r", encoding="utf-8") as f:
                 content = f.read()
@@ -236,26 +269,43 @@ class TemplateManagementService:
         """
         List all template backups.
 
+        Returns the DEFAULT backup first (if exists), followed by timestamped
+        backups sorted by creation date (newest first).
+
         Returns:
-            list: List of backup info dicts with filename, path, and timestamp
+            list: List of backup info dicts with filename, path, timestamp, and is_default flag
         """
         try:
             backup_dir = cls.get_backup_directory()
             backups = []
+            default_backup = None
 
             for filename in sorted(os.listdir(backup_dir), reverse=True):
-                if filename.startswith("contract_template_backup_") and filename.endswith(".html"):
-                    file_path = os.path.join(backup_dir, filename)
-                    stat_info = os.stat(file_path)
+                if not filename.endswith(".html"):
+                    continue
 
-                    backups.append(
-                        {
-                            "filename": filename,
-                            "path": file_path,
-                            "size": stat_info.st_size,
-                            "created_at": datetime.fromtimestamp(stat_info.st_ctime).isoformat(),
-                        }
-                    )
+                file_path = os.path.join(backup_dir, filename)
+                stat_info = os.stat(file_path)
+
+                backup_info = {
+                    "filename": filename,
+                    "path": file_path,
+                    "size": stat_info.st_size,
+                    "created_at": datetime.fromtimestamp(stat_info.st_ctime).isoformat(),
+                    "is_default": filename == "contract_template_DEFAULT.html",
+                }
+
+                # Separate default backup to show first
+                if filename == "contract_template_DEFAULT.html":
+                    default_backup = backup_info
+                elif filename.startswith("contract_template_backup_") or filename.startswith(
+                    "contract_template_before_restore_"
+                ):
+                    backups.append(backup_info)
+
+            # Put default backup at the beginning if it exists
+            if default_backup:
+                backups.insert(0, default_backup)
 
             return backups
 

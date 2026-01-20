@@ -71,6 +71,12 @@ class ApartmentViewSet(viewsets.ModelViewSet):
     - Write: Admin only
 
     Apartment data (units, rental values, etc.) is managed by administrators.
+
+    Filters (query params):
+    - building_id: Filter by building ID
+    - is_rented: Filter by rental status (true/false)
+    - min_price: Filter apartments with rental_value >= min_price
+    - max_price: Filter apartments with rental_value <= max_price
     """
 
     queryset = Apartment.objects.all().order_by("id")
@@ -80,6 +86,7 @@ class ApartmentViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """
         Optimize queryset with select_related and prefetch_related.
+        Also applies filters based on query parameters.
 
         Phase 5 Query Optimization:
         - select_related: For building (ForeignKey)
@@ -91,6 +98,30 @@ class ApartmentViewSet(viewsets.ModelViewSet):
             queryset = queryset.select_related("building").prefetch_related(  # ForeignKey: Apartment -> Building
                 "furnitures"  # ManyToMany: Apartment -> Furnitures
             )
+
+        if self.action == "list":
+            # Apply filters from query parameters
+            params = self.request.query_params
+
+            # Filter by building_id
+            building_id = params.get("building_id")
+            if building_id:
+                queryset = queryset.filter(building_id=building_id)
+
+            # Filter by is_rented
+            is_rented = params.get("is_rented")
+            if is_rented is not None and is_rented != "":
+                queryset = queryset.filter(is_rented=is_rented.lower() == "true")
+
+            # Filter by min_price
+            min_price = params.get("min_price")
+            if min_price:
+                queryset = queryset.filter(rental_value__gte=min_price)
+
+            # Filter by max_price
+            max_price = params.get("max_price")
+            if max_price:
+                queryset = queryset.filter(rental_value__lte=max_price)
 
         return queryset
 
@@ -104,6 +135,12 @@ class TenantViewSet(viewsets.ModelViewSet):
     - Write: Admin only
 
     Tenant personal data should be protected and only manageable by administrators.
+
+    Filters (query params):
+    - is_company: Filter by company status (true/false)
+    - has_dependents: Filter tenants with dependents (true/false)
+    - has_furniture: Filter tenants with furniture (true/false)
+    - search: Search by name or CPF/CNPJ
     """
 
     queryset = Tenant.objects.all().order_by("id")
@@ -113,10 +150,13 @@ class TenantViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """
         Optimize queryset with prefetch_related.
+        Also applies filters based on query parameters.
 
         Phase 5 Query Optimization:
         - prefetch_related: For dependents (reverse FK) and furnitures (ManyToMany)
         """
+        from django.db.models import Count, Q
+
         queryset = super().get_queryset()
 
         if self.action in ["list", "retrieve"]:
@@ -124,6 +164,36 @@ class TenantViewSet(viewsets.ModelViewSet):
                 "dependents",  # Reverse FK: Tenant -> Dependents
                 "furnitures",  # ManyToMany: Tenant -> Furnitures
             )
+
+        if self.action == "list":
+            # Apply filters from query parameters
+            params = self.request.query_params
+
+            # Filter by is_company
+            is_company = params.get("is_company")
+            if is_company is not None and is_company != "":
+                queryset = queryset.filter(is_company=is_company.lower() == "true")
+
+            # Filter by has_dependents
+            has_dependents = params.get("has_dependents")
+            if has_dependents is not None and has_dependents != "":
+                if has_dependents.lower() == "true":
+                    queryset = queryset.annotate(dep_count=Count("dependents")).filter(dep_count__gt=0)
+                else:
+                    queryset = queryset.annotate(dep_count=Count("dependents")).filter(dep_count=0)
+
+            # Filter by has_furniture
+            has_furniture = params.get("has_furniture")
+            if has_furniture is not None and has_furniture != "":
+                if has_furniture.lower() == "true":
+                    queryset = queryset.annotate(furn_count=Count("furnitures")).filter(furn_count__gt=0)
+                else:
+                    queryset = queryset.annotate(furn_count=Count("furnitures")).filter(furn_count=0)
+
+            # Search by name or CPF/CNPJ
+            search = params.get("search")
+            if search:
+                queryset = queryset.filter(Q(name__icontains=search) | Q(cpf_cnpj__icontains=search))
 
         return queryset
 
@@ -138,6 +208,13 @@ class LeaseViewSet(viewsets.ModelViewSet):
 
     Lease terms are managed by administrators. Tenants can view their leases
     and perform specific actions like viewing late fees.
+
+    Filters (query params):
+    - apartment_id: Filter by apartment ID
+    - responsible_tenant_id: Filter by responsible tenant ID
+    - is_active: Filter for active leases (not expired)
+    - is_expired: Filter for expired leases
+    - expiring_soon: Filter for leases expiring within 30 days
     """
 
     queryset = Lease.objects.all().order_by("id")
@@ -147,6 +224,7 @@ class LeaseViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """
         Optimize queryset with select_related and prefetch_related to eliminate N+1 queries.
+        Also applies filters based on query parameters.
 
         Phase 5 Query Optimization:
         - select_related: For ForeignKey and OneToOne (apartment, building, responsible_tenant)
@@ -154,6 +232,9 @@ class LeaseViewSet(viewsets.ModelViewSet):
 
         This reduces queries from ~301 to ~4 for the list endpoint.
         """
+        from datetime import timedelta
+        from dateutil.relativedelta import relativedelta
+
         queryset = super().get_queryset()
 
         if self.action == "list":
@@ -168,6 +249,56 @@ class LeaseViewSet(viewsets.ModelViewSet):
                 "tenants__furnitures",  # ManyToMany: Tenant -> Furnitures (tenant's own)
                 "apartment__furnitures",  # ManyToMany: Apartment -> Furnitures (apartment's)
             )
+
+            # Apply filters from query parameters
+            params = self.request.query_params
+
+            # Filter by apartment_id
+            apartment_id = params.get("apartment_id")
+            if apartment_id:
+                queryset = queryset.filter(apartment_id=apartment_id)
+
+            # Filter by responsible_tenant_id
+            responsible_tenant_id = params.get("responsible_tenant_id")
+            if responsible_tenant_id:
+                queryset = queryset.filter(responsible_tenant_id=responsible_tenant_id)
+
+            # Filter by lease status (is_active, is_expired, expiring_soon)
+            # These are computed from start_date + validity_months
+            today = date.today()
+
+            is_active = params.get("is_active")
+            if is_active and is_active.lower() == "true":
+                # Active leases: final_date >= today
+                # We need to filter in Python since final_date is computed
+                lease_ids = []
+                for lease in queryset:
+                    final_date = lease.start_date + relativedelta(months=lease.validity_months)
+                    if final_date >= today:
+                        lease_ids.append(lease.id)
+                queryset = queryset.filter(id__in=lease_ids)
+
+            is_expired = params.get("is_expired")
+            if is_expired and is_expired.lower() == "true":
+                # Expired leases: final_date < today
+                lease_ids = []
+                for lease in queryset:
+                    final_date = lease.start_date + relativedelta(months=lease.validity_months)
+                    if final_date < today:
+                        lease_ids.append(lease.id)
+                queryset = queryset.filter(id__in=lease_ids)
+
+            expiring_soon = params.get("expiring_soon")
+            if expiring_soon and expiring_soon.lower() == "true":
+                # Expiring soon: final_date is within 30 days from today
+                threshold = today + timedelta(days=30)
+                lease_ids = []
+                for lease in queryset:
+                    final_date = lease.start_date + relativedelta(months=lease.validity_months)
+                    if today <= final_date <= threshold:
+                        lease_ids.append(lease.id)
+                queryset = queryset.filter(id__in=lease_ids)
+
         elif self.action == "retrieve":
             # Optimize for detail view: same as list but for single object
             queryset = queryset.select_related(

@@ -44,7 +44,9 @@ export function ContractGenerateModal({ open, lease, onClose }: Props) {
   const handleDownload = () => {
     if (pdfPath) {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
-      const downloadUrl = `${apiUrl.replace('/api', '')}/${pdfPath}`;
+      // Extract relative path from full Windows path (e.g., "C:\...\contracts\836\file.pdf" -> "contracts/836/file.pdf")
+      const relativePath = pdfPath.replace(/\\/g, '/').replace(/^.*?(contracts\/)/, '$1');
+      const downloadUrl = `${apiUrl.replace('/api', '')}/${relativePath}`;
       window.open(downloadUrl, '_blank');
     }
   };
@@ -65,23 +67,20 @@ export function ContractGenerateModal({ open, lease, onClose }: Props) {
 
         <div className="space-y-4">
           {pdfPath ? (
-            <Alert className="border-green-200 bg-green-50">
-              <CheckCircle className="h-4 w-4 text-green-600" />
-              <AlertDescription className="ml-2">
-                <div className="space-y-2">
+            <div className="border border-green-200 bg-green-50 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
+                <div className="space-y-2 flex-1 min-w-0">
                   <p className="font-medium text-green-900">Contrato Gerado com Sucesso!</p>
                   <p className="text-sm text-green-800">
                     O contrato foi gerado e salvo no servidor.
-                  </p>
-                  <p className="mt-2 font-mono text-xs bg-white p-2 rounded border">
-                    {pdfPath}
                   </p>
                   <p className="text-sm text-green-800">
                     Clique em &quot;Baixar Contrato&quot; para visualizar o PDF.
                   </p>
                 </div>
-              </AlertDescription>
-            </Alert>
+              </div>
+            </div>
           ) : (
             <>
               <Alert>
@@ -116,10 +115,9 @@ export function ContractGenerateModal({ open, lease, onClose }: Props) {
                       </dd>
                     </div>
                     <div className="flex justify-between py-2 border-b">
-                      <dt className="font-medium text-sm text-gray-600">Período</dt>
+                      <dt className="font-medium text-sm text-gray-600">Data de Início</dt>
                       <dd className="text-sm text-gray-900">
-                        {format(parseISO(lease.start_date), 'dd/MM/yyyy')} até{' '}
-                        {lease.final_date ? format(parseISO(lease.final_date), 'dd/MM/yyyy') : 'N/A'}
+                        {format(parseISO(lease.start_date), 'dd/MM/yyyy')}
                       </dd>
                     </div>
                     <div className="flex justify-between py-2 border-b">

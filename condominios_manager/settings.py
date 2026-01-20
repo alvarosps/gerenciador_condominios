@@ -178,6 +178,10 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 
+# Media files (User uploads, Generated contracts)
+MEDIA_URL = "/contracts/"
+MEDIA_ROOT = BASE_DIR / "contracts"
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
@@ -267,12 +271,13 @@ SPECTACULAR_SETTINGS = {
 from datetime import timedelta
 
 SIMPLE_JWT = {
-    # Token lifetimes
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=config("JWT_ACCESS_TOKEN_LIFETIME", default=60, cast=int)),
-    "REFRESH_TOKEN_LIFETIME": timedelta(minutes=config("JWT_REFRESH_TOKEN_LIFETIME", default=1440, cast=int)),
-    # Token refresh settings
-    "ROTATE_REFRESH_TOKENS": config("JWT_ROTATE_REFRESH_TOKENS", default=True, cast=bool),
-    "BLACKLIST_AFTER_ROTATION": config("JWT_BLACKLIST_AFTER_ROTATION", default=True, cast=bool),
+    # Token lifetimes - Set to 1 year (365 days) for long-lived sessions
+    # For development/personal use, effectively "never expires"
+    "ACCESS_TOKEN_LIFETIME": timedelta(days=config("JWT_ACCESS_TOKEN_LIFETIME_DAYS", default=365, cast=int)),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=config("JWT_REFRESH_TOKEN_LIFETIME_DAYS", default=365, cast=int)),
+    # Token refresh settings - Disable rotation to prevent token invalidation issues
+    "ROTATE_REFRESH_TOKENS": config("JWT_ROTATE_REFRESH_TOKENS", default=False, cast=bool),
+    "BLACKLIST_AFTER_ROTATION": config("JWT_BLACKLIST_AFTER_ROTATION", default=False, cast=bool),
     # Security settings
     "ALGORITHM": config("JWT_ALGORITHM", default="HS256"),
     "SIGNING_KEY": SECRET_KEY,

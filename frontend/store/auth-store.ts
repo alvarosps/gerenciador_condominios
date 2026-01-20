@@ -75,8 +75,10 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'auth-storage',
-      // Only persist essential data
+      // Persist all auth data including tokens for long-lived sessions
       partialize: (state) => ({
+        token: state.token,
+        refreshToken: state.refreshToken,
         user: state.user,
         isAuthenticated: state.isAuthenticated,
       }),
