@@ -12,11 +12,15 @@ import {
   mockApartments,
   mockTenants,
   mockLeases,
+  mockPersons,
+  mockExpenses,
   createMockBuilding,
   createMockFurniture,
   createMockApartment,
   createMockTenant,
   createMockLease,
+  createMockPerson,
+  createMockExpense,
 } from './data';
 
 const API_BASE = 'http://localhost:8000/api';
@@ -27,6 +31,8 @@ let furniture = [...mockFurniture];
 let apartments = [...mockApartments];
 let tenants = [...mockTenants];
 let leases = [...mockLeases];
+let persons = [...mockPersons];
+let expenses = [...mockExpenses];
 
 // Helper to reset data between tests
 export function resetMockData() {
@@ -35,6 +41,8 @@ export function resetMockData() {
   apartments = [...mockApartments];
   tenants = [...mockTenants];
   leases = [...mockLeases];
+  persons = [...mockPersons];
+  expenses = [...mockExpenses];
 }
 
 /**
@@ -324,11 +332,15 @@ const leaseHandlers = [
     if (index === -1) {
       return new HttpResponse(null, { status: 404 });
     }
-    leases[index]!.contract_generated = true;
-    leases[index]!.pdf_path = `contracts/mock/contract_${id}.pdf`;
+    const lease = leases[index];
+    if (!lease) {
+      return new HttpResponse(null, { status: 404 });
+    }
+    lease.contract_generated = true;
+    lease.pdf_path = `contracts/mock/contract_${id}.pdf`;
     return HttpResponse.json({
       message: 'Contract generated successfully',
-      pdf_path: leases[index]!.pdf_path,
+      pdf_path: lease.pdf_path,
     });
   }),
 
@@ -360,8 +372,12 @@ const leaseHandlers = [
     if (index === -1) {
       return new HttpResponse(null, { status: 404 });
     }
-    const oldDueDay = leases[index]!.due_day;
-    leases[index]!.due_day = data.new_due_day;
+    const existingLease = leases[index];
+    if (!existingLease) {
+      return new HttpResponse(null, { status: 404 });
+    }
+    const oldDueDay = existingLease.due_day;
+    existingLease.due_day = data.new_due_day;
     return HttpResponse.json({
       message: 'Due date changed successfully',
       old_due_day: oldDueDay,
@@ -523,6 +539,287 @@ const dashboardHandlers = [
 ];
 
 /**
+ * Person handlers
+ */
+const personHandlers = [
+  http.get(`${API_BASE}/persons/`, async () => {
+    await delay(50);
+    return HttpResponse.json(persons);
+  }),
+
+  http.get(`${API_BASE}/persons/:id/`, async ({ params }) => {
+    await delay(50);
+    const id = Number(params.id);
+    const person = persons.find((p) => p.id === id);
+    if (!person) {
+      return new HttpResponse(null, { status: 404 });
+    }
+    return HttpResponse.json(person);
+  }),
+
+  http.post(`${API_BASE}/persons/`, async ({ request }) => {
+    await delay(100);
+    const data = (await request.json()) as Record<string, unknown>;
+    const newPerson = createMockPerson({ ...data, id: persons.length + 1 } as Partial<(typeof persons)[0]>);
+    persons.push(newPerson);
+    return HttpResponse.json(newPerson, { status: 201 });
+  }),
+
+  http.put(`${API_BASE}/persons/:id/`, async ({ params, request }) => {
+    await delay(100);
+    const id = Number(params.id);
+    const data = (await request.json()) as (typeof persons)[0];
+    const index = persons.findIndex((p) => p.id === id);
+    if (index === -1) {
+      return new HttpResponse(null, { status: 404 });
+    }
+    persons[index] = { ...persons[index], ...data };
+    return HttpResponse.json(persons[index]);
+  }),
+
+  http.delete(`${API_BASE}/persons/:id/`, async ({ params }) => {
+    await delay(100);
+    const id = Number(params.id);
+    const index = persons.findIndex((p) => p.id === id);
+    if (index === -1) {
+      return new HttpResponse(null, { status: 404 });
+    }
+    persons.splice(index, 1);
+    return new HttpResponse(null, { status: 204 });
+  }),
+];
+
+/**
+ * Expense handlers
+ */
+const expenseHandlers = [
+  http.get(`${API_BASE}/expenses/`, async () => {
+    await delay(50);
+    return HttpResponse.json(expenses);
+  }),
+
+  http.get(`${API_BASE}/expenses/:id/`, async ({ params }) => {
+    await delay(50);
+    const id = Number(params.id);
+    const expense = expenses.find((e) => e.id === id);
+    if (!expense) {
+      return new HttpResponse(null, { status: 404 });
+    }
+    return HttpResponse.json(expense);
+  }),
+
+  http.post(`${API_BASE}/expenses/`, async ({ request }) => {
+    await delay(100);
+    const data = (await request.json()) as Record<string, unknown>;
+    const newExpense = createMockExpense({ ...data, id: expenses.length + 1 } as Partial<(typeof expenses)[0]>);
+    expenses.push(newExpense);
+    return HttpResponse.json(newExpense, { status: 201 });
+  }),
+
+  http.post(`${API_BASE}/expenses/:id/mark_paid/`, async ({ params }) => {
+    await delay(100);
+    const id = Number(params.id);
+    const index = expenses.findIndex((e) => e.id === id);
+    if (index === -1) {
+      return new HttpResponse(null, { status: 404 });
+    }
+    const existing = expenses[index];
+    if (!existing) {
+      return new HttpResponse(null, { status: 404 });
+    }
+    expenses[index] = { ...existing, is_paid: true, paid_date: '2026-03-22' };
+    return HttpResponse.json(expenses[index]);
+  }),
+
+  http.post(`${API_BASE}/expenses/:id/generate_installments/`, async ({ params }) => {
+    await delay(100);
+    const id = Number(params.id);
+    const expense = expenses.find((e) => e.id === id);
+    if (!expense) {
+      return new HttpResponse(null, { status: 404 });
+    }
+    return HttpResponse.json({
+      message: 'Parcelas geradas com sucesso',
+      installments_created: expense.total_installments ?? 1,
+    });
+  }),
+];
+
+/**
+ * Expense installment handlers
+ */
+const expenseInstallmentHandlers = [
+  http.get(`${API_BASE}/expense-installments/`, async () => {
+    await delay(50);
+    const allInstallments = expenses.flatMap((e) => e.installments);
+    return HttpResponse.json(allInstallments);
+  }),
+
+  http.post(`${API_BASE}/expense-installments/:id/mark_paid/`, async ({ params }) => {
+    await delay(100);
+    const id = Number(params.id);
+    return HttpResponse.json({
+      id,
+      is_paid: true,
+      paid_date: '2026-03-22',
+    });
+  }),
+
+  http.post(`${API_BASE}/expense-installments/bulk_mark_paid/`, async ({ request }) => {
+    await delay(100);
+    const data = (await request.json()) as { ids: number[] };
+    return HttpResponse.json({
+      message: `${data.ids.length} parcelas marcadas como pagas`,
+      updated_count: data.ids.length,
+    });
+  }),
+];
+
+/**
+ * Financial dashboard handlers
+ */
+const financialDashboardHandlers = [
+  http.get(`${API_BASE}/financial-dashboard/overview/`, async () => {
+    await delay(50);
+    return HttpResponse.json({
+      total_expenses: 5200.0,
+      total_income: 12000.0,
+      net_balance: 6800.0,
+      pending_expenses: 3,
+      pending_income: 1,
+      overdue_installments: 2,
+    });
+  }),
+
+  http.get(`${API_BASE}/financial-dashboard/debt_by_person/`, async () => {
+    await delay(50);
+    return HttpResponse.json([
+      { person_id: 1, person_name: 'Rodrigo Souza', total_debt: 1500.0 },
+      { person_id: 3, person_name: 'Alvaro Souza', total_debt: 800.0 },
+    ]);
+  }),
+
+  http.get(`${API_BASE}/financial-dashboard/debt_by_type/`, async () => {
+    await delay(50);
+    return HttpResponse.json([
+      { expense_type: 'card_purchase', total: 2500.0 },
+      { expense_type: 'fixed_expense', total: 1200.0 },
+    ]);
+  }),
+
+  http.get(`${API_BASE}/financial-dashboard/upcoming_installments/`, async () => {
+    await delay(50);
+    return HttpResponse.json([
+      {
+        id: 2,
+        expense_description: 'Supermercado Extra',
+        installment_number: 2,
+        total_installments: 3,
+        amount: '150.00',
+        due_date: '2026-04-10',
+      },
+    ]);
+  }),
+
+  http.get(`${API_BASE}/financial-dashboard/overdue_installments/`, async () => {
+    await delay(50);
+    return HttpResponse.json([]);
+  }),
+
+  http.get(`${API_BASE}/financial-dashboard/category_breakdown/`, async () => {
+    await delay(50);
+    return HttpResponse.json([
+      { category_name: 'Pessoal', total: 2500.0, percentage: 48.1 },
+      { category_name: 'Kitnets', total: 1700.0, percentage: 32.7 },
+      { category_name: 'Carros', total: 1000.0, percentage: 19.2 },
+    ]);
+  }),
+];
+
+/**
+ * Cash flow handlers
+ */
+const cashFlowHandlers = [
+  http.get(`${API_BASE}/cash-flow/monthly/`, async () => {
+    await delay(50);
+    return HttpResponse.json({
+      year: 2026,
+      month: 3,
+      total_income: 12000.0,
+      total_expenses: 5200.0,
+      net_cash_flow: 6800.0,
+      opening_balance: 10000.0,
+      closing_balance: 16800.0,
+      income_items: [],
+      expense_items: [],
+    });
+  }),
+
+  http.get(`${API_BASE}/cash-flow/projection/`, async () => {
+    await delay(50);
+    return HttpResponse.json([
+      { year: 2026, month: 3, projected_income: 12000.0, projected_expenses: 5200.0, projected_balance: 16800.0 },
+      { year: 2026, month: 4, projected_income: 12000.0, projected_expenses: 5100.0, projected_balance: 23700.0 },
+      { year: 2026, month: 5, projected_income: 12000.0, projected_expenses: 5000.0, projected_balance: 30700.0 },
+    ]);
+  }),
+
+  http.get(`${API_BASE}/cash-flow/person_summary/`, async () => {
+    await delay(50);
+    return HttpResponse.json({
+      person_id: 1,
+      person_name: 'Rodrigo Souza',
+      year: 2026,
+      month: 3,
+      total_income: 1100.0,
+      total_expenses: 450.0,
+      net: 650.0,
+    });
+  }),
+
+  http.post(`${API_BASE}/cash-flow/simulate/`, async ({ request }) => {
+    await delay(100);
+    const data = (await request.json()) as { scenarios: { name: string }[] };
+    return HttpResponse.json({
+      results: data.scenarios.map((s) => ({
+        scenario_name: s.name,
+        months: [
+          { year: 2026, month: 4, projected_income: 12000.0, projected_expenses: 5000.0, projected_balance: 23700.0 },
+        ],
+      })),
+    });
+  }),
+];
+
+/**
+ * Income handlers
+ */
+const incomeHandlers = [
+  http.get(`${API_BASE}/incomes/`, async () => {
+    await delay(50);
+    return HttpResponse.json([]);
+  }),
+  http.post(`${API_BASE}/incomes/:id/mark_received/`, async () => {
+    await delay(100);
+    return HttpResponse.json({ is_received: true, received_date: '2026-03-22' });
+  }),
+];
+
+/**
+ * Employee payment handlers
+ */
+const employeePaymentHandlers = [
+  http.get(`${API_BASE}/employee-payments/`, async () => {
+    await delay(50);
+    return HttpResponse.json([]);
+  }),
+  http.post(`${API_BASE}/employee-payments/:id/mark_paid/`, async () => {
+    await delay(100);
+    return HttpResponse.json({ is_paid: true, payment_date: '2026-03-22' });
+  }),
+];
+
+/**
  * All handlers combined
  */
 export const handlers = [
@@ -533,4 +830,11 @@ export const handlers = [
   ...leaseHandlers,
   ...authHandlers,
   ...dashboardHandlers,
+  ...personHandlers,
+  ...expenseHandlers,
+  ...expenseInstallmentHandlers,
+  ...financialDashboardHandlers,
+  ...cashFlowHandlers,
+  ...incomeHandlers,
+  ...employeePaymentHandlers,
 ];
