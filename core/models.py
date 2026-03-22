@@ -891,6 +891,11 @@ class Expense(AuditMixin, SoftDeleteMixin, models.Model):
     )
     is_paid = models.BooleanField(default=False)
     paid_date = models.DateField(null=True, blank=True)
+    end_date = models.DateField(
+        null=True,
+        blank=True,
+        help_text="Data fim para gastos fixos recorrentes. Projeção para após esta data.",
+    )
     is_offset = models.BooleanField(
         default=False,
         help_text="Desconto: valor é subtraído do total da pessoa (compra feita no cartão dela, mas para os sogros/Camila).",
@@ -1043,7 +1048,9 @@ class EmployeePayment(AuditMixin, SoftDeleteMixin, models.Model):
 
 class PersonPayment(AuditMixin, SoftDeleteMixin, models.Model):
     person = models.ForeignKey(Person, related_name="payments_received", on_delete=models.CASCADE)
-    reference_month = models.DateField(help_text="Primeiro dia do mês de referência (ex: 2026-03-01)")
+    reference_month = models.DateField(
+        help_text="Primeiro dia do mês de referência (ex: 2026-03-01)"
+    )
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     payment_date = models.DateField()
     notes = models.TextField(blank=True)

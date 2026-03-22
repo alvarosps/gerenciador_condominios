@@ -11,7 +11,9 @@ import copy
 from decimal import Decimal
 from typing import Any
 
-from core.models import Apartment, Expense, ExpenseInstallment, Lease
+from django.core.exceptions import ObjectDoesNotExist
+
+from core.models import Apartment, Expense, ExpenseInstallment
 
 VALID_SCENARIO_TYPES = frozenset(
     [
@@ -234,7 +236,7 @@ def _db_change_rent(projection: list[dict[str, Any]], scenario: dict[str, Any]) 
     try:
         apartment = Apartment.objects.select_related("lease").get(pk=apartment_id)
         current_value = apartment.lease.rental_value
-    except Apartment.DoesNotExist, Lease.DoesNotExist:
+    except ObjectDoesNotExist:
         return
     delta = new_value - current_value
     for entry in projection:
@@ -260,7 +262,7 @@ def _db_remove_tenant(projection: list[dict[str, Any]], scenario: dict[str, Any]
     try:
         apartment = Apartment.objects.select_related("lease").get(pk=apartment_id)
         rental_value = apartment.lease.rental_value
-    except Apartment.DoesNotExist, Lease.DoesNotExist:
+    except ObjectDoesNotExist:
         return
     for entry in projection:
         entry["income_total"] -= rental_value

@@ -162,7 +162,37 @@
 
 ---
 
-## Resumo Visual
+### Wave 11 — Correções Pós-Auditoria (sequencial)
+| Sessão | Descrição | Dependência | Gaps cobertos |
+|--------|-----------|-------------|---------------|
+| **16** | Backend: Correções críticas + gaps de serviço | 15 | #1,2,3,4,6,7,8 |
+| **17** | Frontend: Schemas, hooks e interfaces corrigidos | 16 | #5,9,10,11,12,16 |
+
+> Sequencial: 17 depende das correções backend de 16.
+
+---
+
+### Wave 12 — Novas Páginas (paralela parcial)
+| Sessão | Descrição | Dependência | Gaps cobertos |
+|--------|-----------|-------------|---------------|
+| **18** | Página de Pagamentos a Pessoas + PersonSummaryCards | 17 | #13,14,15 |
+| **19** | Controle Diário de Entradas e Saídas | 17 | Nova funcionalidade |
+
+> **Paralelo**: 18 e 19 criam páginas em diretórios diferentes.
+> Ambas dependem de 17 (hooks corrigidos).
+
+---
+
+### Wave 13 — Polish Final
+| Sessão | Descrição | Dependência |
+|--------|-----------|-------------|
+| **20** | PersonIncome page + Testes E2E + Polish | 18, 19 |
+
+> Verifica tudo, testa tudo, fecha todos os gaps restantes (#16).
+
+---
+
+## Resumo Visual (Atualizado)
 
 ```
 Wave    Sessões                     Trabalhadores    Duração
@@ -177,12 +207,38 @@ Wave    Sessões                     Trabalhadores    Duração
   8     [11] + [12] + [13]               3          1 sessão
   9     [14]                              1          1 sessão
  10     [15]                              1          1 sessão
+ 11     [16] → [17]                       1          2 sessões
+ 12     [18] + [19]                       2          1 sessão
+ 13     [20]                              1          1 sessão
                                                     ─────────
-                                          Total:    11 sessões
-                                          (vs 15 sessões sequencial)
+                                          Total:    15 sessões
+                                          (vs 20 sessões sequencial)
 ```
 
-**Economia**: 4 sessões (~27%) com paralelismo nas Waves 2, 3 e 8.
+**Economia**: 5 sessões (~25%) com paralelismo nas Waves 2, 3, 8 e 12.
+
+## Cobertura de Gaps
+
+| Gap | Sev | Sessão | Descrição |
+|-----|-----|--------|-----------|
+| 7 | Crítico | 16 | SyntaxError simulation_service.py |
+| 1 | Médio | 16 | Fixed expenses com pessoa no person_summary |
+| 2 | Médio | 16 | end_date no Expense |
+| 3 | Baixo | 16 | utility_bills is_offset filter |
+| 4 | Médio | 16 | Projeção parcelas is_offset filter |
+| 6 | Baixo | 16 | category_breakdown is_offset filter |
+| 8 | Baixo | 16 | Simulação base exclui offsets |
+| 5 | Alto | 17 | PersonSummary interface corrigida |
+| 9 | Alto | 17 | CashFlowMonth interface corrigida |
+| 10 | Alto | 17 | expense.schema.ts is_offset |
+| 11 | Alto | 17 | person-payment.schema.ts criado |
+| 12 | Alto | 17 | use-person-payments.ts hook |
+| 16 | Médio | 17 | use-person-incomes.ts hook |
+| 13 | Alto | 18 | Página PersonPayments |
+| 14 | Alto | 18 | PersonSummaryCards atualizado |
+| 15 | Alto | 18 | is_offset toggle no expense form |
+
+**16/16 gaps cobertos. Zero pendentes.**
 
 ---
 
