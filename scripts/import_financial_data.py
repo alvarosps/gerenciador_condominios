@@ -273,7 +273,7 @@ class FinancialDataImporter:
                     income_type="apartment_rent",
                     apartment=apt,
                     defaults={
-                        "start_date": self._parse_date(item["data_inicio"]),
+                        "start_date": self._require_date(item["data_inicio"], "data_inicio", f"recebimento {item['pessoa']}"),
                         "end_date": self._parse_date(item.get("data_fim")),
                         "is_active": True,
                         "notes": item.get("notas", ""),
@@ -290,7 +290,7 @@ class FinancialDataImporter:
                     income_type="fixed_stipend",
                     defaults={
                         "fixed_amount": Decimal(str(item["valor"])),
-                        "start_date": self._parse_date(item["data_inicio"]),
+                        "start_date": self._require_date(item["data_inicio"], "data_inicio", f"estipêndio {item['pessoa']}"),
                         "end_date": self._parse_date(item.get("data_fim")),
                         "is_active": True,
                         "notes": item.get("notas", ""),
@@ -614,7 +614,7 @@ class FinancialDataImporter:
                             description=f"{type_name} - Prédio {item['predio_street_number']} - {entry['mes'][:7]}",
                             expense_type=bill_type,
                             total_amount=Decimal(str(entry["valor"])),
-                            expense_date=self._parse_date(entry["mes"]),
+                            expense_date=self._require_date(entry["mes"], "mes", f"{type_name} prédio {item['predio_street_number']}"),
                             building=building,
                             is_installment=False,
                             is_paid=entry.get("pago", False),
@@ -727,7 +727,7 @@ class FinancialDataImporter:
                     description=item["descricao"],
                     expense_type="fixed_expense",
                     total_amount=Decimal(str(item["valor_mensal"])),
-                    expense_date=self._parse_date(item["data_inicio"]),
+                    expense_date=self._require_date(item["data_inicio"], "data_inicio", item["descricao"]),
                     building=building,
                     category=category,
                     is_installment=False,
@@ -760,7 +760,7 @@ class FinancialDataImporter:
                     description=item["descricao"],
                     expense_type="one_time_expense",
                     total_amount=Decimal(str(item["valor"])),
-                    expense_date=self._parse_date(item["data"]),
+                    expense_date=self._require_date(item["data"], "data", item["descricao"]),
                     person=person,
                     credit_card=card,
                     building=building,
@@ -789,7 +789,7 @@ class FinancialDataImporter:
                 Income.objects.create(
                     description=item["descricao"],
                     amount=Decimal(str(item["valor_mensal"])),
-                    income_date=self._parse_date(item["data_inicio"]),
+                    income_date=self._require_date(item["data_inicio"], "data_inicio", item["descricao"]),
                     person=person,
                     is_recurring=True,
                     expected_monthly_amount=Decimal(str(item["valor_mensal"])),
@@ -806,7 +806,7 @@ class FinancialDataImporter:
                 Income.objects.create(
                     description=item["descricao"],
                     amount=Decimal(str(item["valor"])),
-                    income_date=self._parse_date(item["data"]),
+                    income_date=self._require_date(item["data"], "data", item["descricao"]),
                     person=person,
                     building=building,
                     is_recurring=False,
@@ -829,10 +829,10 @@ class FinancialDataImporter:
             if not self.dry_run:
                 RentPayment.objects.update_or_create(
                     lease=lease,
-                    reference_month=self._parse_date(item["mes_referencia"]),
+                    reference_month=self._require_date(item["mes_referencia"], "mes_referencia", f"aluguel apto {item['apartamento_number']}"),
                     defaults={
                         "amount_paid": Decimal(str(item["valor_pago"])),
-                        "payment_date": self._parse_date(item["data_pagamento"]),
+                        "payment_date": self._require_date(item["data_pagamento"], "data_pagamento", f"aluguel apto {item['apartamento_number']}"),
                         "notes": item.get("notas", ""),
                     },
                 )
@@ -851,7 +851,7 @@ class FinancialDataImporter:
             if not self.dry_run:
                 EmployeePayment.objects.update_or_create(
                     person=person,
-                    reference_month=self._parse_date(item["mes_referencia"]),
+                    reference_month=self._require_date(item["mes_referencia"], "mes_referencia", f"pagamento {item['pessoa']}"),
                     defaults={
                         "base_salary": Decimal(str(item["salario_base"])),
                         "variable_amount": Decimal(str(item.get("valor_variavel", 0))),

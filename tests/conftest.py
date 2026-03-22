@@ -159,7 +159,7 @@ def mock_chrome_path(monkeypatch):
 @pytest.fixture
 def mock_pdf_generation(mocker, mock_pdf_output_dir):
     """
-    Mocks the PDF generation process to avoid actually launching Chrome/pyppeteer.
+    Mocks the PDF generation process to avoid actually launching Chrome/Playwright.
     This allows the generate_contract code to execute without external dependencies.
 
     Usage:
@@ -167,12 +167,13 @@ def mock_pdf_generation(mocker, mock_pdf_output_dir):
             response = client.post('/api/leases/1/generate_contract/')
             assert response.status_code == 200
     """
-    # Mock asyncio.run to prevent actual pyppeteer execution
-    # The mock will allow the code to run but skip the async PDF generation
-    mock_run = mocker.patch("core.views.asyncio.run")
-    mock_run.return_value = None  # Simulate successful PDF generation
+    # Mock Playwright's sync_playwright to prevent actual browser launch
+    mock_playwright = mocker.patch(
+        "core.services.contract_service.ContractService.generate_pdf_from_html"
+    )
+    mock_playwright.return_value = None
 
-    return mock_run
+    return mock_playwright
 
 
 @pytest.fixture

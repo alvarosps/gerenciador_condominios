@@ -42,6 +42,7 @@ python -m pytest tests/unit/                  # Só unit tests
 python -m pytest --cov=core --cov-report=html # Com coverage
 ruff check && ruff format --check              # Lint/format (replaces black, isort, flake8)
 mypy core/                                     # Type checking with django-stubs
+pyright                                        # Strict type checking (pyrightconfig.json)
 
 # Frontend (cd frontend/)
 npm run dev                                   # http://localhost:4000
@@ -63,6 +64,16 @@ npm run lint && npm run type-check            # ESLint + TypeScript
 - Late fee: 5% ao dia × (rental_value ÷ 30) × days_late — lógica em `fee_calculator.py`
 - Furniture no contrato = Apartment furniture − Tenant furniture
 - PDFs salvos em: `contracts/{building_number}/contract_apto_{apt_number}_{lease_id}.pdf`
+
+## Princípios de Design — OBRIGATÓRIO
+
+- CRITICAL: **SOLID, DRY, KISS, YAGNI, Clean Code** — sempre, sem exceções, sem preguiça
+- CRITICAL: **Sem workarounds** — corrija o problema na raiz, corretamente
+- CRITICAL: **Sem quick wins** — toda mudança deve ser feita da forma correta, mesmo que leve mais tempo
+- CRITICAL: **Sem backwards compatibility** — código legado não é mantido; ao refatorar, atualize TODOS os consumidores e efeitos colaterais
+- CRITICAL: **Sem re-exports** — importe da fonte, nunca crie barrel files ou wrappers de re-exportação
+- CRITICAL: **Refatoração completa** — ao mudar uma interface/assinatura/padrão, atualize TODOS os usos no codebase inteiro
+- Ver regras completas em `.claude/rules/design-principles.md`
 
 ## Convenções
 
