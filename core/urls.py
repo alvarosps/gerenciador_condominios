@@ -11,13 +11,21 @@ from .views import (
     TenantViewSet,
 )
 from .viewsets import (
+    CashFlowViewSet,
     ContractRuleViewSet,
     ContractTemplateViewSet,
     CreditCardViewSet,
+    EmployeePaymentViewSet,
     ExpenseCategoryViewSet,
+    ExpenseInstallmentViewSet,
+    ExpenseViewSet,
+    FinancialDashboardViewSet,
     FinancialSettingsViewSet,
+    IncomeViewSet,
     LandlordViewSet,
+    PersonIncomeViewSet,
     PersonViewSet,
+    RentPaymentViewSet,
 )
 
 router = DefaultRouter()
@@ -36,6 +44,14 @@ router.register(r"persons", PersonViewSet, basename="persons")
 router.register(r"credit-cards", CreditCardViewSet, basename="credit-cards")
 router.register(r"expense-categories", ExpenseCategoryViewSet, basename="expense-categories")
 router.register(r"financial-settings", FinancialSettingsViewSet, basename="financial-settings")
+router.register(r"expenses", ExpenseViewSet, basename="expenses")
+router.register(r"expense-installments", ExpenseInstallmentViewSet, basename="expense-installments")
+router.register(r"incomes", IncomeViewSet, basename="incomes")
+router.register(r"rent-payments", RentPaymentViewSet, basename="rent-payments")
+router.register(r"employee-payments", EmployeePaymentViewSet, basename="employee-payments")
+router.register(r"person-incomes", PersonIncomeViewSet, basename="person-incomes")
+router.register(r"financial-dashboard", FinancialDashboardViewSet, basename="financial-dashboard")
+router.register(r"cash-flow", CashFlowViewSet, basename="cash-flow")
 
 urlpatterns = [
     path("api/", include(router.urls)),

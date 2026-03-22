@@ -1,0 +1,186 @@
+"""Financial dashboard and cash flow ViewSets — read-only endpoints for aggregated metrics."""
+
+from datetime import date
+
+from rest_framework import status, viewsets
+from rest_framework.decorators import action
+from rest_framework.request import Request
+from rest_framework.response import Response
+
+from core.models import Person
+from core.permissions import IsAdminUser, ReadOnlyForNonAdmin
+from core.services.cash_flow_service import MONTHS_IN_YEAR, CashFlowService
+from core.services.financial_dashboard_service import FinancialDashboardService
+from core.services.simulation_service import SimulationService
+
+_DEFAULT_UPCOMING_DAYS = 30
+_DEFAULT_PROJECTION_MONTHS = 12
+
+
+class FinancialDashboardViewSet(viewsets.ViewSet):
+    """Read-only ViewSet exposing FinancialDashboardService aggregations."""
+
+    permission_classes = [ReadOnlyForNonAdmin]
+
+    @action(detail=False, methods=["get"])
+    def overview(self, request: Request) -> Response:
+        data = FinancialDashboardService.get_overview()
+        return Response(data, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["get"])
+    def debt_by_person(self, request: Request) -> Response:
+        data = FinancialDashboardService.get_debt_by_person()
+        return Response(data, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["get"])
+    def debt_by_type(self, request: Request) -> Response:
+        data = FinancialDashboardService.get_debt_by_type()
+        return Response(data, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["get"])
+    def upcoming_installments(self, request: Request) -> Response:
+        try:
+            days = int(request.query_params.get("days", _DEFAULT_UPCOMING_DAYS))
+        except ValueError:
+            return Response(
+                {"error": "O parâmetro 'days' deve ser um inteiro válido."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        data = FinancialDashboardService.get_upcoming_installments(days=days)
+        return Response(data, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["get"])
+    def overdue_installments(self, request: Request) -> Response:
+        data = FinancialDashboardService.get_overdue_installments()
+        return Response(data, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["get"])
+    def category_breakdown(self, request: Request) -> Response:
+        today = date.today()
+        try:
+            year = int(request.query_params.get("year", today.year))
+            month = int(request.query_params.get("month", today.month))
+        except ValueError:
+            return Response(
+                {"error": "Os parâmetros 'year' e 'month' devem ser inteiros válidos."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        data = FinancialDashboardService.get_expense_category_breakdown(year=year, month=month)
+        return Response(data, status=status.HTTP_200_OK)
+
+
+class CashFlowViewSet(viewsets.ViewSet):
+    """ViewSet for cash flow calculation and simulation endpoints."""
+
+    permission_classes = [ReadOnlyForNonAdmin]
+
+    @action(detail=False, methods=["get"])
+    def monthly(self, request: Request) -> Response:
+        year_str = request.query_params.get("year")
+        month_str = request.query_params.get("month")
+
+        if year_str is None or month_str is None:
+            return Response(
+                {"error": "Os parâmetros 'year' e 'month' são obrigatórios."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            year = int(year_str)
+            month = int(month_str)
+        except ValueError:
+            return Response(
+                {"error": "Os parâmetros 'year' e 'month' devem ser inteiros."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not (1 <= month <= MONTHS_IN_YEAR):
+            return Response(
+                {"error": "O parâmetro 'month' deve estar entre 1 e 12."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        result = CashFlowService.get_monthly_cash_flow(year, month)
+        return Response(result, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["get"])
+    def projection(self, request: Request) -> Response:
+        months_str = request.query_params.get("months", str(_DEFAULT_PROJECTION_MONTHS))
+
+        try:
+            months = int(months_str)
+        except ValueError:
+            return Response(
+                {"error": "O parâmetro 'months' deve ser um inteiro."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if months < 1:
+            return Response(
+                {"error": "O parâmetro 'months' deve ser maior que zero."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        result = CashFlowService.get_cash_flow_projection(months)
+        return Response(result, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["get"], url_path="person_summary")
+    def person_summary(self, request: Request) -> Response:
+        person_id_str = request.query_params.get("person_id")
+        year_str = request.query_params.get("year")
+        month_str = request.query_params.get("month")
+
+        if person_id_str is None:
+            return Response(
+                {"error": "O parâmetro 'person_id' é obrigatório."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if year_str is None or month_str is None:
+            return Response(
+                {"error": "Os parâmetros 'year' e 'month' são obrigatórios."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            person_id = int(person_id_str)
+            year = int(year_str)
+            month = int(month_str)
+        except ValueError:
+            return Response(
+                {"error": "Os parâmetros 'person_id', 'year' e 'month' devem ser inteiros."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            result = CashFlowService.get_person_summary(person_id, year, month)
+        except Person.DoesNotExist:
+            return Response(
+                {"error": "Pessoa não encontrada."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        return Response(result, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["post"], permission_classes=[IsAdminUser])
+    def simulate(self, request: Request) -> Response:
+        scenarios = request.data.get("scenarios")
+
+        if not isinstance(scenarios, list) or len(scenarios) == 0:
+            return Response(
+                {"error": "O campo 'scenarios' é obrigatório e deve ser uma lista não vazia."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        errors = SimulationService.validate_scenarios(scenarios)
+        if errors:
+            return Response({"errors": errors}, status=status.HTTP_400_BAD_REQUEST)
+
+        base = CashFlowService.get_cash_flow_projection(_DEFAULT_PROJECTION_MONTHS)
+        simulated = SimulationService.simulate_from_db(base, scenarios)
+        comparison = SimulationService.compare(base, simulated)
+
+        return Response(
+            {"base": base, "simulated": simulated, "comparison": comparison},
+            status=status.HTTP_200_OK,
+        )
