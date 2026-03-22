@@ -41,8 +41,8 @@ describe('useCashFlowProjection', () => {
     expect(Array.isArray(result.current.data)).toBe(true);
     expect(result.current.data?.length).toBeGreaterThan(0);
     const firstMonth = result.current.data?.[0];
-    expect(firstMonth?.projected_income).toBeDefined();
-    expect(firstMonth?.projected_expenses).toBeDefined();
+    expect(firstMonth?.income_total).toBeDefined();
+    expect(firstMonth?.expenses_total).toBeDefined();
   });
 });
 

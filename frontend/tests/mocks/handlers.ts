@@ -682,29 +682,35 @@ const financialDashboardHandlers = [
   http.get(`${API_BASE}/financial-dashboard/overview/`, async () => {
     await delay(50);
     return HttpResponse.json({
-      total_expenses: 5200.0,
-      total_income: 12000.0,
-      net_balance: 6800.0,
-      pending_expenses: 3,
-      pending_income: 1,
-      overdue_installments: 2,
+      current_month_balance: 6800.0,
+      current_month_income: 12000.0,
+      current_month_expenses: 5200.0,
+      total_debt: 2300.0,
+      total_monthly_obligations: 3200.0,
+      total_monthly_income: 12000.0,
+      months_until_break_even: null,
     });
   }),
 
   http.get(`${API_BASE}/financial-dashboard/debt_by_person/`, async () => {
     await delay(50);
     return HttpResponse.json([
-      { person_id: 1, person_name: 'Rodrigo Souza', total_debt: 1500.0 },
-      { person_id: 3, person_name: 'Alvaro Souza', total_debt: 800.0 },
+      { person_id: 1, person_name: 'Rodrigo Souza', card_debt: 1000.0, loan_debt: 500.0, total_debt: 1500.0, monthly_card: 200.0, monthly_loan: 100.0, cards_count: 2 },
+      { person_id: 3, person_name: 'Alvaro Souza', card_debt: 800.0, loan_debt: 0, total_debt: 800.0, monthly_card: 150.0, monthly_loan: 0, cards_count: 3 },
     ]);
   }),
 
   http.get(`${API_BASE}/financial-dashboard/debt_by_type/`, async () => {
     await delay(50);
-    return HttpResponse.json([
-      { expense_type: 'card_purchase', total: 2500.0 },
-      { expense_type: 'fixed_expense', total: 1200.0 },
-    ]);
+    return HttpResponse.json({
+      card_purchases: 2500.0,
+      bank_loans: 700.0,
+      personal_loans: 500.0,
+      water_debt: 0,
+      electricity_debt: 0,
+      property_tax_debt: 0,
+      total: 3700.0,
+    });
   }),
 
   http.get(`${API_BASE}/financial-dashboard/upcoming_installments/`, async () => {
@@ -713,10 +719,14 @@ const financialDashboardHandlers = [
       {
         id: 2,
         expense_description: 'Supermercado Extra',
+        expense_type: 'card_purchase',
+        person_name: 'Alvaro Souza',
+        credit_card_nickname: 'Trigg',
         installment_number: 2,
         total_installments: 3,
         amount: '150.00',
         due_date: '2026-04-10',
+        days_until_due: 19,
       },
     ]);
   }),
@@ -729,9 +739,9 @@ const financialDashboardHandlers = [
   http.get(`${API_BASE}/financial-dashboard/category_breakdown/`, async () => {
     await delay(50);
     return HttpResponse.json([
-      { category_name: 'Pessoal', total: 2500.0, percentage: 48.1 },
-      { category_name: 'Kitnets', total: 1700.0, percentage: 32.7 },
-      { category_name: 'Carros', total: 1000.0, percentage: 19.2 },
+      { category_id: 1, category_name: 'Pessoal', color: '#3b82f6', total: 2500.0, percentage: 48.1, count: 5 },
+      { category_id: 2, category_name: 'Kitnets', color: '#10b981', total: 1700.0, percentage: 32.7, count: 3 },
+      { category_id: 3, category_name: 'Carros', color: '#f59e0b', total: 1000.0, percentage: 19.2, count: 2 },
     ]);
   }),
 ];
@@ -758,9 +768,9 @@ const cashFlowHandlers = [
   http.get(`${API_BASE}/cash-flow/projection/`, async () => {
     await delay(50);
     return HttpResponse.json([
-      { year: 2026, month: 3, projected_income: 12000.0, projected_expenses: 5200.0, projected_balance: 16800.0 },
-      { year: 2026, month: 4, projected_income: 12000.0, projected_expenses: 5100.0, projected_balance: 23700.0 },
-      { year: 2026, month: 5, projected_income: 12000.0, projected_expenses: 5000.0, projected_balance: 30700.0 },
+      { year: 2026, month: 3, income_total: 12000.0, expenses_total: 5200.0, balance: 6800.0, cumulative_balance: 16800.0, is_projected: false },
+      { year: 2026, month: 4, income_total: 12000.0, expenses_total: 5100.0, balance: 6900.0, cumulative_balance: 23700.0, is_projected: true },
+      { year: 2026, month: 5, income_total: 12000.0, expenses_total: 5000.0, balance: 7000.0, cumulative_balance: 30700.0, is_projected: true },
     ]);
   }),
 

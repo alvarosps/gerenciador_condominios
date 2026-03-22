@@ -2,18 +2,24 @@ import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '../client';
 
 export interface FinancialOverview {
-  total_expenses: number;
-  total_income: number;
-  net_balance: number;
-  pending_expenses: number;
-  pending_income: number;
-  overdue_installments: number;
+  current_month_balance: number;
+  current_month_income: number;
+  current_month_expenses: number;
+  total_debt: number;
+  total_monthly_obligations: number;
+  total_monthly_income: number;
+  months_until_break_even: number | null;
 }
 
 export interface DebtByPerson {
   person_id: number;
   person_name: string;
+  card_debt: number;
+  loan_debt: number;
   total_debt: number;
+  monthly_card: number;
+  monthly_loan: number;
+  cards_count: number;
 }
 
 export interface DebtByType {
@@ -24,16 +30,24 @@ export interface DebtByType {
 export interface UpcomingInstallment {
   id: number;
   expense_description: string;
+  expense_type: string;
+  person_name: string | null;
+  credit_card_nickname: string | null;
   installment_number: number;
   total_installments: number;
   amount: string;
   due_date: string;
+  days_until_due?: number;
+  days_overdue?: number;
 }
 
 export interface CategoryBreakdown {
+  category_id: number | null;
   category_name: string;
+  color: string;
   total: number;
   percentage: number;
+  count: number;
 }
 
 const STALE_TIME = 1000 * 60 * 5;
