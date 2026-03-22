@@ -153,7 +153,7 @@ export default function TenantsPage() {
       width: 120,
       align: 'center',
       render: (_, record: Tenant) => {
-        const count = record.dependents?.length || 0;
+        const count = record.dependents?.length ?? 0;
         return (
           <div className="flex items-center gap-2 justify-center">
             <Users className="h-5 w-5 text-muted-foreground" />
@@ -166,7 +166,7 @@ export default function TenantsPage() {
           </div>
         );
       },
-      sorter: (a: Tenant, b: Tenant) => (a.dependents?.length || 0) - (b.dependents?.length || 0),
+      sorter: (a: Tenant, b: Tenant) => (a.dependents?.length ?? 0) - (b.dependents?.length ?? 0),
     },
     {
       title: 'Móveis',
@@ -174,7 +174,7 @@ export default function TenantsPage() {
       width: 100,
       align: 'center',
       render: (_, record: Tenant) => {
-        const count = record.furnitures?.length || 0;
+        const count = record.furnitures?.length ?? 0;
         return (
           <div className="flex items-center gap-2 justify-center">
             <User className="h-5 w-5 text-muted-foreground" />
