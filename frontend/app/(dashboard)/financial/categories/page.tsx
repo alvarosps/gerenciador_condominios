@@ -12,6 +12,7 @@ import {
 } from '@/lib/api/hooks/use-expense-categories';
 import { type ExpenseCategory } from '@/lib/schemas/expense-category.schema';
 import { useCrudPage } from '@/lib/hooks/use-crud-page';
+import { useAuthStore } from '@/store/auth-store';
 
 interface FlatCategory {
   [key: string]: unknown;
@@ -56,6 +57,8 @@ function flattenCategories(categories: ExpenseCategory[]): FlatCategory[] {
 }
 
 export default function CategoriesPage() {
+  const { user } = useAuthStore();
+  const isAdmin = user?.is_staff ?? false;
   const { data: categories, isLoading, error } = useExpenseCategories();
   const deleteMutation = useDeleteExpenseCategory();
 
@@ -120,42 +123,46 @@ export default function CategoriesPage() {
         return <span>{record.parent_name}</span>;
       },
     },
-    {
-      title: 'Ações',
-      key: 'actions',
-      width: 150,
-      fixed: 'right',
-      render: (_, record) => (
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              const original = findOriginalCategory(record.id);
-              if (original) crud.openEditModal(original);
-            }}
-          >
-            <Pencil className="h-4 w-4 mr-1" />
-            Editar
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              const original = findOriginalCategory(record.id);
-              if (original) {
-                crud.setItemToDelete(original);
-                if (record.id !== undefined) crud.handleDeleteClick(record.id);
-              }
-            }}
-            disabled={crud.isDeleting}
-          >
-            <Trash2 className="h-4 w-4 mr-1" />
-            Excluir
-          </Button>
-        </div>
-      ),
-    },
+    ...(isAdmin
+      ? [
+          {
+            title: 'Ações',
+            key: 'actions',
+            width: 150,
+            fixed: 'right' as const,
+            render: (_: unknown, record: FlatCategory) => (
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    const original = findOriginalCategory(record.id);
+                    if (original) crud.openEditModal(original);
+                  }}
+                >
+                  <Pencil className="h-4 w-4 mr-1" />
+                  Editar
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    const original = findOriginalCategory(record.id);
+                    if (original) {
+                      crud.setItemToDelete(original);
+                      if (record.id !== undefined) crud.handleDeleteClick(record.id);
+                    }
+                  }}
+                  disabled={crud.isDeleting}
+                >
+                  <Trash2 className="h-4 w-4 mr-1" />
+                  Excluir
+                </Button>
+              </div>
+            ),
+          },
+        ]
+      : []),
   ];
 
   if (error) {
@@ -169,10 +176,12 @@ export default function CategoriesPage() {
           <h1 className="text-2xl font-bold">Categorias de Despesas</h1>
           <p className="text-gray-600 mt-1">Gerencie as categorias e subcategorias de despesas</p>
         </div>
-        <Button onClick={crud.openCreateModal}>
-          <Plus className="h-4 w-4 mr-2" />
-          Nova Categoria
-        </Button>
+        {isAdmin && (
+          <Button onClick={crud.openCreateModal}>
+            <Plus className="h-4 w-4 mr-2" />
+            Nova Categoria
+          </Button>
+        )}
       </div>
 
       <DataTable<FlatCategory>

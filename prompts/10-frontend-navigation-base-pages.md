@@ -78,13 +78,16 @@ Seguir exatamente o padrão de `buildings/page.tsx`:
    - Botão "Remover" por cartão
    - Usa `useCreateCreditCard()`, `useDeleteCreditCard()` diretamente
 
-### Página de Categorias (CRUD simples)
+### Página de Categorias (CRUD com hierarquia)
 
-Página mínima seguindo padrão:
-1. `useExpenseCategories()` para dados
+Categorias suportam subcategorias via campo `parent` (FK para si mesma).
+
+1. `useExpenseCategories()` para dados — retorna árvore com `subcategories` aninhadas
 2. `useDeleteExpenseCategory()` para mutation
-3. Colunas: Nome, Descrição, Cor (preview), Ações
-4. `CategoryFormModal` com campos: name, description, color (input type="color")
+3. Exibição hierárquica: mostrar categorias principais com subcategorias indentadas abaixo
+4. Colunas: Nome (com indentação para subcategorias), Descrição, Cor (preview), Pai, Ações
+5. `CategoryFormModal` com campos: name, description, color (input type="color"), parent_id (select opcional — lista categorias principais)
+6. Ao criar subcategoria, herdar cor do pai como default
 
 ### Página de Configurações Financeiras
 

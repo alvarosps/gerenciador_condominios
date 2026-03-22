@@ -19,6 +19,7 @@ from .financial_views import (
     FinancialSettingsViewSet,
     IncomeViewSet,
     PersonIncomeViewSet,
+    PersonPaymentViewSet,
     PersonViewSet,
     RentPaymentViewSet,
 )
@@ -40,6 +41,7 @@ __all__ = [
     "IncomeViewSet",
     "LandlordViewSet",
     "PersonIncomeViewSet",
+    "PersonPaymentViewSet",
     "PersonViewSet",
     "RentPaymentViewSet",
 ]

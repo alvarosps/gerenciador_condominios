@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { useMonthlyCashFlow, useCashFlowProjection } from '../use-cash-flow';
-import { useSimulation } from '../use-simulation';
 import { createWrapper } from '@/tests/test-utils';
 
 describe('useMonthlyCashFlow', () => {
@@ -43,25 +42,5 @@ describe('useCashFlowProjection', () => {
     const firstMonth = result.current.data?.[0];
     expect(firstMonth?.income_total).toBeDefined();
     expect(firstMonth?.expenses_total).toBeDefined();
-  });
-});
-
-describe('useSimulation', () => {
-  it('should send scenarios and return result', async () => {
-    const { result } = renderHook(() => useSimulation(), {
-      wrapper: createWrapper(),
-    });
-
-    result.current.mutate([
-      { name: 'Cenário Otimista' },
-      { name: 'Cenário Pessimista' },
-    ]);
-
-    await waitFor(() => expect(result.current.isSuccess).toBe(true));
-
-    expect(result.current.data?.results).toHaveLength(2);
-    const firstResult = result.current.data?.results[0];
-    expect(firstResult?.scenario_name).toBe('Cenário Otimista');
-    expect(firstResult?.months).toBeDefined();
   });
 });

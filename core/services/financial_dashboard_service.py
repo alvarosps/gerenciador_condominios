@@ -51,12 +51,13 @@ class FinancialDashboardService:
         current_month_expenses = cash_flow["expenses"]["total"]
         current_month_balance = cash_flow["balance"]
 
-        # Total debt: all unpaid installments (future or past)
+        # Total debt: all unpaid installments (excluding offsets — those are discounts, not real debt)
         total_debt = ExpenseInstallment.objects.filter(
             is_paid=False,
+            expense__is_offset=False,
         ).aggregate(total=Coalesce(Sum("amount"), Decimal("0.00")))["total"]
 
-        # Monthly obligations estimate: installments due this month (unpaid)
+        # Monthly obligations estimate: installments due this month (unpaid, excluding offsets)
         month_start = date(year, month, 1)
         next_month = _next_month_start(year, month)
 
@@ -64,6 +65,7 @@ class FinancialDashboardService:
             due_date__gte=month_start,
             due_date__lt=next_month,
             is_paid=False,
+            expense__is_offset=False,
         ).aggregate(total=Coalesce(Sum("amount"), Decimal("0.00")))["total"]
 
         total_monthly_income = current_month_income
@@ -119,6 +121,7 @@ class FinancialDashboardService:
             unpaid_installments = ExpenseInstallment.objects.filter(
                 expense__person=person,
                 is_paid=False,
+                expense__is_offset=False,
             )
 
             card_debt = unpaid_installments.filter(
@@ -129,10 +132,11 @@ class FinancialDashboardService:
                 expense__expense_type__in=[ExpenseType.BANK_LOAN, ExpenseType.PERSONAL_LOAN],
             ).aggregate(total=Coalesce(Sum("amount"), Decimal("0.00")))["total"]
 
-            # Monthly amounts (this month only)
+            # Monthly amounts (this month only, excluding offsets)
             monthly_card = ExpenseInstallment.objects.filter(
                 expense__person=person,
                 expense__expense_type=ExpenseType.CARD_PURCHASE,
+                expense__is_offset=False,
                 due_date__gte=month_start,
                 due_date__lt=next_month,
                 is_paid=False,
@@ -141,6 +145,7 @@ class FinancialDashboardService:
             monthly_loan = ExpenseInstallment.objects.filter(
                 expense__person=person,
                 expense__expense_type__in=[ExpenseType.BANK_LOAN, ExpenseType.PERSONAL_LOAN],
+                expense__is_offset=False,
                 due_date__gte=month_start,
                 due_date__lt=next_month,
                 is_paid=False,
@@ -171,7 +176,7 @@ class FinancialDashboardService:
     @staticmethod
     def get_debt_by_type() -> dict[str, Decimal]:
         """Return total unpaid debt grouped by expense type."""
-        unpaid = ExpenseInstallment.objects.filter(is_paid=False)
+        unpaid = ExpenseInstallment.objects.filter(is_paid=False, expense__is_offset=False)
 
         card_purchases = unpaid.filter(
             expense__expense_type=ExpenseType.CARD_PURCHASE,
@@ -229,6 +234,7 @@ class FinancialDashboardService:
                 due_date__gte=today,
                 due_date__lte=end_date,
                 is_paid=False,
+                expense__is_offset=False,
             )
             .select_related("expense", "expense__person", "expense__credit_card")
             .order_by("due_date")
@@ -261,6 +267,7 @@ class FinancialDashboardService:
             ExpenseInstallment.objects.filter(
                 due_date__lt=today,
                 is_paid=False,
+                expense__is_offset=False,
             )
             .select_related("expense", "expense__person", "expense__credit_card")
             .order_by("due_date")

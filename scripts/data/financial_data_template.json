@@ -13,61 +13,107 @@
     "notas": "Saldo inicial estimado em março/2026"
   },
 
-  "categorias": [
-    {
-      "nome": "Manutenção",
-      "cor": "#EF4444",
-      "descricao": "Reparos e manutenção dos prédios"
-    },
-    {
-      "nome": "Material de Construção",
-      "cor": "#F97316",
-      "descricao": "Cimento, tinta, ferragens, etc."
-    },
-    {
-      "nome": "Mercado",
-      "cor": "#22C55E",
-      "descricao": "Compras de supermercado"
-    },
-    {
-      "nome": "Farmácia",
-      "cor": "#06B6D4",
-      "descricao": "Medicamentos e produtos de farmácia"
-    },
-    { "nome": "Gasolina", "cor": "#8B5CF6", "descricao": "Combustível" },
-    {
-      "nome": "Ração/Sítio",
-      "cor": "#A3E635",
-      "descricao": "Ração para galinhas e despesas do sítio"
-    },
-    {
-      "nome": "Pessoal",
-      "cor": "#EC4899",
-      "descricao": "Gastos pessoais dos sogros"
-    },
-    { "nome": "Vestuário", "cor": "#F59E0B", "descricao": "Roupas e calçados" },
-    {
-      "nome": "Saúde",
-      "cor": "#14B8A6",
-      "descricao": "Consultas, exames, tratamentos"
-    },
-    {
-      "nome": "Eletrodoméstico",
-      "cor": "#6366F1",
-      "descricao": "Geladeira, fogão, etc."
-    },
-    {
-      "nome": "Móveis",
-      "cor": "#78716C",
-      "descricao": "Móveis para os imóveis ou sítio"
-    },
-    { "nome": "Internet", "cor": "#3B82F6", "descricao": "Planos de internet" },
-    {
-      "nome": "Outros",
-      "cor": "#6B7280",
-      "descricao": "Gastos que não se encaixam em outra categoria"
-    }
-  ],
+  "categorias": {
+    "_instrucoes": "Categorias principais (parent=null) e subcategorias (parent=nome do pai). Nos gastos, use a subcategoria quando aplicável, ou a categoria pai se não souber.",
+    "items": [
+      {
+        "nome": "Pessoal",
+        "cor": "#EC4899",
+        "descricao": "Gastos pessoais dos sogros",
+        "parent": null
+      },
+      {
+        "nome": "Saúde",
+        "cor": "#EC4899",
+        "descricao": "Consultas, exames, plano de saúde",
+        "parent": "Pessoal"
+      },
+      {
+        "nome": "Mercado",
+        "cor": "#EC4899",
+        "descricao": "Supermercado, feira, fruteira",
+        "parent": "Pessoal"
+      },
+      {
+        "nome": "Farmácia",
+        "cor": "#EC4899",
+        "descricao": "Medicamentos e produtos de farmácia",
+        "parent": "Pessoal"
+      },
+      {
+        "nome": "Vestuário",
+        "cor": "#EC4899",
+        "descricao": "Roupas e calçados",
+        "parent": "Pessoal"
+      },
+      {
+        "nome": "Carros",
+        "cor": "#8B5CF6",
+        "descricao": "Gastos com veículos",
+        "parent": null
+      },
+      {
+        "nome": "Gasolina",
+        "cor": "#8B5CF6",
+        "descricao": "Combustível",
+        "parent": "Carros"
+      },
+      {
+        "nome": "Pedágio",
+        "cor": "#8B5CF6",
+        "descricao": "Pedágios",
+        "parent": "Carros"
+      },
+      {
+        "nome": "Manutenção Veículo",
+        "cor": "#8B5CF6",
+        "descricao": "Peças, oficina, revisão",
+        "parent": "Carros"
+      },
+      {
+        "nome": "Kitnets",
+        "cor": "#F97316",
+        "descricao": "Gastos com os prédios",
+        "parent": null
+      },
+      {
+        "nome": "Manutenção",
+        "cor": "#F97316",
+        "descricao": "Reparos e manutenção dos prédios",
+        "parent": "Kitnets"
+      },
+      {
+        "nome": "Material de Construção",
+        "cor": "#F97316",
+        "descricao": "Cimento, tinta, ferragens",
+        "parent": "Kitnets"
+      },
+      {
+        "nome": "Internet",
+        "cor": "#F97316",
+        "descricao": "Planos de internet dos prédios",
+        "parent": "Kitnets"
+      },
+      {
+        "nome": "Faxinas",
+        "cor": "#F97316",
+        "descricao": "Faxinas nos kitnets desocupados",
+        "parent": "Kitnets"
+      },
+      {
+        "nome": "Camila",
+        "cor": "#06B6D4",
+        "descricao": "Gastos relacionados à Camila",
+        "parent": null
+      },
+      {
+        "nome": "Ajuda",
+        "cor": "#22C55E",
+        "descricao": "Valores emprestados/adiantados pelos filhos cobrados em parcelas",
+        "parent": null
+      }
+    ]
+  },
 
   "pessoas": [
     {
@@ -114,6 +160,15 @@
       "is_owner": false,
       "is_employee": true,
       "notas": "Mora no kitnet 206 do prédio 850. Aluguel compensado no salário."
+    },
+    {
+      "nome": "Camila",
+      "relacao": "filha",
+      "telefone": "",
+      "email": "",
+      "is_owner": false,
+      "is_employee": false,
+      "notas": ""
     }
   ],
 
@@ -121,25 +176,25 @@
     {
       "pessoa": "Rodrigo",
       "apelido": "Itau Azul Rodrigo",
-      "ultimos_4_digitos": "",
+      "ultimos_4_digitos": "7160",
       "dia_fechamento": 1,
-      "dia_vencimento": 10,
+      "dia_vencimento": 9,
       "ativo": true
     },
     {
       "pessoa": "Rodrigo",
-      "apelido": "_NOME_CARTAO_2_RODRIGO_",
-      "ultimos_4_digitos": "",
-      "dia_fechamento": 1,
-      "dia_vencimento": 10,
+      "apelido": "Itau Visa Rodrigo",
+      "ultimos_4_digitos": "9608",
+      "dia_fechamento": 27,
+      "dia_vencimento": 3,
       "ativo": true
     },
     {
       "pessoa": "Rodrigo",
-      "apelido": "_NOME_CARTAO_3_RODRIGO_",
-      "ultimos_4_digitos": "",
-      "dia_fechamento": 1,
-      "dia_vencimento": 10,
+      "apelido": "Caixa Rodrigo",
+      "ultimos_4_digitos": "5443",
+      "dia_fechamento": 27,
+      "dia_vencimento": 7,
       "ativo": true
     },
     {
@@ -152,7 +207,7 @@
     },
     {
       "pessoa": "Alvaro",
-      "apelido": "_NOME_CARTAO_1_ALVARO_",
+      "apelido": "Trigg Alvaro",
       "ultimos_4_digitos": "",
       "dia_fechamento": 1,
       "dia_vencimento": 10,
@@ -160,7 +215,7 @@
     },
     {
       "pessoa": "Alvaro",
-      "apelido": "_NOME_CARTAO_2_ALVARO_",
+      "apelido": "Players Alvaro",
       "ultimos_4_digitos": "",
       "dia_fechamento": 1,
       "dia_vencimento": 10,
@@ -168,7 +223,15 @@
     },
     {
       "pessoa": "Alvaro",
-      "apelido": "_NOME_CARTAO_3_ALVARO_",
+      "apelido": "Samsung Alvaro",
+      "ultimos_4_digitos": "",
+      "dia_fechamento": 1,
+      "dia_vencimento": 10,
+      "ativo": true
+    },
+    {
+      "pessoa": "Camila",
+      "apelido": "Nubank Camila",
       "ultimos_4_digitos": "",
       "dia_fechamento": 1,
       "dia_vencimento": 10,
@@ -256,6 +319,18 @@
     ]
   },
 
+  "kitnets_desalugados": {
+    "_instrucoes": "Kitnets que estão vagos. O script atualiza is_rented=False e desativa o lease se existir.",
+    "items": [
+      {"predio_street_number": 836, "apartamento_number": 104, "notas": "Reformado, anunciado recentemente"},
+      {"predio_street_number": 836, "apartamento_number": 115, "notas": "Reformado, anunciado recentemente"},
+      {"predio_street_number": 836, "apartamento_number": 116, "notas": "Vaga essa semana (mar/2026)"},
+      {"predio_street_number": 850, "apartamento_number": 103, "notas": "Reformado, anunciado recentemente"},
+      {"predio_street_number": 850, "apartamento_number": 202, "notas": "Reformado, anunciado recentemente"},
+      {"predio_street_number": 850, "apartamento_number": 204, "notas": "Reformado, anunciado recentemente"}
+    ]
+  },
+
   "leases_especiais": {
     "_instrucoes": "Configura leases com comportamento especial.",
     "prepaid": [
@@ -276,19 +351,1351 @@
   },
 
   "compras_cartao": {
-    "_instrucoes": "Cada compra parcelada no cartão. parcela_atual = em qual parcela estamos AGORA (ex: se está pagando 3/10, coloque 3). Para data: use data_compra SE souber a data exata, OU use data_proxima_parcela com a data de vencimento da parcela atual (mais prático para compras antigas). Se ambos forem preenchidos, data_proxima_parcela tem prioridade.",
+    "_instrucoes": "Cada compra no cartão. parcela_atual = parcela sendo cobrada AGORA (ex: 3/10 = coloque 3). Use 0 para compras cuja 1ª parcela vem na próxima fatura. Use -1 para carência de 60 dias (1ª parcela em 2 faturas), -2 para 90 dias, etc. Para data: use data_compra SE souber, OU data_proxima_parcela. Quando parcela_atual <= 0, data_proxima_parcela = data do próximo vencimento do cartão (a 1ª parcela será deslocada conforme a carência). Se ambos preenchidos, data_proxima_parcela tem prioridade.",
     "items": [
+      {
+        "_comentario": "=== ITAU AZUL RODRIGO - Fatura 03/2026 (venc 09/03/2026) ==="
+      },
+      { "_comentario": "--- Compras parceladas ---" },
       {
         "pessoa": "Rodrigo",
         "cartao": "Itau Azul Rodrigo",
-        "descricao": "mega brick",
-        "valor_parcela": 0.0,
+        "descricao": "MEGA BRICK",
+        "valor_parcela": 60.0,
         "parcela_atual": 5,
-        "total_parcelas": 1,
-        "data_compra": null,
-        "data_proxima_parcela": "2026-04-10",
+        "total_parcelas": 10,
+        "data_compra": "2025-10-28",
+        "data_proxima_parcela": "2026-03-09",
+        "categoria": "Kitnets",
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Itau Azul Rodrigo",
+        "descricao": "SHOPEE *Hippie outros Bauru",
+        "valor_parcela": 60.22,
+        "parcela_atual": 3,
+        "total_parcelas": 9,
+        "data_compra": "2025-12-05",
+        "data_proxima_parcela": "2026-03-09",
         "categoria": null,
         "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Itau Azul Rodrigo",
+        "descricao": "PANVEL MATRIZE ELDORADO DO SUL",
+        "valor_parcela": 31.17,
+        "parcela_atual": 3,
+        "total_parcelas": 4,
+        "data_compra": "2025-12-11",
+        "data_proxima_parcela": "2026-03-09",
+        "categoria": "Pessoal",
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Itau Azul Rodrigo",
+        "descricao": "RENNER CABREUVA",
+        "valor_parcela": 43.26,
+        "parcela_atual": 3,
+        "total_parcelas": 6,
+        "data_compra": "2025-12-22",
+        "data_proxima_parcela": "2026-03-09",
+        "categoria": "Camila",
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Itau Azul Rodrigo",
+        "descricao": "LOJAS RENNER SANTA MARIA",
+        "valor_parcela": 50.0,
+        "parcela_atual": 3,
+        "total_parcelas": 3,
+        "data_compra": "2025-12-30",
+        "data_proxima_parcela": "2026-03-09",
+        "categoria": "Camila",
+        "notas": "Última parcela"
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Itau Azul Rodrigo",
+        "descricao": "BRAS ATACADO PORTO ALEGRE",
+        "valor_parcela": 93.8,
+        "parcela_atual": 2,
+        "total_parcelas": 3,
+        "data_compra": "2026-01-06",
+        "data_proxima_parcela": "2026-03-09",
+        "categoria": "Pessoal",
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Itau Azul Rodrigo",
+        "descricao": "SHOPEE *Lapisd Paranavai",
+        "valor_parcela": 74.84,
+        "parcela_atual": 2,
+        "total_parcelas": 2,
+        "data_compra": "2026-01-08",
+        "data_proxima_parcela": "2026-03-09",
+        "categoria": null,
+        "notas": "Última parcela"
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Itau Azul Rodrigo",
+        "descricao": "PANVEL FILIAL PORTO ALEGRE",
+        "valor_parcela": 52.18,
+        "parcela_atual": 2,
+        "total_parcelas": 3,
+        "data_compra": "2026-01-08",
+        "data_proxima_parcela": "2026-03-09",
+        "categoria": "Pessoal",
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Itau Azul Rodrigo",
+        "descricao": "AgroRural GRAVATAI",
+        "valor_parcela": 294.2,
+        "parcela_atual": 2,
+        "total_parcelas": 2,
+        "data_compra": "2026-01-09",
+        "data_proxima_parcela": "2026-03-09",
+        "categoria": "Pessoal",
+        "notas": "Última parcela"
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Itau Azul Rodrigo",
+        "descricao": "REFRICRIL DIST PORTO ALEGRE",
+        "valor_parcela": 111.25,
+        "parcela_atual": 2,
+        "total_parcelas": 2,
+        "data_compra": "2026-01-13",
+        "data_proxima_parcela": "2026-03-09",
+        "categoria": "Kitnets",
+        "notas": "Última parcela"
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Itau Azul Rodrigo",
+        "descricao": "PANVEL FILIAL PORTO ALEGRE",
+        "valor_parcela": 49.55,
+        "parcela_atual": 2,
+        "total_parcelas": 2,
+        "data_compra": "2026-01-16",
+        "data_proxima_parcela": "2026-03-09",
+        "categoria": "Pessoal",
+        "notas": "Última parcela"
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Itau Azul Rodrigo",
+        "descricao": "MERCADO LIVRE Arujá",
+        "valor_parcela": 108.48,
+        "parcela_atual": 1,
+        "total_parcelas": 2,
+        "data_compra": "2026-02-02",
+        "data_proxima_parcela": "2026-03-09",
+        "categoria": null,
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Itau Azul Rodrigo",
+        "descricao": "MERCADO LIVRE São Paulo",
+        "valor_parcela": 15.23,
+        "parcela_atual": 1,
+        "total_parcelas": 2,
+        "data_compra": "2026-02-02",
+        "data_proxima_parcela": "2026-03-09",
+        "categoria": null,
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Itau Azul Rodrigo",
+        "descricao": "SHOPEE *Mehlev Lençóis Paulista",
+        "valor_parcela": 78.0,
+        "parcela_atual": 1,
+        "total_parcelas": 3,
+        "data_compra": "2026-02-03",
+        "data_proxima_parcela": "2026-03-09",
+        "categoria": null,
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Itau Azul Rodrigo",
+        "descricao": "CASAS BAHIA Rio de Janeiro",
+        "valor_parcela": 54.05,
+        "parcela_atual": 1,
+        "total_parcelas": 2,
+        "data_compra": "2026-02-05",
+        "data_proxima_parcela": "2026-03-09",
+        "categoria": null,
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Itau Azul Rodrigo",
+        "descricao": "MARISA PORTO ALEGRE",
+        "valor_parcela": 60.0,
+        "parcela_atual": 1,
+        "total_parcelas": 3,
+        "data_compra": "2026-02-06",
+        "data_proxima_parcela": "2026-03-09",
+        "categoria": null,
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Itau Azul Rodrigo",
+        "descricao": "JIM.COM DOUGLA GLORINHA",
+        "valor_parcela": 268.4,
+        "parcela_atual": 1,
+        "total_parcelas": 4,
+        "data_compra": "2026-02-12",
+        "data_proxima_parcela": "2026-03-09",
+        "categoria": "Pessoal",
+        "notas": ""
+      },
+
+      { "_comentario": "--- Compras à vista (fatura 03/2026 apenas) ---" },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Itau Azul Rodrigo",
+        "descricao": "CONCESSIONARIA DAS RODOVIAS",
+        "valor_parcela": 8.25,
+        "parcela_atual": 1,
+        "total_parcelas": 1,
+        "data_compra": "2026-02-04",
+        "data_proxima_parcela": null,
+        "categoria": "Carros",
+        "notas": "Pedágio"
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Itau Azul Rodrigo",
+        "descricao": "MADEREIRA GLORINHA",
+        "valor_parcela": 141.82,
+        "parcela_atual": 1,
+        "total_parcelas": 1,
+        "data_compra": "2026-02-05",
+        "data_proxima_parcela": null,
+        "categoria": "Pessoal",
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Itau Azul Rodrigo",
+        "descricao": "CONCESSIONARIA DAS RODOVIAS",
+        "valor_parcela": 5.5,
+        "parcela_atual": 1,
+        "total_parcelas": 1,
+        "data_compra": "2026-02-05",
+        "data_proxima_parcela": null,
+        "categoria": "Carros",
+        "notas": "Pedágio"
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Itau Azul Rodrigo",
+        "descricao": "CONCESSIONARIA DAS RODOVIAS",
+        "valor_parcela": 5.5,
+        "parcela_atual": 1,
+        "total_parcelas": 1,
+        "data_compra": "2026-02-06",
+        "data_proxima_parcela": null,
+        "categoria": "Carros",
+        "notas": "Pedágio"
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Itau Azul Rodrigo",
+        "descricao": "FARMACIA MUNIZ GLORINHA",
+        "valor_parcela": 97.0,
+        "parcela_atual": 1,
+        "total_parcelas": 1,
+        "data_compra": "2026-02-07",
+        "data_proxima_parcela": null,
+        "categoria": "Pessoal",
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Itau Azul Rodrigo",
+        "descricao": "SUPERMERCADOS JM RAMOS GLORINHA",
+        "valor_parcela": 108.17,
+        "parcela_atual": 1,
+        "total_parcelas": 1,
+        "data_compra": "2026-02-10",
+        "data_proxima_parcela": null,
+        "categoria": "Pessoal",
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Itau Azul Rodrigo",
+        "descricao": "BELLA KASA COMERCIO DEC PORTO ALEGRE",
+        "valor_parcela": 32.78,
+        "parcela_atual": 1,
+        "total_parcelas": 1,
+        "data_compra": "2026-02-14",
+        "data_proxima_parcela": null,
+        "categoria": "Kitnets",
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Itau Azul Rodrigo",
+        "descricao": "PONTO DE LINHA PORTO ALEGRE",
+        "valor_parcela": 48.7,
+        "parcela_atual": 1,
+        "total_parcelas": 1,
+        "data_compra": "2026-02-14",
+        "data_proxima_parcela": null,
+        "categoria": "Pessoal",
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Itau Azul Rodrigo",
+        "descricao": "FRUTEIRÃO DO FORTE PORTO ALEGRE",
+        "valor_parcela": 67.93,
+        "parcela_atual": 1,
+        "total_parcelas": 1,
+        "data_compra": "2026-02-19",
+        "data_proxima_parcela": null,
+        "categoria": "Pessoal",
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Itau Azul Rodrigo",
+        "descricao": "CASA DOS PARAFUSOS PORTO ALEGRE",
+        "valor_parcela": 49.8,
+        "parcela_atual": 1,
+        "total_parcelas": 1,
+        "data_compra": "2026-02-19",
+        "data_proxima_parcela": null,
+        "categoria": "Kitnets",
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Itau Azul Rodrigo",
+        "descricao": "CONCESSIONARIA DAS RODOVIAS",
+        "valor_parcela": 5.5,
+        "parcela_atual": 1,
+        "total_parcelas": 1,
+        "data_compra": "2026-02-22",
+        "data_proxima_parcela": null,
+        "categoria": "Carros",
+        "notas": "Pedágio"
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Itau Azul Rodrigo",
+        "descricao": "DUPORTO PEÇAS E MANUT PORTO ALEGRE",
+        "valor_parcela": 27.0,
+        "parcela_atual": 1,
+        "total_parcelas": 1,
+        "data_compra": "2026-02-25",
+        "data_proxima_parcela": null,
+        "categoria": "Kitnets",
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Itau Azul Rodrigo",
+        "descricao": "FRUTEIRÃO DO FORTE PORTO ALEGRE",
+        "valor_parcela": 19.56,
+        "parcela_atual": 1,
+        "total_parcelas": 1,
+        "data_compra": "2026-02-25",
+        "data_proxima_parcela": null,
+        "categoria": "Pessoal",
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Itau Azul Rodrigo",
+        "descricao": "VIA SUL FPAY Porto Alegre",
+        "valor_parcela": 5.5,
+        "parcela_atual": 1,
+        "total_parcelas": 1,
+        "data_compra": "2026-02-25",
+        "data_proxima_parcela": null,
+        "categoria": "Carros",
+        "notas": "Pedágio"
+      },
+
+      { "_comentario": "--- Anuidade ---" },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Itau Azul Rodrigo",
+        "descricao": "Anuidade Itau Azul (líquida)",
+        "valor_parcela": 31.0,
+        "parcela_atual": 1,
+        "total_parcelas": 1,
+        "data_compra": "2026-03-01",
+        "data_proxima_parcela": null,
+        "categoria": null,
+        "notas": "Mensalidade R$62 - Redução R$31"
+      },
+
+      {
+        "_comentario": "=== ITAU AZUL RODRIGO - Compras de março/2026 (entram na fatura abr/2026, venc 09/04/2026) ==="
+      },
+      {
+        "_comentario": "--- Compras parceladas (parcela_atual=0, 1ª parcela em abril) ---"
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Itau Azul Rodrigo",
+        "descricao": "LEROY MERLIN PORTO ALEGRE",
+        "valor_parcela": 118.01,
+        "parcela_atual": 0,
+        "total_parcelas": 6,
+        "data_compra": "2026-03-06",
+        "data_proxima_parcela": "2026-04-09",
+        "categoria": "Kitnets",
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Itau Azul Rodrigo",
+        "descricao": "MERCADOLIVRE 2 PRODUTOS Borda da Mata",
+        "valor_parcela": 32.49,
+        "parcela_atual": 0,
+        "total_parcelas": 4,
+        "data_compra": "2026-03-20",
+        "data_proxima_parcela": "2026-04-09",
+        "categoria": null,
+        "notas": ""
+      },
+
+      { "_comentario": "--- Compras à vista (entram na fatura abr/2026) ---" },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Itau Azul Rodrigo",
+        "descricao": "CONCESSIONARIA DAS RODOVIAS",
+        "valor_parcela": 5.5,
+        "parcela_atual": 0,
+        "total_parcelas": 1,
+        "data_compra": "2026-03-13",
+        "data_proxima_parcela": null,
+        "categoria": "Carros",
+        "notas": "Pedágio"
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Itau Azul Rodrigo",
+        "descricao": "FARMACIA SÃO JOÃO PORTO ALEGRE",
+        "valor_parcela": 21.21,
+        "parcela_atual": 0,
+        "total_parcelas": 1,
+        "data_compra": "2026-03-18",
+        "data_proxima_parcela": null,
+        "categoria": "Pessoal",
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Itau Azul Rodrigo",
+        "descricao": "MENTI ESTACIONAMENTO PORTO ALEGRE",
+        "valor_parcela": 50.0,
+        "parcela_atual": 0,
+        "total_parcelas": 1,
+        "data_compra": "2026-03-18",
+        "data_proxima_parcela": null,
+        "categoria": "Carros",
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Itau Azul Rodrigo",
+        "descricao": "CARTÓRIO PORTO ALEGRE",
+        "valor_parcela": 87.14,
+        "parcela_atual": 0,
+        "total_parcelas": 1,
+        "data_compra": "2026-03-18",
+        "data_proxima_parcela": null,
+        "categoria": "Pessoal",
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Itau Azul Rodrigo",
+        "descricao": "MENTI ESTACIONAMENTO PORTO ALEGRE",
+        "valor_parcela": 20.0,
+        "parcela_atual": 0,
+        "total_parcelas": 1,
+        "data_compra": "2026-03-18",
+        "data_proxima_parcela": null,
+        "categoria": "Carros",
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Itau Azul Rodrigo",
+        "descricao": "MERCADOLIVRE 2 PRODUTOS Indaiatuba",
+        "valor_parcela": 29.9,
+        "parcela_atual": 0,
+        "total_parcelas": 1,
+        "data_compra": "2026-03-20",
+        "data_proxima_parcela": null,
+        "categoria": null,
+        "notas": ""
+      },
+
+      {
+        "_comentario": "=== ITAU VISA RODRIGO - Fatura 02/2026 (venc 03/03/2026) ==="
+      },
+      { "_comentario": "--- Compras parceladas ---" },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Itau Visa Rodrigo",
+        "descricao": "CLINICA VETERINARIA PORTO ALEGRE",
+        "valor_parcela": 226.0,
+        "parcela_atual": 4,
+        "total_parcelas": 5,
+        "data_compra": "2025-11-04",
+        "data_proxima_parcela": "2026-03-03",
+        "categoria": "Pessoal",
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Itau Visa Rodrigo",
+        "descricao": "REFRICRIL DIST PORTO ALEGRE",
+        "valor_parcela": 168.48,
+        "parcela_atual": 2,
+        "total_parcelas": 3,
+        "data_compra": "2026-01-06",
+        "data_proxima_parcela": "2026-03-03",
+        "categoria": "Kitnets",
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Itau Visa Rodrigo",
+        "descricao": "MSS COMERCIO D PORTO ALEGRE",
+        "valor_parcela": 50.0,
+        "parcela_atual": 2,
+        "total_parcelas": 5,
+        "data_compra": "2026-01-06",
+        "data_proxima_parcela": "2026-03-03",
+        "categoria": null,
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Itau Visa Rodrigo",
+        "descricao": "TORRA TORRA PORTO ALEGRE",
+        "valor_parcela": 68.3,
+        "parcela_atual": 2,
+        "total_parcelas": 3,
+        "data_compra": "2026-01-06",
+        "data_proxima_parcela": "2026-03-03",
+        "categoria": null,
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Itau Visa Rodrigo",
+        "descricao": "PATILLER CALÇADOS PORTO ALEGRE",
+        "valor_parcela": 59.5,
+        "parcela_atual": 2,
+        "total_parcelas": 2,
+        "data_compra": "2026-01-06",
+        "data_proxima_parcela": "2026-03-03",
+        "categoria": "Pessoal",
+        "notas": "Última parcela"
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Itau Visa Rodrigo",
+        "descricao": "MEGA BRICK PORTO ALEGRE",
+        "valor_parcela": 100.0,
+        "parcela_atual": 2,
+        "total_parcelas": 10,
+        "data_compra": "2026-01-08",
+        "data_proxima_parcela": "2026-03-03",
+        "categoria": "Kitnets",
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Itau Visa Rodrigo",
+        "descricao": "CASA DO PAPEL PORTO ALEGRE",
+        "valor_parcela": 96.83,
+        "parcela_atual": 2,
+        "total_parcelas": 3,
+        "data_compra": "2026-01-08",
+        "data_proxima_parcela": "2026-03-03",
+        "categoria": null,
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Itau Visa Rodrigo",
+        "descricao": "PG *MIXXON MOD São Paulo",
+        "valor_parcela": 149.27,
+        "parcela_atual": 1,
+        "total_parcelas": 4,
+        "data_compra": "2026-02-04",
+        "data_proxima_parcela": "2026-03-03",
+        "categoria": null,
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Itau Visa Rodrigo",
+        "descricao": "CASAS BAHIA Rio de Janeiro",
+        "valor_parcela": 54.04,
+        "parcela_atual": 1,
+        "total_parcelas": 2,
+        "data_compra": "2026-02-05",
+        "data_proxima_parcela": "2026-03-03",
+        "categoria": null,
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Itau Visa Rodrigo",
+        "descricao": "00013 SH IGUATEMI PORTO ALEGRE",
+        "valor_parcela": 101.91,
+        "parcela_atual": 1,
+        "total_parcelas": 3,
+        "data_compra": "2026-02-13",
+        "data_proxima_parcela": "2026-03-03",
+        "categoria": null,
+        "notas": ""
+      },
+
+      { "_comentario": "--- Compras à vista ---" },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Itau Visa Rodrigo",
+        "descricao": "00013 SH IGUATEMI POA",
+        "valor_parcela": 29.48,
+        "parcela_atual": 1,
+        "total_parcelas": 1,
+        "data_compra": "2026-02-13",
+        "data_proxima_parcela": null,
+        "categoria": null,
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Itau Visa Rodrigo",
+        "descricao": "BOURBON COUNTRY PORTO ALEGRE",
+        "valor_parcela": 49.8,
+        "parcela_atual": 1,
+        "total_parcelas": 1,
+        "data_compra": "2026-02-13",
+        "data_proxima_parcela": null,
+        "categoria": null,
+        "notas": ""
+      },
+
+      { "_comentario": "--- Anuidade ---" },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Itau Visa Rodrigo",
+        "descricao": "Anuidade Itau Visa",
+        "valor_parcela": 19.9,
+        "parcela_atual": 1,
+        "total_parcelas": 1,
+        "data_compra": "2026-01-27",
+        "data_proxima_parcela": null,
+        "categoria": null,
+        "notas": "Mensalidade Plano Anuidade Diferenciada"
+      },
+
+      {
+        "_comentario": "=== ITAU VISA RODRIGO - Compras fev-mar/2026 (entram na fatura abr/2026, venc 03/04/2026) ==="
+      },
+      {
+        "_comentario": "--- Compras parceladas (parcela_atual=0, 1ª parcela em abril) ---"
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Itau Visa Rodrigo",
+        "descricao": "CASA MARIA PORTO ALEGRE",
+        "valor_parcela": 82.65,
+        "parcela_atual": 0,
+        "total_parcelas": 5,
+        "data_compra": "2026-03-03",
+        "data_proxima_parcela": "2026-04-03",
+        "categoria": null,
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Itau Visa Rodrigo",
+        "descricao": "MERCADOLIVRE 2 PRODUTOS Auriflama",
+        "valor_parcela": 27.02,
+        "parcela_atual": 0,
+        "total_parcelas": 3,
+        "data_compra": "2026-03-04",
+        "data_proxima_parcela": "2026-04-03",
+        "categoria": null,
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Itau Visa Rodrigo",
+        "descricao": "PANVEL FILIAL 165 PORTO ALEGRE",
+        "valor_parcela": 45.73,
+        "parcela_atual": 0,
+        "total_parcelas": 2,
+        "data_compra": "2026-03-04",
+        "data_proxima_parcela": "2026-04-03",
+        "categoria": "Pessoal",
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Itau Visa Rodrigo",
+        "descricao": "PANVEL FILIAL 369 PORTO ALEGRE",
+        "valor_parcela": 109.48,
+        "parcela_atual": 0,
+        "total_parcelas": 2,
+        "data_compra": "2026-03-11",
+        "data_proxima_parcela": "2026-04-03",
+        "categoria": "Pessoal",
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Itau Visa Rodrigo",
+        "descricao": "00013 SH IGUATEMI POA",
+        "valor_parcela": 59.94,
+        "parcela_atual": 0,
+        "total_parcelas": 3,
+        "data_compra": "2026-03-20",
+        "data_proxima_parcela": "2026-04-03",
+        "categoria": "Pessoal",
+        "notas": ""
+      },
+
+      { "_comentario": "--- Compras à vista (fatura abr/2026) ---" },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Itau Visa Rodrigo",
+        "descricao": "QUIOSQUE PORTO ALEGRE",
+        "valor_parcela": 21.0,
+        "parcela_atual": 0,
+        "total_parcelas": 1,
+        "data_compra": "2026-02-28",
+        "data_proxima_parcela": null,
+        "categoria": "Pessoal",
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Itau Visa Rodrigo",
+        "descricao": "DELITZZI PORTO ALEGRE",
+        "valor_parcela": 81.0,
+        "parcela_atual": 0,
+        "total_parcelas": 1,
+        "data_compra": "2026-03-02",
+        "data_proxima_parcela": null,
+        "categoria": "Pessoal",
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Itau Visa Rodrigo",
+        "descricao": "PANVEL FILIAL 369 PORTO ALEGRE",
+        "valor_parcela": 95.22,
+        "parcela_atual": 0,
+        "total_parcelas": 1,
+        "data_compra": "2026-03-03",
+        "data_proxima_parcela": null,
+        "categoria": "Pessoal",
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Itau Visa Rodrigo",
+        "descricao": "DSB GASTRONOMIA E EVENTOS PORTO ALEGRE",
+        "valor_parcela": 22.0,
+        "parcela_atual": 0,
+        "total_parcelas": 1,
+        "data_compra": "2026-03-03",
+        "data_proxima_parcela": null,
+        "categoria": "Pessoal",
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Itau Visa Rodrigo",
+        "descricao": "MERCADOLIVRE 2 PRODUTOS Ibitinga",
+        "valor_parcela": 62.37,
+        "parcela_atual": 0,
+        "total_parcelas": 1,
+        "data_compra": "2026-03-04",
+        "data_proxima_parcela": null,
+        "categoria": null,
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Itau Visa Rodrigo",
+        "descricao": "CONCESSIONARIA DAS RODOVIAS",
+        "valor_parcela": 5.5,
+        "parcela_atual": 0,
+        "total_parcelas": 1,
+        "data_compra": "2026-03-13",
+        "data_proxima_parcela": null,
+        "categoria": "Carros",
+        "notas": "Pedágio"
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Itau Visa Rodrigo",
+        "descricao": "CONCESSIONARIA DAS RODOVIAS",
+        "valor_parcela": 8.25,
+        "parcela_atual": 0,
+        "total_parcelas": 1,
+        "data_compra": "2026-03-14",
+        "data_proxima_parcela": null,
+        "categoria": "Carros",
+        "notas": "Pedágio"
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Itau Visa Rodrigo",
+        "descricao": "BISTEK SUPERMERCADOS PORTO ALEGRE",
+        "valor_parcela": 350.0,
+        "parcela_atual": 0,
+        "total_parcelas": 1,
+        "data_compra": "2026-03-19",
+        "data_proxima_parcela": null,
+        "categoria": "Pessoal",
+        "notas": ""
+      },
+
+      {
+        "_comentario": "=== CAIXA RODRIGO - Próxima Fatura (abr/2026, venc ~07/04/2026) ==="
+      },
+      { "_comentario": "--- Compras parceladas ---" },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Caixa Rodrigo",
+        "descricao": "SCHUMANN MOVEIS",
+        "valor_parcela": 31.62,
+        "parcela_atual": 10,
+        "total_parcelas": 10,
+        "data_compra": "2025-05-19",
+        "data_proxima_parcela": null,
+        "categoria": "Kitnets",
+        "notas": "Última parcela"
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Caixa Rodrigo",
+        "descricao": "MEGA BRICK",
+        "valor_parcela": 130.0,
+        "parcela_atual": 7,
+        "total_parcelas": 10,
+        "data_compra": "2025-09-09",
+        "data_proxima_parcela": null,
+        "categoria": "Kitnets",
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Caixa Rodrigo",
+        "descricao": "SHOPEE AMORDEC",
+        "valor_parcela": 61.3,
+        "parcela_atual": 5,
+        "total_parcelas": 6,
+        "data_compra": "2025-11-06",
+        "data_proxima_parcela": null,
+        "categoria": null,
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Caixa Rodrigo",
+        "descricao": "EC 6P",
+        "valor_parcela": 32.94,
+        "parcela_atual": 4,
+        "total_parcelas": 5,
+        "data_compra": "2025-12-07",
+        "data_proxima_parcela": null,
+        "categoria": null,
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Caixa Rodrigo",
+        "descricao": "FERRAGEM PARATI",
+        "valor_parcela": 294.81,
+        "parcela_atual": 4,
+        "total_parcelas": 4,
+        "data_compra": "2025-12-08",
+        "data_proxima_parcela": null,
+        "categoria": "Kitnets",
+        "notas": "Última parcela"
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Caixa Rodrigo",
+        "descricao": "SHOPEE MEHLEVA",
+        "valor_parcela": 74.99,
+        "parcela_atual": 3,
+        "total_parcelas": 3,
+        "data_compra": "2026-01-10",
+        "data_proxima_parcela": null,
+        "categoria": null,
+        "notas": "Última parcela"
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Caixa Rodrigo",
+        "descricao": "SHOPEE SHPSTEC",
+        "valor_parcela": 97.1,
+        "parcela_atual": 3,
+        "total_parcelas": 4,
+        "data_compra": "2026-01-24",
+        "data_proxima_parcela": null,
+        "categoria": null,
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Caixa Rodrigo",
+        "descricao": "MEGA BRICK",
+        "valor_parcela": 100.0,
+        "parcela_atual": 2,
+        "total_parcelas": 6,
+        "data_compra": "2026-02-03",
+        "data_proxima_parcela": null,
+        "categoria": "Kitnets",
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Caixa Rodrigo",
+        "descricao": "MERCADOLIVRE ME",
+        "valor_parcela": 207.99,
+        "parcela_atual": 2,
+        "total_parcelas": 2,
+        "data_compra": "2026-02-05",
+        "data_proxima_parcela": null,
+        "categoria": null,
+        "notas": "Última parcela"
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Caixa Rodrigo",
+        "descricao": "SHOPEE MULTIDE",
+        "valor_parcela": 80.56,
+        "parcela_atual": 2,
+        "total_parcelas": 2,
+        "data_compra": "2026-02-06",
+        "data_proxima_parcela": null,
+        "categoria": null,
+        "notas": "Última parcela"
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Caixa Rodrigo",
+        "descricao": "MERCADOLIVRE 2P",
+        "valor_parcela": 61.61,
+        "parcela_atual": 2,
+        "total_parcelas": 2,
+        "data_compra": "2026-02-10",
+        "data_proxima_parcela": null,
+        "categoria": null,
+        "notas": "Última parcela"
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Caixa Rodrigo",
+        "descricao": "EC MERCADO",
+        "valor_parcela": 83.99,
+        "parcela_atual": 2,
+        "total_parcelas": 4,
+        "data_compra": "2026-02-10",
+        "data_proxima_parcela": null,
+        "categoria": null,
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Caixa Rodrigo",
+        "descricao": "PAYGO VIDRACARI",
+        "valor_parcela": 118.34,
+        "parcela_atual": 2,
+        "total_parcelas": 3,
+        "data_compra": "2026-02-12",
+        "data_proxima_parcela": null,
+        "categoria": "Kitnets",
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Caixa Rodrigo",
+        "descricao": "AGRORURAL",
+        "valor_parcela": 178.94,
+        "parcela_atual": 2,
+        "total_parcelas": 2,
+        "data_compra": "2026-02-19",
+        "data_proxima_parcela": null,
+        "categoria": "Pessoal",
+        "notas": "Última parcela"
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Caixa Rodrigo",
+        "descricao": "TUMELERO 019",
+        "valor_parcela": 89.5,
+        "parcela_atual": 1,
+        "total_parcelas": 6,
+        "data_compra": "2026-03-08",
+        "data_proxima_parcela": null,
+        "categoria": "Kitnets",
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Caixa Rodrigo",
+        "descricao": "MERCADOLIVRE 3P",
+        "valor_parcela": 57.17,
+        "parcela_atual": 1,
+        "total_parcelas": 2,
+        "data_compra": "2026-03-10",
+        "data_proxima_parcela": null,
+        "categoria": null,
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Caixa Rodrigo",
+        "descricao": "DUPORTO REFRIGERAÇÃO",
+        "valor_parcela": 50.0,
+        "parcela_atual": 1,
+        "total_parcelas": 2,
+        "data_compra": "2026-03-11",
+        "data_proxima_parcela": null,
+        "categoria": "Kitnets",
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Caixa Rodrigo",
+        "descricao": "EC 2P",
+        "valor_parcela": 26.81,
+        "parcela_atual": 1,
+        "total_parcelas": 4,
+        "data_compra": "2026-03-14",
+        "data_proxima_parcela": null,
+        "categoria": null,
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Caixa Rodrigo",
+        "descricao": "PANVEL FILIAL 3",
+        "valor_parcela": 96.92,
+        "parcela_atual": 1,
+        "total_parcelas": 3,
+        "data_compra": "2026-03-14",
+        "data_proxima_parcela": null,
+        "categoria": "Pessoal",
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Caixa Rodrigo",
+        "descricao": "D TUDO",
+        "valor_parcela": 66.6,
+        "parcela_atual": 1,
+        "total_parcelas": 3,
+        "data_compra": "2026-03-19",
+        "data_proxima_parcela": null,
+        "categoria": "Kitnets",
+        "notas": ""
+      },
+
+      { "_comentario": "--- Compras à vista ---" },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Caixa Rodrigo",
+        "descricao": "BISTEK SUPERMERCADOS",
+        "valor_parcela": 176.22,
+        "parcela_atual": 1,
+        "total_parcelas": 1,
+        "data_compra": "2026-03-08",
+        "data_proxima_parcela": null,
+        "categoria": "Pessoal",
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Caixa Rodrigo",
+        "descricao": "POSTO CARLÃO",
+        "valor_parcela": 128.11,
+        "parcela_atual": 1,
+        "total_parcelas": 1,
+        "data_compra": "2026-03-08",
+        "data_proxima_parcela": null,
+        "categoria": "Carros",
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Caixa Rodrigo",
+        "descricao": "DL GOOGLE YOUTUBE",
+        "valor_parcela": 53.9,
+        "parcela_atual": 1,
+        "total_parcelas": 1,
+        "data_compra": "2026-03-09",
+        "data_proxima_parcela": null,
+        "categoria": "Pessoal",
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Caixa Rodrigo",
+        "descricao": "FRUTEIRÃO DO FORTE",
+        "valor_parcela": 72.22,
+        "parcela_atual": 1,
+        "total_parcelas": 1,
+        "data_compra": "2026-03-10",
+        "data_proxima_parcela": null,
+        "categoria": "Pessoal",
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Caixa Rodrigo",
+        "descricao": "CAPPTA FPS COMERCIO D",
+        "valor_parcela": 342.0,
+        "parcela_atual": 1,
+        "total_parcelas": 1,
+        "data_compra": "2026-03-12",
+        "data_proxima_parcela": null,
+        "categoria": null,
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Caixa Rodrigo",
+        "descricao": "SERRABEN",
+        "valor_parcela": 65.02,
+        "parcela_atual": 1,
+        "total_parcelas": 1,
+        "data_compra": "2026-03-13",
+        "data_proxima_parcela": null,
+        "categoria": "Pessoal",
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Caixa Rodrigo",
+        "descricao": "PANVEL FILIAL 369",
+        "valor_parcela": 29.43,
+        "parcela_atual": 1,
+        "total_parcelas": 1,
+        "data_compra": "2026-03-14",
+        "data_proxima_parcela": null,
+        "categoria": "Pessoal",
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Caixa Rodrigo",
+        "descricao": "MERCADOLIVRE 2 PRODUTOS",
+        "valor_parcela": 40.64,
+        "parcela_atual": 1,
+        "total_parcelas": 1,
+        "data_compra": "2026-03-14",
+        "data_proxima_parcela": null,
+        "categoria": null,
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Caixa Rodrigo",
+        "descricao": "SUPERMERCADOS JM RAMOS",
+        "valor_parcela": 49.63,
+        "parcela_atual": 1,
+        "total_parcelas": 1,
+        "data_compra": "2026-03-14",
+        "data_proxima_parcela": null,
+        "categoria": "Pessoal",
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Caixa Rodrigo",
+        "descricao": "POSTO FLEX CARLÃO",
+        "valor_parcela": 154.58,
+        "parcela_atual": 1,
+        "total_parcelas": 1,
+        "data_compra": "2026-03-14",
+        "data_proxima_parcela": null,
+        "categoria": "Carros",
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Caixa Rodrigo",
+        "descricao": "MP FRUTEIRÃO DO FORTE",
+        "valor_parcela": 43.68,
+        "parcela_atual": 1,
+        "total_parcelas": 1,
+        "data_compra": "2026-03-14",
+        "data_proxima_parcela": null,
+        "categoria": "Pessoal",
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Caixa Rodrigo",
+        "descricao": "CARLOS ALBERTO",
+        "valor_parcela": 110.0,
+        "parcela_atual": 1,
+        "total_parcelas": 1,
+        "data_compra": "2026-03-17",
+        "data_proxima_parcela": null,
+        "categoria": null,
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Caixa Rodrigo",
+        "descricao": "MCDONALDS",
+        "valor_parcela": 55.8,
+        "parcela_atual": 1,
+        "total_parcelas": 1,
+        "data_compra": "2026-03-17",
+        "data_proxima_parcela": null,
+        "categoria": "Camila",
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Caixa Rodrigo",
+        "descricao": "BIGMIX",
+        "valor_parcela": 97.73,
+        "parcela_atual": 1,
+        "total_parcelas": 1,
+        "data_compra": "2026-03-18",
+        "data_proxima_parcela": null,
+        "categoria": "Pessoal",
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Caixa Rodrigo",
+        "descricao": "POSTO FLEX",
+        "valor_parcela": 165.85,
+        "parcela_atual": 1,
+        "total_parcelas": 1,
+        "data_compra": "2026-03-19",
+        "data_proxima_parcela": null,
+        "categoria": "Carros",
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Caixa Rodrigo",
+        "descricao": "MP FRUTEIRÃO DO FORTE",
+        "valor_parcela": 68.1,
+        "parcela_atual": 1,
+        "total_parcelas": 1,
+        "data_compra": "2026-03-19",
+        "data_proxima_parcela": null,
+        "categoria": "Pessoal",
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Caixa Rodrigo",
+        "descricao": "BISTEK SUPERMERCADOS",
+        "valor_parcela": 351.6,
+        "parcela_atual": 1,
+        "total_parcelas": 1,
+        "data_compra": "2026-03-19",
+        "data_proxima_parcela": null,
+        "categoria": "Pessoal",
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Caixa Rodrigo",
+        "descricao": "MP MAURO CESAR DAS",
+        "valor_parcela": 32.0,
+        "parcela_atual": 1,
+        "total_parcelas": 1,
+        "data_compra": "2026-03-19",
+        "data_proxima_parcela": null,
+        "categoria": null,
+        "notas": ""
+      },
+
+      { "_comentario": "--- Anuidade ---" },
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "Caixa Rodrigo",
+        "descricao": "Anuidade Caixa Elo (parcela)",
+        "valor_parcela": 34.5,
+        "parcela_atual": 5,
+        "total_parcelas": 12,
+        "data_compra": "2025-11-27",
+        "data_proxima_parcela": null,
+        "categoria": null,
+        "notas": "Anuidade anual parcelada em 12x"
+      },
+
+      {
+        "_comentario": "=== ALVARO - Faturas cartões março/2026 (valores mensais, sem detalhe de parcelas por compra) ==="
+      },
+      {
+        "pessoa": "Alvaro",
+        "cartao": "Trigg Alvaro",
+        "descricao": "Fatura Trigg mar/2026",
+        "valor_parcela": 19.9,
+        "parcela_atual": 1,
+        "total_parcelas": 1,
+        "data_compra": "2026-03-01",
+        "data_proxima_parcela": null,
+        "categoria": "Pessoal",
+        "notas": "Valor total da fatura do mês"
+      },
+      {
+        "pessoa": "Alvaro",
+        "cartao": "Players Alvaro",
+        "descricao": "Fatura Players mar/2026",
+        "valor_parcela": 175.0,
+        "parcela_atual": 1,
+        "total_parcelas": 1,
+        "data_compra": "2026-03-01",
+        "data_proxima_parcela": null,
+        "categoria": "Pessoal",
+        "notas": "Valor total da fatura do mês"
+      },
+      {
+        "pessoa": "Alvaro",
+        "cartao": "Samsung Alvaro",
+        "descricao": "Fatura Samsung mar/2026",
+        "valor_parcela": 244.31,
+        "parcela_atual": 1,
+        "total_parcelas": 1,
+        "data_compra": "2026-03-01",
+        "data_proxima_parcela": null,
+        "categoria": "Pessoal",
+        "notas": "Valor total da fatura do mês"
       }
     ]
   },
@@ -298,17 +1705,16 @@
     "items": [
       {
         "pessoa": "Rodrigo",
-        "descricao": "_DESCRICAO_EMPRESTIMO_",
-        "valor_total": 0.0,
-        "valor_parcela": 0.0,
+        "descricao": "Emprestimo R$15000 Nubank",
+        "valor_parcela": 1200.0,
         "parcela_atual": 1,
-        "total_parcelas": 1,
+        "total_parcelas": 9,
         "data_inicio": null,
         "data_proxima_parcela": "2026-04-10",
         "dia_vencimento": 10,
-        "banco": "_NOME_BANCO_",
+        "banco": "Nubank",
         "taxa_juros": null,
-        "categoria": null,
+        "categoria": "Pessoal",
         "notas": ""
       }
     ]
@@ -319,143 +1725,905 @@
     "items": [
       {
         "pessoa": "Rodrigo",
-        "descricao": "_DESCRICAO_EMPRESTIMO_",
-        "valor_total": 0.0,
-        "valor_parcela": 0.0,
+        "descricao": "Panvel",
+        "valor_parcela": 57.73,
+        "parcela_atual": 1,
+        "total_parcelas": 5,
+        "data_inicio": null,
+        "data_proxima_parcela": "2026-04-30",
+        "dia_vencimento": 30,
+        "categoria": "Pessoal",
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "descricao": "TV",
+        "valor_parcela": 294.0,
+        "parcela_atual": 13,
+        "total_parcelas": 15,
+        "data_inicio": null,
+        "data_proxima_parcela": "2026-04-30",
+        "dia_vencimento": 30,
+        "categoria": "Pessoal",
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "descricao": "Modulo",
+        "valor_parcela": 202.0,
+        "parcela_atual": 8,
+        "total_parcelas": 10,
+        "data_inicio": null,
+        "data_proxima_parcela": "2026-04-30",
+        "dia_vencimento": 30,
+        "categoria": "Carros",
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "descricao": "Roteador",
+        "valor_parcela": 150.0,
+        "parcela_atual": 7,
+        "total_parcelas": 12,
+        "data_inicio": null,
+        "data_proxima_parcela": "2026-04-30",
+        "dia_vencimento": 30,
+        "categoria": null,
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "descricao": "Bomba",
+        "valor_parcela": 90.0,
+        "parcela_atual": 7,
+        "total_parcelas": 510,
+        "data_inicio": null,
+        "data_proxima_parcela": "2026-04-30",
+        "dia_vencimento": 30,
+        "categoria": "Carros",
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "descricao": "Geladeira ML",
+        "valor_parcela": 142.0,
+        "parcela_atual": 7,
+        "total_parcelas": 12,
+        "data_inicio": null,
+        "data_proxima_parcela": "2026-04-30",
+        "dia_vencimento": 30,
+        "categoria": "Kitnets",
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "descricao": "P/ Tracker",
+        "valor_parcela": 106.0,
+        "parcela_atual": 6,
+        "total_parcelas": 10,
+        "data_inicio": null,
+        "data_proxima_parcela": "2026-04-30",
+        "dia_vencimento": 30,
+        "categoria": "Carros",
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "descricao": "Pneu",
+        "valor_parcela": 148.0,
+        "parcela_atual": 6,
+        "total_parcelas": 6,
+        "data_inicio": null,
+        "data_proxima_parcela": "2026-04-30",
+        "dia_vencimento": 30,
+        "categoria": "Carros",
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "descricao": "Tracker",
+        "valor_parcela": 349.0,
+        "parcela_atual": 4,
+        "total_parcelas": 6,
+        "data_inicio": null,
+        "data_proxima_parcela": "2026-04-30",
+        "dia_vencimento": 30,
+        "categoria": "Carros",
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "descricao": "Panificadora",
+        "valor_parcela": 71.0,
+        "parcela_atual": 3,
+        "total_parcelas": 7,
+        "data_inicio": null,
+        "data_proxima_parcela": "2026-04-30",
+        "dia_vencimento": 30,
+        "categoria": "Pessoal",
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "descricao": "Geladeira Shoppe",
+        "valor_parcela": 165.9,
+        "parcela_atual": 2,
+        "total_parcelas": 10,
+        "data_inicio": null,
+        "data_proxima_parcela": "2026-04-30",
+        "dia_vencimento": 30,
+        "categoria": "Kitnets",
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "descricao": "Panvel 2",
+        "valor_parcela": 34.0,
+        "parcela_atual": 2,
+        "total_parcelas": 4,
+        "data_inicio": null,
+        "data_proxima_parcela": "2026-04-30",
+        "dia_vencimento": 30,
+        "categoria": "Pessoal",
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "descricao": "Ferragem Parati",
+        "valor_parcela": 57.73,
+        "parcela_atual": 1,
+        "total_parcelas": 5,
+        "data_inicio": null,
+        "data_proxima_parcela": "2026-04-30",
+        "dia_vencimento": 30,
+        "categoria": null,
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "descricao": "Empréstimo pedido a Camila de R$1000.00",
+        "valor_parcela": 100.0,
+        "parcela_atual": 1,
+        "total_parcelas": 10,
+        "data_inicio": null,
+        "data_proxima_parcela": "2026-04-30",
+        "dia_vencimento": 30,
+        "categoria": "Ajuda",
+        "notas": "Rodrigo pediu empréstimo de R$1000 a Camila, como não se tinha a vista, ficou de se pagar em 10xR$100.00"
+      },
+      {
+        "pessoa": "Rodrigo",
+        "descricao": "Cadeira",
+        "valor_parcela": 124.5,
+        "parcela_atual": 1,
+        "total_parcelas": 10,
+        "data_inicio": null,
+        "data_proxima_parcela": "2026-04-30",
+        "dia_vencimento": 30,
+        "categoria": "Camila",
+        "notas": ""
+      },
+      {
+        "pessoa": "Rodrigo",
+        "descricao": "Panvel 3",
+        "valor_parcela": 227.78,
+        "parcela_atual": 1,
+        "total_parcelas": 5,
+        "data_inicio": null,
+        "data_proxima_parcela": "2026-04-30",
+        "dia_vencimento": 30,
+        "categoria": "Pessoal",
+        "notas": ""
+      },
+
+      {
+        "_comentario": "=== TIAGO - Valores devidos em março/2026. Parcelas restantes tratadas como total. ==="
+      },
+      {
+        "pessoa": "Tiago",
+        "descricao": "Fogão",
+        "valor_parcela": 96.5,
+        "parcela_atual": 1,
+        "total_parcelas": 2,
+        "data_inicio": null,
+        "data_proxima_parcela": "2026-03-10",
+        "dia_vencimento": 10,
+        "categoria": "Kitnets",
+        "notas": "2 parcelas restantes em mar/2026"
+      },
+      {
+        "pessoa": "Tiago",
+        "descricao": "Euro Óculos",
+        "valor_parcela": 95.5,
         "parcela_atual": 1,
         "total_parcelas": 1,
         "data_inicio": null,
-        "data_proxima_parcela": "2026-04-10",
+        "data_proxima_parcela": "2026-03-10",
+        "dia_vencimento": 10,
+        "categoria": "Pessoal",
+        "notas": "Última parcela"
+      },
+      {
+        "pessoa": "Tiago",
+        "descricao": "Geladeira (9x)",
+        "valor_parcela": 102.78,
+        "parcela_atual": 1,
+        "total_parcelas": 9,
+        "data_inicio": null,
+        "data_proxima_parcela": "2026-03-10",
+        "dia_vencimento": 10,
+        "categoria": "Kitnets",
+        "notas": "9 parcelas restantes em mar/2026"
+      },
+      {
+        "pessoa": "Tiago",
+        "descricao": "Aspirador",
+        "valor_parcela": 103.0,
+        "parcela_atual": 1,
+        "total_parcelas": 14,
+        "data_inicio": null,
+        "data_proxima_parcela": "2026-03-10",
+        "dia_vencimento": 10,
+        "categoria": "Kitnets",
+        "notas": "14 parcelas restantes em mar/2026"
+      },
+      {
+        "pessoa": "Tiago",
+        "descricao": "Geladeira (14x)",
+        "valor_parcela": 93.0,
+        "parcela_atual": 1,
+        "total_parcelas": 14,
+        "data_inicio": null,
+        "data_proxima_parcela": "2026-03-10",
+        "dia_vencimento": 10,
+        "categoria": "Kitnets",
+        "notas": "14 parcelas restantes em mar/2026"
+      },
+      {
+        "pessoa": "Tiago",
+        "descricao": "Geladeira (8x)",
+        "valor_parcela": 134.0,
+        "parcela_atual": 1,
+        "total_parcelas": 8,
+        "data_inicio": null,
+        "data_proxima_parcela": "2026-03-10",
+        "dia_vencimento": 10,
+        "categoria": "Kitnets",
+        "notas": "8 parcelas restantes em mar/2026"
+      },
+      {
+        "pessoa": "Tiago",
+        "descricao": "Alarme",
+        "valor_parcela": 72.0,
+        "parcela_atual": 1,
+        "total_parcelas": 8,
+        "data_inicio": null,
+        "data_proxima_parcela": "2026-03-10",
+        "dia_vencimento": 10,
+        "categoria": "Kitnets",
+        "notas": "8 parcelas restantes em mar/2026"
+      },
+      {
+        "pessoa": "Tiago",
+        "descricao": "Starlink",
+        "valor_parcela": 163.9,
+        "parcela_atual": 1,
+        "total_parcelas": 7,
+        "data_inicio": null,
+        "data_proxima_parcela": "2026-03-10",
+        "dia_vencimento": 10,
+        "categoria": "Kitnets",
+        "notas": "7 parcelas restantes em mar/2026"
+      },
+      {
+        "pessoa": "Tiago",
+        "descricao": "Geladeira (7x)",
+        "valor_parcela": 188.0,
+        "parcela_atual": 1,
+        "total_parcelas": 7,
+        "data_inicio": null,
+        "data_proxima_parcela": "2026-03-10",
+        "dia_vencimento": 10,
+        "categoria": "Kitnets",
+        "notas": "7 parcelas restantes em mar/2026"
+      },
+      {
+        "pessoa": "Tiago",
+        "descricao": "Livros Isabela",
+        "valor_parcela": 45.0,
+        "parcela_atual": 1,
+        "total_parcelas": 10,
+        "data_inicio": null,
+        "data_proxima_parcela": "2026-03-10",
+        "dia_vencimento": 10,
+        "categoria": "Pessoal",
+        "notas": "10 parcelas restantes em mar/2026"
+      },
+      {
+        "pessoa": "Tiago",
+        "descricao": "Escola Isabela",
+        "valor_parcela": 500.0,
+        "parcela_atual": 1,
+        "total_parcelas": 1,
+        "data_inicio": null,
+        "data_proxima_parcela": "2026-03-10",
+        "dia_vencimento": 10,
+        "categoria": "Pessoal",
+        "notas": "Pagamento único ou mensal - confirmar"
+      },
+      {
+        "pessoa": "Tiago",
+        "descricao": "Escada Pai",
+        "valor_parcela": 62.05,
+        "parcela_atual": 1,
+        "total_parcelas": 8,
+        "data_inicio": null,
+        "data_proxima_parcela": "2026-03-10",
+        "dia_vencimento": 10,
+        "categoria": "Kitnets",
+        "notas": "8 parcelas restantes em mar/2026"
+      },
+      {
+        "pessoa": "Tiago",
+        "descricao": "Projetor",
+        "valor_parcela": 50.0,
+        "parcela_atual": 1,
+        "total_parcelas": 17,
+        "data_inicio": null,
+        "data_proxima_parcela": "2026-03-10",
+        "dia_vencimento": 10,
+        "categoria": null,
+        "notas": "17 parcelas restantes em mar/2026"
+      },
+      {
+        "pessoa": "Tiago",
+        "descricao": "Tela Projetor",
+        "valor_parcela": 50.0,
+        "parcela_atual": 1,
+        "total_parcelas": 3,
+        "data_inicio": null,
+        "data_proxima_parcela": "2026-03-10",
+        "dia_vencimento": 10,
+        "categoria": null,
+        "notas": "3 parcelas restantes em mar/2026"
+      },
+      {
+        "pessoa": "Tiago",
+        "descricao": "Tinta",
+        "valor_parcela": 90.0,
+        "parcela_atual": 1,
+        "total_parcelas": 8,
+        "data_inicio": null,
+        "data_proxima_parcela": "2026-03-10",
+        "dia_vencimento": 10,
+        "categoria": "Kitnets",
+        "notas": "8 parcelas restantes em mar/2026"
+      },
+      {
+        "pessoa": "Tiago",
+        "descricao": "Mesa",
+        "valor_parcela": 77.17,
+        "parcela_atual": 1,
+        "total_parcelas": 18,
+        "data_inicio": null,
+        "data_proxima_parcela": "2026-03-10",
+        "dia_vencimento": 10,
+        "categoria": "Kitnets",
+        "notas": "18 parcelas restantes em mar/2026"
+      },
+
+      { "_comentario": "=== JUNIOR - Valores devidos ===" },
+      {
+        "pessoa": "Junior",
+        "descricao": "Placas Solar",
+        "valor_parcela": 950.0,
+        "parcela_atual": 22,
+        "total_parcelas": 60,
+        "data_inicio": null,
+        "data_proxima_parcela": "2026-03-10",
+        "dia_vencimento": 10,
+        "categoria": "Kitnets",
+        "notas": "60 parcelas total, 39 restantes em mar/2026 (parcela 22/60)"
+      },
+      {
+        "pessoa": "Junior",
+        "descricao": "Bolsa Camila",
+        "valor_parcela": 120.0,
+        "parcela_atual": 1,
+        "total_parcelas": 4,
+        "data_inicio": null,
+        "data_proxima_parcela": "2026-03-10",
+        "dia_vencimento": 10,
+        "categoria": "Camila",
+        "notas": "Mar a Jun/2026"
+      },
+      {
+        "pessoa": "Junior",
+        "descricao": "Perfume Camila",
+        "valor_parcela": 97.0,
+        "parcela_atual": 1,
+        "total_parcelas": 1,
+        "data_inicio": null,
+        "data_proxima_parcela": "2026-03-10",
+        "dia_vencimento": 10,
+        "categoria": "Camila",
+        "notas": "Última parcela"
+      },
+
+      {
+        "_comentario": "=== ALVARO - Parcelas (valores que Célia paga ao Alvaro) ==="
+      },
+      {
+        "pessoa": "Alvaro",
+        "descricao": "Financiamento Strada",
+        "valor_parcela": 1531.0,
+        "parcela_atual": 15,
+        "total_parcelas": 35,
+        "data_inicio": null,
+        "data_proxima_parcela": "2026-03-10",
+        "dia_vencimento": 10,
+        "categoria": "Carros",
+        "notas": ""
+      },
+      {
+        "pessoa": "Alvaro",
+        "descricao": "Fogão Zaffari",
+        "valor_parcela": 120.0,
+        "parcela_atual": 10,
+        "total_parcelas": 10,
+        "data_inicio": null,
+        "data_proxima_parcela": "2026-03-10",
+        "dia_vencimento": 10,
+        "categoria": "Kitnets",
+        "notas": "Última parcela"
+      },
+      {
+        "pessoa": "Alvaro",
+        "descricao": "Cartão Renner Junho",
+        "valor_parcela": 116.7,
+        "parcela_atual": 10,
+        "total_parcelas": 12,
+        "data_inicio": null,
+        "data_proxima_parcela": "2026-03-10",
+        "dia_vencimento": 10,
+        "categoria": "Camila",
+        "notas": ""
+      },
+      {
+        "pessoa": "Alvaro",
+        "descricao": "Cheque especial Itau",
+        "valor_parcela": 192.5,
+        "parcela_atual": 8,
+        "total_parcelas": 24,
+        "data_inicio": null,
+        "data_proxima_parcela": "2026-03-10",
         "dia_vencimento": 10,
         "categoria": null,
         "notas": ""
+      },
+      {
+        "pessoa": "Alvaro",
+        "descricao": "Faculdade Camila Julho",
+        "valor_parcela": 189.8,
+        "parcela_atual": 8,
+        "total_parcelas": 10,
+        "data_inicio": null,
+        "data_proxima_parcela": "2026-03-10",
+        "dia_vencimento": 10,
+        "categoria": "Camila",
+        "notas": ""
+      },
+      {
+        "pessoa": "Alvaro",
+        "descricao": "Parcelamento Unimed",
+        "valor_parcela": 139.49,
+        "parcela_atual": 8,
+        "total_parcelas": 18,
+        "data_inicio": null,
+        "data_proxima_parcela": "2026-03-10",
+        "dia_vencimento": 10,
+        "categoria": "Pessoal",
+        "notas": ""
+      },
+      {
+        "pessoa": "Alvaro",
+        "descricao": "Parcela 1 dos IPTUs",
+        "valor_parcela": 245.48,
+        "parcela_atual": 6,
+        "total_parcelas": 12,
+        "data_inicio": null,
+        "data_proxima_parcela": "2026-03-10",
+        "dia_vencimento": 10,
+        "categoria": "Kitnets",
+        "notas": ""
+      },
+      {
+        "pessoa": "Alvaro",
+        "descricao": "Faculdade Camila Setembro",
+        "valor_parcela": 191.09,
+        "parcela_atual": 5,
+        "total_parcelas": 10,
+        "data_inicio": null,
+        "data_proxima_parcela": "2026-03-10",
+        "dia_vencimento": 10,
+        "categoria": "Camila",
+        "notas": ""
+      },
+      {
+        "pessoa": "Alvaro",
+        "descricao": "Placas Solares Sunnyhub",
+        "valor_parcela": 1505.0,
+        "parcela_atual": 4,
+        "total_parcelas": 60,
+        "data_inicio": null,
+        "data_proxima_parcela": "2026-03-10",
+        "dia_vencimento": 10,
+        "categoria": "Kitnets",
+        "notas": ""
+      },
+      {
+        "pessoa": "Alvaro",
+        "descricao": "Carro Camila",
+        "valor_parcela": 3034.5,
+        "parcela_atual": 3,
+        "total_parcelas": 48,
+        "data_inicio": null,
+        "data_proxima_parcela": "2026-03-10",
+        "dia_vencimento": 10,
+        "categoria": "Camila",
+        "notas": ""
+      },
+      {
+        "pessoa": "Alvaro",
+        "descricao": "Parcela valores nov/dez",
+        "valor_parcela": 585.4,
+        "parcela_atual": 3,
+        "total_parcelas": 12,
+        "data_inicio": null,
+        "data_proxima_parcela": "2026-03-10",
+        "dia_vencimento": 10,
+        "categoria": null,
+        "notas": ""
+      },
+      {
+        "pessoa": "Alvaro",
+        "descricao": "Zaffari compras",
+        "valor_parcela": 58.62,
+        "parcela_atual": 2,
+        "total_parcelas": 6,
+        "data_inicio": null,
+        "data_proxima_parcela": "2026-03-10",
+        "dia_vencimento": 10,
+        "categoria": "Pessoal",
+        "notas": ""
+      },
+      {
+        "pessoa": "Alvaro",
+        "descricao": "IPVA Strada",
+        "valor_parcela": 259.0,
+        "parcela_atual": 3,
+        "total_parcelas": 6,
+        "data_inicio": null,
+        "data_proxima_parcela": "2026-03-10",
+        "dia_vencimento": 10,
+        "categoria": "Carros",
+        "notas": ""
+      },
+      {
+        "pessoa": "Alvaro",
+        "descricao": "Tags prédio",
+        "valor_parcela": 74.81,
+        "parcela_atual": 2,
+        "total_parcelas": 6,
+        "data_inicio": null,
+        "data_proxima_parcela": "2026-03-10",
+        "dia_vencimento": 10,
+        "categoria": "Kitnets",
+        "notas": ""
+      },
+      {
+        "pessoa": "Alvaro",
+        "descricao": "Leroy 1",
+        "valor_parcela": 68.56,
+        "parcela_atual": 1,
+        "total_parcelas": 10,
+        "data_inicio": null,
+        "data_proxima_parcela": "2026-03-10",
+        "dia_vencimento": 10,
+        "categoria": "Kitnets",
+        "notas": ""
+      },
+      {
+        "pessoa": "Alvaro",
+        "descricao": "Leroy 2",
+        "valor_parcela": 25.53,
+        "parcela_atual": 1,
+        "total_parcelas": 10,
+        "data_inicio": null,
+        "data_proxima_parcela": "2026-03-10",
+        "dia_vencimento": 10,
+        "categoria": "Kitnets",
+        "notas": ""
+      },
+      {
+        "pessoa": "Alvaro",
+        "descricao": "Ferragem 1",
+        "valor_parcela": 164.52,
+        "parcela_atual": 1,
+        "total_parcelas": 4,
+        "data_inicio": null,
+        "data_proxima_parcela": "2026-03-10",
+        "dia_vencimento": 10,
+        "categoria": "Kitnets",
+        "notas": ""
+      },
+      {
+        "pessoa": "Alvaro",
+        "descricao": "Mega Brick 1",
+        "valor_parcela": 141.7,
+        "parcela_atual": 1,
+        "total_parcelas": 6,
+        "data_inicio": null,
+        "data_proxima_parcela": "2026-03-10",
+        "dia_vencimento": 10,
+        "categoria": "Kitnets",
+        "notas": ""
+      },
+      {
+        "pessoa": "Alvaro",
+        "descricao": "Compra cartão Leroy",
+        "valor_parcela": 52.0,
+        "parcela_atual": 1,
+        "total_parcelas": 10,
+        "data_inicio": null,
+        "data_proxima_parcela": "2026-03-10",
+        "dia_vencimento": 10,
+        "categoria": "Kitnets",
+        "notas": ""
+      },
+      {
+        "pessoa": "Alvaro",
+        "descricao": "Duporto Peças",
+        "valor_parcela": 171.0,
+        "parcela_atual": 1,
+        "total_parcelas": 2,
+        "data_inicio": null,
+        "data_proxima_parcela": "2026-03-10",
+        "dia_vencimento": 10,
+        "categoria": null,
+        "notas": ""
+      },
+      {
+        "pessoa": "Alvaro",
+        "descricao": "Leroy 3",
+        "valor_parcela": 20.11,
+        "parcela_atual": 1,
+        "total_parcelas": 9,
+        "data_inicio": null,
+        "data_proxima_parcela": "2026-03-10",
+        "dia_vencimento": 10,
+        "categoria": "Kitnets",
+        "notas": ""
+      }
+    ]
+  },
+
+  "descontos": {
+    "_instrucoes": "Despesas que estão nos cartões/empréstimos de uma pessoa, mas são compras para os sogros/Camila. O valor é SUBTRAÍDO do total que o condomínio deve pagar à pessoa. Criados como Expense com is_offset=True.",
+    "items": [
+      {
+        "pessoa": "Alvaro",
+        "descricao": "TV presente aniversário Célia",
+        "valor_parcela": 295.0,
+        "parcela_atual": 8,
+        "total_parcelas": 10,
+        "data_proxima_parcela": "2026-03-10",
+        "dia_vencimento": 10,
+        "categoria": "Pessoal",
+        "notas": "Desconto: compra para os sogros"
+      },
+      {
+        "pessoa": "Alvaro",
+        "descricao": "Máquina secar roupas (Rodrigo)",
+        "valor_parcela": 337.5,
+        "parcela_atual": 7,
+        "total_parcelas": 12,
+        "data_proxima_parcela": "2026-03-10",
+        "dia_vencimento": 10,
+        "categoria": "Pessoal",
+        "notas": "Desconto: Rodrigo comprou para eles"
+      },
+      {
+        "pessoa": "Alvaro",
+        "descricao": "Cadeira Camila",
+        "valor_parcela": 124.5,
+        "parcela_atual": 1,
+        "total_parcelas": 10,
+        "data_proxima_parcela": "2026-03-10",
+        "dia_vencimento": 10,
+        "categoria": "Camila",
+        "notas": "Desconto: compra da Camila"
+      },
+      {
+        "pessoa": "Alvaro",
+        "descricao": "Carro Camila (desconto)",
+        "valor_parcela": 1534.5,
+        "parcela_atual": 3,
+        "total_parcelas": 48,
+        "data_proxima_parcela": "2026-03-10",
+        "dia_vencimento": 10,
+        "categoria": "Camila",
+        "notas": "Desconto: metade do financiamento é da Camila"
       }
     ]
   },
 
   "contas_consumo": {
-    "_instrucoes": "Contas mensais de água e luz. Cadastre os últimos meses para que o sistema calcule a média para projeção. Se o valor é fixo (conta com tarifa social, etc.), coloque is_recurring=true e o valor em expected_monthly_amount.",
+    "_instrucoes": "Contas mensais de água e luz. Valor é o TOTAL da fatura (incluindo parcelamento se houver). Se a fatura inclui parcela de dívida negociada, adicione 'parcelamento' com o nome do parcelamento em parcelamentos_divida. O sistema calcula: consumo_real = valor_fatura - valor_parcela.",
     "agua": [
       {
         "predio_street_number": 836,
+        "suspensa": true,
         "historico_mensal": [
           {
             "mes": "2026-01-01",
-            "valor": 0.0,
-            "pago": true,
-            "data_pagamento": "2026-01-15"
+            "valor": 1218.37,
+            "pago": false,
+            "data_pagamento": null
           },
           {
             "mes": "2026-02-01",
-            "valor": 0.0,
-            "pago": true,
-            "data_pagamento": "2026-02-15"
+            "valor": 1218.37,
+            "pago": false,
+            "data_pagamento": null
           },
           {
             "mes": "2026-03-01",
-            "valor": 0.0,
+            "valor": 1286.95,
             "pago": false,
             "data_pagamento": null
           }
         ],
         "dia_vencimento": 15,
-        "notas": ""
+        "notas": "SUSPENSA: Faturas não pagas, esperando DMAE cortar para fazer o parcelamento (não parcelam sem antes cortar). Não contabilizar no fluxo de caixa até negociação. Depois será entrada + parcelamento. Relógio DMAE 3419142"
       },
       {
         "predio_street_number": 850,
         "historico_mensal": [
           {
-            "mes": "2026-01-01",
-            "valor": 0.0,
-            "pago": true,
-            "data_pagamento": "2026-01-15"
-          },
-          {
             "mes": "2026-02-01",
-            "valor": 0.0,
+            "valor": 414.89,
             "pago": true,
             "data_pagamento": "2026-02-15"
           },
           {
             "mes": "2026-03-01",
-            "valor": 0.0,
-            "pago": false,
-            "data_pagamento": null
+            "valor": 696.04,
+            "pago": true,
+            "data_pagamento": "2026-03-15"
           }
         ],
-        "dia_vencimento": 15,
-        "notas": ""
+        "dia_vencimento": 4,
+        "notas": "Relógio DMAE 463540. Parcelamento de R$850/mês começa em abril/2026.",
+        "parcelamento": "Parcelamento Água 850"
       }
     ],
     "luz": [
       {
         "predio_street_number": 836,
+        "identificador": "Relógio Principal (Av. Circular 840)",
         "historico_mensal": [
           {
             "mes": "2026-01-01",
-            "valor": 0.0,
+            "valor": 1493.5,
             "pago": true,
             "data_pagamento": "2026-01-15"
           },
           {
             "mes": "2026-02-01",
-            "valor": 0.0,
+            "valor": 384.98,
             "pago": true,
             "data_pagamento": "2026-02-15"
           },
           {
             "mes": "2026-03-01",
-            "valor": 0.0,
+            "valor": 453.77,
             "pago": false,
             "data_pagamento": null
           }
         ],
-        "dia_vencimento": 20,
+        "dia_vencimento": 11,
         "notas": ""
+      },
+      {
+        "predio_street_number": 836,
+        "identificador": "Relógio 2 Kitnets (Av. Circular 836)",
+        "ativo": true,
+        "desativar_apos": null,
+        "historico_mensal": [
+          {
+            "mes": "2026-01-01",
+            "valor": 211.53,
+            "pago": true,
+            "data_pagamento": "2026-01-15"
+          },
+          {
+            "mes": "2026-02-01",
+            "valor": 108.61,
+            "pago": true,
+            "data_pagamento": "2026-02-15"
+          },
+          {
+            "mes": "2026-03-01",
+            "valor": 174.61,
+            "pago": false,
+            "data_pagamento": null
+          }
+        ],
+        "dia_vencimento": 5,
+        "notas": "Relógio conectado a apenas 2 kitnets, será desligado. Endereço CEEE: Av. Circular 836 (mesmo prédio físico que 840)"
       },
       {
         "predio_street_number": 850,
         "historico_mensal": [
           {
             "mes": "2026-01-01",
-            "valor": 0.0,
+            "valor": 970.42,
             "pago": true,
             "data_pagamento": "2026-01-15"
           },
           {
             "mes": "2026-02-01",
-            "valor": 0.0,
+            "valor": 957.88,
             "pago": true,
             "data_pagamento": "2026-02-15"
           },
           {
             "mes": "2026-03-01",
-            "valor": 0.0,
+            "valor": 1015.35,
             "pago": false,
             "data_pagamento": null
           }
         ],
-        "dia_vencimento": 20,
-        "notas": ""
+        "dia_vencimento": 11,
+        "notas": "",
+        "parcelamento": "Parcelamento Luz 850"
       }
     ]
   },
 
   "parcelamentos_divida": {
-    "_instrucoes": "Dívidas acumuladas de água/luz/IPTU que foram negociadas em parcelas fixas.",
+    "_instrucoes": "Dívidas acumuladas de água/luz/IPTU que foram negociadas em parcelas fixas. Se o parcelamento está incluso na fatura de consumo (água/luz), vincule pelo campo 'parcelamento' na seção contas_consumo. O sistema subtrai automaticamente o valor da parcela do valor total da fatura para calcular o consumo real.",
     "items": [
       {
+        "nome": "Parcelamento Luz 850",
+        "tipo": "electricity_bill",
+        "predio_street_number": 850,
+        "descricao": "Parcelamento dívida luz prédio 850",
+        "valor_total_divida": null,
+        "valor_parcela": 629.35,
+        "parcela_atual": 16,
+        "total_parcelas": 24,
+        "data_inicio": null,
+        "data_proxima_parcela": "2026-03-11",
+        "dia_vencimento": 11,
+        "categoria": "Kitnets",
+        "notas": "Parcela inclusa na fatura de luz do prédio 850. Valor do consumo real = valor_fatura - 629.35"
+      },
+      {
+        "nome": "Parcelamento Água 850",
         "tipo": "water_bill",
-        "predio_street_number": 836,
-        "descricao": "Parcelamento dívida água prédio 836",
-        "valor_total_divida": 0.0,
-        "valor_parcela": 0.0,
-        "parcela_atual": 1,
-        "total_parcelas": 1,
-        "data_inicio": "2026-01-01",
-        "dia_vencimento": 15,
-        "categoria": null,
-        "notas": ""
+        "predio_street_number": 850,
+        "descricao": "Parcelamento dívida água prédio 850",
+        "valor_total_divida": null,
+        "valor_parcela": 850.00,
+        "parcela_atual": 0,
+        "total_parcelas": 60,
+        "data_inicio": null,
+        "data_proxima_parcela": "2026-04-04",
+        "dia_vencimento": 4,
+        "categoria": "Kitnets",
+        "notas": "1ª parcela em abril/2026. Vai ser inclusa na fatura de água do 850."
       }
     ]
   },
@@ -466,14 +2634,14 @@
       {
         "predio_street_number": 836,
         "ano": 2026,
-        "descricao": "IPTU 2026 - Prédio 836",
-        "valor_total": 0.0,
-        "valor_parcela": 0.0,
+        "descricao": "IPTU 2026 - Prédio 836 (IPTU consta como 828)",
+        "valor_total": 9291.76,
+        "valor_parcela": 0,
         "parcela_atual": 1,
         "total_parcelas": 10,
         "dia_vencimento": 10,
         "data_primeira_parcela": "2026-01-10",
-        "notas": ""
+        "notas": "Não tem parcelamento ainda, provavelmente vão parcelar como divida"
       },
       {
         "predio_street_number": 850,
@@ -491,36 +2659,497 @@
     "divida": [
       {
         "predio_street_number": 836,
-        "descricao": "Parcelamento dívida IPTU prédio 836",
-        "valor_total_divida": 0.0,
-        "valor_parcela": 0.0,
-        "parcela_atual": 1,
-        "total_parcelas": 1,
-        "data_inicio": "2026-01-01",
-        "dia_vencimento": 10,
-        "notas": ""
+        "descricao": "Parcelamento IPTU 836 - 2020/2021, 2021/2021, 2024/2024, 2025/2025",
+        "saldo": 27958.39,
+        "data_inicio": "2025-09-30",
+        "categoria": "Kitnets",
+        "notas": "Termo 992988. Possui protesto ativo.",
+        "parcelas_detalhadas": [
+          {
+            "numero": 1,
+            "valor": 808.68,
+            "vencimento": "2025-09-30",
+            "pago": true,
+            "data_pagamento": "2025-09-30"
+          },
+          {
+            "numero": 2,
+            "valor": 484.35,
+            "vencimento": "2025-10-31",
+            "pago": true,
+            "data_pagamento": "2025-11-28"
+          },
+          {
+            "numero": 3,
+            "valor": 489.15,
+            "vencimento": "2025-11-28",
+            "pago": true,
+            "data_pagamento": "2025-12-28"
+          },
+          {
+            "numero": 4,
+            "valor": 493.94,
+            "vencimento": "2025-12-30",
+            "pago": true,
+            "data_pagamento": "2026-01-29"
+          },
+          {
+            "numero": 5,
+            "valor": 498.74,
+            "vencimento": "2026-01-30",
+            "pago": true,
+            "data_pagamento": "2026-01-29"
+          },
+          {
+            "numero": 6,
+            "valor": 503.53,
+            "vencimento": "2026-02-27",
+            "pago": false,
+            "data_pagamento": null
+          },
+          {
+            "numero": 7,
+            "valor": 508.33,
+            "vencimento": "2026-03-31",
+            "pago": false,
+            "data_pagamento": null
+          }
+        ]
+      },
+      {
+        "predio_street_number": 836,
+        "descricao": "Parcelamento IPTU 836 - 2022/2022, 2023/2023",
+        "saldo": 21260.33,
+        "data_inicio": "2025-09-30",
+        "categoria": "Kitnets",
+        "notas": "Termo 992989. Possui protesto ativo.",
+        "parcelas_detalhadas": [
+          {
+            "numero": 1,
+            "valor": 364.66,
+            "vencimento": "2025-09-30",
+            "pago": true,
+            "data_pagamento": "2025-09-30"
+          },
+          {
+            "numero": 2,
+            "valor": 368.31,
+            "vencimento": "2025-10-31",
+            "pago": true,
+            "data_pagamento": "2025-11-28"
+          },
+          {
+            "numero": 3,
+            "valor": 371.96,
+            "vencimento": "2025-11-28",
+            "pago": true,
+            "data_pagamento": "2025-12-28"
+          },
+          {
+            "numero": 4,
+            "valor": 375.61,
+            "vencimento": "2025-12-30",
+            "pago": true,
+            "data_pagamento": "2026-01-29"
+          },
+          {
+            "numero": 5,
+            "valor": 379.25,
+            "vencimento": "2026-01-30",
+            "pago": true,
+            "data_pagamento": "2026-01-29"
+          },
+          {
+            "numero": 6,
+            "valor": 382.9,
+            "vencimento": "2026-02-27",
+            "pago": false,
+            "data_pagamento": null
+          },
+          {
+            "numero": 7,
+            "valor": 386.55,
+            "vencimento": "2026-03-31",
+            "pago": false,
+            "data_pagamento": null
+          }
+        ]
+      },
+      {
+        "predio_street_number": 836,
+        "descricao": "Parcelamento IPTU 836 - 2017/2017",
+        "saldo": 15466.66,
+        "data_inicio": "2025-09-30",
+        "categoria": "Kitnets",
+        "notas": "Inscrição 516449. Possui protesto ativo. Site mostra apenas 7 parcelas por vez.",
+        "parcelas_detalhadas": [
+          {
+            "numero": 1,
+            "valor": 823.83,
+            "vencimento": "2025-09-30",
+            "pago": true,
+            "data_pagamento": "2025-09-30"
+          },
+          {
+            "numero": 2,
+            "valor": 267.95,
+            "vencimento": "2025-10-31",
+            "pago": true,
+            "data_pagamento": "2025-11-28"
+          },
+          {
+            "numero": 3,
+            "valor": 270.6,
+            "vencimento": "2025-11-28",
+            "pago": true,
+            "data_pagamento": "2025-12-28"
+          },
+          {
+            "numero": 4,
+            "valor": 273.25,
+            "vencimento": "2025-12-30",
+            "pago": true,
+            "data_pagamento": "2026-01-29"
+          },
+          {
+            "numero": 5,
+            "valor": 275.91,
+            "vencimento": "2026-01-30",
+            "pago": true,
+            "data_pagamento": "2026-01-29"
+          },
+          {
+            "numero": 6,
+            "valor": 278.56,
+            "vencimento": "2026-02-27",
+            "pago": false,
+            "data_pagamento": null
+          },
+          {
+            "numero": 7,
+            "valor": 281.21,
+            "vencimento": "2026-03-31",
+            "pago": false,
+            "data_pagamento": null
+          }
+        ]
+      },
+      {
+        "predio_street_number": 836,
+        "descricao": "Multa IPTU 836 - 2017/2024",
+        "saldo": 239.06,
+        "data_inicio": "2025-09-30",
+        "categoria": "Kitnets",
+        "notas": "Inscrição 516449. Multa IPTU.",
+        "parcelas_detalhadas": [
+          {
+            "numero": 1,
+            "valor": 45.1,
+            "vencimento": "2025-09-30",
+            "pago": true,
+            "data_pagamento": "2025-09-30"
+          },
+          {
+            "numero": 2,
+            "valor": 45.55,
+            "vencimento": "2025-10-31",
+            "pago": true,
+            "data_pagamento": "2025-11-28"
+          },
+          {
+            "numero": 3,
+            "valor": 46.0,
+            "vencimento": "2025-11-28",
+            "pago": true,
+            "data_pagamento": "2025-11-28"
+          },
+          {
+            "numero": 4,
+            "valor": 46.45,
+            "vencimento": "2025-12-30",
+            "pago": true,
+            "data_pagamento": "2025-12-28"
+          },
+          {
+            "numero": 5,
+            "valor": 46.9,
+            "vencimento": "2026-01-30",
+            "pago": true,
+            "data_pagamento": "2026-01-29"
+          },
+          {
+            "numero": 6,
+            "valor": 47.35,
+            "vencimento": "2026-02-27",
+            "pago": false,
+            "data_pagamento": null
+          },
+          {
+            "numero": 7,
+            "valor": 47.8,
+            "vencimento": "2026-03-31",
+            "pago": false,
+            "data_pagamento": null
+          }
+        ]
+      },
+      {
+        "predio_street_number": 850,
+        "descricao": "Parcelamento IPTU 850 - 2022/2022, 2023/2023, 2024/2024, 2025/2025",
+        "saldo": 2002.98,
+        "data_inicio": "2025-09-30",
+        "categoria": "Kitnets",
+        "notas": "Inscrição 516481.",
+        "parcelas_detalhadas": [
+          {
+            "numero": 1,
+            "valor": 125.98,
+            "vencimento": "2025-09-30",
+            "pago": true,
+            "data_pagamento": "2025-09-30"
+          },
+          {
+            "numero": 2,
+            "valor": 127.23,
+            "vencimento": "2025-10-31",
+            "pago": true,
+            "data_pagamento": "2025-11-28"
+          },
+          {
+            "numero": 3,
+            "valor": 128.49,
+            "vencimento": "2025-11-28",
+            "pago": true,
+            "data_pagamento": "2025-12-28"
+          },
+          {
+            "numero": 4,
+            "valor": 129.75,
+            "vencimento": "2025-12-30",
+            "pago": true,
+            "data_pagamento": "2026-01-29"
+          },
+          {
+            "numero": 5,
+            "valor": 131.01,
+            "vencimento": "2026-01-30",
+            "pago": true,
+            "data_pagamento": "2026-01-29"
+          },
+          {
+            "numero": 6,
+            "valor": 132.27,
+            "vencimento": "2026-02-27",
+            "pago": false,
+            "data_pagamento": null
+          },
+          {
+            "numero": 7,
+            "valor": 133.53,
+            "vencimento": "2026-03-31",
+            "pago": false,
+            "data_pagamento": null
+          }
+        ]
+      },
+      {
+        "predio_street_number": 850,
+        "descricao": "Parcelamento IPTU 850 - 2018/2018, 2020/2021, 2021/2021",
+        "saldo": 5251.24,
+        "data_inicio": "2021-11-30",
+        "categoria": "Kitnets",
+        "notas": "Inscrição 516503. 53 parcelas total, 51 pagas. Apenas pendentes listadas.",
+        "parcelas_detalhadas": [
+          {
+            "numero": 52,
+            "valor": 158.06,
+            "vencimento": "2026-02-27",
+            "pago": false,
+            "data_pagamento": null
+          },
+          {
+            "numero": 53,
+            "valor": 159.11,
+            "vencimento": "2026-03-31",
+            "pago": false,
+            "data_pagamento": null
+          }
+        ]
+      },
+      {
+        "predio_street_number": 850,
+        "descricao": "Parcelamento IPTU 850 - 2011/2012, 2010/2011, 2012/2013, 2013/2013",
+        "saldo": 8230.02,
+        "data_inicio": "2021-11-30",
+        "categoria": "Kitnets",
+        "notas": "Inscrição 516503. 53 parcelas total, 51 pagas. Apenas pendentes listadas.",
+        "parcelas_detalhadas": [
+          {
+            "numero": 52,
+            "valor": 250.43,
+            "vencimento": "2026-02-27",
+            "pago": false,
+            "data_pagamento": null
+          },
+          {
+            "numero": 53,
+            "valor": 252.09,
+            "vencimento": "2026-03-31",
+            "pago": false,
+            "data_pagamento": null
+          }
+        ]
+      },
+      {
+        "predio_street_number": 850,
+        "descricao": "Parcelamento IPTU 850 - 2024/2024, 2025/2025",
+        "saldo": 12273.44,
+        "data_inicio": "2025-09-30",
+        "categoria": "Kitnets",
+        "notas": "Inscrição 516503.",
+        "parcelas_detalhadas": [
+          {
+            "numero": 1,
+            "valor": 210.51,
+            "vencimento": "2025-09-30",
+            "pago": true,
+            "data_pagamento": "2025-09-30"
+          },
+          {
+            "numero": 2,
+            "valor": 212.62,
+            "vencimento": "2025-10-31",
+            "pago": true,
+            "data_pagamento": "2025-10-31"
+          },
+          {
+            "numero": 3,
+            "valor": 214.73,
+            "vencimento": "2025-11-28",
+            "pago": true,
+            "data_pagamento": "2025-12-28"
+          },
+          {
+            "numero": 4,
+            "valor": 216.83,
+            "vencimento": "2025-12-30",
+            "pago": true,
+            "data_pagamento": "2026-01-29"
+          },
+          {
+            "numero": 5,
+            "valor": 218.94,
+            "vencimento": "2026-01-30",
+            "pago": true,
+            "data_pagamento": "2026-01-29"
+          },
+          {
+            "numero": 6,
+            "valor": 221.04,
+            "vencimento": "2026-02-27",
+            "pago": false,
+            "data_pagamento": null
+          },
+          {
+            "numero": 7,
+            "valor": 223.15,
+            "vencimento": "2026-03-31",
+            "pago": false,
+            "data_pagamento": null
+          }
+        ]
+      },
+      {
+        "predio_street_number": 850,
+        "descricao": "Parcelamento IPTU 850 - 2022/2022, 2023/2023",
+        "saldo": 13793.01,
+        "data_inicio": "2025-09-30",
+        "categoria": "Kitnets",
+        "notas": "Inscrição 516503.",
+        "parcelas_detalhadas": [
+          {
+            "numero": 1,
+            "valor": 236.59,
+            "vencimento": "2025-09-30",
+            "pago": true,
+            "data_pagamento": "2025-09-30"
+          },
+          {
+            "numero": 2,
+            "valor": 238.95,
+            "vencimento": "2025-10-31",
+            "pago": true,
+            "data_pagamento": "2025-10-31"
+          },
+          {
+            "numero": 3,
+            "valor": 241.32,
+            "vencimento": "2025-11-28",
+            "pago": true,
+            "data_pagamento": "2025-12-28"
+          },
+          {
+            "numero": 4,
+            "valor": 243.68,
+            "vencimento": "2025-12-30",
+            "pago": true,
+            "data_pagamento": "2026-01-29"
+          },
+          {
+            "numero": 5,
+            "valor": 246.05,
+            "vencimento": "2026-01-30",
+            "pago": true,
+            "data_pagamento": "2026-01-29"
+          },
+          {
+            "numero": 6,
+            "valor": 248.41,
+            "vencimento": "2026-02-27",
+            "pago": false,
+            "data_pagamento": null
+          },
+          {
+            "numero": 7,
+            "valor": 250.78,
+            "vencimento": "2026-03-31",
+            "pago": false,
+            "data_pagamento": null
+          }
+        ]
+      },
+      {
+        "predio_street_number": 850,
+        "descricao": "IPTU 2026 - Prédio 850",
+        "saldo": 6691.38,
+        "data_inicio": null,
+        "categoria": "Kitnets",
+        "suspensa": true,
+        "notas": "SUSPENSO: IPTU 2026 (R$615,07 + R$6.076,31 = R$6.691,38). Não pago, será parcelado. Adicionar parcelas quando negociado."
       }
     ]
   },
 
   "gastos_fixos": {
-    "_instrucoes": "Gastos mensais recorrentes. O sistema projeta esses valores para meses futuros automaticamente.",
+    "_instrucoes": "Gastos mensais recorrentes. O sistema projeta esses valores para meses futuros automaticamente. Use 'pessoa' para vincular a quem paga (ex: Rodrigo paga Unimed), ou null se é gasto direto do condomínio.",
     "items": [
       {
         "descricao": "Internet - Prédio 836",
-        "valor_mensal": 0.0,
-        "dia_vencimento": 10,
+        "valor_mensal": 129.9,
+        "dia_vencimento": 15,
         "predio_street_number": 836,
-        "categoria": "Internet",
+        "pessoa": null,
+        "categoria": "Kitnets",
         "data_inicio": "2026-01-01",
         "notas": ""
       },
       {
         "descricao": "Internet - Prédio 850",
-        "valor_mensal": 0.0,
-        "dia_vencimento": 10,
+        "valor_mensal": 129.9,
+        "dia_vencimento": 15,
         "predio_street_number": 850,
-        "categoria": "Internet",
+        "pessoa": null,
+        "categoria": "Kitnets",
         "data_inicio": "2026-01-01",
         "notas": ""
       },
@@ -529,18 +3158,62 @@
         "valor_mensal": 0.0,
         "dia_vencimento": 10,
         "predio_street_number": null,
-        "categoria": "Internet",
+        "pessoa": null,
+        "categoria": "Pessoal",
+        "data_inicio": "2026-01-01",
+        "notas": "Vai iniciar em Abril/2026 no valor de R$232.52/mês"
+      },
+      {
+        "descricao": "Ração galinhas",
+        "valor_mensal": 400.0,
+        "dia_vencimento": null,
+        "predio_street_number": null,
+        "pessoa": null,
+        "categoria": "Pessoal",
         "data_inicio": "2026-01-01",
         "notas": ""
       },
       {
-        "descricao": "Ração galinhas",
-        "valor_mensal": 0.0,
+        "descricao": "Detergentes",
+        "valor_mensal": 150.0,
         "dia_vencimento": null,
         "predio_street_number": null,
-        "categoria": "Ração/Sítio",
+        "pessoa": null,
+        "categoria": "Kitnets",
         "data_inicio": "2026-01-01",
-        "notas": ""
+        "notas": "Produtos de limpeza para os kitnets"
+      },
+      {
+        "descricao": "Unimed - Plano de Saúde",
+        "valor_mensal": 2230.0,
+        "dia_vencimento": null,
+        "predio_street_number": null,
+        "pessoa": "Rodrigo",
+        "categoria": "Pessoal",
+        "data_inicio": "2026-01-01",
+        "notas": "Rodrigo paga o plano de saúde dos sogros"
+      },
+      {
+        "descricao": "Faculdade Junior",
+        "valor_mensal": 200.0,
+        "dia_vencimento": 10,
+        "predio_street_number": null,
+        "pessoa": "Junior",
+        "categoria": "Pessoal",
+        "data_inicio": "2026-03-01",
+        "data_fim": "2026-12-31",
+        "notas": "Mensalidade da faculdade do Junior, termina em dez/2026"
+      },
+      {
+        "descricao": "Prestação terras sítio (Eloênio)",
+        "valor_mensal": 500.0,
+        "dia_vencimento": null,
+        "predio_street_number": null,
+        "pessoa": null,
+        "categoria": "Pessoal",
+        "data_inicio": "2026-03-01",
+        "data_fim": "2027-02-28",
+        "notas": "Prestação de terras do sítio paga a Eloênio (terceiro, não familiar)"
       }
     ]
   },
@@ -549,15 +3222,39 @@
     "_instrucoes": "Gastos avulsos que já aconteceram. Para registrar histórico.",
     "items": [
       {
-        "descricao": "_DESCRICAO_",
-        "valor": 0.0,
+        "descricao": "Zaffari (Alvaro)",
+        "valor": 200.0,
         "data": "2026-03-01",
-        "pessoa": null,
+        "pessoa": "Alvaro",
         "cartao": null,
         "predio_street_number": null,
-        "categoria": null,
+        "categoria": "Pessoal",
         "pago": true,
-        "data_pagamento": "2026-03-01",
+        "data_pagamento": "2026-03-10",
+        "notas": "Pagamento único mar/2026"
+      },
+      {
+        "descricao": "Bistek (Alvaro)",
+        "valor": 400.0,
+        "data": "2026-03-01",
+        "pessoa": "Alvaro",
+        "cartao": null,
+        "predio_street_number": null,
+        "categoria": "Pessoal",
+        "pago": true,
+        "data_pagamento": "2026-03-10",
+        "notas": "Pagamento único mar/2026"
+      },
+      {
+        "descricao": "Entrada Parcelamento Conta de Água Prédio 850",
+        "valor": 4000.0,
+        "data": "2026-03-21",
+        "pessoa": "Alvaro",
+        "cartao": null,
+        "predio_street_number": null,
+        "categoria": "Kitnets",
+        "pago": true,
+        "data_pagamento": "2026-03-21",
         "notas": ""
       }
     ]
@@ -567,24 +3264,22 @@
     "_instrucoes": "Receitas que não são aluguel. Aposentadoria, valores avulsos, etc.",
     "recorrentes": [
       {
-        "descricao": "Aposentadoria",
-        "valor_mensal": 0.0,
+        "descricao": "Aposentadoria Raul",
+        "valor_mensal": 1030.0,
         "pessoa": null,
-        "data_inicio": "2026-01-01",
+        "data_inicio": "2024-01-01",
         "notas": ""
       }
     ],
-    "avulsas": [
-      {
-        "descricao": "_DESCRICAO_",
-        "valor": 0.0,
-        "data": "2026-03-01",
-        "pessoa": null,
-        "predio_street_number": null,
-        "recebido": true,
-        "data_recebimento": "2026-03-01",
-        "notas": ""
-      }
+    "avulsas": []
+  },
+
+  "pagamentos_pessoas": {
+    "_instrucoes": "Pagamentos efetivos feitos às pessoas (Rodrigo, Tiago, Junior, Alvaro). Cada entrada é um pagamento individual. O sistema calcula: total_devido - total_pago = saldo_pendente.",
+    "items": [
+      {"pessoa": "Tiago", "mes_referencia": "2026-03-01", "valor": 1922.90, "data_pagamento": "2026-03-10", "notas": "Pago integral março"},
+      {"pessoa": "Rodrigo", "mes_referencia": "2026-03-01", "valor": 5000.00, "data_pagamento": "2026-03-05", "notas": "Pagamento parcial março"},
+      {"pessoa": "Junior", "mes_referencia": "2026-03-01", "valor": 767.00, "data_pagamento": "2026-03-10", "notas": "Pagamento parcial março, falta R$400"}
     ]
   },
 

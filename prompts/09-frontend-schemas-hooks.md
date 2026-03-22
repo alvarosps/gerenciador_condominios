@@ -82,6 +82,9 @@ export const personSchema = z.object({
 });
 ```
 
+**expense-category.schema.ts** deve incluir:
+- `id`, `name`, `description`, `color`, `parent` (nested category ou null), `parent_id` (write), `subcategories` (array recursiva de categorySchema)
+
 **expense.schema.ts** deve incluir:
 - Todos os campos do model Expense
 - `person`, `credit_card`, `building`, `category` como nested objects (read)

@@ -3,7 +3,7 @@
 **Feature**: Módulo Financeiro Completo
 **Design Doc**: `docs/plans/2026-03-21-financial-module-design.md`
 **Total de Sessões**: 15
-**Sessão Atual**: 13 (concluída)
+**Sessão Atual**: 15 (concluída)
 
 ---
 
@@ -21,11 +21,11 @@
 | 08 | Backend: SimulationService + Endpoints + Tests | concluída | SimulationService (6 cenários + compare), FinancialDashboardViewSet (6 endpoints), CashFlowViewSet (4 endpoints), 56 testes passando |
 | 09 | Frontend: Schemas + API Hooks | concluída | 10 schemas + 11 hooks + 4 test files (16 testes), MSW handlers, type-check + lint clean |
 | 10 | Frontend: Navegação + Páginas Base | concluída | Sidebar expansível, 4 páginas (Persons CRUD + cartões, Categories CRUD hierárquica, Settings singleton, Financial placeholder), use-financial-settings hook, type-check + build clean |
-| 11 | Frontend: Página de Despesas | pendente | |
-| 12 | Frontend: Income + RentPayments + Employees | pendente | |
+| 11 | Frontend: Página de Despesas | concluída | 5 componentes (columns, filters, form-modal, installments-drawer, page), smart form por tipo, cascata pessoa→cartão, drawer de parcelas, type-check + build clean |
+| 12 | Frontend: Income + RentPayments + Employees | concluída | 3 páginas CRUD (incomes, rent-payments, employees), 3 form modals, filtros cascata building→apartment, month picker, real-time total, type-check + build clean |
 | 13 | Frontend: Dashboard Financeiro | concluída | 6 widgets (BalanceCards, CashFlowChart, PersonSummaryCards, UpcomingInstallments, OverdueAlerts, CategoryBreakdownChart), interfaces corrigidas para match backend, type-check + build clean |
-| 14 | Frontend: Simulador | pendente | |
-| 15 | Permissões + E2E Tests + Polish | pendente | |
+| 14 | Frontend: Simulador | concluída | 6 componentes (scenario-builder, scenario-card, comparison-chart, comparison-table, impact-summary, page), useSimulation interfaces corrigidas para match backend, MSW handler atualizado, type-check + build + lint clean |
+| 15 | Permissões + E2E Tests + Polish | concluída | FinancialReadOnly permission, IsAuthenticated para Dashboard/CashFlow, is_staff no frontend, conditional UI em 7 páginas, export Excel (despesas/receitas/pagamentos), 6 E2E tests + 3 simulation tests, type-check + lint + build clean |
 
 ---
 
@@ -40,6 +40,14 @@
 7. `PersonSimple` schema em `credit-card.schema.ts` (não em `person.schema.ts`) para evitar dependência circular Person→CreditCard→Person. Person importa CreditCard; schemas que precisam de person nested (expense, income, etc.) importam PersonSimple de credit-card.schema.ts.
 8. `ExpenseCategory` usa `z.lazy()` para suportar subcategories recursivas no schema Zod.
 9. Interfaces dos hooks `use-financial-dashboard.ts` e `use-cash-flow.ts` foram corrigidas na sessão 13 para match com os campos reais do backend (sessão 09 criou interfaces especulativas que divergiam dos endpoints implementados nas sessões 07-08).
+10. Expense form schema usa `z.boolean()` e `z.string()` (sem `.default()` ou `.optional()`) para compatibilidade com `zodResolver` — validação condicional por tipo feita manualmente no `handleSubmit` via `validateConditionalFields()` em vez de `superRefine` (que causa type mismatch com React Hook Form).
+11. Em Zod 4, `z.number({ required_error: '...' })` não é válido — usar `z.number().min(1, '...')` ou `z.number({ error: '...' })`. Também evitar `.optional().default('')` em form schemas, preferir `.default('')` ou plain type com defaultValues no useForm.
+12. `useSimulation` hook (sessão 09) tinha interfaces especulativas (`name` em vez de `type`, `results` em vez de `base/simulated/comparison`) — corrigidas na sessão 14 para match com o endpoint real `POST /api/cash-flow/simulate/` implementado na sessão 08. Cenários usam `type` (SimulationScenarioType union) e resposta retorna `{ base, simulated, comparison }`.
+13. Simulador usa `useRef` para estabilizar `simulation.mutate` sem eslint-disable — padrão seguro para evitar deps infinitas em callbacks que chamam mutations.
+14. `FinancialReadOnly` permission criada em `core/permissions.py` — idêntica em lógica a `ReadOnlyForNonAdmin` mas nomeada especificamente para o módulo financeiro. Aplicada em todos os CRUD ViewSets financeiros.
+15. `FinancialDashboardViewSet` e `CashFlowViewSet` usam `IsAuthenticated` (não `FinancialReadOnly`) — qualquer usuário autenticado pode ler dashboard e rodar simulações.
+16. `FinancialSettingsViewSet` mudou de `IsAdminUser` para `FinancialReadOnly` — non-admin pode ler configurações mas não alterar.
+17. `is_staff` adicionado ao `User` interface no frontend (`auth-store.ts`) — usado para conditional rendering de botões de ação (criar/editar/excluir/marcar como pago).
 
 ## Arquivos Criados
 
@@ -61,6 +69,8 @@
 - `tests/unit/test_financial/test_simulation_service.py` — 30 testes
 - `tests/integration/test_financial_dashboard_api.py` — 15 testes
 - `tests/integration/test_cash_flow_api.py` — 11 testes
+- `tests/e2e/__init__.py`
+- `tests/e2e/test_financial_workflow.py` — 6 testes E2E (workflow completo, owner, prepaid, salary_offset, permissions, bulk_mark_paid)
 
 ### Frontend
 - `frontend/lib/schemas/person.schema.ts` — Person schema + type
@@ -89,7 +99,8 @@
 - `frontend/lib/api/hooks/__tests__/use-persons.test.tsx` — 4 testes
 - `frontend/lib/api/hooks/__tests__/use-expenses.test.tsx` — 6 testes
 - `frontend/lib/api/hooks/__tests__/use-financial-dashboard.test.tsx` — 3 testes
-- `frontend/lib/api/hooks/__tests__/use-cash-flow.test.tsx` — 3 testes
+- `frontend/lib/api/hooks/__tests__/use-cash-flow.test.tsx` — 2 testes (simulation movido para arquivo próprio)
+- `frontend/lib/api/hooks/__tests__/use-simulation.test.tsx` — 3 testes (scenarios, empty, error)
 
 - `frontend/app/(dashboard)/financial/page.tsx` — Placeholder page
 - `frontend/app/(dashboard)/financial/persons/page.tsx` — CRUD Pessoas (8 colunas, badges, useCrudPage)
@@ -100,12 +111,32 @@
 - `frontend/app/(dashboard)/financial/settings/page.tsx` — Formulário singleton (GET/PUT)
 - `frontend/lib/api/hooks/use-financial-settings.ts` — useFinancialSettings + useUpdateFinancialSettings
 
+- `frontend/app/(dashboard)/financial/expenses/page.tsx` — Página de despesas com CRUD, filtros, drawer
+- `frontend/app/(dashboard)/financial/expenses/_components/expense-columns.tsx` — 11 colunas com badges, formatação
+- `frontend/app/(dashboard)/financial/expenses/_components/expense-filters.tsx` — 7 filtros com cascata pessoa→cartão
+- `frontend/app/(dashboard)/financial/expenses/_components/expense-form-modal.tsx` — Smart form adaptativo por tipo (9 tipos)
+- `frontend/app/(dashboard)/financial/expenses/_components/installments-drawer.tsx` — Sheet drawer com mark paid
+
+- `frontend/app/(dashboard)/financial/incomes/page.tsx` — CRUD Receitas (9 colunas, filtros inline, mark_received)
+- `frontend/app/(dashboard)/financial/incomes/_components/income-form-modal.tsx` — Form modal (create/edit, is_recurring toggle)
+- `frontend/app/(dashboard)/financial/rent-payments/page.tsx` — CRUD Pagamentos Aluguel (6 colunas, cascata building→apartment, month range)
+- `frontend/app/(dashboard)/financial/rent-payments/_components/rent-payment-form-modal.tsx` — Form modal (lease select formatado, month picker→YYYY-MM-01)
+- `frontend/app/(dashboard)/financial/employees/page.tsx` — CRUD Funcionários (9 colunas, mark_paid, total bold)
+- `frontend/app/(dashboard)/financial/employees/_components/employee-payment-form-modal.tsx` — Form modal (is_employee filter, real-time total via watch)
+
 - `frontend/app/(dashboard)/financial/_components/balance-cards.tsx` — 4 stat cards com cor condicional
 - `frontend/app/(dashboard)/financial/_components/cash-flow-chart.tsx` — ComposedChart 12 meses (Bar + Line)
 - `frontend/app/(dashboard)/financial/_components/person-summary-cards.tsx` — Grid de cards por pessoa
 - `frontend/app/(dashboard)/financial/_components/upcoming-installments.tsx` — Lista scrollable com highlights
 - `frontend/app/(dashboard)/financial/_components/overdue-alerts.tsx` — Alertas vencidos ou mensagem positiva
 - `frontend/app/(dashboard)/financial/_components/category-breakdown-chart.tsx` — PieChart com cores das categorias
+
+- `frontend/app/(dashboard)/financial/simulator/page.tsx` — Página do simulador (cenários efêmeros, gráfico + tabela comparativa)
+- `frontend/app/(dashboard)/financial/simulator/_components/scenario-builder.tsx` — Sheet drawer para criar cenários (6 tipos)
+- `frontend/app/(dashboard)/financial/simulator/_components/scenario-card.tsx` — Card compacto com ícone, título, descrição e botão remover
+- `frontend/app/(dashboard)/financial/simulator/_components/comparison-chart.tsx` — ComposedChart com linhas base vs simulado + área delta
+- `frontend/app/(dashboard)/financial/simulator/_components/comparison-table.tsx` — Tabela mês a mês com deltas coloridos e total no rodapé
+- `frontend/app/(dashboard)/financial/simulator/_components/impact-summary.tsx` — Card resumo (impacto total, mês equilíbrio, saldos finais)
 
 ## Arquivos Modificados
 
@@ -130,6 +161,22 @@
 - `frontend/tests/mocks/handlers.ts` — MSW handlers atualizados para match novas interfaces
 - `frontend/lib/api/hooks/__tests__/use-financial-dashboard.test.tsx` — testes atualizados para novas interfaces
 - `frontend/lib/api/hooks/__tests__/use-cash-flow.test.tsx` — testes atualizados para novas interfaces
+- `frontend/lib/api/hooks/use-simulation.ts` — interfaces corrigidas para match backend (SimulationScenario.type, SimulationResult com base/simulated/comparison)
+- `frontend/tests/mocks/handlers.ts` — MSW handler de simulate atualizado para retornar { base, simulated, comparison }
+- `frontend/lib/api/hooks/__tests__/use-cash-flow.test.tsx` — teste de simulação movido para use-simulation.test.tsx
+- `core/permissions.py` — adicionada FinancialReadOnly permission class
+- `core/viewsets/financial_views.py` — todos os ViewSets CRUD agora usam FinancialReadOnly (antes ReadOnlyForNonAdmin), FinancialSettingsViewSet mudou de IsAdminUser para FinancialReadOnly
+- `core/viewsets/financial_dashboard_views.py` — DashboardViewSet e CashFlowViewSet mudaram de ReadOnlyForNonAdmin para IsAuthenticated, removido IsAdminUser do simulate action
+- `frontend/store/auth-store.ts` — is_staff adicionado ao User interface
+- `frontend/app/(dashboard)/financial/persons/page.tsx` — conditional UI (isAdmin) para botões criar/editar/excluir
+- `frontend/app/(dashboard)/financial/categories/page.tsx` — conditional UI (isAdmin) para botões criar/editar/excluir
+- `frontend/app/(dashboard)/financial/expenses/page.tsx` — conditional UI + botão exportar Excel
+- `frontend/app/(dashboard)/financial/expenses/_components/expense-columns.tsx` — isAdmin no handler, edit/delete/markPaid condicionais
+- `frontend/app/(dashboard)/financial/incomes/page.tsx` — conditional UI + botão exportar Excel
+- `frontend/app/(dashboard)/financial/rent-payments/page.tsx` — conditional UI + botão exportar Excel
+- `frontend/app/(dashboard)/financial/employees/page.tsx` — conditional UI (isAdmin) para botões criar/editar/excluir/marcar pago
+- `frontend/app/(dashboard)/financial/settings/page.tsx` — campos e botão salvar desabilitados para non-admin
+- `frontend/lib/hooks/use-export.ts` — adicionadas expenseExportColumns, incomeExportColumns, rentPaymentExportColumns
 
 ## Correções Pós-Design (sessão de brainstorming 2026-03-22)
 
@@ -152,3 +199,4 @@
 
 - Testes de serviço (test_contract_service, test_template_management_service) timeout sem Redis local — issue pré-existente, não relacionado ao módulo financeiro
 - xdist workers crasham em Windows/Python 3.14 — issue pré-existente
+- Diretório `financial-employees-temp` é lixo de uma sessão abortada — deve ser deletado manualmente (arquivos foram substituídos por stubs vazios para não bloquear build)

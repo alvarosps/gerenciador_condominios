@@ -26,6 +26,7 @@ from core.models import (
     Person,
     PersonIncome,
     PersonIncomeType,
+    PersonPayment,
     RentPayment,
 )
 
@@ -201,6 +202,7 @@ class CashFlowService:
             due_date__lt=next_month,
             expense__expense_type=ExpenseType.CARD_PURCHASE,
             expense__is_debt_installment=False,
+            expense__is_offset=False,
         ).select_related("expense", "expense__person", "expense__credit_card")
 
         card_installments = Decimal("0.00")
@@ -230,6 +232,7 @@ class CashFlowService:
             due_date__gte=month_start,
             due_date__lt=next_month,
             expense__expense_type__in=[ExpenseType.BANK_LOAN, ExpenseType.PERSONAL_LOAN],
+            expense__is_offset=False,
         ).select_related("expense", "expense__person")
 
         loan_installments = Decimal("0.00")
@@ -711,13 +714,14 @@ class CashFlowService:
                 }
             )
 
-        # Card installments for this person
+        # Card installments for this person (excluding offsets)
         card_installments = ExpenseInstallment.objects.filter(
             due_date__gte=month_start,
             due_date__lt=next_month,
             expense__person=person,
             expense__expense_type=ExpenseType.CARD_PURCHASE,
             expense__is_debt_installment=False,
+            expense__is_offset=False,
         ).select_related("expense", "expense__credit_card")
 
         card_total = Decimal("0.00")
@@ -736,12 +740,13 @@ class CashFlowService:
                 }
             )
 
-        # Loan installments for this person
+        # Loan installments for this person (excluding offsets)
         loan_installments = ExpenseInstallment.objects.filter(
             due_date__gte=month_start,
             due_date__lt=next_month,
             expense__person=person,
             expense__expense_type__in=[ExpenseType.BANK_LOAN, ExpenseType.PERSONAL_LOAN],
+            expense__is_offset=False,
         ).select_related("expense")
 
         loan_total = Decimal("0.00")
@@ -757,7 +762,67 @@ class CashFlowService:
                 }
             )
 
-        net_amount = receives - card_total - loan_total
+        # Offset installments (discounts — purchases on this person's card that are for sogros/Camila)
+        offset_installments = ExpenseInstallment.objects.filter(
+            due_date__gte=month_start,
+            due_date__lt=next_month,
+            expense__person=person,
+            expense__is_offset=True,
+        ).select_related("expense")
+
+        offset_total = Decimal("0.00")
+        offset_details = []
+        for inst in offset_installments:
+            offset_total += inst.amount
+            offset_details.append(
+                {
+                    "description": inst.expense.description,
+                    "installment": f"{inst.installment_number}/{inst.total_installments}",
+                    "amount": inst.amount,
+                    "due_date": inst.due_date,
+                }
+            )
+
+        # Also check non-installment offset expenses for this month
+        offset_single = Expense.objects.filter(
+            expense_date__gte=month_start,
+            expense_date__lt=next_month,
+            person=person,
+            is_offset=True,
+            is_installment=False,
+        )
+        for exp in offset_single:
+            offset_total += exp.total_amount
+            offset_details.append(
+                {
+                    "description": exp.description,
+                    "installment": None,
+                    "amount": exp.total_amount,
+                    "due_date": exp.expense_date,
+                }
+            )
+
+        net_amount = receives - card_total - loan_total + offset_total
+
+        # Payments made to this person for this month
+        payments = PersonPayment.objects.filter(
+            person=person,
+            reference_month=month_start,
+        ).order_by("payment_date")
+
+        total_paid = Decimal("0.00")
+        payment_details = []
+        for payment in payments:
+            total_paid += payment.amount
+            payment_details.append(
+                {
+                    "amount": payment.amount,
+                    "payment_date": payment.payment_date,
+                    "notes": payment.notes,
+                }
+            )
+
+        pending_balance = net_amount - total_paid
 
         return {
             "person_id": person_id,
@@ -768,5 +833,10 @@ class CashFlowService:
             "card_details": card_details,
             "loan_total": loan_total,
             "loan_details": loan_details,
+            "offset_total": offset_total,
+            "offset_details": offset_details,
             "net_amount": net_amount,
+            "total_paid": total_paid,
+            "payment_details": payment_details,
+            "pending_balance": pending_balance,
         }

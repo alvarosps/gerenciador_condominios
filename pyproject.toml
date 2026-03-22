@@ -28,7 +28,7 @@ build-backend = "setuptools.build_meta"
 # =============================================================================
 
 [tool.ruff]
-target-version = "py311"
+target-version = "py314"
 line-length = 100
 src = ["core", "condominios_manager"]
 extend-exclude = [
@@ -88,7 +88,8 @@ select = [
     # --- Testing ---
     "PT",      # flake8-pytest-style
     # --- Type checking ---
-    "TC",      # flake8-type-checking
+    # TC (flake8-type-checking) DISABLED: enforces TYPE_CHECKING + `from __future__ import annotations`
+    # pattern which we don't use — Python 3.14 has PEP 649 lazy annotations natively
     "DTZ",     # flake8-datetimez (timezone-aware datetimes)
     # --- Pylint subset ---
     "PL",      # pylint (conventions, errors, refactor, warnings)

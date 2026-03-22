@@ -833,6 +833,9 @@ class ExpenseCategory(AuditMixin, SoftDeleteMixin, models.Model):
     name = models.CharField(max_length=100, unique=True)
     description = models.TextField(blank=True)
     color = models.CharField(max_length=7, default="#6B7280")
+    parent = models.ForeignKey(
+        "self", null=True, blank=True, related_name="subcategories", on_delete=models.CASCADE
+    )
 
     all_objects = models.Manager()
     objects = SoftDeleteManager()
@@ -842,6 +845,8 @@ class ExpenseCategory(AuditMixin, SoftDeleteMixin, models.Model):
         verbose_name_plural = "Expense categories"
 
     def __str__(self) -> str:
+        if self.parent:
+            return f"{self.parent.name} > {self.name}"
         return self.name
 
 
@@ -886,6 +891,10 @@ class Expense(AuditMixin, SoftDeleteMixin, models.Model):
     )
     is_paid = models.BooleanField(default=False)
     paid_date = models.DateField(null=True, blank=True)
+    is_offset = models.BooleanField(
+        default=False,
+        help_text="Desconto: valor é subtraído do total da pessoa (compra feita no cartão dela, mas para os sogros/Camila).",
+    )
     bank_name = models.CharField(max_length=100, blank=True)
     interest_rate = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
     notes = models.TextField(blank=True)
@@ -1030,6 +1039,26 @@ class EmployeePayment(AuditMixin, SoftDeleteMixin, models.Model):
     @property
     def total_paid(self) -> Decimal:
         return self.base_salary + self.variable_amount
+
+
+class PersonPayment(AuditMixin, SoftDeleteMixin, models.Model):
+    person = models.ForeignKey(Person, related_name="payments_received", on_delete=models.CASCADE)
+    reference_month = models.DateField(help_text="Primeiro dia do mês de referência (ex: 2026-03-01)")
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    payment_date = models.DateField()
+    notes = models.TextField(blank=True)
+
+    all_objects = models.Manager()
+    objects = SoftDeleteManager()
+
+    class Meta:
+        ordering = ["-payment_date"]
+        indexes = [
+            models.Index(fields=["person", "reference_month"], name="person_payment_month_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return f"Pagamento R${self.amount} a {self.person.name} - {self.reference_month.strftime('%m/%Y')}"
 
 
 class FinancialSettings(models.Model):

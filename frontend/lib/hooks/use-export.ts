@@ -297,3 +297,104 @@ export const furnitureExportColumns = [
     format: (value: unknown) => format(new Date(toStr(value)), 'dd/MM/yyyy HH:mm'),
   },
 ];
+
+export const expenseExportColumns = [
+  { key: 'description' as const, label: 'Descrição' },
+  { key: 'expense_type' as const, label: 'Tipo' },
+  {
+    key: 'total_amount' as const,
+    label: 'Valor',
+    format: (value: unknown) => formatCurrency(Number(value) || 0),
+  },
+  {
+    key: 'person' as const,
+    label: 'Pessoa',
+    format: (value: unknown) => (value && typeof value === 'object' && 'name' in value ? String(value.name) : ''),
+  },
+  {
+    key: 'credit_card' as const,
+    label: 'Cartão',
+    format: (value: unknown) => (value && typeof value === 'object' && 'nickname' in value ? String(value.nickname) : ''),
+  },
+  {
+    key: 'building' as const,
+    label: 'Prédio',
+    format: (value: unknown) => (value && typeof value === 'object' && 'name' in value ? String(value.name) : ''),
+  },
+  {
+    key: 'category' as const,
+    label: 'Categoria',
+    format: (value: unknown) => (value && typeof value === 'object' && 'name' in value ? String(value.name) : ''),
+  },
+  {
+    key: 'expense_date' as const,
+    label: 'Data',
+    format: (value: unknown) => format(new Date(toStr(value)), 'dd/MM/yyyy'),
+  },
+  {
+    key: 'is_paid' as const,
+    label: 'Pago',
+    format: (value: unknown) => (value ? 'Sim' : 'Não'),
+  },
+];
+
+export const incomeExportColumns = [
+  { key: 'description' as const, label: 'Descrição' },
+  {
+    key: 'amount' as const,
+    label: 'Valor',
+    format: (value: unknown) => formatCurrency(Number(value) || 0),
+  },
+  {
+    key: 'income_date' as const,
+    label: 'Data',
+    format: (value: unknown) => format(new Date(toStr(value)), 'dd/MM/yyyy'),
+  },
+  {
+    key: 'person' as const,
+    label: 'Pessoa',
+    format: (value: unknown) => (value && typeof value === 'object' && 'name' in value ? String(value.name) : ''),
+  },
+  {
+    key: 'is_received' as const,
+    label: 'Recebido',
+    format: (value: unknown) => (value ? 'Sim' : 'Não'),
+  },
+];
+
+export const rentPaymentExportColumns = [
+  {
+    key: 'reference_month' as const,
+    label: 'Mês Ref.',
+    format: (value: unknown) => {
+      const str = toStr(value);
+      if (!str) return '';
+      const d = new Date(str + 'T00:00:00');
+      return d.toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' }).replace('.', '');
+    },
+  },
+  {
+    key: 'lease' as const,
+    label: 'Apartamento',
+    format: (value: unknown) => {
+      if (value && typeof value === 'object' && 'apartment' in value) {
+        const apt = (value as Record<string, unknown>).apartment;
+        if (apt && typeof apt === 'object' && 'number' in apt) {
+          const building = 'building' in apt && apt.building && typeof apt.building === 'object' && 'name' in apt.building ? String(apt.building.name) : '';
+          return `${String((apt as Record<string, unknown>).number)} - ${building}`;
+        }
+      }
+      return '';
+    },
+  },
+  {
+    key: 'amount_paid' as const,
+    label: 'Valor',
+    format: (value: unknown) => formatCurrency(Number(value) || 0),
+  },
+  {
+    key: 'payment_date' as const,
+    label: 'Data Pgto',
+    format: (value: unknown) => format(new Date(toStr(value)), 'dd/MM/yyyy'),
+  },
+];
