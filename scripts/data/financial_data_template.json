@@ -120,7 +120,7 @@
   "cartoes": [
     {
       "pessoa": "Rodrigo",
-      "apelido": "_NOME_CARTAO_1_RODRIGO_",
+      "apelido": "Itau Azul Rodrigo",
       "ultimos_4_digitos": "",
       "dia_fechamento": 1,
       "dia_vencimento": 10,
@@ -276,16 +276,17 @@
   },
 
   "compras_cartao": {
-    "_instrucoes": "Cada compra parcelada no cartão. parcela_atual = em qual parcela estamos AGORA (ex: se está pagando 3/10, coloque 3). data_compra = quando a compra foi feita. O script calcula os vencimentos das parcelas restantes com base no dia_vencimento do cartão.",
+    "_instrucoes": "Cada compra parcelada no cartão. parcela_atual = em qual parcela estamos AGORA (ex: se está pagando 3/10, coloque 3). Para data: use data_compra SE souber a data exata, OU use data_proxima_parcela com a data de vencimento da parcela atual (mais prático para compras antigas). Se ambos forem preenchidos, data_proxima_parcela tem prioridade.",
     "items": [
       {
         "pessoa": "Rodrigo",
-        "cartao": "_NOME_CARTAO_1_RODRIGO_",
+        "cartao": "Itau Azul Rodrigo",
         "descricao": "_DESCRICAO_DA_COMPRA_",
-        "valor_parcela": 0.0,
+        "valor_parcela": 0.00,
         "parcela_atual": 1,
         "total_parcelas": 1,
-        "data_compra": "2026-01-15",
+        "data_compra": null,
+        "data_proxima_parcela": "2026-04-10",
         "categoria": null,
         "notas": ""
       }
@@ -293,16 +294,17 @@
   },
 
   "emprestimos_bancarios": {
-    "_instrucoes": "Empréstimos formais (consignado, pessoal, etc.) em nome dos filhos/genro.",
+    "_instrucoes": "Empréstimos formais (consignado, pessoal, etc.) em nome dos filhos/genro. Use data_proxima_parcela se não souber a data de início exata.",
     "items": [
       {
         "pessoa": "Rodrigo",
         "descricao": "_DESCRICAO_EMPRESTIMO_",
-        "valor_total": 0.0,
-        "valor_parcela": 0.0,
+        "valor_total": 0.00,
+        "valor_parcela": 0.00,
         "parcela_atual": 1,
         "total_parcelas": 1,
-        "data_inicio": "2026-01-01",
+        "data_inicio": null,
+        "data_proxima_parcela": "2026-04-10",
         "dia_vencimento": 10,
         "banco": "_NOME_BANCO_",
         "taxa_juros": null,
@@ -313,16 +315,17 @@
   },
 
   "emprestimos_pessoais": {
-    "_instrucoes": "Dinheiro emprestado diretamente entre familiares. Pode ser parcelado ou valor único.",
+    "_instrucoes": "Dinheiro emprestado diretamente entre familiares. Pode ser parcelado ou valor único. Use data_proxima_parcela se não souber a data de início exata.",
     "items": [
       {
         "pessoa": "Rodrigo",
         "descricao": "_DESCRICAO_EMPRESTIMO_",
-        "valor_total": 0.0,
-        "valor_parcela": 0.0,
+        "valor_total": 0.00,
+        "valor_parcela": 0.00,
         "parcela_atual": 1,
         "total_parcelas": 1,
-        "data_inicio": "2026-01-01",
+        "data_inicio": null,
+        "data_proxima_parcela": "2026-04-10",
         "dia_vencimento": 10,
         "categoria": null,
         "notas": ""
@@ -605,9 +608,9 @@
       {
         "pessoa": "Rosa",
         "mes_referencia": "2026-03-01",
-        "salario_base": 800.00,
-        "valor_variavel": 0.00,
-        "rent_offset": 0.00,
+        "salario_base": 800.0,
+        "valor_variavel": 0.0,
+        "rent_offset": 0.0,
         "qtd_faxinas": 0,
         "pago": true,
         "data_pagamento": "2026-03-05",

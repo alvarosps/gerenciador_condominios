@@ -148,6 +148,12 @@ class FinancialDataImporter:
             return None
         return date.fromisoformat(date_str)
 
+    def _require_date(self, date_str: str | None, field_name: str, context: str) -> date:
+        result = self._parse_date(date_str)
+        if result is None:
+            raise ValueError(f"Campo '{field_name}' é obrigatório para {context}.")
+        return result
+
     # =========================================================================
     # IMPORTAÇÃO POR SEÇÃO
     # =========================================================================
@@ -177,7 +183,7 @@ class FinancialDataImporter:
         print(f"\n[2/15] Categorias de despesa ({len(items)})...")
         for item in items:
             if not self.dry_run:
-                cat, created = ExpenseCategory.objects.update_or_create(
+                cat, _ = ExpenseCategory.objects.update_or_create(
                     name=item["nome"],
                     defaults={
                         "description": item.get("descricao", ""),
@@ -198,7 +204,7 @@ class FinancialDataImporter:
         print(f"\n[3/15] Pessoas ({len(items)})...")
         for item in items:
             if not self.dry_run:
-                person, created = Person.objects.update_or_create(
+                person, _ = Person.objects.update_or_create(
                     name=item["nome"],
                     defaults={
                         "relationship": item.get("relacao", ""),
@@ -231,7 +237,7 @@ class FinancialDataImporter:
             person = self._get_person(item["pessoa"])
             key = f"{item['pessoa']}|{item['apelido']}"
             if not self.dry_run:
-                card, created = CreditCard.objects.update_or_create(
+                card, _ = CreditCard.objects.update_or_create(
                     person=person,
                     nickname=item["apelido"],
                     defaults={
@@ -345,6 +351,7 @@ class FinancialDataImporter:
         total_installments: int,
         expense_date: date,
         due_day: int,
+        next_installment_date: date | None = None,
         person=None,
         credit_card=None,
         building=None,
@@ -358,6 +365,11 @@ class FinancialDataImporter:
 
         Parcelas antes da parcela_atual são marcadas como pagas.
         Parcelas a partir da parcela_atual são pendentes.
+
+        Para datas das parcelas:
+        - Se next_installment_date é fornecido: usa como âncora da parcela_atual
+          e calcula as demais a partir dela (para trás e para frente)
+        - Senão: calcula a partir de expense_date + due_day (data de compra)
 
         Returns:
             tuple(expenses_created, installments_created)
@@ -386,6 +398,7 @@ class FinancialDataImporter:
             return 1, 0
 
         # Despesa parcelada
+        expense = None
         if not self.dry_run:
             expense = Expense.objects.create(
                 description=description,
@@ -407,9 +420,14 @@ class FinancialDataImporter:
 
         installment_count = 0
 
-        # Calcula a data de vencimento da parcela 1
-        # A primeira parcela vence no mês seguinte à compra, no dia de vencimento
-        first_due = self._calculate_first_due_date(expense_date, due_day)
+        if next_installment_date:
+            # Âncora: data_proxima_parcela é a data de vencimento da parcela_atual
+            # Calcular data da parcela 1 retroativamente
+            months_back = current_installment - 1
+            first_due = self._add_months(next_installment_date, -months_back)
+        else:
+            # Calcular a partir da data de compra
+            first_due = self._calculate_first_due_date(expense_date, due_day)
 
         for i in range(1, total_installments + 1):
             # Data de vencimento: first_due + (i-1) meses
@@ -417,7 +435,7 @@ class FinancialDataImporter:
             is_paid = i < current_installment
             paid_date = due_date if is_paid else None
 
-            if not self.dry_run:
+            if not self.dry_run and expense is not None:
                 ExpenseInstallment.objects.create(
                     expense=expense,
                     installment_number=i,
@@ -466,6 +484,15 @@ class FinancialDataImporter:
             card = self._get_card(item["pessoa"], item["cartao"])
             category = self._get_category(item.get("categoria"))
             total_amount = Decimal(str(item["valor_parcela"])) * item["total_parcelas"]
+            next_date = self._parse_date(item.get("data_proxima_parcela"))
+            due_day = card.due_day if not self.dry_run else item.get("dia_vencimento", 10)
+
+            # expense_date: usa data_compra se disponível, senão retroderiva da data_proxima_parcela
+            expense_date = self._parse_date(item.get("data_compra"))
+            if not expense_date and next_date:
+                expense_date = self._add_months(next_date, -(item["parcela_atual"]))
+            elif not expense_date:
+                raise ValueError(f"Compra '{item['descricao']}': informe data_compra ou data_proxima_parcela.")
 
             expenses, installments = self._create_expense_with_installments(
                 description=item["descricao"],
@@ -474,8 +501,9 @@ class FinancialDataImporter:
                 installment_amount=Decimal(str(item["valor_parcela"])),
                 current_installment=item["parcela_atual"],
                 total_installments=item["total_parcelas"],
-                expense_date=self._parse_date(item["data_compra"]),
-                due_day=card.due_day if not self.dry_run else item.get("dia_vencimento", 10),
+                expense_date=expense_date,
+                due_day=due_day,
+                next_installment_date=next_date,
                 person=person,
                 credit_card=card,
                 category=category,
@@ -497,6 +525,13 @@ class FinancialDataImporter:
         for item in items:
             person = self._get_person(item["pessoa"])
             category = self._get_category(item.get("categoria"))
+            next_date = self._parse_date(item.get("data_proxima_parcela"))
+
+            expense_date = self._parse_date(item.get("data_inicio"))
+            if not expense_date and next_date:
+                expense_date = self._add_months(next_date, -(item["parcela_atual"]))
+            elif not expense_date:
+                raise ValueError(f"Empréstimo '{item['descricao']}': informe data_inicio ou data_proxima_parcela.")
 
             expenses, installments = self._create_expense_with_installments(
                 description=item["descricao"],
@@ -505,8 +540,9 @@ class FinancialDataImporter:
                 installment_amount=Decimal(str(item["valor_parcela"])),
                 current_installment=item["parcela_atual"],
                 total_installments=item["total_parcelas"],
-                expense_date=self._parse_date(item["data_inicio"]),
+                expense_date=expense_date,
                 due_day=item["dia_vencimento"],
+                next_installment_date=next_date,
                 person=person,
                 category=category,
                 bank_name=item.get("banco", ""),
@@ -529,6 +565,13 @@ class FinancialDataImporter:
         for item in items:
             person = self._get_person(item["pessoa"])
             category = self._get_category(item.get("categoria"))
+            next_date = self._parse_date(item.get("data_proxima_parcela"))
+
+            expense_date = self._parse_date(item.get("data_inicio"))
+            if not expense_date and next_date:
+                expense_date = self._add_months(next_date, -(item["parcela_atual"]))
+            elif not expense_date:
+                raise ValueError(f"Empréstimo '{item['descricao']}': informe data_inicio ou data_proxima_parcela.")
 
             expenses, installments = self._create_expense_with_installments(
                 description=item["descricao"],
@@ -537,8 +580,9 @@ class FinancialDataImporter:
                 installment_amount=Decimal(str(item["valor_parcela"])),
                 current_installment=item["parcela_atual"],
                 total_installments=item["total_parcelas"],
-                expense_date=self._parse_date(item["data_inicio"]),
+                expense_date=expense_date,
                 due_day=item["dia_vencimento"],
+                next_installment_date=next_date,
                 person=person,
                 category=category,
                 notes=item.get("notas", ""),
@@ -599,7 +643,7 @@ class FinancialDataImporter:
                 installment_amount=Decimal(str(item["valor_parcela"])),
                 current_installment=item["parcela_atual"],
                 total_installments=item["total_parcelas"],
-                expense_date=self._parse_date(item["data_inicio"]),
+                expense_date=self._require_date(item["data_inicio"], "data_inicio", item["descricao"]),
                 due_day=item["dia_vencimento"],
                 building=building,
                 category=category,
@@ -632,7 +676,9 @@ class FinancialDataImporter:
                 installment_amount=Decimal(str(item["valor_parcela"])),
                 current_installment=item["parcela_atual"],
                 total_installments=item["total_parcelas"],
-                expense_date=self._parse_date(item["data_primeira_parcela"]),
+                expense_date=self._require_date(
+                    item["data_primeira_parcela"], "data_primeira_parcela", item["descricao"]
+                ),
                 due_day=item["dia_vencimento"],
                 building=building,
                 notes=item.get("notas", ""),
@@ -653,7 +699,7 @@ class FinancialDataImporter:
                 installment_amount=Decimal(str(item["valor_parcela"])),
                 current_installment=item["parcela_atual"],
                 total_installments=item["total_parcelas"],
-                expense_date=self._parse_date(item["data_inicio"]),
+                expense_date=self._require_date(item["data_inicio"], "data_inicio", item["descricao"]),
                 due_day=item["dia_vencimento"],
                 building=building,
                 is_debt_installment=True,

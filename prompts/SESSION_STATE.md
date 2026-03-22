@@ -13,7 +13,7 @@
 |---|--------|--------|-------|
 | 01 | Backend: Models + Migration + Tests | concluída | 10 models + 2 campos adicionados, 44 testes passando |
 | 02 | Backend: Serializers + Tests | pendente | |
-| 03 | Backend: ViewSets Simples + Tests | pendente | |
+| 03 | Backend: ViewSets Simples + Tests | concluída | 4 ViewSets + 4 rotas + 23 testes passando |
 | 04 | Backend: Expense ViewSets + Tests | pendente | |
 | 05 | Backend: Income/Payment ViewSets + Tests | pendente | |
 | 06 | Backend: CashFlowService + Tests | concluída | CashFlowService implementado |
