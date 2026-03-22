@@ -38,4 +38,13 @@ export const ROUTES = {
   FURNITURE: '/furniture',
   CONTRACT_TEMPLATE: '/contract-template',
   SETTINGS: '/settings',
+  FINANCIAL: '/financial',
+  FINANCIAL_EXPENSES: '/financial/expenses',
+  FINANCIAL_INCOMES: '/financial/incomes',
+  FINANCIAL_RENT_PAYMENTS: '/financial/rent-payments',
+  FINANCIAL_PERSONS: '/financial/persons',
+  FINANCIAL_EMPLOYEES: '/financial/employees',
+  FINANCIAL_CATEGORIES: '/financial/categories',
+  FINANCIAL_SIMULATOR: '/financial/simulator',
+  FINANCIAL_SETTINGS: '/financial/settings',
 };

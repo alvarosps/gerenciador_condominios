@@ -3,7 +3,7 @@
 **Feature**: Módulo Financeiro Completo
 **Design Doc**: `docs/plans/2026-03-21-financial-module-design.md`
 **Total de Sessões**: 15
-**Sessão Atual**: 9 (concluída)
+**Sessão Atual**: 10 (concluída)
 
 ---
 
@@ -20,7 +20,7 @@
 | 07 | Backend: FinancialDashboardService + Tests | concluída | 6 métodos, 21 testes passando |
 | 08 | Backend: SimulationService + Endpoints + Tests | concluída | SimulationService (6 cenários + compare), FinancialDashboardViewSet (6 endpoints), CashFlowViewSet (4 endpoints), 56 testes passando |
 | 09 | Frontend: Schemas + API Hooks | concluída | 10 schemas + 11 hooks + 4 test files (16 testes), MSW handlers, type-check + lint clean |
-| 10 | Frontend: Navegação + Páginas Base | pendente | |
+| 10 | Frontend: Navegação + Páginas Base | concluída | Sidebar expansível, 4 páginas (Persons CRUD + cartões, Categories CRUD hierárquica, Settings singleton, Financial placeholder), use-financial-settings hook, type-check + build clean |
 | 11 | Frontend: Página de Despesas | pendente | |
 | 12 | Frontend: Income + RentPayments + Employees | pendente | |
 | 13 | Frontend: Dashboard Financeiro | pendente | |
@@ -90,6 +90,15 @@
 - `frontend/lib/api/hooks/__tests__/use-financial-dashboard.test.tsx` — 3 testes
 - `frontend/lib/api/hooks/__tests__/use-cash-flow.test.tsx` — 3 testes
 
+- `frontend/app/(dashboard)/financial/page.tsx` — Placeholder page
+- `frontend/app/(dashboard)/financial/persons/page.tsx` — CRUD Pessoas (8 colunas, badges, useCrudPage)
+- `frontend/app/(dashboard)/financial/persons/_components/person-form-modal.tsx` — Form modal (create/edit com Switch e Select)
+- `frontend/app/(dashboard)/financial/persons/_components/credit-card-section.tsx` — Seção inline de cartões (create/delete)
+- `frontend/app/(dashboard)/financial/categories/page.tsx` — CRUD Categorias (hierárquica com indentação)
+- `frontend/app/(dashboard)/financial/categories/_components/category-form-modal.tsx` — Form modal (color picker, parent select, cor herdada)
+- `frontend/app/(dashboard)/financial/settings/page.tsx` — Formulário singleton (GET/PUT)
+- `frontend/lib/api/hooks/use-financial-settings.ts` — useFinancialSettings + useUpdateFinancialSettings
+
 ## Arquivos Modificados
 
 - `core/models.py` — 10 novos models (Person, CreditCard, ExpenseCategory, ExpenseType, Expense, ExpenseInstallment, PersonIncomeType, PersonIncome, Income, RentPayment, EmployeePayment, FinancialSettings) + `owner` em Apartment + `prepaid_until`/`is_salary_offset` em Lease
@@ -103,6 +112,10 @@
 - `core/urls.py` — 12 rotas financeiras (+ financial-dashboard, cash-flow)
 - `frontend/tests/mocks/handlers.ts` — adicionados handlers financeiros (persons, expenses, installments, financial-dashboard, cash-flow, incomes, employee-payments) + fix non-null assertions pré-existentes
 - `frontend/tests/mocks/data/index.ts` — exporta persons e expenses
+- `frontend/lib/utils/constants.ts` — 9 rotas financeiras no ROUTES
+- `frontend/components/layouts/sidebar.tsx` — Sub-menu expansível com chevron + active state
+- `frontend/.eslintrc.json` — no-unnecessary-type-parameters off para test files
+- `frontend/app/(dashboard)/tenants/page.tsx` — fix || → ?? (pre-existing lint error)
 
 ## Correções Pós-Design (sessão de brainstorming 2026-03-22)
 
@@ -116,6 +129,10 @@
 - Gastos fixos agora suportam `pessoa` (FK) — ex: Unimed R$2.230 via Rodrigo
 - `valor_total` removido de empréstimos — calculado como `valor_parcela × total_parcelas`
 - Prompts 09, 10 atualizados com subcategorias
+- `Expense.is_offset` adicionado (migration 0014) — descontos: compras no cartão de uma pessoa que são para os sogros/Camila, subtraídas do total
+- Dados do Alvaro completos: 3 cartões (Trigg, Players, Samsung), 21 parcelas, 4 descontos, 2 gastos únicos
+- Dados do Tiago completos: 17 itens (fogão, geladeiras, alarme, starlink, etc.)
+- Dados do Junior: placas solar (22/60), bolsa Camila (4x), perfume Camila (1x), faculdade (mensal até dez/2026)
 
 ## Problemas Conhecidos
 
