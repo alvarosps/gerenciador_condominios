@@ -162,7 +162,10 @@ class ExpenseCategory(AuditMixin, SoftDeleteMixin, models.Model):
     name = models.CharField(max_length=100, unique=True)
     description = models.TextField(blank=True)
     color = models.CharField(max_length=7, default='#6B7280')  # hex para dashboard
+    parent = models.ForeignKey('self', null=True, blank=True, related_name='subcategories', on_delete=CASCADE)
 ```
+
+Categorias principais: **Pessoal** (mercado, farmácia, vestuário, saúde), **Carros** (gasolina, pedágio, peças), **Kitnets** (manutenção, material, água, luz, IPTU, faxinas), **Camila**, **Ajuda** (valores emprestados pelos filhos em parcelas).
 
 #### `Expense` (Despesa)
 

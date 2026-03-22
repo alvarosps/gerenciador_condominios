@@ -21,9 +21,10 @@ from core.models import (
     Income,
     Person,
     PersonIncome,
+    PersonPayment,
     RentPayment,
 )
-from core.permissions import IsAdminUser, ReadOnlyForNonAdmin
+from core.permissions import FinancialReadOnly
 from core.serializers import (
     CreditCardSerializer,
     EmployeePaymentSerializer,
@@ -33,6 +34,7 @@ from core.serializers import (
     FinancialSettingsSerializer,
     IncomeSerializer,
     PersonIncomeSerializer,
+    PersonPaymentSerializer,
     PersonSerializer,
     RentPaymentSerializer,
 )
@@ -42,7 +44,7 @@ logger = logging.getLogger(__name__)
 
 class PersonViewSet(viewsets.ModelViewSet):
     serializer_class = PersonSerializer
-    permission_classes = [ReadOnlyForNonAdmin]
+    permission_classes = [FinancialReadOnly]
 
     def get_queryset(self) -> QuerySet[Person]:
         queryset = Person.objects.prefetch_related("credit_cards").all()
@@ -62,7 +64,7 @@ class PersonViewSet(viewsets.ModelViewSet):
 
 class CreditCardViewSet(viewsets.ModelViewSet):
     serializer_class = CreditCardSerializer
-    permission_classes = [ReadOnlyForNonAdmin]
+    permission_classes = [FinancialReadOnly]
 
     def get_queryset(self) -> QuerySet[CreditCard]:
         queryset = CreditCard.objects.select_related("person").all()
@@ -80,11 +82,11 @@ class CreditCardViewSet(viewsets.ModelViewSet):
 class ExpenseCategoryViewSet(viewsets.ModelViewSet):
     queryset = ExpenseCategory.objects.all()
     serializer_class = ExpenseCategorySerializer
-    permission_classes = [ReadOnlyForNonAdmin]
+    permission_classes = [FinancialReadOnly]
 
 
 class FinancialSettingsViewSet(viewsets.ViewSet):
-    permission_classes = [IsAdminUser]
+    permission_classes = [FinancialReadOnly]
 
     @action(detail=False, methods=["get", "put", "patch"], url_path="current")
     def current(self, request: Request) -> Response:
@@ -123,7 +125,7 @@ class FinancialSettingsViewSet(viewsets.ViewSet):
 
 class ExpenseViewSet(viewsets.ModelViewSet):
     serializer_class = ExpenseSerializer
-    permission_classes = [ReadOnlyForNonAdmin]
+    permission_classes = [FinancialReadOnly]
 
     def get_queryset(self) -> QuerySet[Expense]:
         queryset = Expense.objects.select_related(
@@ -167,6 +169,10 @@ class ExpenseViewSet(viewsets.ModelViewSet):
         is_debt_installment = params.get("is_debt_installment")
         if is_debt_installment is not None:
             queryset = queryset.filter(is_debt_installment=is_debt_installment.lower() == "true")
+
+        is_offset = params.get("is_offset")
+        if is_offset is not None:
+            queryset = queryset.filter(is_offset=is_offset.lower() == "true")
 
         date_from = params.get("date_from")
         if date_from is not None:
@@ -242,7 +248,7 @@ class ExpenseViewSet(viewsets.ModelViewSet):
 
 class ExpenseInstallmentViewSet(viewsets.ModelViewSet):
     serializer_class = ExpenseInstallmentSerializer
-    permission_classes = [ReadOnlyForNonAdmin]
+    permission_classes = [FinancialReadOnly]
 
     def get_queryset(self) -> QuerySet[ExpenseInstallment]:
         queryset = ExpenseInstallment.objects.select_related(
@@ -332,7 +338,7 @@ class ExpenseInstallmentViewSet(viewsets.ModelViewSet):
 
 class IncomeViewSet(viewsets.ModelViewSet):
     serializer_class = IncomeSerializer
-    permission_classes = [ReadOnlyForNonAdmin]
+    permission_classes = [FinancialReadOnly]
 
     def get_queryset(self) -> QuerySet[Income]:
         queryset = Income.objects.select_related("person", "building", "category")
@@ -382,7 +388,7 @@ class IncomeViewSet(viewsets.ModelViewSet):
 
 class RentPaymentViewSet(viewsets.ModelViewSet):
     serializer_class = RentPaymentSerializer
-    permission_classes = [ReadOnlyForNonAdmin]
+    permission_classes = [FinancialReadOnly]
 
     def get_queryset(self) -> QuerySet[RentPayment]:
         queryset = RentPayment.objects.select_related(
@@ -428,7 +434,7 @@ class RentPaymentViewSet(viewsets.ModelViewSet):
 
 class EmployeePaymentViewSet(viewsets.ModelViewSet):
     serializer_class = EmployeePaymentSerializer
-    permission_classes = [ReadOnlyForNonAdmin]
+    permission_classes = [FinancialReadOnly]
 
     def get_queryset(self) -> QuerySet[EmployeePayment]:
         queryset = EmployeePayment.objects.select_related("person")
@@ -470,7 +476,7 @@ class EmployeePaymentViewSet(viewsets.ModelViewSet):
 
 class PersonIncomeViewSet(viewsets.ModelViewSet):
     serializer_class = PersonIncomeSerializer
-    permission_classes = [ReadOnlyForNonAdmin]
+    permission_classes = [FinancialReadOnly]
 
     def get_queryset(self) -> QuerySet[PersonIncome]:
         queryset = PersonIncome.objects.select_related("person", "apartment", "apartment__building")
@@ -492,5 +498,33 @@ class PersonIncomeViewSet(viewsets.ModelViewSet):
         apartment_id = params.get("apartment_id")
         if apartment_id is not None:
             queryset = queryset.filter(apartment_id=apartment_id)
+
+        return queryset
+
+
+class PersonPaymentViewSet(viewsets.ModelViewSet):
+    serializer_class = PersonPaymentSerializer
+    permission_classes = [FinancialReadOnly]
+
+    def get_queryset(self) -> QuerySet[PersonPayment]:
+        queryset = PersonPayment.objects.select_related("person")
+
+        params = self.request.query_params
+
+        person_id = params.get("person_id")
+        if person_id is not None:
+            queryset = queryset.filter(person_id=person_id)
+
+        reference_month = params.get("reference_month")
+        if reference_month is not None:
+            queryset = queryset.filter(reference_month=reference_month)
+
+        month_from = params.get("month_from")
+        if month_from is not None:
+            queryset = queryset.filter(reference_month__gte=month_from)
+
+        month_to = params.get("month_to")
+        if month_to is not None:
+            queryset = queryset.filter(reference_month__lte=month_to)
 
         return queryset

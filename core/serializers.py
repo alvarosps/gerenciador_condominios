@@ -24,6 +24,7 @@ from .models import (
     Lease,
     Person,
     PersonIncome,
+    PersonPayment,
     RentPayment,
     Tenant,
 )
@@ -500,10 +501,33 @@ class CreditCardSerializer(serializers.ModelSerializer):
 
 
 class ExpenseCategorySerializer(serializers.ModelSerializer):
+    subcategories = serializers.SerializerMethodField()
+    parent_id = serializers.PrimaryKeyRelatedField(
+        queryset=ExpenseCategory.objects.all(),
+        source="parent",
+        write_only=True,
+        required=False,
+        allow_null=True,
+    )
+
     class Meta:
         model = ExpenseCategory
-        fields = ["id", "name", "description", "color", "created_at", "updated_at"]
-        read_only_fields = ["id", "created_at", "updated_at"]
+        fields = [
+            "id",
+            "name",
+            "description",
+            "color",
+            "parent",
+            "parent_id",
+            "subcategories",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "parent", "subcategories", "created_at", "updated_at"]
+
+    def get_subcategories(self, obj: ExpenseCategory) -> list:
+        children = obj.subcategories.all()
+        return ExpenseCategorySerializer(children, many=True).data
 
 
 class ExpenseInstallmentSerializer(serializers.ModelSerializer):
@@ -591,6 +615,7 @@ class ExpenseSerializer(serializers.ModelSerializer):
             "recurrence_day",
             "is_paid",
             "paid_date",
+            "is_offset",
             "bank_name",
             "interest_rate",
             "notes",
@@ -804,6 +829,30 @@ class EmployeePaymentSerializer(serializers.ModelSerializer):
             msg = "O mês de referência deve ser o primeiro dia do mês."
             raise serializers.ValidationError(msg)
         return value
+
+
+class PersonPaymentSerializer(serializers.ModelSerializer):
+    person = PersonSimpleSerializer(read_only=True)
+    person_id = serializers.PrimaryKeyRelatedField(
+        queryset=Person.objects.all(),
+        source="person",
+        write_only=True,
+    )
+
+    class Meta:
+        model = PersonPayment
+        fields = [
+            "id",
+            "person",
+            "person_id",
+            "reference_month",
+            "amount",
+            "payment_date",
+            "notes",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "created_at", "updated_at"]
 
 
 class FinancialSettingsSerializer(serializers.ModelSerializer):

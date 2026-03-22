@@ -24,6 +24,7 @@ from .viewsets import (
     IncomeViewSet,
     LandlordViewSet,
     PersonIncomeViewSet,
+    PersonPaymentViewSet,
     PersonViewSet,
     RentPaymentViewSet,
 )
@@ -50,6 +51,7 @@ router.register(r"incomes", IncomeViewSet, basename="incomes")
 router.register(r"rent-payments", RentPaymentViewSet, basename="rent-payments")
 router.register(r"employee-payments", EmployeePaymentViewSet, basename="employee-payments")
 router.register(r"person-incomes", PersonIncomeViewSet, basename="person-incomes")
+router.register(r"person-payments", PersonPaymentViewSet, basename="person-payments")
 router.register(r"financial-dashboard", FinancialDashboardViewSet, basename="financial-dashboard")
 router.register(r"cash-flow", CashFlowViewSet, basename="cash-flow")
 

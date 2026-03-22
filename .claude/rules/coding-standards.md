@@ -10,6 +10,7 @@
 - Type hints on all functions (mypy strict enforces this)
 - CRITICAL: When adding a new dependency, it MUST be added to ALL three places: `requirements.txt` (runtime) or `requirements-dev.txt` (dev/test only), AND `pyproject.toml` `[project.dependencies]` or `[project.optional-dependencies.dev]`. Never add to just one.
 - CRITICAL: No optional dependencies — all dependencies in requirements.txt are always loaded. Never use `try/except ImportError` patterns or `HAS_*` flags for imports. Import directly at the top of the file.
+- CRITICAL: Never use `from __future__ import annotations` — Python 3.14 has PEP 649 lazy annotations natively. Import types directly (e.g., `from django.db.models import QuerySet`), never under `if TYPE_CHECKING:` blocks.
 
 ## Frontend (TypeScript/React)
 - ESLint: strict-type-checked + stylistic-type-checked rules

@@ -4,11 +4,11 @@ from datetime import date
 
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 
 from core.models import Person
-from core.permissions import IsAdminUser, ReadOnlyForNonAdmin
 from core.services.cash_flow_service import MONTHS_IN_YEAR, CashFlowService
 from core.services.financial_dashboard_service import FinancialDashboardService
 from core.services.simulation_service import SimulationService
@@ -20,7 +20,7 @@ _DEFAULT_PROJECTION_MONTHS = 12
 class FinancialDashboardViewSet(viewsets.ViewSet):
     """Read-only ViewSet exposing FinancialDashboardService aggregations."""
 
-    permission_classes = [ReadOnlyForNonAdmin]
+    permission_classes = [IsAuthenticated]
 
     @action(detail=False, methods=["get"])
     def overview(self, request: Request) -> Response:
@@ -72,7 +72,7 @@ class FinancialDashboardViewSet(viewsets.ViewSet):
 class CashFlowViewSet(viewsets.ViewSet):
     """ViewSet for cash flow calculation and simulation endpoints."""
 
-    permission_classes = [ReadOnlyForNonAdmin]
+    permission_classes = [IsAuthenticated]
 
     @action(detail=False, methods=["get"])
     def monthly(self, request: Request) -> Response:
@@ -162,7 +162,7 @@ class CashFlowViewSet(viewsets.ViewSet):
 
         return Response(result, status=status.HTTP_200_OK)
 
-    @action(detail=False, methods=["post"], permission_classes=[IsAdminUser])
+    @action(detail=False, methods=["post"])
     def simulate(self, request: Request) -> Response:
         scenarios = request.data.get("scenarios")
 

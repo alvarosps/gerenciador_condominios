@@ -21,6 +21,7 @@ import {
   useFinancialSettings,
   useUpdateFinancialSettings,
 } from '@/lib/api/hooks/use-financial-settings';
+import { useAuthStore } from '@/store/auth-store';
 
 const settingsFormSchema = z.object({
   initial_balance: z.string().min(1, 'Saldo inicial é obrigatório'),
@@ -31,6 +32,8 @@ const settingsFormSchema = z.object({
 type SettingsFormValues = z.infer<typeof settingsFormSchema>;
 
 export default function FinancialSettingsPage() {
+  const { user } = useAuthStore();
+  const isAdmin = user?.is_staff ?? false;
   const { data: settings, isLoading } = useFinancialSettings();
   const updateMutation = useUpdateFinancialSettings();
 
@@ -98,7 +101,7 @@ export default function FinancialSettingsPage() {
                       step="0.01"
                       placeholder="Ex: 10000.00"
                       {...field}
-                      disabled={updateMutation.isPending}
+                      disabled={updateMutation.isPending || !isAdmin}
                     />
                   </FormControl>
                   <FormDescription>Valor do saldo inicial em reais</FormDescription>
@@ -117,7 +120,7 @@ export default function FinancialSettingsPage() {
                     <Input
                       type="date"
                       {...field}
-                      disabled={updateMutation.isPending}
+                      disabled={updateMutation.isPending || !isAdmin}
                     />
                   </FormControl>
                   <FormDescription>Data de referência do saldo inicial</FormDescription>
@@ -137,7 +140,7 @@ export default function FinancialSettingsPage() {
                       rows={3}
                       placeholder="Notas adicionais..."
                       {...field}
-                      disabled={updateMutation.isPending}
+                      disabled={updateMutation.isPending || !isAdmin}
                     />
                   </FormControl>
                   <FormMessage />
@@ -145,9 +148,11 @@ export default function FinancialSettingsPage() {
               )}
             />
 
-            <Button type="submit" disabled={updateMutation.isPending}>
-              {updateMutation.isPending ? 'Salvando...' : 'Salvar'}
-            </Button>
+            {isAdmin && (
+              <Button type="submit" disabled={updateMutation.isPending || !isAdmin}>
+                {updateMutation.isPending ? 'Salvando...' : 'Salvar'}
+              </Button>
+            )}
           </form>
         </Form>
       </div>

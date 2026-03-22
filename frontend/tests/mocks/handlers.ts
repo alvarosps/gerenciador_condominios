@@ -787,16 +787,44 @@ const cashFlowHandlers = [
     });
   }),
 
-  http.post(`${API_BASE}/cash-flow/simulate/`, async ({ request }) => {
+  http.post(`${API_BASE}/cash-flow/simulate/`, async () => {
     await delay(100);
-    const data = (await request.json()) as { scenarios: { name: string }[] };
+    const baseMonth = {
+      year: 2026,
+      month: 4,
+      income_total: 12000.0,
+      expenses_total: 8000.0,
+      balance: 4000.0,
+      cumulative_balance: 4000.0,
+      is_projected: true,
+    };
+    const simMonth = {
+      year: 2026,
+      month: 4,
+      income_total: 12000.0,
+      expenses_total: 5000.0,
+      balance: 7000.0,
+      cumulative_balance: 7000.0,
+      is_projected: true,
+    };
     return HttpResponse.json({
-      results: data.scenarios.map((s) => ({
-        scenario_name: s.name,
-        months: [
-          { year: 2026, month: 4, projected_income: 12000.0, projected_expenses: 5000.0, projected_balance: 23700.0 },
+      base: [baseMonth],
+      simulated: [simMonth],
+      comparison: {
+        month_by_month: [
+          {
+            year: 2026,
+            month: 4,
+            base_balance: 4000.0,
+            simulated_balance: 7000.0,
+            delta: 3000.0,
+            base_cumulative: 4000.0,
+            simulated_cumulative: 7000.0,
+          },
         ],
-      })),
+        total_impact_12m: 3000.0,
+        break_even_month: '2026-04',
+      },
     });
   }),
 ];
