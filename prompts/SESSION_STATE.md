@@ -44,6 +44,9 @@
 - `tests/unit/test_financial/test_financial_dashboard_service.py` — 21 testes
 - `core/migrations/0012_add_financial_module.py`
 - `core/services/financial_dashboard_service.py` — 6 métodos estáticos
+- `tests/integration/__init__.py`
+- `tests/integration/test_financial_api_simple.py` — 23 testes
+- `core/viewsets/financial_views.py` — PersonViewSet, CreditCardViewSet, ExpenseCategoryViewSet, FinancialSettingsViewSet
 
 ### Frontend
 - -
@@ -52,6 +55,8 @@
 
 - `core/models.py` — 10 novos models (Person, CreditCard, ExpenseCategory, ExpenseType, Expense, ExpenseInstallment, PersonIncomeType, PersonIncome, Income, RentPayment, EmployeePayment, FinancialSettings) + `owner` em Apartment + `prepaid_until`/`is_salary_offset` em Lease
 - `pyproject.toml` — PLR2004 adicionado a per-file-ignores para tests (magic values em assertions)
+- `core/viewsets/__init__.py` — exporta 4 novos ViewSets financeiros
+- `core/urls.py` — 4 novas rotas financeiras (persons, credit-cards, expense-categories, financial-settings)
 
 ## Correções Pós-Design (sessão de brainstorming 2026-03-22)
 
