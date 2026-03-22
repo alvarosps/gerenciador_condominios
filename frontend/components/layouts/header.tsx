@@ -52,7 +52,7 @@ export function Header() {
 
   const userInitials = user?.first_name && user?.last_name
     ? `${user.first_name[0]}${user.last_name[0]}`.toUpperCase()
-    : user?.email?.[0]?.toUpperCase() || 'U';
+    : user?.email?.[0]?.toUpperCase() ?? 'U';
 
   return (
     <header className="flex items-center justify-between border-b bg-white px-4 md:px-6 py-4">

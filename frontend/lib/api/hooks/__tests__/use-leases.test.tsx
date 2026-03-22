@@ -50,7 +50,7 @@ describe('useLeases', () => {
       expect(result.current.data?.id).toBe(1);
     });
 
-    it('should not fetch when ID is null', async () => {
+    it('should not fetch when ID is null', () => {
       const { result } = renderHook(() => useLease(null), {
         wrapper: createWrapper(),
       });
@@ -121,7 +121,7 @@ describe('useLeases', () => {
 
       const updatedLease = {
         ...mockLeases[0],
-        id: mockLeases[0].id ?? 1,
+        id: mockLeases[0]?.id ?? 1,
         rental_value: 1800,
       };
 

@@ -18,9 +18,27 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import sys
+import tempfile
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Optional
+
+from django.conf import settings
+
+try:
+    from pyppeteer import launch as pyppeteer_launch
+
+    HAS_PYPPETEER = True
+except ImportError:
+    HAS_PYPPETEER = False
+
+try:
+    import weasyprint as _weasyprint
+
+    HAS_WEASYPRINT = True
+except ImportError:
+    _weasyprint = None  # type: ignore[assignment]
+    HAS_WEASYPRINT = False
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +56,7 @@ class IPDFGenerator(ABC):
         self,
         html_content: str,
         output_path: str | Path,
-        options: Optional[dict] = None,
+        options: dict | None = None,
     ) -> str:
         """
         Generate a PDF file from HTML content.
@@ -54,7 +72,6 @@ class IPDFGenerator(ABC):
         Raises:
             PDFGenerationError: If PDF generation fails
         """
-        pass
 
 
 class PyppeteerPDFGenerator(IPDFGenerator):
@@ -72,7 +89,7 @@ class PyppeteerPDFGenerator(IPDFGenerator):
     - Higher resource usage
     """
 
-    def __init__(self, chrome_path: Optional[str] = None):
+    def __init__(self, chrome_path: str | None = None):
         """
         Initialize Pyppeteer PDF generator.
 
@@ -85,7 +102,7 @@ class PyppeteerPDFGenerator(IPDFGenerator):
         self,
         html_content: str,
         output_path: str | Path,
-        options: Optional[dict] = None,
+        options: dict | None = None,
     ) -> str:
         """
         Generate PDF using Chrome headless via Pyppeteer.
@@ -101,11 +118,15 @@ class PyppeteerPDFGenerator(IPDFGenerator):
         Raises:
             PDFGenerationError: If PDF generation fails
         """
-        import tempfile
+        if not HAS_PYPPETEER:
+            msg = "pyppeteer not installed. Install with: pip install pyppeteer"
+            raise PDFGenerationError(msg)
 
-        from django.conf import settings
-
-        from pyppeteer import launch
+        # Get Chrome path from settings or constructor (validate before async context)
+        chrome_executable = self.chrome_path or getattr(settings, "CHROME_EXECUTABLE_PATH", None)
+        if not chrome_executable:
+            msg = "Chrome executable path not configured"
+            raise PDFGenerationError(msg)
 
         logger.info(f"Generating PDF with Pyppeteer: {output_path}")
 
@@ -115,26 +136,20 @@ class PyppeteerPDFGenerator(IPDFGenerator):
 
         try:
             # Use Windows event loop policy on Windows
-            import sys
-
             if sys.platform == "win32":
                 asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
-            # Get Chrome path from settings or constructor
-            chrome_executable = self.chrome_path or getattr(settings, "CHROME_EXECUTABLE_PATH", None)
-
-            if not chrome_executable:
-                raise ValueError("Chrome executable path not configured")
-
             # Create temporary HTML file
-            with tempfile.NamedTemporaryFile(mode="w", suffix=".html", delete=False, encoding="utf-8") as temp_html:
+            with tempfile.NamedTemporaryFile(
+                mode="w", suffix=".html", delete=False, encoding="utf-8"
+            ) as temp_html:
                 temp_html.write(html_content)
                 temp_html_path = temp_html.name
 
             browser = None
             try:
                 # Launch browser
-                browser = await launch(
+                browser = await pyppeteer_launch(
                     executablePath=chrome_executable,
                     headless=True,
                     args=["--no-sandbox", "--disable-setuid-sandbox"],
@@ -154,12 +169,7 @@ class PyppeteerPDFGenerator(IPDFGenerator):
                     "format": "A4",
                     "printBackground": True,
                     "preferCSSPageSize": False,
-                    "margin": {
-                        "top": "1cm",
-                        "right": "1.5cm",
-                        "bottom": "1cm",
-                        "left": "1.5cm"
-                    },
+                    "margin": {"top": "1cm", "right": "1.5cm", "bottom": "1cm", "left": "1.5cm"},
                 }
                 if options:
                     pdf_options.update(options)
@@ -175,16 +185,17 @@ class PyppeteerPDFGenerator(IPDFGenerator):
                     await browser.close()
 
                 # Clean up temporary file
-                import os
-
                 try:
-                    os.unlink(temp_html_path)
-                except Exception as e:
-                    logger.warning(f"Failed to delete temporary file {temp_html_path}: {e}")
+                    Path(temp_html_path).unlink()
+                except OSError as cleanup_err:
+                    logger.warning(
+                        f"Failed to delete temporary file {temp_html_path}: {cleanup_err}"
+                    )
 
         except Exception as e:
-            logger.error(f"PDF generation failed: {e}")
-            raise PDFGenerationError(f"Pyppeteer PDF generation failed: {e}") from e
+            logger.exception("PDF generation failed")
+            msg = f"Pyppeteer PDF generation failed: {e}"
+            raise PDFGenerationError(msg) from e
 
 
 class WeasyPrintPDFGenerator(IPDFGenerator):
@@ -210,7 +221,7 @@ class WeasyPrintPDFGenerator(IPDFGenerator):
         self,
         html_content: str,
         output_path: str | Path,
-        options: Optional[dict] = None,
+        options: dict | None = None,
     ) -> str:
         """
         Generate PDF using WeasyPrint.
@@ -226,6 +237,10 @@ class WeasyPrintPDFGenerator(IPDFGenerator):
         Raises:
             PDFGenerationError: If PDF generation fails or WeasyPrint not installed
         """
+        if not HAS_WEASYPRINT:
+            msg = "WeasyPrint not installed. Install with: pip install weasyprint"
+            raise PDFGenerationError(msg)
+
         logger.info(f"Generating PDF with WeasyPrint: {output_path}")
 
         # Ensure output directory exists
@@ -233,33 +248,28 @@ class WeasyPrintPDFGenerator(IPDFGenerator):
         output_path_obj.parent.mkdir(parents=True, exist_ok=True)
 
         try:
-            from weasyprint import CSS, HTML
-        except ImportError:
-            raise PDFGenerationError("WeasyPrint not installed. Install with: pip install weasyprint")
-
-        try:
             # Prepare options
-            stylesheets = []
-            if options and "stylesheets" in options:
-                for stylesheet_path in options["stylesheets"]:
-                    stylesheets.append(CSS(filename=stylesheet_path))
+            stylesheets = (
+                [_weasyprint.CSS(filename=p) for p in options["stylesheets"]]
+                if options and "stylesheets" in options
+                else []
+            )
 
             # Generate PDF
-            html_doc = HTML(string=html_content)
+            html_doc = _weasyprint.HTML(string=html_content)
             html_doc.write_pdf(
                 str(output_path),
                 stylesheets=stylesheets,
             )
 
+        except Exception as e:
+            logger.exception("PDF generation failed")
+            msg = f"Failed to generate PDF: {e}"
+            raise PDFGenerationError(msg) from e
+        else:
             logger.info(f"PDF generated successfully: {output_path}")
             return str(output_path)
-
-        except Exception as e:
-            logger.error(f"PDF generation failed: {e}")
-            raise PDFGenerationError(f"Failed to generate PDF: {e}") from e
 
 
 class PDFGenerationError(Exception):
     """Exception raised when PDF generation fails."""
-
-    pass

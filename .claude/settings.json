@@ -1,0 +1,94 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python manage.py runserver:*)",
+      "Bash(python manage.py migrate:*)",
+      "Bash(python manage.py makemigrations:*)",
+      "Bash(python manage.py createsuperuser:*)",
+      "Bash(python manage.py shell:*)",
+      "Bash(python -m pytest:*)",
+      "Bash(pre-commit run:*)",
+      "Bash(cd frontend && npm run dev:*)",
+      "Bash(cd frontend && npm run build:*)",
+      "Bash(cd frontend && npm run lint:*)",
+      "Bash(cd frontend && npm run type-check:*)",
+      "Bash(cd frontend && npm run test:*)",
+      "Bash(cd frontend && npm install:*)",
+      "Bash(npm run dev:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm run lint:*)",
+      "Bash(npm run type-check:*)",
+      "Bash(npm run test:*)",
+      "Bash(npm install:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git branch:*)",
+      "Bash(git checkout:*)",
+      "Bash(git switch:*)",
+      "Bash(git stash:*)",
+      "Bash(git merge:*)",
+      "Bash(git rebase:*)",
+      "Bash(git fetch:*)",
+      "Bash(git remote -v:*)",
+      "Bash(docker-compose up:*)",
+      "Bash(docker-compose down:*)",
+      "Bash(docker-compose logs:*)",
+      "Bash(docker-compose ps:*)",
+      "Bash(python scripts/backup_db.py:*)",
+      "Bash(python scripts/generate_metrics.py:*)",
+      "Bash(wc:*)",
+      "Bash(ls:*)"
+    ],
+    "deny": [
+      "Bash(rm -rf:*)",
+      "Bash(git reset --hard:*)",
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)",
+      "Bash(git clean -f:*)",
+      "Edit(file_path=*node_modules*)",
+      "Edit(file_path=*dist*)",
+      "Edit(file_path=*.next*)",
+      "Edit(file_path=*__pycache__*)",
+      "Edit(file_path=*.lock)",
+      "Edit(file_path=*package-lock.json)",
+      "Read(file_path=*.env)",
+      "Read(file_path=*.env.local)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/pre-edit-scope.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/pre-commit-conventional.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/post-edit-lint.sh"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -35,7 +35,7 @@ interface PaginatedResponse<T> {
 /**
  * Get all contract rules
  */
-export function useContractRules(activeOnly: boolean = false) {
+export function useContractRules(activeOnly = false) {
   return useQuery({
     queryKey: ['contract-rules', { activeOnly }],
     queryFn: async () => {
@@ -61,7 +61,7 @@ export function useContractRule(id: number) {
       const { data } = await apiClient.get<ContractRule>(`/rules/${id}/`);
       return data;
     },
-    enabled: !!id,
+    enabled: Boolean(id),
   });
 }
 
@@ -77,7 +77,7 @@ export function useCreateContractRule() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['contract-rules'] });
+      void queryClient.invalidateQueries({ queryKey: ['contract-rules'] });
     },
   });
 }
@@ -94,7 +94,7 @@ export function useUpdateContractRule() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['contract-rules'] });
+      void queryClient.invalidateQueries({ queryKey: ['contract-rules'] });
     },
   });
 }
@@ -110,7 +110,7 @@ export function useDeleteContractRule() {
       await apiClient.delete(`/rules/${id}/`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['contract-rules'] });
+      void queryClient.invalidateQueries({ queryKey: ['contract-rules'] });
     },
   });
 }
@@ -129,7 +129,7 @@ export function useReorderContractRules() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['contract-rules'] });
+      void queryClient.invalidateQueries({ queryKey: ['contract-rules'] });
     },
   });
 }
@@ -146,7 +146,7 @@ export function useToggleContractRule() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['contract-rules'] });
+      void queryClient.invalidateQueries({ queryKey: ['contract-rules'] });
     },
   });
 }

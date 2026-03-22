@@ -13,4 +13,4 @@ from .landlord_views import LandlordViewSet
 from .rule_views import ContractRuleViewSet
 from .template_views import ContractTemplateViewSet
 
-__all__ = ["ContractTemplateViewSet", "ContractRuleViewSet", "LandlordViewSet"]
+__all__ = ["ContractRuleViewSet", "ContractTemplateViewSet", "LandlordViewSet"]

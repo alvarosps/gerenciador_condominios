@@ -5,15 +5,16 @@ This module provides shared fixtures and configuration for all tests.
 """
 
 import os
-from datetime import date, timedelta
+from datetime import date
 from decimal import Decimal
-from typing import Any, Dict
-
-from django.conf import settings
-from django.core.management import call_command
-from rest_framework.test import APIClient
+from typing import Any
 
 import pytest
+from django.conf import settings
+from django.core.management import call_command
+from django.test import override_settings
+from freezegun import freeze_time as _freeze_time
+from rest_framework.test import APIClient
 
 # Ensure test settings are applied
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "condominios_manager.settings")
@@ -42,7 +43,6 @@ def django_db_setup(django_db_setup, django_db_blocker):
     with django_db_blocker.unblock():
         # Run migrations
         call_command("migrate", "--noinput")
-    yield
     # Cleanup is handled automatically by pytest-django
 
 
@@ -113,7 +113,6 @@ def enable_db_access_for_all_tests(db):
     Automatically enable database access for all tests.
     This removes the need to mark each test with @pytest.mark.django_db
     """
-    pass
 
 
 @pytest.fixture
@@ -177,18 +176,22 @@ def mock_pdf_generation(mocker, mock_pdf_output_dir):
 
 
 @pytest.fixture
-def sample_building_data() -> Dict[str, Any]:
+def sample_building_data() -> dict[str, Any]:
     """
     Provides sample building data for tests.
 
     Returns:
         Dict containing valid building data
     """
-    return {"street_number": 836, "name": "Edifício Teste", "address": "Rua Teste, 836 - Bairro Teste"}
+    return {
+        "street_number": 836,
+        "name": "Edifício Teste",
+        "address": "Rua Teste, 836 - Bairro Teste",
+    }
 
 
 @pytest.fixture
-def sample_apartment_data() -> Dict[str, Any]:
+def sample_apartment_data() -> dict[str, Any]:
     """
     Provides sample apartment data for tests.
     Note: Requires a building_id to be added.
@@ -211,7 +214,7 @@ def sample_apartment_data() -> Dict[str, Any]:
 
 
 @pytest.fixture
-def sample_furniture_data() -> Dict[str, Any]:
+def sample_furniture_data() -> dict[str, Any]:
     """
     Provides sample furniture data for tests.
 
@@ -222,7 +225,7 @@ def sample_furniture_data() -> Dict[str, Any]:
 
 
 @pytest.fixture
-def sample_tenant_data() -> Dict[str, Any]:
+def sample_tenant_data() -> dict[str, Any]:
     """
     Provides sample tenant data for tests.
 
@@ -245,7 +248,7 @@ def sample_tenant_data() -> Dict[str, Any]:
 
 
 @pytest.fixture
-def sample_dependent_data() -> Dict[str, Any]:
+def sample_dependent_data() -> dict[str, Any]:
     """
     Provides sample dependent data for tests.
 
@@ -256,7 +259,7 @@ def sample_dependent_data() -> Dict[str, Any]:
 
 
 @pytest.fixture
-def sample_lease_data() -> Dict[str, Any]:
+def sample_lease_data() -> dict[str, Any]:
     """
     Provides sample lease data for tests.
     Note: Requires apartment_id, responsible_tenant_id, and tenant_ids.
@@ -285,7 +288,7 @@ def cleanup_test_contracts():
     Cleans up any test contract files created during tests.
     Runs after test completion.
     """
-    yield
+    return
     # Cleanup logic would go here if needed
     # Currently handled by tmp_path fixture
 
@@ -301,7 +304,6 @@ def freeze_time():
                 # Test code here
                 pass
     """
-    from freezegun import freeze_time as _freeze_time
 
     return _freeze_time
 
@@ -317,7 +319,6 @@ def settings_override():
                 # Test code with DEBUG=False
                 pass
     """
-    from django.test import override_settings
 
     return override_settings
 
@@ -346,7 +347,9 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "view: View/API endpoint tests")
     config.addinivalue_line("markers", "util: Utility function tests")
     config.addinivalue_line("markers", "factory: Factory/fixture tests")
-    config.addinivalue_line("markers", "infrastructure: Infrastructure abstraction tests (PDF generators, storage)")
+    config.addinivalue_line(
+        "markers", "infrastructure: Infrastructure abstraction tests (PDF generators, storage)"
+    )
 
 
 def pytest_collection_modifyitems(config, items):

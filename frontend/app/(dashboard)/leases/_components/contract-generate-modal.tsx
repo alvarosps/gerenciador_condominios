@@ -14,7 +14,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { FilePlus, Download, CheckCircle, Info, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useGenerateContract } from '@/lib/api/hooks/use-leases';
-import { Lease } from '@/lib/schemas/lease.schema';
+import { type Lease } from '@/lib/schemas/lease.schema';
 import { formatCurrency } from '@/lib/utils/formatters';
 import { format, parseISO } from 'date-fns';
 
@@ -43,7 +43,7 @@ export function ContractGenerateModal({ open, lease, onClose }: Props) {
 
   const handleDownload = () => {
     if (pdfPath) {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000/api';
       // Extract relative path from full Windows path (e.g., "C:\...\contracts\836\file.pdf" -> "contracts/836/file.pdf")
       const relativePath = pdfPath.replace(/\\/g, '/').replace(/^.*?(contracts\/)/, '$1');
       const downloadUrl = `${apiUrl.replace('/api', '')}/${relativePath}`;

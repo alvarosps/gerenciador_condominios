@@ -60,7 +60,7 @@ export function useSaveContractTemplate() {
     },
     onSuccess: () => {
       // Invalidate template cache to fetch new content
-      queryClient.invalidateQueries({ queryKey: ['contract-template'] });
+      void queryClient.invalidateQueries({ queryKey: ['contract-template'] });
     },
   });
 }
@@ -112,8 +112,8 @@ export function useRestoreTemplateBackup() {
     },
     onSuccess: () => {
       // Invalidate template cache to fetch restored content
-      queryClient.invalidateQueries({ queryKey: ['contract-template'] });
-      queryClient.invalidateQueries({ queryKey: ['template-backups'] });
+      void queryClient.invalidateQueries({ queryKey: ['contract-template'] });
+      void queryClient.invalidateQueries({ queryKey: ['template-backups'] });
     },
   });
 }

@@ -12,16 +12,24 @@ This module defines the core domain models for property management:
 
 from __future__ import annotations
 
+import re
 from decimal import Decimal
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.core.validators import MinValueValidator
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.utils import timezone
 
 # Import validators (note: we don't enforce these on existing data)
-from core.validators import validate_brazilian_phone, validate_cnpj, validate_cpf, validate_due_day
+from core.validators import (
+    validate_brazilian_phone,
+    validate_cnpj,
+    validate_cpf,
+    validate_due_day,
+    validate_lease_dates,
+    validate_tenant_count,
+)
 
 # =============================================================================
 # BASE MIXINS
@@ -188,13 +196,15 @@ class Building(AuditMixin, SoftDeleteMixin, models.Model):
     and soft delete capability (is_deleted, deleted_at, deleted_by).
     """
 
-    street_number = models.PositiveIntegerField(unique=True, help_text="Número da rua (ex.: 836 ou 850)")
+    street_number = models.PositiveIntegerField(
+        unique=True, help_text="Número da rua (ex.: 836 ou 850)"
+    )
     name = models.CharField(max_length=100, help_text="Nome do prédio")
     address = models.CharField(max_length=200, help_text="Endereço completo do prédio")
 
     # Custom manager that excludes soft-deleted objects
-    objects = SoftDeleteManager()
     all_objects = models.Manager()  # Access all objects including deleted
+    objects = SoftDeleteManager()
 
     def __str__(self) -> str:
         """Return string representation of building."""
@@ -213,12 +223,14 @@ class Furniture(AuditMixin, SoftDeleteMixin, models.Model):
     and soft delete capability (is_deleted, deleted_at, deleted_by).
     """
 
-    name = models.CharField(max_length=100, unique=True, help_text="Nome do móvel (ex.: Fogão, Geladeira, etc.)")
-    description = models.TextField(blank=True, null=True)
+    name = models.CharField(
+        max_length=100, unique=True, help_text="Nome do móvel (ex.: Fogão, Geladeira, etc.)"
+    )
+    description = models.TextField(blank=True, default="")
 
     # Custom manager that excludes soft-deleted objects
-    objects = SoftDeleteManager()
     all_objects = models.Manager()  # Access all objects including deleted
+    objects = SoftDeleteManager()
 
     def __str__(self) -> str:
         """Return string representation of furniture."""
@@ -249,7 +261,9 @@ class Apartment(AuditMixin, SoftDeleteMixin, models.Model):
 
     building = models.ForeignKey(Building, on_delete=models.CASCADE, related_name="apartments")
     number = models.PositiveIntegerField(help_text="Número único do apartamento no prédio")
-    interfone_configured = models.BooleanField(default=False, help_text="Indica se o interfone está configurado")
+    interfone_configured = models.BooleanField(
+        default=False, help_text="Indica se o interfone está configurado"
+    )
     contract_generated = models.BooleanField(default=False, help_text="Contrato foi gerado?")
     contract_signed = models.BooleanField(default=False, help_text="Contrato foi assinado?")
 
@@ -266,7 +280,9 @@ class Apartment(AuditMixin, SoftDeleteMixin, models.Model):
 
     is_rented = models.BooleanField(default=False, help_text="Apartamento alugado ou não")
     lease_date = models.DateField(blank=True, null=True, help_text="Data da locação (caso alugado)")
-    last_rent_increase_date = models.DateField(blank=True, null=True, help_text="Data do último reajuste do aluguel")
+    last_rent_increase_date = models.DateField(
+        blank=True, null=True, help_text="Data do último reajuste do aluguel"
+    )
 
     # Relação com móveis disponíveis no apartamento
     furnitures = models.ManyToManyField(
@@ -276,9 +292,18 @@ class Apartment(AuditMixin, SoftDeleteMixin, models.Model):
         help_text="Móveis presentes no apartamento",
     )
 
+    # Proprietário do apartamento
+    owner = models.ForeignKey(
+        "Person",
+        null=True,
+        blank=True,
+        related_name="owned_apartments",
+        on_delete=models.SET_NULL,
+    )
+
     # Custom manager that excludes soft-deleted objects
-    objects = SoftDeleteManager()
     all_objects = models.Manager()  # Access all objects including deleted
+    objects = SoftDeleteManager()
 
     class Meta:
         unique_together = ("building", "number")
@@ -352,13 +377,17 @@ class Tenant(AuditMixin, SoftDeleteMixin, models.Model):
         db_index=True,  # Add index for faster lookups
     )
     is_company = models.BooleanField(default=False, help_text="Indica se é Pessoa Jurídica")
-    rg = models.CharField(max_length=20, blank=True, null=True, help_text="RG (não obrigatório para empresas)")
+    rg = models.CharField(
+        max_length=20, blank=True, default="", help_text="RG (não obrigatório para empresas)"
+    )
     phone = models.CharField(
         max_length=20,
         help_text="Telefone de contato",
         validators=[validate_brazilian_phone],
     )
-    marital_status = models.CharField(max_length=50, choices=MARITAL_STATUS_CHOICES, help_text="Estado civil")
+    marital_status = models.CharField(
+        max_length=50, choices=MARITAL_STATUS_CHOICES, help_text="Estado civil"
+    )
     profession = models.CharField(max_length=100, help_text="Profissão")
 
     # Dados financeiros e administrativos
@@ -369,8 +398,12 @@ class Tenant(AuditMixin, SoftDeleteMixin, models.Model):
         blank=True,
         help_text="Valor da caução, se houver",
     )
-    cleaning_fee_paid = models.BooleanField(default=False, help_text="Indica se pagou a taxa de limpeza")
-    tag_deposit_paid = models.BooleanField(default=False, help_text="Indica se o caução das tags já foi pago")
+    cleaning_fee_paid = models.BooleanField(
+        default=False, help_text="Indica se pagou a taxa de limpeza"
+    )
+    tag_deposit_paid = models.BooleanField(
+        default=False, help_text="Indica se o caução das tags já foi pago"
+    )
     rent_due_day = models.PositiveIntegerField(help_text="Dia do vencimento do aluguel", default=1)
 
     # Relação com móveis próprios do inquilino
@@ -379,8 +412,8 @@ class Tenant(AuditMixin, SoftDeleteMixin, models.Model):
     )
 
     # Custom manager that excludes soft-deleted objects
-    objects = SoftDeleteManager()
     all_objects = models.Manager()  # Access all objects including deleted
+    objects = SoftDeleteManager()
 
     class Meta:
         indexes = [
@@ -392,6 +425,11 @@ class Tenant(AuditMixin, SoftDeleteMixin, models.Model):
     def __str__(self) -> str:
         """Return string representation of tenant."""
         return self.name
+
+    def save(self, *args, **kwargs):
+        """Override save to enforce validation before persisting."""
+        self.full_clean()
+        super().save(*args, **kwargs)
 
     def clean(self) -> None:
         """
@@ -412,12 +450,7 @@ class Tenant(AuditMixin, SoftDeleteMixin, models.Model):
                 else:
                     validate_cpf(self.cpf_cnpj)
             except ValidationError as e:
-                raise ValidationError({"cpf_cnpj": e.message})
-
-    def save(self, *args, **kwargs):
-        """Override save to enforce validation before persisting."""
-        self.full_clean()
-        super().save(*args, **kwargs)
+                raise ValidationError({"cpf_cnpj": e.message}) from e
 
 
 class Dependent(AuditMixin, SoftDeleteMixin, models.Model):
@@ -442,8 +475,8 @@ class Dependent(AuditMixin, SoftDeleteMixin, models.Model):
     )
 
     # Custom manager that excludes soft-deleted objects
-    objects = SoftDeleteManager()
     all_objects = models.Manager()  # Access all objects including deleted
+    objects = SoftDeleteManager()
 
     def __str__(self) -> str:
         """Return string representation of dependent."""
@@ -483,7 +516,9 @@ class Lease(AuditMixin, SoftDeleteMixin, models.Model):
         related_name="leases_responsible",
         help_text="Inquilino responsável pela locação",
     )
-    tenants = models.ManyToManyField(Tenant, related_name="leases", help_text="Inquilinos que residem no apartamento")
+    tenants = models.ManyToManyField(
+        Tenant, related_name="leases", help_text="Inquilinos que residem no apartamento"
+    )
     number_of_tenants = models.PositiveIntegerField(
         help_text="Número de ocupantes (para cálculo de taxa de tag). "
         "Pode ser maior que o número de inquilinos registrados.",
@@ -491,7 +526,8 @@ class Lease(AuditMixin, SoftDeleteMixin, models.Model):
     )
 
     start_date = models.DateField(
-        help_text="Data de início da locação", db_index=True  # Add index for date range queries
+        help_text="Data de início da locação",
+        db_index=True,  # Add index for date range queries
     )
     validity_months = models.PositiveIntegerField(help_text="Validade do contrato em meses")
     due_day = models.PositiveIntegerField(
@@ -499,21 +535,41 @@ class Lease(AuditMixin, SoftDeleteMixin, models.Model):
         validators=[validate_due_day],  # Validate 1-31 range
     )
 
-    rental_value = models.DecimalField(max_digits=10, decimal_places=2, help_text="Valor do aluguel")
-    cleaning_fee = models.DecimalField(max_digits=10, decimal_places=2, help_text="Valor da taxa de limpeza")
-    tag_fee = models.DecimalField(max_digits=10, decimal_places=2, help_text="Valor da caução da tag", default=0)
+    rental_value = models.DecimalField(
+        max_digits=10, decimal_places=2, help_text="Valor do aluguel"
+    )
+    cleaning_fee = models.DecimalField(
+        max_digits=10, decimal_places=2, help_text="Valor da taxa de limpeza"
+    )
+    tag_fee = models.DecimalField(
+        max_digits=10, decimal_places=2, help_text="Valor da caução da tag", default=0
+    )
 
-    contract_generated = models.BooleanField(default=False, help_text="Indica se o contrato foi gerado")
-    contract_signed = models.BooleanField(default=False, help_text="Indica se o contrato foi assinado")
-    interfone_configured = models.BooleanField(default=False, help_text="Indica se o interfone foi configurado")
+    contract_generated = models.BooleanField(
+        default=False, help_text="Indica se o contrato foi gerado"
+    )
+    contract_signed = models.BooleanField(
+        default=False, help_text="Indica se o contrato foi assinado"
+    )
+    interfone_configured = models.BooleanField(
+        default=False, help_text="Indica se o interfone foi configurado"
+    )
 
     warning_count = models.PositiveIntegerField(
         default=0, help_text="Número de avisos do inquilino por descumprimento das regras"
     )
 
+    # Financial fields
+    prepaid_until = models.DateField(
+        null=True, blank=True, help_text="Aluguel pré-pago até esta data."
+    )
+    is_salary_offset = models.BooleanField(
+        default=False, help_text="Aluguel compensado como salário."
+    )
+
     # Managers
-    objects = SoftDeleteManager()
     all_objects = models.Manager()  # Access all objects including deleted
+    objects = SoftDeleteManager()
 
     class Meta:
         indexes = [
@@ -526,6 +582,15 @@ class Lease(AuditMixin, SoftDeleteMixin, models.Model):
             models.Index(fields=["contract_generated", "start_date"], name="lease_status_date_idx"),
             models.Index(fields=["due_day", "start_date"], name="lease_due_date_idx"),
         ]
+
+    def __str__(self) -> str:
+        """Return string representation of lease."""
+        return f"Locação do Apto {self.apartment.number} - {self.apartment.building.street_number}"
+
+    def save(self, *args, **kwargs):
+        """Override save to enforce validation before persisting."""
+        self.full_clean()
+        super().save(*args, **kwargs)
 
     def clean(self) -> None:
         """
@@ -542,31 +607,12 @@ class Lease(AuditMixin, SoftDeleteMixin, models.Model):
         """
         super().clean()
 
-        from core.validators import validate_lease_dates, validate_tenant_count
-
         # Validate lease dates
-        try:
-            validate_lease_dates(self)
-        except ValidationError:
-            # Re-raise to preserve error structure
-            raise
+        validate_lease_dates(self)
 
         # Validate tenant count (only if lease is saved)
         if self.pk:
-            try:
-                validate_tenant_count(self)
-            except ValidationError:
-                # Re-raise to preserve error structure
-                raise
-
-    def save(self, *args, **kwargs):
-        """Override save to enforce validation before persisting."""
-        self.full_clean()
-        super().save(*args, **kwargs)
-
-    def __str__(self) -> str:
-        """Return string representation of lease."""
-        return f"Locação do Apto {self.apartment.number} - {self.apartment.building.street_number}"
+            validate_tenant_count(self)
 
 
 class Landlord(AuditMixin, SoftDeleteMixin, models.Model):
@@ -600,18 +646,14 @@ class Landlord(AuditMixin, SoftDeleteMixin, models.Model):
 
     # Personal Information
     name = models.CharField(max_length=200, help_text="Nome completo ou razão social")
-    nationality = models.CharField(
-        max_length=100, default="Brasileira", help_text="Nacionalidade"
-    )
+    nationality = models.CharField(max_length=100, default="Brasileira", help_text="Nacionalidade")
     marital_status = models.CharField(
         max_length=50,
         choices=Tenant.MARITAL_STATUS_CHOICES,
         help_text="Estado civil",
     )
     cpf_cnpj = models.CharField(max_length=20, help_text="CPF ou CNPJ")
-    rg = models.CharField(
-        max_length=20, blank=True, null=True, help_text="RG (opcional)"
-    )
+    rg = models.CharField(max_length=20, blank=True, default="", help_text="RG (opcional)")
 
     # Contact Information
     phone = models.CharField(
@@ -619,14 +661,12 @@ class Landlord(AuditMixin, SoftDeleteMixin, models.Model):
         help_text="Telefone de contato",
         validators=[validate_brazilian_phone],
     )
-    email = models.EmailField(blank=True, null=True, help_text="Email de contato")
+    email = models.EmailField(blank=True, default="", help_text="Email de contato")
 
     # Address
     street = models.CharField(max_length=200, help_text="Rua/Avenida")
     street_number = models.CharField(max_length=20, help_text="Número")
-    complement = models.CharField(
-        max_length=100, blank=True, null=True, help_text="Complemento"
-    )
+    complement = models.CharField(max_length=100, blank=True, default="", help_text="Complemento")
     neighborhood = models.CharField(max_length=100, help_text="Bairro")
     city = models.CharField(max_length=100, help_text="Cidade")
     state = models.CharField(max_length=50, help_text="Estado")
@@ -639,8 +679,8 @@ class Landlord(AuditMixin, SoftDeleteMixin, models.Model):
     )
 
     # Managers
-    objects = SoftDeleteManager()
     all_objects = models.Manager()
+    objects = SoftDeleteManager()
 
     class Meta:
         verbose_name = "Locador"
@@ -649,6 +689,13 @@ class Landlord(AuditMixin, SoftDeleteMixin, models.Model):
     def __str__(self) -> str:
         """Return string representation of landlord."""
         return self.name
+
+    def save(self, *args, **kwargs):
+        """Ensure only one active landlord exists."""
+        if self.is_active:
+            # Deactivate other landlords
+            Landlord.objects.filter(is_active=True).exclude(pk=self.pk).update(is_active=False)
+        super().save(*args, **kwargs)
 
     @property
     def full_address(self) -> str:
@@ -661,19 +708,13 @@ class Landlord(AuditMixin, SoftDeleteMixin, models.Model):
         parts.append(f"CEP {self.zip_code}")
         return ", ".join(parts)
 
-    def save(self, *args, **kwargs):
-        """Ensure only one active landlord exists."""
-        if self.is_active:
-            # Deactivate other landlords
-            Landlord.objects.filter(is_active=True).exclude(pk=self.pk).update(
-                is_active=False
-            )
-        super().save(*args, **kwargs)
-
     @classmethod
-    def get_active(cls) -> "Landlord | None":
+    def get_active(cls) -> Landlord | None:
         """Get the currently active landlord."""
         return cls.objects.filter(is_active=True).first()
+
+
+_RULE_TRUNCATE_LENGTH = 50
 
 
 class ContractRule(AuditMixin, SoftDeleteMixin, models.Model):
@@ -692,23 +733,17 @@ class ContractRule(AuditMixin, SoftDeleteMixin, models.Model):
     and soft delete capability (is_deleted, deleted_at, deleted_by).
     """
 
-    content = models.TextField(
-        help_text="Conteúdo HTML da regra (use <strong> para negrito)"
-    )
+    content = models.TextField(help_text="Conteúdo HTML da regra (use <strong> para negrito)")
     order = models.PositiveIntegerField(
-        default=0,
-        db_index=True,
-        help_text="Ordem de exibição (menores valores aparecem primeiro)"
+        default=0, db_index=True, help_text="Ordem de exibição (menores valores aparecem primeiro)"
     )
     is_active = models.BooleanField(
-        default=True,
-        db_index=True,
-        help_text="Se a regra deve ser incluída nos contratos"
+        default=True, db_index=True, help_text="Se a regra deve ser incluída nos contratos"
     )
 
     # Managers
-    objects = SoftDeleteManager()
     all_objects = models.Manager()
+    objects = SoftDeleteManager()
 
     class Meta:
         ordering = ["order", "id"]
@@ -721,9 +756,10 @@ class ContractRule(AuditMixin, SoftDeleteMixin, models.Model):
     def __str__(self) -> str:
         """Return truncated rule content for display."""
         # Strip HTML and truncate
-        import re
         clean_text = re.sub(r"<[^>]+>", "", self.content)
-        return clean_text[:50] + "..." if len(clean_text) > 50 else clean_text
+        if len(clean_text) > _RULE_TRUNCATE_LENGTH:
+            return clean_text[:_RULE_TRUNCATE_LENGTH] + "..."
+        return clean_text
 
     @classmethod
     def get_active_rules(cls) -> list[str]:
@@ -737,3 +773,281 @@ class ContractRule(AuditMixin, SoftDeleteMixin, models.Model):
             .order_by("order", "id")
             .values_list("content", flat=True)
         )
+
+
+# =============================================================================
+# FINANCIAL MODULE MODELS
+# =============================================================================
+
+
+class Person(AuditMixin, SoftDeleteMixin, models.Model):
+    name = models.CharField(max_length=200)
+    relationship = models.CharField(max_length=50)
+    phone = models.CharField(max_length=20, blank=True)
+    email = models.EmailField(blank=True)
+    is_owner = models.BooleanField(default=False)
+    is_employee = models.BooleanField(default=False)
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="person_profile",
+    )
+    notes = models.TextField(blank=True)
+
+    all_objects = models.Manager()
+    objects = SoftDeleteManager()
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self) -> str:
+        return self.name
+
+
+class CreditCard(AuditMixin, SoftDeleteMixin, models.Model):
+    person = models.ForeignKey(Person, related_name="credit_cards", on_delete=models.CASCADE)
+    nickname = models.CharField(max_length=100)
+    last_four_digits = models.CharField(max_length=4, blank=True)
+    closing_day = models.PositiveSmallIntegerField(
+        validators=[MinValueValidator(1), MaxValueValidator(31)]
+    )
+    due_day = models.PositiveSmallIntegerField(
+        validators=[MinValueValidator(1), MaxValueValidator(31)]
+    )
+    is_active = models.BooleanField(default=True)
+
+    all_objects = models.Manager()
+    objects = SoftDeleteManager()
+
+    class Meta:
+        ordering = ["person", "nickname"]
+        unique_together = ["person", "nickname"]
+
+    def __str__(self) -> str:
+        return f"{self.nickname} ({self.person.name})"
+
+
+class ExpenseCategory(AuditMixin, SoftDeleteMixin, models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    description = models.TextField(blank=True)
+    color = models.CharField(max_length=7, default="#6B7280")
+
+    all_objects = models.Manager()
+    objects = SoftDeleteManager()
+
+    class Meta:
+        ordering = ["name"]
+        verbose_name_plural = "Expense categories"
+
+    def __str__(self) -> str:
+        return self.name
+
+
+class ExpenseType(models.TextChoices):
+    CARD_PURCHASE = "card_purchase", "Compra no Cartão"
+    BANK_LOAN = "bank_loan", "Empréstimo Bancário"
+    PERSONAL_LOAN = "personal_loan", "Empréstimo Pessoal"
+    WATER_BILL = "water_bill", "Conta de Água"
+    ELECTRICITY_BILL = "electricity_bill", "Conta de Luz"
+    PROPERTY_TAX = "property_tax", "IPTU"
+    FIXED_EXPENSE = "fixed_expense", "Gasto Fixo Mensal"
+    ONE_TIME_EXPENSE = "one_time_expense", "Gasto Único"
+    EMPLOYEE_SALARY = "employee_salary", "Salário Funcionário"
+
+
+class Expense(AuditMixin, SoftDeleteMixin, models.Model):
+    description = models.CharField(max_length=500)
+    expense_type = models.CharField(max_length=30, choices=ExpenseType.choices)
+    total_amount = models.DecimalField(max_digits=12, decimal_places=2)
+    expense_date = models.DateField()
+    person = models.ForeignKey(
+        Person, null=True, blank=True, related_name="expenses", on_delete=models.SET_NULL
+    )
+    credit_card = models.ForeignKey(
+        CreditCard, null=True, blank=True, related_name="expenses", on_delete=models.SET_NULL
+    )
+    building = models.ForeignKey(
+        Building, null=True, blank=True, related_name="expenses", on_delete=models.SET_NULL
+    )
+    category = models.ForeignKey(
+        ExpenseCategory, null=True, blank=True, related_name="expenses", on_delete=models.SET_NULL
+    )
+    is_installment = models.BooleanField(default=False)
+    total_installments = models.PositiveIntegerField(null=True, blank=True)
+    is_debt_installment = models.BooleanField(default=False)
+    is_recurring = models.BooleanField(default=False)
+    expected_monthly_amount = models.DecimalField(
+        max_digits=12, decimal_places=2, null=True, blank=True
+    )
+    recurrence_day = models.PositiveSmallIntegerField(
+        null=True, blank=True, validators=[MinValueValidator(1), MaxValueValidator(31)]
+    )
+    is_paid = models.BooleanField(default=False)
+    paid_date = models.DateField(null=True, blank=True)
+    bank_name = models.CharField(max_length=100, blank=True)
+    interest_rate = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    notes = models.TextField(blank=True)
+
+    all_objects = models.Manager()
+    objects = SoftDeleteManager()
+
+    class Meta:
+        ordering = ["-expense_date"]
+        indexes = [
+            models.Index(fields=["-expense_date"], name="expense_date_idx"),
+            models.Index(fields=["expense_type", "-expense_date"], name="expense_type_date_idx"),
+            models.Index(fields=["is_paid", "-expense_date"], name="expense_paid_date_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.description} - R${self.total_amount}"
+
+
+class ExpenseInstallment(AuditMixin, SoftDeleteMixin, models.Model):
+    expense = models.ForeignKey(Expense, related_name="installments", on_delete=models.CASCADE)
+    installment_number = models.PositiveIntegerField()
+    total_installments = models.PositiveIntegerField()
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    due_date = models.DateField()
+    is_paid = models.BooleanField(default=False)
+    paid_date = models.DateField(null=True, blank=True)
+    notes = models.TextField(blank=True)
+
+    all_objects = models.Manager()
+    objects = SoftDeleteManager()
+
+    class Meta:
+        unique_together = ["expense", "installment_number"]
+        ordering = ["due_date", "installment_number"]
+        indexes = [
+            models.Index(fields=["due_date"], name="installment_due_date_idx"),
+            models.Index(fields=["is_paid", "due_date"], name="installment_paid_due_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.expense.description} - Parcela {self.installment_number}/{self.total_installments}"
+
+
+class PersonIncomeType(models.TextChoices):
+    APARTMENT_RENT = "apartment_rent", "Aluguel de Apartamento"
+    FIXED_STIPEND = "fixed_stipend", "Estipêndio Fixo"
+
+
+class PersonIncome(AuditMixin, SoftDeleteMixin, models.Model):
+    person = models.ForeignKey(Person, related_name="incomes", on_delete=models.CASCADE)
+    income_type = models.CharField(max_length=20, choices=PersonIncomeType.choices)
+    apartment = models.ForeignKey(Apartment, null=True, blank=True, on_delete=models.SET_NULL)
+    fixed_amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    start_date = models.DateField()
+    end_date = models.DateField(null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+    notes = models.TextField(blank=True)
+
+    all_objects = models.Manager()
+    objects = SoftDeleteManager()
+
+    class Meta:
+        ordering = ["-start_date"]
+
+    def __str__(self) -> str:
+        return f"{self.person.name} - {self.get_income_type_display()}"
+
+
+class Income(AuditMixin, SoftDeleteMixin, models.Model):
+    description = models.CharField(max_length=500)
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    income_date = models.DateField()
+    person = models.ForeignKey(
+        Person, null=True, blank=True, related_name="extra_incomes", on_delete=models.SET_NULL
+    )
+    building = models.ForeignKey(
+        Building, null=True, blank=True, related_name="extra_incomes", on_delete=models.SET_NULL
+    )
+    category = models.ForeignKey(ExpenseCategory, null=True, blank=True, on_delete=models.SET_NULL)
+    is_recurring = models.BooleanField(default=False)
+    expected_monthly_amount = models.DecimalField(
+        max_digits=12, decimal_places=2, null=True, blank=True
+    )
+    is_received = models.BooleanField(default=False)
+    received_date = models.DateField(null=True, blank=True)
+    notes = models.TextField(blank=True)
+
+    all_objects = models.Manager()
+    objects = SoftDeleteManager()
+
+    class Meta:
+        ordering = ["-income_date"]
+
+    def __str__(self) -> str:
+        return f"{self.description} - R${self.amount}"
+
+
+class RentPayment(AuditMixin, SoftDeleteMixin, models.Model):
+    lease = models.ForeignKey(Lease, related_name="rent_payments", on_delete=models.CASCADE)
+    reference_month = models.DateField()
+    amount_paid = models.DecimalField(max_digits=12, decimal_places=2)
+    payment_date = models.DateField()
+    notes = models.TextField(blank=True)
+
+    all_objects = models.Manager()
+    objects = SoftDeleteManager()
+
+    class Meta:
+        unique_together = ["lease", "reference_month"]
+        ordering = ["-reference_month"]
+        indexes = [
+            models.Index(fields=["-reference_month"], name="rent_payment_month_idx"),
+            models.Index(fields=["lease", "-reference_month"], name="rent_payment_lease_month_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return f"Pagamento {self.reference_month.strftime('%m/%Y')} - Apto {self.lease.apartment.number}"
+
+
+class EmployeePayment(AuditMixin, SoftDeleteMixin, models.Model):
+    person = models.ForeignKey(Person, related_name="employee_payments", on_delete=models.CASCADE)
+    reference_month = models.DateField()
+    base_salary = models.DecimalField(max_digits=12, decimal_places=2)
+    variable_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    rent_offset = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    cleaning_count = models.PositiveIntegerField(default=0)
+    payment_date = models.DateField(null=True, blank=True)
+    is_paid = models.BooleanField(default=False)
+    notes = models.TextField(blank=True)
+
+    all_objects = models.Manager()
+    objects = SoftDeleteManager()
+
+    class Meta:
+        unique_together = ["person", "reference_month"]
+        ordering = ["-reference_month"]
+
+    def __str__(self) -> str:
+        return f"Pagamento {self.person.name} - {self.reference_month.strftime('%m/%Y')}"
+
+    @property
+    def total_paid(self) -> Decimal:
+        return self.base_salary + self.variable_amount
+
+
+class FinancialSettings(models.Model):
+    initial_balance = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    initial_balance_date = models.DateField()
+    notes = models.TextField(blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    updated_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL)
+
+    class Meta:
+        verbose_name_plural = "Financial settings"
+
+    def __str__(self) -> str:
+        return f"Saldo inicial: R${self.initial_balance}"
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        if FinancialSettings.objects.filter(pk=1).exists():
+            kwargs.pop("force_insert", None)
+            kwargs["force_update"] = True
+        super().save(*args, **kwargs)

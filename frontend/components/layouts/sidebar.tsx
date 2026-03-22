@@ -74,7 +74,7 @@ export function Sidebar() {
   };
 
   const handleApiDocsClick = (): void => {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000/api';
     window.open(`${apiUrl}/schema/swagger-ui/`, '_blank', 'noopener,noreferrer');
   };
 

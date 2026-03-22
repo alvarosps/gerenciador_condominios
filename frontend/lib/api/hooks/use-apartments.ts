@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
-import { Apartment, apartmentSchema } from '@/lib/schemas/apartment.schema';
-import { PaginatedResponse, extractResults } from '@/lib/types/api';
+import { type Apartment, apartmentSchema } from '@/lib/schemas/apartment.schema';
+import { type PaginatedResponse, extractResults } from '@/lib/types/api';
 
 /**
  * Hook to fetch all apartments
@@ -42,7 +42,7 @@ export function useApartment(id: number | null) {
       const { data} = await apiClient.get<Apartment>(`/apartments/${id}/`);
       return apartmentSchema.parse(data);
     },
-    enabled: !!id,
+    enabled: Boolean(id),
   });
 }
 
@@ -61,7 +61,7 @@ export function useCreateApartment() {
     },
     onSuccess: () => {
       // Invalidate apartments list to trigger refetch
-      queryClient.invalidateQueries({ queryKey: ['apartments'] });
+      void queryClient.invalidateQueries({ queryKey: ['apartments'] });
     },
   });
 }
@@ -87,8 +87,8 @@ export function useUpdateApartment() {
     },
     onSuccess: (data) => {
       // Invalidate both list and specific apartment cache
-      queryClient.invalidateQueries({ queryKey: ['apartments'] });
-      queryClient.invalidateQueries({ queryKey: ['apartments', data.id] });
+      void queryClient.invalidateQueries({ queryKey: ['apartments'] });
+      void queryClient.invalidateQueries({ queryKey: ['apartments', data.id] });
     },
   });
 }
@@ -105,7 +105,7 @@ export function useDeleteApartment() {
     },
     onSuccess: () => {
       // Invalidate apartments list to trigger refetch
-      queryClient.invalidateQueries({ queryKey: ['apartments'] });
+      void queryClient.invalidateQueries({ queryKey: ['apartments'] });
     },
   });
 }

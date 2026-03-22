@@ -15,12 +15,12 @@ from __future__ import annotations
 import logging
 from datetime import date, timedelta
 from decimal import Decimal
-from typing import Any, Dict, List
+from typing import Any
 
 from django.db.models import Count, Q, Sum
 from django.db.models.functions import Coalesce
 
-from core.models import Apartment, Building, Lease, Tenant
+from core.models import Apartment, Building, Dependent, Lease, Tenant
 
 from .fee_calculator import FeeCalculatorService
 
@@ -48,7 +48,7 @@ class DashboardService:
     """
 
     @staticmethod
-    def get_financial_summary() -> Dict[str, Any]:
+    def get_financial_summary() -> dict[str, Any]:
         """
         Calculate financial summary across all properties.
 
@@ -108,7 +108,9 @@ class DashboardService:
 
         # Calculate occupancy rate and revenue per apartment
         occupancy_rate = (rented_apartments / total_apartments * 100) if total_apartments > 0 else 0
-        revenue_per_apartment = (total_revenue / rented_apartments) if rented_apartments > 0 else Decimal("0.00")
+        revenue_per_apartment = (
+            (total_revenue / rented_apartments) if rented_apartments > 0 else Decimal("0.00")
+        )
 
         summary = {
             "total_revenue": total_revenue,
@@ -126,7 +128,7 @@ class DashboardService:
         return summary
 
     @staticmethod
-    def get_lease_metrics() -> Dict[str, Any]:
+    def get_lease_metrics() -> dict[str, Any]:
         """
         Calculate lease statistics and metrics.
 
@@ -184,7 +186,9 @@ class DashboardService:
         expired_leases = 0
 
         for lease_data in lease_dates:
-            final_date = lease_data["start_date"] + timedelta(days=lease_data["validity_months"] * 30)
+            final_date = lease_data["start_date"] + timedelta(
+                days=lease_data["validity_months"] * 30
+            )
             if final_date < today:
                 expired_leases += 1
             elif final_date <= expiry_threshold:
@@ -200,11 +204,13 @@ class DashboardService:
             "expired_leases": expired_leases,
         }
 
-        logger.info(f"Lease metrics: Total={total_leases}, Active={active_leases}, " f"Expiring soon={expiring_soon}")
+        logger.info(
+            f"Lease metrics: Total={total_leases}, Active={active_leases}, Expiring soon={expiring_soon}"
+        )
         return metrics
 
     @staticmethod
-    def get_building_statistics() -> List[Dict[str, Any]]:
+    def get_building_statistics() -> list[dict[str, Any]]:
         """
         Get per-building statistics and occupancy.
 
@@ -221,8 +227,10 @@ class DashboardService:
         Example:
             >>> stats = DashboardService.get_building_statistics()
             >>> for building_stat in stats:
-            ...     print(f"Building {building_stat['building_number']}: "
-            ...           f"{building_stat['occupancy_rate']}% occupied")
+            ...     print(
+            ...         f"Building {building_stat['building_number']}: "
+            ...         f"{building_stat['occupancy_rate']}% occupied"
+            ...     )
         """
         logger.info("Calculating building statistics")
 
@@ -243,7 +251,9 @@ class DashboardService:
             rented_apartments = building["rented_apartments"]
             vacant_apartments = total_apartments - rented_apartments
 
-            occupancy_rate = (rented_apartments / total_apartments * 100) if total_apartments > 0 else 0
+            occupancy_rate = (
+                (rented_apartments / total_apartments * 100) if total_apartments > 0 else 0
+            )
             total_revenue = building["total_revenue"] or Decimal("0.00")
 
             building_stats.append(
@@ -266,7 +276,7 @@ class DashboardService:
         return building_stats
 
     @staticmethod
-    def get_late_payment_summary() -> Dict[str, Any]:
+    def get_late_payment_summary() -> dict[str, Any]:
         """
         Calculate late payment statistics across all active leases.
 
@@ -329,11 +339,13 @@ class DashboardService:
             "late_leases": late_leases,
         }
 
-        logger.info(f"Late payment summary: {len(late_leases)} leases late, " f"total fees=R$ {total_late_fees}")
+        logger.info(
+            f"Late payment summary: {len(late_leases)} leases late, total fees=R$ {total_late_fees}"
+        )
         return summary
 
     @staticmethod
-    def get_tenant_statistics() -> Dict[str, Any]:
+    def get_tenant_statistics() -> dict[str, Any]:
         """
         Calculate tenant statistics and demographics.
 
@@ -349,8 +361,10 @@ class DashboardService:
         Example:
             >>> stats = DashboardService.get_tenant_statistics()
             >>> print(f"Total tenants: {stats['total_tenants']}")
-            >>> print(f"Individuals: {stats['individual_tenants']}, "
-            ...       f"Companies: {stats['company_tenants']}")
+            >>> print(
+            ...     f"Individuals: {stats['individual_tenants']}, "
+            ...     f"Companies: {stats['company_tenants']}"
+            ... )
         """
         logger.info("Calculating tenant statistics")
 
@@ -365,12 +379,15 @@ class DashboardService:
         tenants_with_dependents = Tenant.objects.filter(dependents__isnull=False).distinct().count()
 
         # Count total dependents
-        from core.models import Dependent
 
         total_dependents = Dependent.objects.count()
 
         # Get marital status distribution using values().annotate() - single query
-        marital_status_qs = Tenant.objects.filter(is_company=False).values("marital_status").annotate(count=Count("id"))
+        marital_status_qs = (
+            Tenant.objects.filter(is_company=False)
+            .values("marital_status")
+            .annotate(count=Count("id"))
+        )
         marital_status_distribution = {}
         for item in marital_status_qs:
             status = item["marital_status"] or "Not specified"

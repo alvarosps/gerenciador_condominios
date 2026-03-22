@@ -24,7 +24,8 @@ Date: 2025-10-19
 
 import subprocess
 import sys
-from datetime import datetime
+import traceback
+from datetime import UTC, datetime
 from pathlib import Path
 
 # Add project root to Python path
@@ -44,25 +45,27 @@ def run_command(cmd, description, ignore_errors=False):
     Returns:
         str: Command output or error message
     """
-    print(f"\n{'='*80}")
+    print(f"\n{'=' * 80}")
     print(f"Running: {description}")
     print(f"Command: {cmd}")
-    print(f"{'='*80}")
+    print(f"{'=' * 80}")
 
     try:
-        result = subprocess.run(cmd, shell=True, capture_output=True, text=True, cwd=str(project_root))
+        result = subprocess.run(
+            cmd, shell=True, capture_output=True, text=True, cwd=str(project_root), check=False
+        )
 
         if result.returncode != 0 and not ignore_errors:
             output = f"Command failed with exit code {result.returncode}\n"
             output += f"STDOUT:\n{result.stdout}\n"
             output += f"STDERR:\n{result.stderr}\n"
         else:
-            output = result.stdout if result.stdout else result.stderr
+            output = result.stdout or result.stderr
 
-        return output
-
-    except Exception as e:
+    except OSError as e:
         return f"Error executing command: {e}"
+    else:
+        return output
 
 
 def install_missing_tools():
@@ -76,11 +79,11 @@ def install_missing_tools():
 
     for tool, package in tools.items():
         try:
-            subprocess.run(f"{tool} --version", shell=True, capture_output=True, check=True)
+            subprocess.run([tool, "--version"], capture_output=True, check=True)
             print(f"  ✓ {tool} is installed")
-        except subprocess.CalledProcessError:
+        except (subprocess.CalledProcessError, FileNotFoundError):
             print(f"  ✗ {tool} not found, installing...")
-            subprocess.run(f"pip install {package}", shell=True, check=True)
+            subprocess.run(["pip", "install", package], check=True)
 
 
 def count_lines_of_code():
@@ -107,13 +110,12 @@ def count_lines_of_code():
                 continue
 
             try:
-                with open(py_file, "r", encoding="utf-8") as f:
-                    lines = f.readlines()
-                    num_lines = len(lines)
-                    total_lines += num_lines
-                    total_files += 1
-                    output += f"{py_file.name:40} {num_lines:6} lines\n"
-            except Exception as e:
+                lines = py_file.read_text(encoding="utf-8").splitlines()
+                num_lines = len(lines)
+                total_lines += num_lines
+                total_files += 1
+                output += f"{py_file.name:40} {num_lines:6} lines\n"
+            except OSError as e:
                 output += f"{py_file.name:40} Error: {e}\n"
 
     output += "\n" + "=" * 60 + "\n"
@@ -129,25 +131,25 @@ def generate_metrics():
     metrics_dir = project_root / "metrics"
     metrics_dir.mkdir(exist_ok=True)
 
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now(tz=UTC).strftime("%Y%m%d_%H%M%S")
     report_file = metrics_dir / f"baseline_metrics_{timestamp}.txt"
 
     print("=" * 80)
     print("Condominios Manager - Code Quality Metrics Generator")
     print("=" * 80)
-    print(f"\nTimestamp: {datetime.now().isoformat()}")
+    print(f"\nTimestamp: {datetime.now(tz=UTC).isoformat()}")
     print(f"Report will be saved to: {report_file}")
 
     # Install missing tools
     install_missing_tools()
 
     # Open report file
-    with open(report_file, "w", encoding="utf-8") as f:
+    with report_file.open("w", encoding="utf-8") as f:
         # Header
         f.write("=" * 80 + "\n")
         f.write("CONDOMINIOS MANAGER - BASELINE CODE QUALITY METRICS\n")
         f.write("=" * 80 + "\n")
-        f.write(f"Generated: {datetime.now().isoformat()}\n")
+        f.write(f"Generated: {datetime.now(tz=UTC).isoformat()}\n")
         f.write("Phase: 0 - Pre-Refactoring Setup\n")
         f.write("=" * 80 + "\n\n")
 
@@ -160,7 +162,9 @@ def generate_metrics():
         # 2. Flake8 Violations
         print("\n[2/6] Running Flake8...")
         output = run_command(
-            "flake8 core condominios_manager --count --statistics", "Flake8 Code Quality Analysis", ignore_errors=True
+            "flake8 core condominios_manager --count --statistics",
+            "Flake8 Code Quality Analysis",
+            ignore_errors=True,
         )
         f.write("=" * 80 + "\n")
         f.write("FLAKE8 VIOLATIONS\n")
@@ -180,7 +184,9 @@ def generate_metrics():
         # 4. Security Analysis (Bandit)
         print("\n[4/6] Running Bandit security scan...")
         output = run_command(
-            "bandit -r core condominios_manager -f txt", "Security Analysis (Bandit)", ignore_errors=True
+            "bandit -r core condominios_manager -f txt",
+            "Security Analysis (Bandit)",
+            ignore_errors=True,
         )
         f.write("=" * 80 + "\n")
         f.write("SECURITY ANALYSIS (BANDIT)\n")
@@ -191,7 +197,9 @@ def generate_metrics():
         # 5. Cyclomatic Complexity
         print("\n[5/6] Calculating cyclomatic complexity...")
         output = run_command(
-            "radon cc core condominios_manager -a -nb", "Cyclomatic Complexity (Radon)", ignore_errors=True
+            "radon cc core condominios_manager -a -nb",
+            "Cyclomatic Complexity (Radon)",
+            ignore_errors=True,
         )
         f.write("=" * 80 + "\n")
         f.write("CYCLOMATIC COMPLEXITY\n")
@@ -202,7 +210,9 @@ def generate_metrics():
         # 6. Maintainability Index
         print("\n[6/6] Calculating maintainability index...")
         output = run_command(
-            "radon mi core condominios_manager -nb", "Maintainability Index (Radon)", ignore_errors=True
+            "radon mi core condominios_manager -nb",
+            "Maintainability Index (Radon)",
+            ignore_errors=True,
         )
         f.write("=" * 80 + "\n")
         f.write("MAINTAINABILITY INDEX\n")
@@ -245,12 +255,10 @@ def generate_metrics():
 def main():
     """Main function"""
     try:
-        _report_file = generate_metrics()  # noqa: F841
+        _report_file = generate_metrics()
         sys.exit(0)
-    except Exception as e:
+    except OSError as e:
         print(f"\n✗ Error generating metrics: {e}", file=sys.stderr)
-        import traceback
-
         traceback.print_exc()
         sys.exit(1)
 

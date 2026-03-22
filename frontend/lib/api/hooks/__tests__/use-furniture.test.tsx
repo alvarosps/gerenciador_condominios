@@ -23,7 +23,7 @@ describe('useFurniture', () => {
 
       // Should have fetched furniture
       expect(result.current.data).toHaveLength(mockFurniture.length);
-      expect(result.current.data?.[0].name).toBe(mockFurniture[0].name);
+      expect(result.current.data?.[0]?.name).toBe(mockFurniture[0]?.name);
     });
 
     it('should validate furniture data with Zod schema', async () => {

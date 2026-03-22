@@ -26,13 +26,13 @@ import {
   FileText,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { DataTable, Column } from '@/components/tables/data-table';
+import { DataTable, type Column } from '@/components/tables/data-table';
 import { FurnitureFormModal } from './_components/furniture-form-modal';
 import {
   useFurniture,
   useDeleteFurniture,
 } from '@/lib/api/hooks/use-furniture';
-import { Furniture } from '@/lib/schemas/furniture.schema';
+import { type Furniture } from '@/lib/schemas/furniture.schema';
 import { furnitureExportColumns } from '@/lib/hooks/use-export';
 import { useCrudPage } from '@/lib/hooks/use-crud-page';
 
@@ -57,7 +57,7 @@ export default function FurniturePage() {
       dataIndex: 'id',
       key: 'id',
       width: 80,
-      sorter: (a: Furniture, b: Furniture) => (a.id || 0) - (b.id || 0),
+      sorter: (a: Furniture, b: Furniture) => (a.id ?? 0) - (b.id ?? 0),
     },
     {
       title: 'Nome do Móvel',
@@ -85,7 +85,7 @@ export default function FurniturePage() {
             size="sm"
             onClick={() => {
               crud.setItemToDelete(record);
-              crud.handleDeleteClick(record.id!);
+              if (record.id !== undefined) crud.handleDeleteClick(record.id);
             }}
             disabled={crud.isDeleting}
           >
@@ -122,11 +122,11 @@ export default function FurniturePage() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
-              <DropdownMenuItem onClick={() => crud.handleExport('excel', furniture || [])}>
+              <DropdownMenuItem onClick={() => crud.handleExport('excel', furniture ?? [])}>
                 <FileSpreadsheet className="h-4 w-4 mr-2" />
                 Exportar para Excel
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => crud.handleExport('csv', furniture || [])}>
+              <DropdownMenuItem onClick={() => crud.handleExport('csv', furniture ?? [])}>
                 <FileText className="h-4 w-4 mr-2" />
                 Exportar para CSV
               </DropdownMenuItem>

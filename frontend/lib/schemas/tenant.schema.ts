@@ -22,7 +22,7 @@ export const tenantSchema = z.object({
   cpf_cnpj: z.string().min(1, 'CPF/CNPJ é obrigatório'),
   rg: z.string().optional().nullable(),
   phone: z.string().min(1, 'Telefone é obrigatório'),
-  email: z.string().email('Email inválido').optional().nullable().or(z.literal('')),
+  email: z.union([z.email('Email inválido'), z.literal('')]).optional().nullable(),
   phone_alternate: z.string().optional().nullable(),
   marital_status: z.string().optional().nullable(),
   profession: z.string().optional().nullable(),

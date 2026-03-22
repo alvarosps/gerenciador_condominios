@@ -23,7 +23,7 @@ import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useCalculateLateFee } from '@/lib/api/hooks/use-leases';
-import { Lease } from '@/lib/schemas/lease.schema';
+import { type Lease } from '@/lib/schemas/lease.schema';
 import { formatCurrency } from '@/lib/utils/formatters';
 
 interface Props {
@@ -144,7 +144,7 @@ export function LateFeeModal({ open, lease, onClose }: Props) {
                   selected={paymentDate}
                   onSelect={(date) => date && setPaymentDate(date)}
                   locale={ptBR}
-                  initialFocus
+                  autoFocus
                 />
               </PopoverContent>
             </Popover>

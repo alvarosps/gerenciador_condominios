@@ -39,7 +39,7 @@ class RequestResponseLoggingMiddleware(MiddlewareMixin):
         Args:
             request: Incoming HTTP request
         """
-        request._start_time = time.time()
+        request.start_time = time.time()
 
         # Log access
         access_logger.info(
@@ -67,8 +67,8 @@ class RequestResponseLoggingMiddleware(MiddlewareMixin):
         Returns:
             The unmodified HTTP response
         """
-        if hasattr(request, "_start_time"):
-            duration = time.time() - request._start_time
+        if hasattr(request, "start_time"):
+            duration = time.time() - request.start_time
 
             # Log access response
             access_logger.info(

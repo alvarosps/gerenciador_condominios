@@ -9,18 +9,18 @@ Handles all business logic related to contract template management including:
 
 from __future__ import annotations
 
+import datetime as dt
 import logging
-import os
 import shutil
-from datetime import datetime
-from typing import Dict, Optional
+from pathlib import Path
 
 from django.conf import settings
-
-from jinja2 import BaseLoader, Environment
+from jinja2 import BaseLoader, Environment, select_autoescape
 
 from core.models import Lease
 from core.utils import format_currency, number_to_words
+
+from .contract_service import ContractService
 
 logger = logging.getLogger(__name__)
 
@@ -41,39 +41,40 @@ class TemplateManagementService:
     """
 
     @staticmethod
-    def get_template_path() -> str:
+    def get_template_path() -> Path:
         """
         Get the absolute path to the contract template file.
 
         Returns:
-            str: Absolute path to contract_template.html
+            Path to contract_template.html
 
         Raises:
             FileNotFoundError: If template file doesn't exist
         """
-        template_path = os.path.join(settings.BASE_DIR, "core", "templates", "contract_template.html")
+        template_path = Path(settings.BASE_DIR) / "core" / "templates" / "contract_template.html"
 
-        if not os.path.exists(template_path):
-            raise FileNotFoundError(f"Template file not found at {template_path}")
+        if not template_path.exists():
+            msg = f"Template file not found at {template_path}"
+            raise FileNotFoundError(msg)
 
         return template_path
 
     @staticmethod
-    def get_backup_directory() -> str:
+    def get_backup_directory() -> Path:
         """
         Get the directory for template backups.
 
         Returns:
-            str: Absolute path to backups directory
+            Path to backups directory
 
         Creates the directory if it doesn't exist.
         """
-        backup_dir = os.path.join(settings.BASE_DIR, "core", "templates", "backups")
-        os.makedirs(backup_dir, exist_ok=True)
+        backup_dir = Path(settings.BASE_DIR) / "core" / "templates" / "backups"
+        backup_dir.mkdir(parents=True, exist_ok=True)
         return backup_dir
 
     @classmethod
-    def ensure_default_backup(cls) -> Optional[str]:
+    def ensure_default_backup(cls) -> str | None:
         """
         Ensure a default backup exists.
 
@@ -86,18 +87,18 @@ class TemplateManagementService:
         """
         try:
             backup_dir = cls.get_backup_directory()
-            default_backup_path = os.path.join(backup_dir, "contract_template_DEFAULT.html")
+            default_backup_path = backup_dir / "contract_template_DEFAULT.html"
 
-            if not os.path.exists(default_backup_path):
+            if not default_backup_path.exists():
                 template_path = cls.get_template_path()
                 shutil.copy2(template_path, default_backup_path)
                 logger.info(f"Default backup created: {default_backup_path}")
-                return default_backup_path
+                return str(default_backup_path)
 
+        except OSError:
+            logger.exception("Error creating default backup")
             return None
-
-        except Exception as e:
-            logger.error(f"Error creating default backup: {str(e)}")
+        else:
             return None
 
     @classmethod
@@ -114,24 +115,17 @@ class TemplateManagementService:
             FileNotFoundError: If template file doesn't exist
             IOError: If file cannot be read
         """
-        try:
-            template_path = cls.get_template_path()
+        template_path = cls.get_template_path()
 
-            # Ensure default backup exists on first access
-            cls.ensure_default_backup()
+        # Ensure default backup exists on first access
+        cls.ensure_default_backup()
 
-            with open(template_path, "r", encoding="utf-8") as f:
-                content = f.read()
-
-            logger.info("Template content retrieved successfully")
-            return content
-
-        except Exception as e:
-            logger.error(f"Error reading template: {str(e)}")
-            raise
+        content = template_path.read_text(encoding="utf-8")
+        logger.info("Template content retrieved successfully")
+        return content
 
     @classmethod
-    def save_template(cls, content: str) -> Dict[str, str]:
+    def save_template(cls, content: str) -> dict[str, str]:
         """
         Save contract template with automatic backup.
 
@@ -152,40 +146,34 @@ class TemplateManagementService:
             IOError: If file operations fail
         """
         if not content or not content.strip():
-            raise ValueError("Template content cannot be empty")
+            msg = "Template content cannot be empty"
+            raise ValueError(msg)
 
-        try:
-            template_path = cls.get_template_path()
-            backup_dir = cls.get_backup_directory()
+        template_path = cls.get_template_path()
+        backup_dir = cls.get_backup_directory()
 
-            # Generate timestamped backup filename
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            backup_filename = f"contract_template_backup_{timestamp}.html"
-            backup_path = os.path.join(backup_dir, backup_filename)
+        # Generate timestamped backup filename
+        timestamp = dt.datetime.now(tz=dt.UTC).strftime("%Y%m%d_%H%M%S")
+        backup_filename = f"contract_template_backup_{timestamp}.html"
+        backup_path = backup_dir / backup_filename
 
-            # Create backup of current template
-            if os.path.exists(template_path):
-                shutil.copy2(template_path, backup_path)
-                logger.info(f"Backup created: {backup_path}")
+        # Create backup of current template
+        if template_path.exists():
+            shutil.copy2(template_path, backup_path)
+            logger.info(f"Backup created: {backup_path}")
 
-            # Save new template
-            with open(template_path, "w", encoding="utf-8") as f:
-                f.write(content)
+        # Save new template
+        template_path.write_text(content, encoding="utf-8")
+        logger.info("Template saved successfully")
 
-            logger.info("Template saved successfully")
-
-            return {
-                "message": "Template salvo com sucesso! Backup criado.",
-                "backup_path": backup_path,
-                "backup_filename": backup_filename,
-            }
-
-        except Exception as e:
-            logger.error(f"Error saving template: {str(e)}")
-            raise
+        return {
+            "message": "Template salvo com sucesso! Backup criado.",
+            "backup_path": str(backup_path),
+            "backup_filename": backup_filename,
+        }
 
     @classmethod
-    def preview_template(cls, content: str, lease_id: Optional[int] = None) -> str:
+    def preview_template(cls, content: str, lease_id: int | None = None) -> str:
         """
         Render template with sample data for preview.
 
@@ -203,69 +191,48 @@ class TemplateManagementService:
             ValueError: If no sample lease is available
             Exception: If template rendering fails
         """
+        lease_qs = Lease.objects.select_related(
+            "apartment",
+            "apartment__building",
+            "responsible_tenant",
+        ).prefetch_related(
+            "tenants",
+            "tenants__dependents",
+            "tenants__furnitures",
+            "apartment__furnitures",
+        )
+
         try:
-            # Get sample lease
-            if lease_id:
-                sample_lease = (
-                    Lease.objects.select_related(
-                        "apartment",
-                        "apartment__building",
-                        "responsible_tenant",
-                    )
-                    .prefetch_related(
-                        "tenants",
-                        "tenants__dependents",
-                        "tenants__furnitures",
-                        "apartment__furnitures",
-                    )
-                    .get(pk=lease_id)
-                )
-            else:
-                sample_lease = (
-                    Lease.objects.select_related(
-                        "apartment",
-                        "apartment__building",
-                        "responsible_tenant",
-                    )
-                    .prefetch_related(
-                        "tenants",
-                        "tenants__dependents",
-                        "tenants__furnitures",
-                        "apartment__furnitures",
-                    )
-                    .first()
-                )
-
-            if not sample_lease:
-                raise ValueError(
-                    "Nenhuma locação encontrada no sistema. " "Crie uma locação para visualizar o preview."
-                )
-
-            # Import ContractService to reuse context preparation
-            from .contract_service import ContractService
-
-            # Prepare context using the same logic as contract generation
-            context = ContractService.prepare_contract_context(sample_lease)
-
-            # Render template with Jinja2
-            env = Environment(loader=BaseLoader())
-            env.filters["currency"] = format_currency
-            env.filters["extenso"] = number_to_words
-
-            template = env.from_string(content)
-            html_content = template.render(context)
-
-            logger.info("Template preview rendered successfully")
-            return html_content
-
+            sample_lease = lease_qs.get(pk=lease_id) if lease_id else lease_qs.first()
         except Lease.DoesNotExist:
-            raise ValueError(f"Locação com ID {lease_id} não encontrada")
-        except Exception as e:
-            logger.error(f"Error rendering template preview: {str(e)}")
-            raise
+            msg = f"Locação com ID {lease_id} não encontrada"
+            raise ValueError(msg) from None
+
+        if not sample_lease:
+            msg = (
+                "Nenhuma locação encontrada no sistema. Crie uma locação para visualizar o preview."
+            )
+            raise ValueError(msg)
+
+        # Prepare context using the same logic as contract generation
+        context = ContractService.prepare_contract_context(sample_lease)
+
+        # Render template with Jinja2
+        env = Environment(
+            loader=BaseLoader(),
+            autoescape=select_autoescape(["html"]),
+        )
+        env.filters["currency"] = format_currency
+        env.filters["extenso"] = number_to_words
+
+        template = env.from_string(content)
+        html_content = template.render(context)
+
+        logger.info("Template preview rendered successfully")
+        return html_content
 
     @classmethod
-    def list_backups(cls) -> list[Dict[str, str]]:
+    def list_backups(cls) -> list[dict[str, str]]:
         """
         List all template backups.
 
@@ -275,46 +242,40 @@ class TemplateManagementService:
         Returns:
             list: List of backup info dicts with filename, path, timestamp, and is_default flag
         """
-        try:
-            backup_dir = cls.get_backup_directory()
-            backups = []
-            default_backup = None
+        backup_dir = cls.get_backup_directory()
+        backups = []
+        default_backup = None
 
-            for filename in sorted(os.listdir(backup_dir), reverse=True):
-                if not filename.endswith(".html"):
-                    continue
+        for filename in sorted(backup_dir.iterdir(), key=lambda p: p.name, reverse=True):
+            if filename.suffix != ".html":
+                continue
 
-                file_path = os.path.join(backup_dir, filename)
-                stat_info = os.stat(file_path)
+            stat_info = filename.stat()
 
-                backup_info = {
-                    "filename": filename,
-                    "path": file_path,
-                    "size": stat_info.st_size,
-                    "created_at": datetime.fromtimestamp(stat_info.st_ctime).isoformat(),
-                    "is_default": filename == "contract_template_DEFAULT.html",
-                }
+            backup_info = {
+                "filename": filename.name,
+                "path": str(filename),
+                "size": stat_info.st_size,
+                "created_at": dt.datetime.fromtimestamp(stat_info.st_ctime, tz=dt.UTC).isoformat(),
+                "is_default": filename.name == "contract_template_DEFAULT.html",
+            }
 
-                # Separate default backup to show first
-                if filename == "contract_template_DEFAULT.html":
-                    default_backup = backup_info
-                elif filename.startswith("contract_template_backup_") or filename.startswith(
-                    "contract_template_before_restore_"
-                ):
-                    backups.append(backup_info)
+            # Separate default backup to show first
+            if filename.name == "contract_template_DEFAULT.html":
+                default_backup = backup_info
+            elif filename.name.startswith(
+                ("contract_template_backup_", "contract_template_before_restore_")
+            ):
+                backups.append(backup_info)
 
-            # Put default backup at the beginning if it exists
-            if default_backup:
-                backups.insert(0, default_backup)
+        # Put default backup at the beginning if it exists
+        if default_backup:
+            backups.insert(0, default_backup)
 
-            return backups
-
-        except Exception as e:
-            logger.error(f"Error listing backups: {str(e)}")
-            raise
+        return backups
 
     @classmethod
-    def restore_backup(cls, backup_filename: str) -> Dict[str, str]:
+    def restore_backup(cls, backup_filename: str) -> dict[str, str]:
         """
         Restore a template from backup.
 
@@ -328,31 +289,27 @@ class TemplateManagementService:
             FileNotFoundError: If backup file doesn't exist
             IOError: If file operations fail
         """
-        try:
-            backup_dir = cls.get_backup_directory()
-            backup_path = os.path.join(backup_dir, backup_filename)
+        backup_dir = cls.get_backup_directory()
+        backup_path = backup_dir / backup_filename
 
-            if not os.path.exists(backup_path):
-                raise FileNotFoundError(f"Backup file not found: {backup_filename}")
+        if not backup_path.exists():
+            msg = f"Backup file not found: {backup_filename}"
+            raise FileNotFoundError(msg)
 
-            template_path = cls.get_template_path()
+        template_path = cls.get_template_path()
 
-            # Create a backup of current template before restoring
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            safety_backup = f"contract_template_before_restore_{timestamp}.html"
-            safety_backup_path = os.path.join(backup_dir, safety_backup)
-            shutil.copy2(template_path, safety_backup_path)
+        # Create a backup of current template before restoring
+        timestamp = dt.datetime.now(tz=dt.UTC).strftime("%Y%m%d_%H%M%S")
+        safety_backup = f"contract_template_before_restore_{timestamp}.html"
+        safety_backup_path = backup_dir / safety_backup
+        shutil.copy2(template_path, safety_backup_path)
 
-            # Restore the backup
-            shutil.copy2(backup_path, template_path)
+        # Restore the backup
+        shutil.copy2(backup_path, template_path)
 
-            logger.info(f"Template restored from backup: {backup_filename}")
+        logger.info(f"Template restored from backup: {backup_filename}")
 
-            return {
-                "message": f"Template restaurado com sucesso de {backup_filename}",
-                "safety_backup": safety_backup,
-            }
-
-        except Exception as e:
-            logger.error(f"Error restoring backup: {str(e)}")
-            raise
+        return {
+            "message": f"Template restaurado com sucesso de {backup_filename}",
+            "safety_backup": safety_backup,
+        }

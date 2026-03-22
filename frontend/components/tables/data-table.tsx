@@ -26,7 +26,7 @@ export interface Column<T> {
   render?: (value: unknown, record: T, index: number) => React.ReactNode;
   width?: number | string;
   sorter?: (a: T, b: T) => number;
-  filters?: Array<{ text: string; value: unknown }>;
+  filters?: { text: string; value: unknown }[];
   onFilter?: (value: unknown, record: T) => boolean;
   fixed?: 'left' | 'right';
   align?: 'left' | 'center' | 'right';
@@ -68,7 +68,7 @@ export function DataTable<T extends Record<string, unknown>>({
 
   const showPagination = pagination !== false;
   const paginationConfig = typeof pagination === 'object' ? pagination : {};
-  const total = paginationConfig.total || dataSource.length;
+  const total = paginationConfig.total ?? dataSource.length;
   const totalPages = Math.ceil(total / pageSize);
   const start = (currentPage - 1) * pageSize;
   const end = start + pageSize;
@@ -85,7 +85,7 @@ export function DataTable<T extends Record<string, unknown>>({
     return `row-${index}`;
   };
 
-  const selectedKeys = rowSelection?.selectedRowKeys || [];
+  const selectedKeys = rowSelection?.selectedRowKeys ?? [];
   const allCurrentPageKeys: React.Key[] = paginatedData.map((_record, index) =>
     getRowKey(_record, start + index)
   );
@@ -133,8 +133,11 @@ export function DataTable<T extends Record<string, unknown>>({
 
       allCurrentPageKeys.forEach((key, index) => {
         if (!selectedKeys.includes(key)) {
-          newSelectedKeys.push(key);
-          newSelectedRows.push(paginatedData[index]);
+          const row = paginatedData[index];
+          if (row !== undefined) {
+            newSelectedKeys.push(key);
+            newSelectedRows.push(row);
+          }
         }
       });
 
@@ -241,7 +244,7 @@ export function DataTable<T extends Record<string, unknown>>({
                       const value = getCellValue(record, column);
                       const content = column.render
                         ? column.render(value, record, index)
-                        : String(value ?? '');
+                        : value === null || value === undefined ? '' : typeof value === 'object' ? JSON.stringify(value) : String(value as string | number | boolean | bigint);
 
                       return <TableCell key={column.key}>{content}</TableCell>;
                     })}

@@ -26,13 +26,13 @@ import {
   FileText,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { DataTable, Column } from '@/components/tables/data-table';
+import { DataTable, type Column } from '@/components/tables/data-table';
 import { BuildingFormModal } from './_components/building-form-modal';
 import {
   useBuildings,
   useDeleteBuilding,
 } from '@/lib/api/hooks/use-buildings';
-import { Building } from '@/lib/schemas/building.schema';
+import { type Building } from '@/lib/schemas/building.schema';
 import { buildingExportColumns } from '@/lib/hooks/use-export';
 import { useCrudPage } from '@/lib/hooks/use-crud-page';
 
@@ -90,7 +90,7 @@ export default function BuildingsPage() {
             size="sm"
             onClick={() => {
               crud.setItemToDelete(record);
-              crud.handleDeleteClick(record.id!);
+              if (record.id !== undefined) crud.handleDeleteClick(record.id);
             }}
             disabled={crud.isDeleting}
           >
@@ -127,11 +127,11 @@ export default function BuildingsPage() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
-              <DropdownMenuItem onClick={() => crud.handleExport('excel', buildings || [])}>
+              <DropdownMenuItem onClick={() => crud.handleExport('excel', buildings ?? [])}>
                 <FileSpreadsheet className="h-4 w-4 mr-2" />
                 Exportar para Excel
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => crud.handleExport('csv', buildings || [])}>
+              <DropdownMenuItem onClick={() => crud.handleExport('csv', buildings ?? [])}>
                 <FileText className="h-4 w-4 mr-2" />
                 Exportar para CSV
               </DropdownMenuItem>

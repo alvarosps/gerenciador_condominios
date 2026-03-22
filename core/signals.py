@@ -247,8 +247,6 @@ def disconnect_all_signals():
 
     Warning: Use with caution! Disabling signals can lead to stale caches.
     """
-    from django.db.models.signals import m2m_changed, post_delete, post_save
-
     # Disconnect all post_save signals
     post_save.disconnect(sender=Building)
     post_save.disconnect(sender=Apartment)

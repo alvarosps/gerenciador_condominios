@@ -10,9 +10,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { SearchableSelect, SearchableSelectOption } from '@/components/ui/searchable-select';
-import { Apartment } from '@/lib/schemas/apartment.schema';
-import { Tenant } from '@/lib/schemas/tenant.schema';
+import { SearchableSelect, type SearchableSelectOption } from '@/components/ui/searchable-select';
+import { type Apartment } from '@/lib/schemas/apartment.schema';
+import { type Tenant } from '@/lib/schemas/tenant.schema';
 
 export interface LeaseFilters {
   apartment_id: number | undefined;
@@ -46,10 +46,12 @@ export function LeaseFiltersCard({ filters, onFiltersChange, apartments, tenants
   const tenantOptions: SearchableSelectOption[] = useMemo(() => {
     const options: SearchableSelectOption[] = [{ value: 'all', label: 'Todos os inquilinos' }];
     tenants?.forEach((t) => {
-      options.push({
-        value: String(t.id!),
-        label: t.name,
-      });
+      if (t.id !== undefined) {
+        options.push({
+          value: String(t.id),
+          label: t.name,
+        });
+      }
     });
     return options;
   }, [tenants]);

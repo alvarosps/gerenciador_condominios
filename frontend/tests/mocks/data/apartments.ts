@@ -7,7 +7,7 @@ export const mockApartments: Apartment[] = [
     id: 1,
     number: 101,
     building_id: 1,
-    building: mockBuildings[0],
+    building: mockBuildings[0]!,
     interfone_configured: true,
     contract_generated: false,
     contract_signed: false,
@@ -17,13 +17,13 @@ export const mockApartments: Apartment[] = [
     is_rented: false,
     lease_date: null,
     last_rent_increase_date: null,
-    furnitures: [mockFurniture[0], mockFurniture[1]],
+    furnitures: [mockFurniture[0]!, mockFurniture[1]!],
   },
   {
     id: 2,
     number: 102,
     building_id: 1,
-    building: mockBuildings[0],
+    building: mockBuildings[0]!,
     interfone_configured: true,
     contract_generated: true,
     contract_signed: true,
@@ -33,13 +33,13 @@ export const mockApartments: Apartment[] = [
     is_rented: true,
     lease_date: '2024-01-15',
     last_rent_increase_date: '2024-07-15',
-    furnitures: [mockFurniture[2], mockFurniture[3], mockFurniture[4]],
+    furnitures: [mockFurniture[2]!, mockFurniture[3]!, mockFurniture[4]!],
   },
   {
     id: 3,
     number: 201,
     building_id: 2,
-    building: mockBuildings[1],
+    building: mockBuildings[1]!,
     interfone_configured: false,
     contract_generated: false,
     contract_signed: false,
@@ -55,7 +55,7 @@ export const mockApartments: Apartment[] = [
     id: 4,
     number: 202,
     building_id: 2,
-    building: mockBuildings[1],
+    building: mockBuildings[1]!,
     interfone_configured: true,
     contract_generated: true,
     contract_signed: false,
@@ -73,7 +73,7 @@ export const mockApartments: Apartment[] = [
  * Factory to create mock apartment with custom overrides
  */
 export function createMockApartment(overrides: Partial<Apartment> = {}): Apartment {
-  const building = mockBuildings[0];
+  const building = mockBuildings[0]!;
   return {
     id: Math.floor(Math.random() * 1000) + 100,
     number: Math.floor(Math.random() * 900) + 100,

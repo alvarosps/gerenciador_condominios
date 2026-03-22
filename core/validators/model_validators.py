@@ -9,10 +9,20 @@ from __future__ import annotations
 from datetime import date
 from typing import TYPE_CHECKING
 
+from dateutil.relativedelta import relativedelta
 from django.core.exceptions import ValidationError
 
 if TYPE_CHECKING:
     from core.models import Lease
+
+# Validation constants
+_DUE_DAY_MIN = 1
+_DUE_DAY_MAX = 31
+_VALIDITY_MONTHS_MIN = 1
+_VALIDITY_MONTHS_MAX = 60
+_LEASE_HISTORY_YEARS_MAX = 10
+_RENTAL_VALUE_MIN = 100
+_RENTAL_VALUE_MAX = 100_000
 
 
 def validate_due_day(value: int) -> None:
@@ -27,14 +37,16 @@ def validate_due_day(value: int) -> None:
 
     Example:
         >>> validate_due_day(15)  # Valid
-        >>> validate_due_day(0)   # Raises ValidationError
+        >>> validate_due_day(0)  # Raises ValidationError
         >>> validate_due_day(32)  # Raises ValidationError
     """
     if not isinstance(value, int):
-        raise ValidationError("Due day must be an integer.")
+        msg = "Due day must be an integer."
+        raise ValidationError(msg)
 
-    if value < 1 or value > 31:
-        raise ValidationError(f"Due day must be between 1 and 31. Got: {value}", code="invalid_due_day")
+    if value < _DUE_DAY_MIN or value > _DUE_DAY_MAX:
+        msg = f"Due day must be between 1 and 31. Got: {value}"
+        raise ValidationError(msg, code="invalid_due_day")
 
 
 def validate_date_range(start_date: date, end_date: date, field_name: str = "end_date") -> None:
@@ -55,7 +67,9 @@ def validate_date_range(start_date: date, end_date: date, field_name: str = "end
     """
     if end_date <= start_date:
         raise ValidationError(
-            {field_name: f"{field_name} must be after start date. " f"Start: {start_date}, End: {end_date}"},
+            {
+                field_name: f"{field_name} must be after start date. Start: {start_date}, End: {end_date}"
+            },
             code="invalid_date_range",
         )
 
@@ -75,14 +89,13 @@ def validate_lease_dates(lease: Lease) -> None:
     Raises:
         ValidationError: If lease dates are inconsistent
     """
-    from dateutil.relativedelta import relativedelta
 
     errors = {}
 
     # Validate validity months
-    if lease.validity_months < 1:
+    if lease.validity_months < _VALIDITY_MONTHS_MIN:
         errors["validity_months"] = "Validity must be at least 1 month."
-    elif lease.validity_months > 60:
+    elif lease.validity_months > _VALIDITY_MONTHS_MAX:
         errors["validity_months"] = "Validity cannot exceed 60 months (5 years)."
 
     # Calculate end date and validate
@@ -94,7 +107,7 @@ def validate_lease_dates(lease: Lease) -> None:
     # Validate start date is not too far in the past
     if lease.start_date:
         years_ago = date.today().year - lease.start_date.year
-        if years_ago > 10:
+        if years_ago > _LEASE_HISTORY_YEARS_MAX:
             errors["start_date"] = "Start date cannot be more than 10 years in the past."
 
     if errors:
@@ -147,10 +160,13 @@ def validate_rental_value(value: float) -> None:
         ValidationError: If value is unreasonable
     """
     if value < 0:
-        raise ValidationError("Rental value cannot be negative.")
+        msg = "Rental value cannot be negative."
+        raise ValidationError(msg)
 
-    if value < 100:
-        raise ValidationError("Rental value seems too low. Minimum: R$ 100.00", code="rental_value_too_low")
+    if value < _RENTAL_VALUE_MIN:
+        msg = "Rental value seems too low. Minimum: R$ 100.00"
+        raise ValidationError(msg, code="rental_value_too_low")
 
-    if value > 100000:
-        raise ValidationError("Rental value seems too high. Maximum: R$ 100,000.00", code="rental_value_too_high")
+    if value > _RENTAL_VALUE_MAX:
+        msg = "Rental value seems too high. Maximum: R$ 100,000.00"
+        raise ValidationError(msg, code="rental_value_too_high")

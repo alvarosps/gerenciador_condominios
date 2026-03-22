@@ -3,7 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useFurniture } from '@/lib/api/hooks/use-furniture';
 import { formatCPFOrCNPJ, formatBrazilianPhone } from '@/lib/utils/formatters';
-import { StepProps } from './types';
+import { type StepProps } from './types';
 
 export function ReviewStep({ formMethods }: StepProps) {
   const { data: furniture } = useFurniture();
@@ -114,7 +114,7 @@ export function ReviewStep({ formMethods }: StepProps) {
           <CardContent>
             <div className="text-sm">
               {furniture
-                ?.filter((f) => values.furniture_ids?.includes(f.id!))
+                ?.filter((f) => f.id !== undefined && values.furniture_ids?.includes(f.id))
                 .map((f) => f.name)
                 .join(', ')}
             </div>

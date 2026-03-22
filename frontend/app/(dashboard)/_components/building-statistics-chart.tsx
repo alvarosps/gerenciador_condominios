@@ -91,11 +91,13 @@ export function BuildingStatisticsChart() {
     label,
   }: {
     active?: boolean;
-    payload?: Array<{ payload: ChartDataItem }>;
+    payload?: { payload: ChartDataItem }[];
     label?: string;
   }) => {
-    if (active && payload && payload.length) {
-      const dataItem = payload[0].payload;
+    if (active && payload?.length) {
+      const first = payload[0];
+      if (!first) return null;
+      const dataItem = first.payload;
       return (
         <div className="bg-card border rounded-lg shadow-lg p-4">
           <p className="font-bold mb-2">{label}</p>

@@ -11,6 +11,7 @@ This module handles all contract rule CRUD operations:
 
 Separated from main views to follow Single Responsibility Principle.
 """
+
 import logging
 
 from django.db import transaction
@@ -110,9 +111,7 @@ class ContractRuleViewSet(viewsets.ModelViewSet):
             with transaction.atomic():
                 # Verify all IDs exist
                 existing_ids = set(
-                    ContractRule.objects.filter(id__in=rule_ids).values_list(
-                        "id", flat=True
-                    )
+                    ContractRule.objects.filter(id__in=rule_ids).values_list("id", flat=True)
                 )
                 missing_ids = set(rule_ids) - existing_ids
                 if missing_ids:

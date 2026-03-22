@@ -5,7 +5,7 @@
  * across the application.
  */
 
-import { AxiosError } from 'axios';
+import { type AxiosError } from 'axios';
 
 /**
  * Type guard to check if an error is an AxiosError.
@@ -14,7 +14,7 @@ export function isAxiosError(error: unknown): error is AxiosError {
   return (
     error instanceof Error &&
     'isAxiosError' in error &&
-    (error as AxiosError).isAxiosError === true
+    (error as AxiosError).isAxiosError
   );
 }
 

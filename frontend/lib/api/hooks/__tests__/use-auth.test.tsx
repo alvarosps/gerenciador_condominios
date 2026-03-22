@@ -21,19 +21,21 @@ const mockSetTokens = vi.fn();
 const mockSetToken = vi.fn();
 const mockClearAuth = vi.fn();
 
+const authStoreMock = (selector: (state: Record<string, unknown>) => unknown): unknown => {
+  const mockState: Record<string, unknown> = {
+    user: { id: 1, email: 'test@example.com', first_name: 'Test', last_name: 'User' },
+    accessToken: 'mock-access-token',
+    refreshToken: 'mock-refresh-token-67890',
+    setAuth: mockSetAuth,
+    setTokens: mockSetTokens,
+    setToken: mockSetToken,
+    clearAuth: mockClearAuth,
+  };
+  return selector(mockState);
+};
+
 vi.mock('@/store/auth-store', () => ({
-  useAuthStore: vi.fn((selector) => {
-    const mockState = {
-      user: { id: 1, email: 'test@example.com', first_name: 'Test', last_name: 'User' },
-      accessToken: 'mock-access-token',
-      refreshToken: 'mock-refresh-token-67890',
-      setAuth: mockSetAuth,
-      setTokens: mockSetTokens,
-      setToken: mockSetToken,
-      clearAuth: mockClearAuth,
-    };
-    return selector(mockState);
-  }),
+  useAuthStore: vi.fn(authStoreMock),
 }));
 
 // Store original window.location
@@ -105,7 +107,7 @@ describe('useAuth hooks', () => {
   });
 
   describe('useCurrentUser', () => {
-    it('should return current user when authenticated', async () => {
+    it('should return current user when authenticated', () => {
       const { result } = renderHook(() => useCurrentUser(), {
         wrapper: createWrapper(),
       });

@@ -15,7 +15,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Calendar, AlertTriangle, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { useChangeDueDate } from '@/lib/api/hooks/use-leases';
-import { Lease } from '@/lib/schemas/lease.schema';
+import { type Lease } from '@/lib/schemas/lease.schema';
 import { formatCurrency } from '@/lib/utils/formatters';
 
 interface Props {

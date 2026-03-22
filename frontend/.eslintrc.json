@@ -1,12 +1,16 @@
 {
   "extends": [
     "next/core-web-vitals",
-    "plugin:@typescript-eslint/recommended",
+    "plugin:@typescript-eslint/strict-type-checked",
+    "plugin:@typescript-eslint/stylistic-type-checked",
     "prettier"
   ],
   "parser": "@typescript-eslint/parser",
+  "parserOptions": {
+    "project": true
+  },
   "plugins": ["@typescript-eslint"],
-  "ignorePatterns": ["scripts/**/*"],
+  "ignorePatterns": ["scripts/**/*", "next.config.js", "postcss.config.js"],
   "rules": {
     "no-console": ["warn", { "allow": ["error", "warn"] }],
     "no-unused-vars": "off",
@@ -19,15 +23,41 @@
       }
     ],
     "@typescript-eslint/no-explicit-any": "error",
+    "@typescript-eslint/consistent-type-imports": [
+      "error",
+      { "prefer": "type-imports", "fixStyle": "inline-type-imports" }
+    ],
+    "@typescript-eslint/no-floating-promises": "error",
+    "@typescript-eslint/no-misused-promises": [
+      "error",
+      { "checksVoidReturn": { "attributes": false } }
+    ],
+    "@typescript-eslint/strict-boolean-expressions": "off",
+    "@typescript-eslint/no-confusing-void-expression": "off",
+    "@typescript-eslint/restrict-template-expressions": ["error", { "allowNumber": true }],
+    "@typescript-eslint/no-unnecessary-condition": "off",
     "react/no-unescaped-entities": "error",
     "react-hooks/rules-of-hooks": "error",
-    "react-hooks/exhaustive-deps": "warn"
+    "react-hooks/exhaustive-deps": "warn",
+    "prefer-const": "error",
+    "no-var": "error",
+    "eqeqeq": ["error", "always"],
+    "no-implicit-coercion": "error",
+    "no-throw-literal": "error"
   },
   "overrides": [
     {
       "files": ["tailwind.config.ts"],
       "rules": {
         "@typescript-eslint/no-require-imports": "off"
+      }
+    },
+    {
+      "files": ["**/*.test.ts", "**/*.test.tsx", "tests/**/*"],
+      "rules": {
+        "@typescript-eslint/no-floating-promises": "off",
+        "@typescript-eslint/no-unsafe-assignment": "off",
+        "@typescript-eslint/no-unsafe-member-access": "off"
       }
     }
   ]

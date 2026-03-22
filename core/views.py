@@ -1,16 +1,30 @@
 # core/views.py
 import logging
-from datetime import date
+from datetime import date, timedelta
 
+from dateutil.relativedelta import relativedelta
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import DatabaseError, IntegrityError
+from django.db.models import Count, Q
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from .models import Apartment, Building, Furniture, Lease, Tenant
-from .permissions import CanGenerateContract, CanModifyLease, IsAdminUser, IsTenantOrAdmin, ReadOnlyForNonAdmin
-from .serializers import ApartmentSerializer, BuildingSerializer, FurnitureSerializer, LeaseSerializer, TenantSerializer
+from .permissions import (
+    CanGenerateContract,
+    CanModifyLease,
+    IsAdminUser,
+    IsTenantOrAdmin,
+    ReadOnlyForNonAdmin,
+)
+from .serializers import (
+    ApartmentSerializer,
+    BuildingSerializer,
+    FurnitureSerializer,
+    LeaseSerializer,
+    TenantSerializer,
+)
 from .services import ContractService, DashboardService, FeeCalculatorService
 
 logger = logging.getLogger(__name__)
@@ -95,7 +109,9 @@ class ApartmentViewSet(viewsets.ModelViewSet):
         queryset = super().get_queryset()
 
         if self.action in ["list", "retrieve"]:
-            queryset = queryset.select_related("building").prefetch_related(  # ForeignKey: Apartment -> Building
+            queryset = queryset.select_related(
+                "building"
+            ).prefetch_related(  # ForeignKey: Apartment -> Building
                 "furnitures"  # ManyToMany: Apartment -> Furnitures
             )
 
@@ -155,7 +171,6 @@ class TenantViewSet(viewsets.ModelViewSet):
         Phase 5 Query Optimization:
         - prefetch_related: For dependents (reverse FK) and furnitures (ManyToMany)
         """
-        from django.db.models import Count, Q
 
         queryset = super().get_queryset()
 
@@ -178,7 +193,9 @@ class TenantViewSet(viewsets.ModelViewSet):
             has_dependents = params.get("has_dependents")
             if has_dependents is not None and has_dependents != "":
                 if has_dependents.lower() == "true":
-                    queryset = queryset.annotate(dep_count=Count("dependents")).filter(dep_count__gt=0)
+                    queryset = queryset.annotate(dep_count=Count("dependents")).filter(
+                        dep_count__gt=0
+                    )
                 else:
                     queryset = queryset.annotate(dep_count=Count("dependents")).filter(dep_count=0)
 
@@ -186,14 +203,20 @@ class TenantViewSet(viewsets.ModelViewSet):
             has_furniture = params.get("has_furniture")
             if has_furniture is not None and has_furniture != "":
                 if has_furniture.lower() == "true":
-                    queryset = queryset.annotate(furn_count=Count("furnitures")).filter(furn_count__gt=0)
+                    queryset = queryset.annotate(furn_count=Count("furnitures")).filter(
+                        furn_count__gt=0
+                    )
                 else:
-                    queryset = queryset.annotate(furn_count=Count("furnitures")).filter(furn_count=0)
+                    queryset = queryset.annotate(furn_count=Count("furnitures")).filter(
+                        furn_count=0
+                    )
 
             # Search by name or CPF/CNPJ
             search = params.get("search")
             if search:
-                queryset = queryset.filter(Q(name__icontains=search) | Q(cpf_cnpj__icontains=search))
+                queryset = queryset.filter(
+                    Q(name__icontains=search) | Q(cpf_cnpj__icontains=search)
+                )
 
         return queryset
 
@@ -221,6 +244,42 @@ class LeaseViewSet(viewsets.ModelViewSet):
     serializer_class = LeaseSerializer
     permission_classes = [CanModifyLease]
 
+    def _apply_lease_status_filters(self, queryset, params):
+        """Apply computed date-based filters to a lease queryset."""
+        today = date.today()
+
+        is_active = params.get("is_active")
+        if is_active and is_active.lower() == "true":
+            lease_ids = [
+                lease.id
+                for lease in queryset
+                if lease.start_date + relativedelta(months=lease.validity_months) >= today
+            ]
+            queryset = queryset.filter(id__in=lease_ids)
+
+        is_expired = params.get("is_expired")
+        if is_expired and is_expired.lower() == "true":
+            lease_ids = [
+                lease.id
+                for lease in queryset
+                if lease.start_date + relativedelta(months=lease.validity_months) < today
+            ]
+            queryset = queryset.filter(id__in=lease_ids)
+
+        expiring_soon = params.get("expiring_soon")
+        if expiring_soon and expiring_soon.lower() == "true":
+            threshold = today + timedelta(days=30)
+            lease_ids = [
+                lease.id
+                for lease in queryset
+                if today
+                <= lease.start_date + relativedelta(months=lease.validity_months)
+                <= threshold
+            ]
+            queryset = queryset.filter(id__in=lease_ids)
+
+        return queryset
+
     def get_queryset(self):
         """
         Optimize queryset with select_related and prefetch_related to eliminate N+1 queries.
@@ -232,9 +291,6 @@ class LeaseViewSet(viewsets.ModelViewSet):
 
         This reduces queries from ~301 to ~4 for the list endpoint.
         """
-        from datetime import timedelta
-        from dateutil.relativedelta import relativedelta
-
         queryset = super().get_queryset()
 
         if self.action == "list":
@@ -250,60 +306,25 @@ class LeaseViewSet(viewsets.ModelViewSet):
                 "apartment__furnitures",  # ManyToMany: Apartment -> Furnitures (apartment's)
             )
 
-            # Apply filters from query parameters
             params = self.request.query_params
 
-            # Filter by apartment_id
             apartment_id = params.get("apartment_id")
             if apartment_id:
                 queryset = queryset.filter(apartment_id=apartment_id)
 
-            # Filter by responsible_tenant_id
             responsible_tenant_id = params.get("responsible_tenant_id")
             if responsible_tenant_id:
                 queryset = queryset.filter(responsible_tenant_id=responsible_tenant_id)
 
-            # Filter by lease status (is_active, is_expired, expiring_soon)
-            # These are computed from start_date + validity_months
-            today = date.today()
-
-            is_active = params.get("is_active")
-            if is_active and is_active.lower() == "true":
-                # Active leases: final_date >= today
-                # We need to filter in Python since final_date is computed
-                lease_ids = []
-                for lease in queryset:
-                    final_date = lease.start_date + relativedelta(months=lease.validity_months)
-                    if final_date >= today:
-                        lease_ids.append(lease.id)
-                queryset = queryset.filter(id__in=lease_ids)
-
-            is_expired = params.get("is_expired")
-            if is_expired and is_expired.lower() == "true":
-                # Expired leases: final_date < today
-                lease_ids = []
-                for lease in queryset:
-                    final_date = lease.start_date + relativedelta(months=lease.validity_months)
-                    if final_date < today:
-                        lease_ids.append(lease.id)
-                queryset = queryset.filter(id__in=lease_ids)
-
-            expiring_soon = params.get("expiring_soon")
-            if expiring_soon and expiring_soon.lower() == "true":
-                # Expiring soon: final_date is within 30 days from today
-                threshold = today + timedelta(days=30)
-                lease_ids = []
-                for lease in queryset:
-                    final_date = lease.start_date + relativedelta(months=lease.validity_months)
-                    if today <= final_date <= threshold:
-                        lease_ids.append(lease.id)
-                queryset = queryset.filter(id__in=lease_ids)
+            queryset = self._apply_lease_status_filters(queryset, params)
 
         elif self.action == "retrieve":
             # Optimize for detail view: same as list but for single object
             queryset = queryset.select_related(
                 "apartment", "apartment__building", "responsible_tenant"
-            ).prefetch_related("tenants", "tenants__dependents", "tenants__furnitures", "apartment__furnitures")
+            ).prefetch_related(
+                "tenants", "tenants__dependents", "tenants__furnitures", "apartment__furnitures"
+            )
 
         return queryset
 
@@ -335,14 +356,14 @@ class LeaseViewSet(viewsets.ModelViewSet):
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         except PermissionDenied as e:
             return Response({"error": str(e)}, status=status.HTTP_403_FORBIDDEN)
-        except FileNotFoundError as e:
-            logger.error(f"Template not found during contract generation: {e}")
+        except FileNotFoundError:
+            logger.exception("Template not found during contract generation")
             return Response(
                 {"error": "Template de contrato não encontrado"},
                 status=status.HTTP_404_NOT_FOUND,
             )
-        except (DatabaseError, IntegrityError) as e:
-            logger.error(f"Database error during contract generation: {e}")
+        except (DatabaseError, IntegrityError):
+            logger.exception("Database error during contract generation")
             return Response(
                 {"error": "Erro ao salvar dados do contrato"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -377,8 +398,7 @@ class LeaseViewSet(viewsets.ModelViewSet):
                 {"late_days": result["late_days"], "late_fee": result["late_fee"]},
                 status=status.HTTP_200_OK,
             )
-        else:
-            return Response({"message": result["message"]}, status=status.HTTP_200_OK)
+        return Response({"message": result["message"]}, status=status.HTTP_200_OK)
 
     # Endpoint para alteração do dia de vencimento com cálculo da taxa
     @action(detail=True, methods=["post"], permission_classes=[IsAdminUser])
@@ -394,7 +414,9 @@ class LeaseViewSet(viewsets.ModelViewSet):
         new_due_day = request.data.get("new_due_day")
 
         if not new_due_day:
-            return Response({"error": "Campo new_due_day é obrigatório."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"error": "Campo new_due_day é obrigatório."}, status=status.HTTP_400_BAD_REQUEST
+            )
 
         try:
             new_due_day = int(new_due_day)
@@ -416,13 +438,13 @@ class LeaseViewSet(viewsets.ModelViewSet):
             )
         except ValueError as e:
             return Response(
-                {"error": f"Valor inválido para new_due_day: {str(e)}"},
+                {"error": f"Valor inválido para new_due_day: {e!s}"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         except ValidationError as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        except (DatabaseError, IntegrityError) as e:
-            logger.error(f"Database error during due date change: {e}")
+        except (DatabaseError, IntegrityError):
+            logger.exception("Database error during due date change")
             return Response(
                 {"error": "Erro ao salvar alteração de vencimento"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,

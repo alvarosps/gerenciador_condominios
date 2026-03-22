@@ -41,13 +41,13 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { DataTable, Column } from '@/components/tables/data-table';
+import { DataTable, type Column } from '@/components/tables/data-table';
 import { TenantFormWizard } from './_components/tenant-form-wizard';
 import {
   useTenants,
   useDeleteTenant,
 } from '@/lib/api/hooks/use-tenants';
-import { Tenant } from '@/lib/schemas/tenant.schema';
+import { type Tenant } from '@/lib/schemas/tenant.schema';
 import { formatCPFOrCNPJ, formatBrazilianPhone } from '@/lib/utils/formatters';
 import { tenantExportColumns } from '@/lib/hooks/use-export';
 import { useCrudPage } from '@/lib/hooks/use-crud-page';
@@ -141,7 +141,7 @@ export default function TenantsPage() {
           'Viúvo': 'bg-gray-100 text-gray-800 hover:bg-gray-200',
         };
         return (
-          <Badge className={cn(statusVariants[value as string] || 'bg-gray-100 text-gray-800')}>
+          <Badge className={cn(statusVariants[value as string] ?? 'bg-gray-100 text-gray-800')}>
             {value as string}
           </Badge>
         );
@@ -208,7 +208,7 @@ export default function TenantsPage() {
             size="sm"
             onClick={() => {
               crud.setItemToDelete(record);
-              crud.handleDeleteClick(record.id!);
+              if (record.id !== undefined) crud.handleDeleteClick(record.id);
             }}
             disabled={crud.isDeleting}
           >
@@ -251,11 +251,11 @@ export default function TenantsPage() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
-              <DropdownMenuItem onClick={() => crud.handleExport('excel', tenants || [])}>
+              <DropdownMenuItem onClick={() => crud.handleExport('excel', tenants ?? [])}>
                 <FileSpreadsheet className="h-4 w-4 mr-2" />
                 Exportar para Excel
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => crud.handleExport('csv', tenants || [])}>
+              <DropdownMenuItem onClick={() => crud.handleExport('csv', tenants ?? [])}>
                 <FileText className="h-4 w-4 mr-2" />
                 Exportar para CSV
               </DropdownMenuItem>
