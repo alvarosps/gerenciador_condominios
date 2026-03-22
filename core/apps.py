@@ -1,3 +1,4 @@
+import importlib
 import logging
 
 from django.apps import AppConfig
@@ -16,9 +17,7 @@ class CoreConfig(AppConfig):
         Phase 4: Connect cache invalidation signals.
         """
         try:
-            # Import signals to register them
-            from . import signals  # noqa: F401
-
+            importlib.import_module(".signals", package="core")
             logger.info("Core app signals registered successfully")
-        except Exception as e:
-            logger.error(f"Error registering core signals: {e}")
+        except Exception:
+            logger.exception("Error registering core signals")

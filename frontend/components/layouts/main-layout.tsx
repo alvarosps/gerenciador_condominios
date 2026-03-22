@@ -2,7 +2,7 @@
 
 import { Sidebar } from './sidebar';
 import { Header } from './header';
-import { ReactNode } from 'react';
+import { type ReactNode } from 'react';
 
 interface MainLayoutProps {
   children: ReactNode;

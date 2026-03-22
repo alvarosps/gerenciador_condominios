@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { formatBrazilianPhone } from '@/lib/utils/formatters';
-import { StepProps } from './types';
+import { type StepProps } from './types';
 
 export function ContactInfoStep({ formMethods }: StepProps) {
   return (

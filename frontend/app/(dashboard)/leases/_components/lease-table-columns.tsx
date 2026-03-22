@@ -16,8 +16,8 @@ import {
   FilePlus,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Column } from '@/components/tables/data-table';
-import { Lease } from '@/lib/schemas/lease.schema';
+import { type Column } from '@/components/tables/data-table';
+import { type Lease } from '@/lib/schemas/lease.schema';
 import { formatCurrency } from '@/lib/utils/formatters';
 import { format, isPast, isFuture, differenceInDays, differenceInMonths, parseISO } from 'date-fns';
 
@@ -153,7 +153,7 @@ export function createLeaseColumns(handlers: LeaseActionHandlers): Column<Lease>
       render: (_, record: Lease) => {
         const { status, color } = getLeaseStatus(record);
         return (
-          <Badge className={cn(badgeVariants[color] || 'bg-gray-100 text-gray-800')}>
+          <Badge className={cn(badgeVariants[color] ?? 'bg-gray-100 text-gray-800')}>
             {status}
           </Badge>
         );
@@ -169,7 +169,7 @@ export function createLeaseColumns(handlers: LeaseActionHandlers): Column<Lease>
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Badge className={cn(badgeVariants[color] || 'bg-gray-100 text-gray-800', 'cursor-help')}>
+                <Badge className={cn(badgeVariants[color] ?? 'bg-gray-100 text-gray-800', 'cursor-help')}>
                   {label}
                 </Badge>
               </TooltipTrigger>
@@ -197,7 +197,7 @@ export function createLeaseColumns(handlers: LeaseActionHandlers): Column<Lease>
       dataIndex: 'due_day',
       key: 'due_day',
       width: 100,
-      render: (value) => `Dia ${value}`,
+      render: (value) => `Dia ${String(value)}`,
       sorter: (a: Lease, b: Lease) => a.due_day - b.due_day,
     },
     {

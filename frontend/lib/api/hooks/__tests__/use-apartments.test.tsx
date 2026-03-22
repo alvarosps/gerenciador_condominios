@@ -57,7 +57,7 @@ describe('useApartments', () => {
       expect(result.current.data?.id).toBe(1);
     });
 
-    it('should not fetch when ID is null', async () => {
+    it('should not fetch when ID is null', () => {
       const { result } = renderHook(() => useApartment(null), {
         wrapper: createWrapper(),
       });
@@ -138,7 +138,7 @@ describe('useApartments', () => {
 
       const updatedApartment = {
         id: 1,
-        number: mockApartments[0].number,
+        number: mockApartments[0]?.number ?? 0,
         has_furniture: false,
       };
 

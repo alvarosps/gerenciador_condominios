@@ -324,11 +324,11 @@ const leaseHandlers = [
     if (index === -1) {
       return new HttpResponse(null, { status: 404 });
     }
-    leases[index].contract_generated = true;
-    leases[index].pdf_path = `contracts/mock/contract_${id}.pdf`;
+    leases[index]!.contract_generated = true;
+    leases[index]!.pdf_path = `contracts/mock/contract_${id}.pdf`;
     return HttpResponse.json({
       message: 'Contract generated successfully',
-      pdf_path: leases[index].pdf_path,
+      pdf_path: leases[index]!.pdf_path,
     });
   }),
 
@@ -360,8 +360,8 @@ const leaseHandlers = [
     if (index === -1) {
       return new HttpResponse(null, { status: 404 });
     }
-    const oldDueDay = leases[index].due_day;
-    leases[index].due_day = data.new_due_day;
+    const oldDueDay = leases[index]!.due_day;
+    leases[index]!.due_day = data.new_due_day;
     return HttpResponse.json({
       message: 'Due date changed successfully',
       old_due_day: oldDueDay,

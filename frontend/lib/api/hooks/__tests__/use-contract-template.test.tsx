@@ -13,7 +13,7 @@
 import { renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { ReactNode } from 'react';
+import { type ReactNode } from 'react';
 import {
   useContractTemplate,
   useSaveContractTemplate,
@@ -21,13 +21,15 @@ import {
   useTemplateBackups,
   useRestoreTemplateBackup,
 } from '../use-contract-template';
-import { apiClient } from '@/lib/api/client';
+// Create mock functions before vi.mock so they can be referenced inside the factory
+const mockGet = vi.fn();
+const mockPost = vi.fn();
 
 // Mock the apiClient
 vi.mock('@/lib/api/client', () => ({
   apiClient: {
-    get: vi.fn(),
-    post: vi.fn(),
+    get: mockGet,
+    post: mockPost,
   },
 }));
 
@@ -66,7 +68,7 @@ describe('useContractTemplate', () => {
       content: '<html><body>Test Template</body></html>',
     };
 
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockTemplate });
+    mockGet.mockResolvedValue({ data: mockTemplate });
 
     const { result } = renderHook(() => useContractTemplate(), {
       wrapper: createWrapper(),
@@ -83,8 +85,8 @@ describe('useContractTemplate', () => {
 
     expect(result.current.data).toEqual(mockTemplate);
     expect(result.current.data?.content).toContain('Test Template');
-    expect(apiClient.get).toHaveBeenCalledWith('/templates/current/');
-    expect(apiClient.get).toHaveBeenCalledTimes(1);
+    expect(mockGet).toHaveBeenCalledWith('/templates/current/');
+    expect(mockGet).toHaveBeenCalledTimes(1);
   });
 
   it('should handle fetch error gracefully', async () => {
@@ -94,7 +96,7 @@ describe('useContractTemplate', () => {
       },
     };
 
-    vi.mocked(apiClient.get).mockRejectedValue(mockError);
+    mockGet.mockRejectedValue(mockError);
 
     const { result } = renderHook(() => useContractTemplate(), {
       wrapper: createWrapper(),
@@ -113,7 +115,7 @@ describe('useContractTemplate', () => {
       content: '<html><body>Cached Template</body></html>',
     };
 
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockTemplate });
+    mockGet.mockResolvedValue({ data: mockTemplate });
 
     const { result, rerender } = renderHook(() => useContractTemplate(), {
       wrapper: createWrapper(),
@@ -124,13 +126,13 @@ describe('useContractTemplate', () => {
     });
 
     // Clear mock call history
-    vi.mocked(apiClient.get).mockClear();
+    mockGet.mockClear();
 
     // Re-render should use cache (no new API call)
     rerender();
 
     // Verify no additional API calls
-    expect(apiClient.get).not.toHaveBeenCalled();
+    expect(mockGet).not.toHaveBeenCalled();
     expect(result.current.data).toEqual(mockTemplate);
   });
 });
@@ -151,7 +153,7 @@ describe('useSaveContractTemplate', () => {
       backup_filename: 'contract_template_backup_20250115_120000.html',
     };
 
-    vi.mocked(apiClient.post).mockResolvedValue({ data: mockResponse });
+    mockPost.mockResolvedValue({ data: mockResponse });
 
     const { result } = renderHook(() => useSaveContractTemplate(), {
       wrapper: createWrapper(),
@@ -167,7 +169,7 @@ describe('useSaveContractTemplate', () => {
     });
 
     expect(result.current.data).toEqual(mockResponse);
-    expect(apiClient.post).toHaveBeenCalledWith('/templates/save/', {
+    expect(mockPost).toHaveBeenCalledWith('/templates/save/', {
       content: newContent,
     });
   });
@@ -179,7 +181,7 @@ describe('useSaveContractTemplate', () => {
       },
     };
 
-    vi.mocked(apiClient.post).mockRejectedValue(mockError);
+    mockPost.mockRejectedValue(mockError);
 
     const { result } = renderHook(() => useSaveContractTemplate(), {
       wrapper: createWrapper(),
@@ -201,10 +203,10 @@ describe('useSaveContractTemplate', () => {
       backup_filename: 'backup.html',
     };
 
-    vi.mocked(apiClient.post).mockResolvedValue({ data: mockResponse });
+    mockPost.mockResolvedValue({ data: mockResponse });
 
     // Mock get for template query
-    vi.mocked(apiClient.get).mockResolvedValue({
+    mockGet.mockResolvedValue({
       data: { content: 'Old content' },
     });
 
@@ -234,7 +236,7 @@ describe('useSaveContractTemplate', () => {
     });
 
     // Mock new content for refetch
-    vi.mocked(apiClient.get).mockResolvedValue({
+    mockGet.mockResolvedValue({
       data: { content: 'New content' },
     });
 
@@ -246,7 +248,7 @@ describe('useSaveContractTemplate', () => {
 
     // Cache should be invalidated - template query should refetch
     await waitFor(() => {
-      expect(apiClient.get).toHaveBeenCalledWith('/templates/current/');
+      expect(mockGet).toHaveBeenCalledWith('/templates/current/');
     });
   });
 });
@@ -265,7 +267,7 @@ describe('usePreviewContractTemplate', () => {
       html: '<html><body>Preview with rendered data</body></html>',
     };
 
-    vi.mocked(apiClient.post).mockResolvedValue({ data: mockPreview });
+    mockPost.mockResolvedValue({ data: mockPreview });
 
     const { result } = renderHook(() => usePreviewContractTemplate(), {
       wrapper: createWrapper(),
@@ -280,7 +282,7 @@ describe('usePreviewContractTemplate', () => {
     });
 
     expect(result.current.data).toEqual(mockPreview);
-    expect(apiClient.post).toHaveBeenCalledWith('/templates/preview/', {
+    expect(mockPost).toHaveBeenCalledWith('/templates/preview/', {
       content,
     });
   });
@@ -290,7 +292,7 @@ describe('usePreviewContractTemplate', () => {
       html: '<html><body>Preview for specific lease</body></html>',
     };
 
-    vi.mocked(apiClient.post).mockResolvedValue({ data: mockPreview });
+    mockPost.mockResolvedValue({ data: mockPreview });
 
     const { result } = renderHook(() => usePreviewContractTemplate(), {
       wrapper: createWrapper(),
@@ -305,7 +307,7 @@ describe('usePreviewContractTemplate', () => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    expect(apiClient.post).toHaveBeenCalledWith('/templates/preview/', {
+    expect(mockPost).toHaveBeenCalledWith('/templates/preview/', {
       content,
       lease_id,
     });
@@ -320,7 +322,7 @@ describe('usePreviewContractTemplate', () => {
       },
     };
 
-    vi.mocked(apiClient.post).mockRejectedValue(mockError);
+    mockPost.mockRejectedValue(mockError);
 
     const { result } = renderHook(() => usePreviewContractTemplate(), {
       wrapper: createWrapper(),
@@ -344,7 +346,7 @@ describe('usePreviewContractTemplate', () => {
       },
     };
 
-    vi.mocked(apiClient.post).mockRejectedValue(mockError);
+    mockPost.mockRejectedValue(mockError);
 
     const { result } = renderHook(() => usePreviewContractTemplate(), {
       wrapper: createWrapper(),
@@ -385,7 +387,7 @@ describe('useTemplateBackups', () => {
       },
     ];
 
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockBackups });
+    mockGet.mockResolvedValue({ data: mockBackups });
 
     const { result } = renderHook(() => useTemplateBackups(), {
       wrapper: createWrapper(),
@@ -397,11 +399,11 @@ describe('useTemplateBackups', () => {
 
     expect(result.current.data).toEqual(mockBackups);
     expect(result.current.data).toHaveLength(2);
-    expect(apiClient.get).toHaveBeenCalledWith('/templates/backups/');
+    expect(mockGet).toHaveBeenCalledWith('/templates/backups/');
   });
 
   it('should return empty array when no backups exist', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: [] });
+    mockGet.mockResolvedValue({ data: [] });
 
     const { result } = renderHook(() => useTemplateBackups(), {
       wrapper: createWrapper(),
@@ -425,7 +427,7 @@ describe('useTemplateBackups', () => {
       },
     ];
 
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockBackups });
+    mockGet.mockResolvedValue({ data: mockBackups });
 
     const { result, rerender } = renderHook(() => useTemplateBackups(), {
       wrapper: createWrapper(),
@@ -436,13 +438,13 @@ describe('useTemplateBackups', () => {
     });
 
     // Clear mock call history
-    vi.mocked(apiClient.get).mockClear();
+    mockGet.mockClear();
 
     // Re-render should use cache
     rerender();
 
     // Verify no additional API calls
-    expect(apiClient.get).not.toHaveBeenCalled();
+    expect(mockGet).not.toHaveBeenCalled();
     expect(result.current.data).toEqual(mockBackups);
   });
 
@@ -453,7 +455,7 @@ describe('useTemplateBackups', () => {
       },
     };
 
-    vi.mocked(apiClient.get).mockRejectedValue(mockError);
+    mockGet.mockRejectedValue(mockError);
 
     const { result } = renderHook(() => useTemplateBackups(), {
       wrapper: createWrapper(),
@@ -482,7 +484,7 @@ describe('useRestoreTemplateBackup', () => {
       safety_backup: 'contract_template_before_restore_20250115_160000.html',
     };
 
-    vi.mocked(apiClient.post).mockResolvedValue({ data: mockResponse });
+    mockPost.mockResolvedValue({ data: mockResponse });
 
     const { result } = renderHook(() => useRestoreTemplateBackup(), {
       wrapper: createWrapper(),
@@ -497,7 +499,7 @@ describe('useRestoreTemplateBackup', () => {
     });
 
     expect(result.current.data).toEqual(mockResponse);
-    expect(apiClient.post).toHaveBeenCalledWith('/templates/restore/', {
+    expect(mockPost).toHaveBeenCalledWith('/templates/restore/', {
       backup_filename,
     });
   });
@@ -509,7 +511,7 @@ describe('useRestoreTemplateBackup', () => {
       },
     };
 
-    vi.mocked(apiClient.post).mockRejectedValue(mockError);
+    mockPost.mockRejectedValue(mockError);
 
     const { result } = renderHook(() => useRestoreTemplateBackup(), {
       wrapper: createWrapper(),
@@ -530,10 +532,10 @@ describe('useRestoreTemplateBackup', () => {
       safety_backup: 'safety.html',
     };
 
-    vi.mocked(apiClient.post).mockResolvedValue({ data: mockResponse });
+    mockPost.mockResolvedValue({ data: mockResponse });
 
     // Mock get endpoints
-    vi.mocked(apiClient.get).mockImplementation((url: string) => {
+    mockGet.mockImplementation((url: string) => {
       if (url === '/templates/current/') {
         return Promise.resolve({ data: { content: 'Template' } });
       }
@@ -568,7 +570,7 @@ describe('useRestoreTemplateBackup', () => {
     });
 
     // Clear get mocks
-    vi.mocked(apiClient.get).mockClear();
+    mockGet.mockClear();
 
     // Now restore backup
     const { result: restoreResult } = renderHook(() => useRestoreTemplateBackup(), {
@@ -583,12 +585,12 @@ describe('useRestoreTemplateBackup', () => {
 
     // Both caches should be invalidated
     await waitFor(() => {
-      expect(apiClient.get).toHaveBeenCalledWith('/templates/current/');
-      expect(apiClient.get).toHaveBeenCalledWith('/templates/backups/');
+      expect(mockGet).toHaveBeenCalledWith('/templates/current/');
+      expect(mockGet).toHaveBeenCalledWith('/templates/backups/');
     });
 
     // Should have been called twice (once for each query)
-    expect(apiClient.get).toHaveBeenCalledTimes(2);
+    expect(mockGet).toHaveBeenCalledTimes(2);
   });
 });
 
@@ -603,7 +605,7 @@ describe('Hooks Integration', () => {
 
   it('should work together: save template → see new backup → restore backup', async () => {
     // Setup mocks
-    vi.mocked(apiClient.get).mockImplementation((url: string) => {
+    mockGet.mockImplementation((url: string) => {
       if (url === '/templates/current/') {
         return Promise.resolve({
           data: { content: '<html>Current</html>' },
@@ -624,7 +626,7 @@ describe('Hooks Integration', () => {
       return Promise.reject(new Error('Unknown endpoint'));
     });
 
-    vi.mocked(apiClient.post).mockImplementation((url: string, _data: unknown) => {
+    mockPost.mockImplementation((url: string, _data: unknown) => {
       if (url === '/templates/save/') {
         return Promise.resolve({
           data: {
@@ -679,7 +681,7 @@ describe('Hooks Integration', () => {
     });
 
     expect(backupsResult.current.data).toHaveLength(1);
-    expect(backupsResult.current.data?.[0].filename).toBe('backup_new.html');
+    expect(backupsResult.current.data?.[0]?.filename).toBe('backup_new.html');
 
     // 3. Restore backup
     const { result: restoreResult } = renderHook(() => useRestoreTemplateBackup(), {

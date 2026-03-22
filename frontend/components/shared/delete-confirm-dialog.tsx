@@ -97,7 +97,7 @@ export function DeleteConfirmDialog({
             {title}
           </AlertDialogTitle>
           <AlertDialogDescription>
-            {description || defaultDescription}
+            {description ?? defaultDescription}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -107,7 +107,7 @@ export function DeleteConfirmDialog({
           <AlertDialogAction
             onClick={(e) => {
               e.preventDefault();
-              handleConfirm();
+              void handleConfirm();
             }}
             disabled={actualLoading}
             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
@@ -214,7 +214,7 @@ export function BulkDeleteConfirmDialog({
           <AlertDialogAction
             onClick={(e) => {
               e.preventDefault();
-              handleConfirm();
+              void handleConfirm();
             }}
             disabled={actualLoading}
             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"

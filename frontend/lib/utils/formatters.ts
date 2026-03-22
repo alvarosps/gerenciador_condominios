@@ -78,5 +78,5 @@ export function formatDate(date: string | Date | null | undefined): string {
 export function formatDateISO(date: Date | null | undefined): string {
   if (!date) return '';
   if (isNaN(date.getTime())) return '';
-  return date.toISOString().split('T')[0];
+  return date.toISOString().split('T')[0] ?? '';
 }

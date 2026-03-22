@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
-import { Lease, leaseSchema } from '@/lib/schemas/lease.schema';
-import { PaginatedResponse, extractResults } from '@/lib/types/api';
+import { type Lease, leaseSchema } from '@/lib/schemas/lease.schema';
+import { type PaginatedResponse, extractResults } from '@/lib/types/api';
 
 /**
  * Hook to fetch all leases with optional filters
@@ -43,7 +43,7 @@ export function useLease(id: number | null) {
       const { data } = await apiClient.get<Lease>(`/leases/${id}/`);
       return leaseSchema.parse(data);
     },
-    enabled: !!id,
+    enabled: Boolean(id),
   });
 }
 
@@ -60,9 +60,9 @@ export function useCreateLease() {
     },
     onSuccess: () => {
       // Invalidate leases list and related caches
-      queryClient.invalidateQueries({ queryKey: ['leases'] });
-      queryClient.invalidateQueries({ queryKey: ['apartments'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      void queryClient.invalidateQueries({ queryKey: ['leases'] });
+      void queryClient.invalidateQueries({ queryKey: ['apartments'] });
+      void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
   });
 }
@@ -88,10 +88,10 @@ export function useUpdateLease() {
     },
     onSuccess: (data) => {
       // Invalidate both list and specific lease cache
-      queryClient.invalidateQueries({ queryKey: ['leases'] });
-      queryClient.invalidateQueries({ queryKey: ['leases', data.id] });
-      queryClient.invalidateQueries({ queryKey: ['apartments'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      void queryClient.invalidateQueries({ queryKey: ['leases'] });
+      void queryClient.invalidateQueries({ queryKey: ['leases', data.id] });
+      void queryClient.invalidateQueries({ queryKey: ['apartments'] });
+      void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
   });
 }
@@ -108,9 +108,9 @@ export function useDeleteLease() {
     },
     onSuccess: () => {
       // Invalidate leases list and related caches
-      queryClient.invalidateQueries({ queryKey: ['leases'] });
-      queryClient.invalidateQueries({ queryKey: ['apartments'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      void queryClient.invalidateQueries({ queryKey: ['leases'] });
+      void queryClient.invalidateQueries({ queryKey: ['apartments'] });
+      void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
   });
 }
@@ -132,9 +132,9 @@ export function useGenerateContract() {
     },
     onSuccess: (_, leaseId) => {
       // Invalidate lease to refresh contract_generated status
-      queryClient.invalidateQueries({ queryKey: ['leases', leaseId] });
-      queryClient.invalidateQueries({ queryKey: ['leases'] });
-      queryClient.invalidateQueries({ queryKey: ['apartments'] });
+      void queryClient.invalidateQueries({ queryKey: ['leases', leaseId] });
+      void queryClient.invalidateQueries({ queryKey: ['leases'] });
+      void queryClient.invalidateQueries({ queryKey: ['apartments'] });
     },
   });
 }
@@ -190,8 +190,8 @@ export function useChangeDueDate() {
     },
     onSuccess: (_, params) => {
       // Invalidate lease to refresh due_day
-      queryClient.invalidateQueries({ queryKey: ['leases', params.leaseId] });
-      queryClient.invalidateQueries({ queryKey: ['leases'] });
+      void queryClient.invalidateQueries({ queryKey: ['leases', params.leaseId] });
+      void queryClient.invalidateQueries({ queryKey: ['leases'] });
     },
   });
 }

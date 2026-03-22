@@ -8,6 +8,14 @@ interface ExportOptions {
   sheetName?: string;
 }
 
+/** Safely convert an unknown value to string, returning '' for objects/arrays */
+function toStr(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  return '';
+}
+
 /**
  * Custom hook for exporting data to Excel
  * Handles formatting, file generation, and download
@@ -15,7 +23,7 @@ interface ExportOptions {
 export function useExport() {
   const [isExporting, setIsExporting] = useState(false);
 
-  const exportToExcel = async <T extends Record<string, unknown>>(
+  const exportToExcel = <T extends Record<string, unknown>>(
     data: T[],
     columns: {
       key: string;
@@ -34,7 +42,7 @@ export function useExport() {
           const value = record[column.key];
           const formattedValue = column.format
             ? column.format(value, record)
-            : String(value ?? '');
+            : toStr(value);
           row[column.label] = formattedValue;
         });
         return row;
@@ -46,7 +54,7 @@ export function useExport() {
       XLSX.utils.book_append_sheet(
         workbook,
         worksheet,
-        options.sheetName || 'Dados'
+        options.sheetName ?? 'Dados'
       );
 
       // Auto-size columns
@@ -55,7 +63,7 @@ export function useExport() {
         const headerLength = column.label.length;
         const maxContentLength = Math.max(
           ...formattedData.map((row) =>
-            String(row[column.label] || '').length
+            String(row[column.label] ?? '').length
           )
         );
         maxWidths[idx] = Math.min(
@@ -83,7 +91,7 @@ export function useExport() {
     }
   };
 
-  const exportToCSV = async <T extends Record<string, unknown>>(
+  const exportToCSV = <T extends Record<string, unknown>>(
     data: T[],
     columns: {
       key: string;
@@ -102,7 +110,7 @@ export function useExport() {
           const value = record[column.key];
           const formattedValue = column.format
             ? column.format(value, record)
-            : String(value ?? '');
+            : toStr(value);
           row[column.label] = formattedValue;
         });
         return row;
@@ -156,7 +164,7 @@ export const buildingExportColumns = [
   {
     key: 'created_at' as const,
     label: 'Data de Cadastro',
-    format: (value: unknown) => format(new Date(String(value ?? '')), 'dd/MM/yyyy HH:mm'),
+    format: (value: unknown) => format(new Date(toStr(value)), 'dd/MM/yyyy HH:mm'),
   },
 ];
 
@@ -197,12 +205,12 @@ export const tenantExportColumns = [
   {
     key: 'cpf_cnpj' as const,
     label: 'CPF / CNPJ',
-    format: (value: unknown) => formatCPFOrCNPJ(String(value ?? '')),
+    format: (value: unknown) => formatCPFOrCNPJ(toStr(value)),
   },
   {
     key: 'phone' as const,
     label: 'Telefone',
-    format: (value: unknown) => formatBrazilianPhone(String(value ?? '')),
+    format: (value: unknown) => formatBrazilianPhone(toStr(value)),
   },
   { key: 'email' as const, label: 'Email' },
   {
@@ -231,7 +239,7 @@ export const leaseExportColumns = [
     format: (value: unknown) => {
       if (value && typeof value === 'object' && 'number' in value) {
         const building = 'building' in value && value.building && typeof value.building === 'object' && 'name' in value.building ? String(value.building.name) : '';
-        return `${building} - Apto ${value.number}`;
+        return `${building} - Apto ${String(value.number)}`;
       }
       return '';
     },
@@ -244,17 +252,17 @@ export const leaseExportColumns = [
   {
     key: 'start_date' as const,
     label: 'Data de Início',
-    format: (value: unknown) => format(new Date(String(value ?? '')), 'dd/MM/yyyy'),
+    format: (value: unknown) => format(new Date(toStr(value)), 'dd/MM/yyyy'),
   },
   {
     key: 'final_date' as const,
     label: 'Data Final',
-    format: (value: unknown) => format(new Date(String(value ?? '')), 'dd/MM/yyyy'),
+    format: (value: unknown) => format(new Date(toStr(value)), 'dd/MM/yyyy'),
   },
   {
     key: 'next_month_date' as const,
     label: 'Próximo Mês',
-    format: (value: unknown) => format(new Date(String(value ?? '')), 'dd/MM/yyyy'),
+    format: (value: unknown) => format(new Date(toStr(value)), 'dd/MM/yyyy'),
   },
   { key: 'validity_months' as const, label: 'Validade (meses)' },
   { key: 'due_day' as const, label: 'Dia de Vencimento' },
@@ -286,6 +294,6 @@ export const furnitureExportColumns = [
   {
     key: 'created_at' as const,
     label: 'Data de Cadastro',
-    format: (value: unknown) => format(new Date(String(value ?? '')), 'dd/MM/yyyy HH:mm'),
+    format: (value: unknown) => format(new Date(toStr(value)), 'dd/MM/yyyy HH:mm'),
   },
 ];

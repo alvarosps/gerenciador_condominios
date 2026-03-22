@@ -9,10 +9,22 @@ according to Brazilian government standards.
 from __future__ import annotations
 
 import re
-from typing import Optional
 
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
+
+# CPF constants
+_CPF_LENGTH = 11
+_CHECKSUM_MIN_REMAINDER = 2
+_CHECKSUM_MODULO = 11
+
+# CNPJ constants
+_CNPJ_LENGTH = 14
+
+# Phone constants
+_AREA_CODE_DIGITS = 2
+_AREA_CODE_MIN = 11
+_AREA_CODE_MAX = 99
 
 
 class CPFValidator:
@@ -24,9 +36,9 @@ class CPFValidator:
 
     Example:
         >>> validator = CPFValidator()
-        >>> validator('111.444.777-35')  # Valid
-        >>> validator('11144477735')     # Valid (raw format)
-        >>> validator('111.444.777-00')  # Raises ValidationError (invalid checksum)
+        >>> validator("111.444.777-35")  # Valid
+        >>> validator("11144477735")  # Valid (raw format)
+        >>> validator("111.444.777-00")  # Raises ValidationError (invalid checksum)
     """
 
     message = "CPF inválido. Formato esperado: XXX.XXX.XXX-XX ou 11 dígitos."
@@ -44,7 +56,7 @@ class CPFValidator:
             CPF with only digits
 
         Example:
-            >>> CPFValidator.clean('111.444.777-35')
+            >>> CPFValidator.clean("111.444.777-35")
             '11144477735'
         """
         return re.sub(r"[^0-9]", "", value)
@@ -62,8 +74,8 @@ class CPFValidator:
             Checksum digit (0-9)
         """
         total = sum(int(cpf_digits[i]) * (position - i) for i in range(len(cpf_digits)))
-        remainder = total % 11
-        return 0 if remainder < 2 else 11 - remainder
+        remainder = total % _CHECKSUM_MODULO
+        return 0 if remainder < _CHECKSUM_MIN_REMAINDER else _CHECKSUM_MODULO - remainder
 
     def validate(self, value: str) -> bool:
         """
@@ -75,7 +87,7 @@ class CPFValidator:
         Returns:
             True if valid, False otherwise
         """
-        if len(value) != 11:
+        if len(value) != _CPF_LENGTH:
             return False
 
         # Check if all digits are the same (invalid CPFs like 111.111.111-11)
@@ -89,12 +101,9 @@ class CPFValidator:
 
         # Validate second checksum digit
         second_digit = self.calculate_checksum_digit(value[:10], 11)
-        if second_digit != int(value[10]):
-            return False
+        return second_digit == int(value[10])
 
-        return True
-
-    def __call__(self, value: Optional[str]) -> str:
+    def __call__(self, value: str | None) -> str:
         """
         Validate and clean CPF.
 
@@ -127,9 +136,9 @@ class CNPJValidator:
 
     Example:
         >>> validator = CNPJValidator()
-        >>> validator('11.222.333/0001-81')  # Valid
-        >>> validator('11222333000181')      # Valid (raw format)
-        >>> validator('11.222.333/0001-00')  # Raises ValidationError (invalid checksum)
+        >>> validator("11.222.333/0001-81")  # Valid
+        >>> validator("11222333000181")  # Valid (raw format)
+        >>> validator("11.222.333/0001-00")  # Raises ValidationError (invalid checksum)
     """
 
     message = "CNPJ inválido. Formato esperado: XX.XXX.XXX/XXXX-XX ou 14 dígitos."
@@ -147,7 +156,7 @@ class CNPJValidator:
             CNPJ with only digits
 
         Example:
-            >>> CNPJValidator.clean('11.222.333/0001-81')
+            >>> CNPJValidator.clean("11.222.333/0001-81")
             '11222333000181'
         """
         return re.sub(r"[^0-9]", "", value)
@@ -165,8 +174,8 @@ class CNPJValidator:
             Checksum digit (0-9)
         """
         total = sum(int(cnpj_digits[i]) * weights[i] for i in range(len(cnpj_digits)))
-        remainder = total % 11
-        return 0 if remainder < 2 else 11 - remainder
+        remainder = total % _CHECKSUM_MODULO
+        return 0 if remainder < _CHECKSUM_MIN_REMAINDER else _CHECKSUM_MODULO - remainder
 
     def validate(self, value: str) -> bool:
         """
@@ -178,7 +187,7 @@ class CNPJValidator:
         Returns:
             True if valid, False otherwise
         """
-        if len(value) != 14:
+        if len(value) != _CNPJ_LENGTH:
             return False
 
         # Check if all digits are the same (invalid CNPJs)
@@ -194,12 +203,9 @@ class CNPJValidator:
         # Validate second checksum digit
         second_weights = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
         second_digit = self.calculate_checksum_digit(value[:13], second_weights)
-        if second_digit != int(value[13]):
-            return False
+        return second_digit == int(value[13])
 
-        return True
-
-    def __call__(self, value: Optional[str]) -> str:
+    def __call__(self, value: str | None) -> str:
         """
         Validate and clean CNPJ.
 
@@ -233,9 +239,9 @@ class BrazilianPhoneValidator(RegexValidator):
 
     Example:
         >>> validator = BrazilianPhoneValidator()
-        >>> validator('(11) 98765-4321')  # Valid mobile
-        >>> validator('(11) 3456-7890')   # Valid landline
-        >>> validator('11987654321')      # Valid (raw format)
+        >>> validator("(11) 98765-4321")  # Valid mobile
+        >>> validator("(11) 3456-7890")  # Valid landline
+        >>> validator("11987654321")  # Valid (raw format)
     """
 
     regex = r"^(\(?\d{2}\)?\s?)?(\d{4,5})-?(\d{4})$"
@@ -258,12 +264,12 @@ class BrazilianPhoneValidator(RegexValidator):
             Phone with only digits
 
         Example:
-            >>> BrazilianPhoneValidator.clean('(11) 98765-4321')
+            >>> BrazilianPhoneValidator.clean("(11) 98765-4321")
             '11987654321'
         """
         return re.sub(r"[^0-9]", "", value)
 
-    def __call__(self, value: Optional[str]) -> str:
+    def __call__(self, value: str | None) -> str:
         """
         Validate Brazilian phone number.
 
@@ -288,10 +294,11 @@ class BrazilianPhoneValidator(RegexValidator):
             raise ValidationError(self.message, code=self.code)
 
         # Check area code (11-99)
-        if len(cleaned) >= 2:
-            area_code = int(cleaned[:2])
-            if area_code < 11 or area_code > 99:
-                raise ValidationError("Código de área inválido. Deve estar entre 11 e 99.", code="invalid_area_code")
+        if len(cleaned) >= _AREA_CODE_DIGITS:
+            area_code = int(cleaned[:_AREA_CODE_DIGITS])
+            if area_code < _AREA_CODE_MIN or area_code > _AREA_CODE_MAX:
+                msg = "Código de área inválido. Deve estar entre 11 e 99."
+                raise ValidationError(msg, code="invalid_area_code")
 
         return value
 

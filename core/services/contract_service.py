@@ -14,20 +14,25 @@ Handles all business logic related to contract generation including:
 from __future__ import annotations
 
 import logging
-import os
+import tempfile
 import warnings
 from pathlib import Path
-from typing import Any, Dict, List, Optional
-
-from django.conf import settings
-from django.db import transaction
+from typing import Any
 
 from asgiref.sync import async_to_sync
-from jinja2 import Environment, FileSystemLoader
+from django.conf import settings
+from django.db import transaction
+from jinja2 import Environment, FileSystemLoader, select_autoescape
+from pyppeteer import launch
 
 from core.contract_rules import regras_condominio
-from core.infrastructure import FileSystemDocumentStorage, IDocumentStorage, IPDFGenerator, PyppeteerPDFGenerator
-from core.models import ContractRule, Furniture, Lease
+from core.infrastructure import (
+    FileSystemDocumentStorage,
+    IDocumentStorage,
+    IPDFGenerator,
+    PyppeteerPDFGenerator,
+)
+from core.models import ContractRule, Furniture, Landlord, Lease
 from core.utils import format_currency, number_to_words
 
 from .date_calculator import DateCalculatorService
@@ -60,19 +65,19 @@ class ContractService:
         >>> from core.infrastructure import WeasyPrintPDFGenerator, S3DocumentStorage
         >>> service = ContractService(
         ...     pdf_generator=WeasyPrintPDFGenerator(),
-        ...     document_storage=S3DocumentStorage(bucket_name="my-bucket")
+        ...     document_storage=S3DocumentStorage(bucket_name="my-bucket"),
         ... )
         >>> pdf_path = service.generate_contract_instance(lease)
     """
 
     # Class-level default implementations
-    _default_pdf_generator: Optional[IPDFGenerator] = None
-    _default_document_storage: Optional[IDocumentStorage] = None
+    _default_pdf_generator: IPDFGenerator | None = None
+    _default_document_storage: IDocumentStorage | None = None
 
     def __init__(
         self,
-        pdf_generator: Optional[IPDFGenerator] = None,
-        document_storage: Optional[IDocumentStorage] = None,
+        pdf_generator: IPDFGenerator | None = None,
+        document_storage: IDocumentStorage | None = None,
     ):
         """
         Initialize ContractService with custom implementations.
@@ -103,7 +108,7 @@ class ContractService:
         return cls._default_document_storage
 
     @staticmethod
-    def calculate_lease_furniture(lease: Lease) -> List[Furniture]:
+    def calculate_lease_furniture(lease: Lease) -> list[Furniture]:
         """
         Calculate furniture list for the lease.
 
@@ -138,7 +143,7 @@ class ContractService:
         return lease_furnitures
 
     @staticmethod
-    def prepare_contract_context(lease: Lease) -> Dict[str, Any]:
+    def prepare_contract_context(lease: Lease) -> dict[str, Any]:
         """
         Prepare the context dictionary for contract template rendering.
 
@@ -155,12 +160,10 @@ class ContractService:
         Examples:
             >>> lease = Lease.objects.get(pk=1)
             >>> context = ContractService.prepare_contract_context(lease)
-            >>> print(context['tenant'])  # Responsible tenant
-            >>> print(context['landlord'])  # Active landlord
-            >>> print(context['rental_value'])  # Monthly rent
+            >>> print(context["tenant"])  # Responsible tenant
+            >>> print(context["landlord"])  # Active landlord
+            >>> print(context["rental_value"])  # Monthly rent
         """
-        from core.models import Landlord
-
         start_date = lease.start_date
         validity = lease.validity_months
 
@@ -187,7 +190,7 @@ class ContractService:
 
         # Get rules from database, fallback to hardcoded rules if none exist
         db_rules = ContractRule.get_active_rules()
-        rules = db_rules if db_rules else regras_condominio
+        rules = db_rules or regras_condominio
 
         context = {
             "landlord": landlord,
@@ -258,17 +261,19 @@ class ContractService:
             >>> path = ContractService.get_contract_pdf_path(lease)
             >>> print(path)  # 'C:/path/contracts/836/contract_apto_101_1.pdf'
         """
-        base_dir = settings.BASE_DIR
-        contracts_dir = os.path.join(base_dir, settings.PDF_OUTPUT_DIR, str(lease.apartment.building.street_number))
-        os.makedirs(contracts_dir, exist_ok=True)
+        base_dir = Path(settings.BASE_DIR)
+        contracts_dir = (
+            base_dir / settings.PDF_OUTPUT_DIR / str(lease.apartment.building.street_number)
+        )
+        contracts_dir.mkdir(parents=True, exist_ok=True)
 
-        pdf_path = os.path.join(contracts_dir, f"contract_apto_{lease.apartment.number}_{lease.id}.pdf")
+        pdf_path = contracts_dir / f"contract_apto_{lease.apartment.number}_{lease.id}.pdf"
 
         logger.debug(f"PDF path for lease {lease.id}: {pdf_path}")
-        return pdf_path
+        return str(pdf_path)
 
     @staticmethod
-    def render_contract_template(context: Dict[str, Any]) -> str:
+    def render_contract_template(context: dict[str, Any]) -> str:
         """
         Render the contract HTML template with the given context.
 
@@ -284,10 +289,13 @@ class ContractService:
         Examples:
             >>> context = ContractService.prepare_contract_context(lease)
             >>> html = ContractService.render_contract_template(context)
-            >>> assert '<html>' in html
+            >>> assert "<html>" in html
         """
-        template_path = os.path.join(settings.BASE_DIR, "core", "templates")
-        env = Environment(loader=FileSystemLoader(template_path))
+        template_path = str(Path(settings.BASE_DIR) / "core" / "templates")
+        env = Environment(
+            loader=FileSystemLoader(template_path),
+            autoescape=select_autoescape(["html"]),
+        )
         env.filters["currency"] = format_currency
         env.filters["extenso"] = number_to_words
 
@@ -319,15 +327,15 @@ class ContractService:
             >>> html = "<html><body>Contract</body></html>"
             >>> path = await service.generate_pdf_with_infrastructure(html, "836/contract_1.pdf")
         """
-        import tempfile
-
         # Create temporary PDF file
         with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as temp_pdf:
             temp_pdf_path = temp_pdf.name
 
         try:
             # Generate PDF using IPDFGenerator
-            await self.pdf_generator.generate_pdf(html_content=html_content, output_path=temp_pdf_path, options=None)
+            await self.pdf_generator.generate_pdf(
+                html_content=html_content, output_path=temp_pdf_path, options=None
+            )
 
             # Read PDF content
             pdf_content = Path(temp_pdf_path).read_bytes()
@@ -346,7 +354,7 @@ class ContractService:
             # Clean up temporary file
             try:
                 Path(temp_pdf_path).unlink(missing_ok=True)
-            except Exception as e:
+            except OSError as e:
                 logger.warning(f"Failed to delete temporary PDF {temp_pdf_path}: {e}")
 
     @staticmethod
@@ -372,10 +380,8 @@ class ContractService:
             >>> html = "<html><body>Contract</body></html>"
             >>> await ContractService.generate_pdf_from_html(html, "output.pdf", 1)
         """
-        from pyppeteer import launch
-
         # Calculate contracts directory from pdf_path
-        contracts_dir = os.path.dirname(pdf_path)
+        contracts_dir = Path(pdf_path).parent
 
         browser = await launch(
             handleSIGINT=False,
@@ -404,28 +410,24 @@ class ContractService:
             page = await browser.newPage()
 
             # Save temporary HTML file
-            temp_html_path = os.path.join(contracts_dir, f"temp_contract_{lease_id}.html")
-            with open(temp_html_path, "w", encoding="utf-8") as f:
-                f.write(html_content)
+            temp_html_path = contracts_dir / f"temp_contract_{lease_id}.html"
+            temp_html_path.write_text(html_content, encoding="utf-8")
 
             # Generate PDF
             file_url = f"file:///{temp_html_path}"
             await page.goto(file_url, {"waitUntil": "networkidle2"})
-            await page.pdf({
-                "path": pdf_path,
-                "format": "A4",
-                "printBackground": True,
-                "margin": {
-                    "top": "1cm",
-                    "right": "1.5cm",
-                    "bottom": "1cm",
-                    "left": "1.5cm"
-                },
-                "preferCSSPageSize": False
-            })
+            await page.pdf(
+                {
+                    "path": pdf_path,
+                    "format": "A4",
+                    "printBackground": True,
+                    "margin": {"top": "1cm", "right": "1.5cm", "bottom": "1cm", "left": "1.5cm"},
+                    "preferCSSPageSize": False,
+                }
+            )
 
             # Clean up temporary file
-            os.remove(temp_html_path)
+            temp_html_path.unlink(missing_ok=True)
 
             logger.info(f"PDF generated successfully for lease {lease_id}: {pdf_path}")
         finally:
@@ -518,7 +520,6 @@ class ContractService:
         Examples:
             >>> lease = Lease.objects.get(pk=1)
             >>> pdf_path = ContractService.generate_contract(lease)
-            >>> assert os.path.exists(pdf_path)
             >>> assert lease.contract_generated is True
         """
         # Emit deprecation warning

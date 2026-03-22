@@ -164,8 +164,8 @@ export function useCurrentUser() {
       const { data } = await apiClient.get<User>('/auth/user/');
       return data;
     },
-    enabled: !!user,
-    initialData: user || undefined,
+    enabled: Boolean(user),
+    initialData: user ?? undefined,
   });
 }
 
@@ -175,7 +175,7 @@ export function useCurrentUser() {
  */
 export function useGoogleLogin() {
   return () => {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000/api';
     window.location.href = `${apiUrl}/auth/google/`;
   };
 }

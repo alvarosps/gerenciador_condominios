@@ -10,6 +10,7 @@ This module handles all contract template CRUD operations:
 
 Separated from LeaseViewSet to follow Single Responsibility Principle.
 """
+
 import logging
 
 from django.core.exceptions import ObjectDoesNotExist
@@ -57,8 +58,8 @@ class ContractTemplateViewSet(viewsets.ViewSet):
                 {"error": "Template de contrato não encontrado"},
                 status=status.HTTP_404_NOT_FOUND,
             )
-        except PermissionError as e:
-            logger.error(f"Permission denied reading template: {e}")
+        except PermissionError:
+            logger.exception("Permission denied reading template")
             return Response(
                 {"error": "Sem permissão para ler o template"},
                 status=status.HTTP_403_FORBIDDEN,
@@ -105,14 +106,14 @@ class ContractTemplateViewSet(viewsets.ViewSet):
             return Response(result, status=status.HTTP_200_OK)
         except ValueError as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        except PermissionError as e:
-            logger.error(f"Permission denied saving template: {e}")
+        except PermissionError:
+            logger.exception("Permission denied saving template")
             return Response(
                 {"error": "Sem permissão para salvar o template"},
                 status=status.HTTP_403_FORBIDDEN,
             )
-        except OSError as e:
-            logger.error(f"OS error saving template: {e}")
+        except OSError:
+            logger.exception("OS error saving template")
             return Response(
                 {"error": "Erro ao salvar arquivo do template"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -197,8 +198,8 @@ class ContractTemplateViewSet(viewsets.ViewSet):
         except FileNotFoundError as e:
             logger.warning(f"Backup directory not found: {e}")
             return Response([], status=status.HTTP_200_OK)  # Return empty list if no backups
-        except PermissionError as e:
-            logger.error(f"Permission denied listing backups: {e}")
+        except PermissionError:
+            logger.exception("Permission denied listing backups")
             return Response(
                 {"error": "Sem permissão para listar backups"},
                 status=status.HTTP_403_FORBIDDEN,
@@ -248,14 +249,14 @@ class ContractTemplateViewSet(viewsets.ViewSet):
                 {"error": "Arquivo de backup não encontrado"},
                 status=status.HTTP_404_NOT_FOUND,
             )
-        except PermissionError as e:
-            logger.error(f"Permission denied restoring backup: {e}")
+        except PermissionError:
+            logger.exception("Permission denied restoring backup")
             return Response(
                 {"error": "Sem permissão para restaurar backup"},
                 status=status.HTTP_403_FORBIDDEN,
             )
-        except OSError as e:
-            logger.error(f"OS error restoring backup: {e}")
+        except OSError:
+            logger.exception("OS error restoring backup")
             return Response(
                 {"error": "Erro ao restaurar arquivo de backup"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,

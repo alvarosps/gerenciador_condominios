@@ -3,7 +3,7 @@
 import { Node, mergeAttributes } from '@tiptap/core';
 import {
   NodeViewWrapper,
-  NodeViewProps,
+  type NodeViewProps,
   ReactNodeViewRenderer,
 } from '@tiptap/react';
 import React from 'react';

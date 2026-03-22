@@ -10,11 +10,13 @@ This service handles all fee-related business logic:
 
 from __future__ import annotations
 
-from datetime import date
 from decimal import Decimal
-from typing import Dict, Union
+from typing import TYPE_CHECKING
 
 from django.conf import settings
+
+if TYPE_CHECKING:
+    from datetime import date
 
 
 class FeeCalculatorService:
@@ -36,7 +38,7 @@ class FeeCalculatorService:
             Daily rental rate (rental_value / DAYS_PER_MONTH)
 
         Examples:
-            >>> FeeCalculatorService.calculate_daily_rate(Decimal('1500.00'))
+            >>> FeeCalculatorService.calculate_daily_rate(Decimal("1500.00"))
             Decimal('50.00')  # 1500 / 30
         """
         days_per_month = Decimal(str(settings.DAYS_PER_MONTH))
@@ -45,7 +47,7 @@ class FeeCalculatorService:
     @staticmethod
     def calculate_late_fee(
         rental_value: Decimal, due_day: int, current_date: date
-    ) -> Dict[str, Union[int, Decimal, str]]:
+    ) -> dict[str, int | Decimal | str]:
         """
         Calculate late payment fee based on days overdue.
 
@@ -66,14 +68,10 @@ class FeeCalculatorService:
 
         Examples:
             >>> service = FeeCalculatorService()
-            >>> result = service.calculate_late_fee(
-            ...     Decimal('1500.00'),
-            ...     10,
-            ...     date(2025, 1, 15)
-            ... )
-            >>> result['late_days']
+            >>> result = service.calculate_late_fee(Decimal("1500.00"), 10, date(2025, 1, 15))
+            >>> result["late_days"]
             5
-            >>> result['late_fee']
+            >>> result["late_fee"]
             Decimal('375.00')  # (1500/30) × 5 × 1.05
         """
         if current_date.day > due_day:
@@ -88,18 +86,17 @@ class FeeCalculatorService:
                 "late_fee": late_fee,
                 "message": f"Pagamento atrasado há {late_days} dia(s).",
             }
-        else:
-            return {
-                "is_late": False,
-                "late_days": 0,
-                "late_fee": Decimal("0.00"),
-                "message": "Aluguel não está atrasado.",
-            }
+        return {
+            "is_late": False,
+            "late_days": 0,
+            "late_fee": Decimal("0.00"),
+            "message": "Aluguel não está atrasado.",
+        }
 
     @staticmethod
     def calculate_due_date_change_fee(
         rental_value: Decimal, current_due_day: int, new_due_day: int
-    ) -> Dict[str, Union[int, Decimal]]:
+    ) -> dict[str, int | Decimal]:
         """
         Calculate fee for changing the rental due date.
 
@@ -119,14 +116,10 @@ class FeeCalculatorService:
 
         Examples:
             >>> service = FeeCalculatorService()
-            >>> result = service.calculate_due_date_change_fee(
-            ...     Decimal('1500.00'),
-            ...     10,
-            ...     15
-            ... )
-            >>> result['days_difference']
+            >>> result = service.calculate_due_date_change_fee(Decimal("1500.00"), 10, 15)
+            >>> result["days_difference"]
             5
-            >>> result['fee']
+            >>> result["fee"]
             Decimal('250.00')  # (1500/30) × 5
         """
         days_difference = abs(new_due_day - current_due_day)
@@ -162,15 +155,17 @@ class FeeCalculatorService:
             Decimal('80.00')
         """
         if num_tenants < 1:
-            raise ValueError("Number of tenants must be at least 1")
+            msg = "Number of tenants must be at least 1"
+            raise ValueError(msg)
 
         if num_tenants == 1:
             return Decimal(str(settings.DEFAULT_TAG_FEE_SINGLE))
-        else:
-            return Decimal(str(settings.DEFAULT_TAG_FEE_MULTIPLE))
+        return Decimal(str(settings.DEFAULT_TAG_FEE_MULTIPLE))
 
     @staticmethod
-    def calculate_total_value(rental_value: Decimal, cleaning_fee: Decimal, tag_fee: Decimal) -> Decimal:
+    def calculate_total_value(
+        rental_value: Decimal, cleaning_fee: Decimal, tag_fee: Decimal
+    ) -> Decimal:
         """
         Calculate total initial payment value.
 
@@ -187,9 +182,7 @@ class FeeCalculatorService:
 
         Examples:
             >>> FeeCalculatorService.calculate_total_value(
-            ...     Decimal('1500.00'),
-            ...     Decimal('200.00'),
-            ...     Decimal('80.00')
+            ...     Decimal("1500.00"), Decimal("200.00"), Decimal("80.00")
             ... )
             Decimal('1780.00')
         """

@@ -67,7 +67,7 @@ export default function ContractTemplatePage() {
   }, [templateData]);
 
   const handleSave = async () => {
-    if (!content || !content.trim()) {
+    if (!content?.trim()) {
       toast.error('O template não pode estar vazio');
       return;
     }
@@ -87,7 +87,7 @@ export default function ContractTemplatePage() {
   };
 
   const handlePreview = async () => {
-    if (!content || !content.trim()) {
+    if (!content?.trim()) {
       toast.error('O template não pode estar vazio');
       return;
     }
@@ -123,7 +123,7 @@ export default function ContractTemplatePage() {
       toast.success(result.message);
       setIsBackupModalOpen(false);
       setRestoreBackupFilename(null);
-      refetchBackups();
+      void refetchBackups();
     } catch (error: unknown) {
       const errorMessage = error && typeof error === 'object' && 'response' in error
         && error.response && typeof error.response === 'object' && 'data' in error.response
@@ -140,7 +140,7 @@ export default function ContractTemplatePage() {
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+    return `${String(Math.round((bytes / Math.pow(k, i)) * 100) / 100)} ${sizes[i] ?? ''}`;
   };
 
   const hasChanges = content !== templateData?.content;
@@ -274,7 +274,7 @@ export default function ContractTemplatePage() {
                     height="100%"
                     language="html"
                     value={content}
-                    onChange={(value) => setContent(value || '')}
+                    onChange={(value) => setContent(value ?? '')}
                     theme="vs-dark"
                     options={{
                       minimap: { enabled: false },
@@ -452,7 +452,7 @@ export default function ContractTemplatePage() {
 
       {/* Restore Confirmation Dialog */}
       <AlertDialog
-        open={!!restoreBackupFilename}
+        open={Boolean(restoreBackupFilename)}
         onOpenChange={(open) => !open && setRestoreBackupFilename(null)}
       >
         <AlertDialogContent>

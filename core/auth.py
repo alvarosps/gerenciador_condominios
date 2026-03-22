@@ -8,14 +8,13 @@ Provides OAuth callback handler that issues JWT tokens after successful Google O
 import logging
 from urllib.parse import urlencode
 
+from allauth.socialaccount.models import SocialAccount
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.http import JsonResponse
 from django.shortcuts import redirect
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
-
-from allauth.socialaccount.models import SocialAccount
 from rest_framework_simplejwt.tokens import RefreshToken
 
 logger = logging.getLogger(__name__)
@@ -112,13 +111,15 @@ class GoogleOAuthCallbackView:
             }
 
             # Construct the full redirect URL
-            redirect_url = f"{settings.FRONTEND_URL}{settings.FRONTEND_AUTH_CALLBACK_PATH}?{urlencode(params)}"
+            redirect_url = (
+                f"{settings.FRONTEND_URL}{settings.FRONTEND_AUTH_CALLBACK_PATH}?{urlencode(params)}"
+            )
 
             return redirect(redirect_url)
 
         except Exception as e:
-            logger.error(f"Error generating JWT tokens for OAuth user: {str(e)}", exc_info=True)
-            error_url = f"{settings.FRONTEND_URL}?error=token_generation_failed&message={str(e)}"
+            logger.error(f"Error generating JWT tokens for OAuth user: {e!s}", exc_info=True)
+            error_url = f"{settings.FRONTEND_URL}?error=token_generation_failed&message={e!s}"
             return redirect(error_url)
 
 
@@ -169,7 +170,9 @@ def link_oauth_account(request):
         google_account = SocialAccount.objects.filter(user=user, provider="google").first()
 
         if google_account:
-            return JsonResponse({"success": True, "message": "Google account already linked", "user_id": user.id})
+            return JsonResponse(
+                {"success": True, "message": "Google account already linked", "user_id": user.id}
+            )
 
         return JsonResponse(
             {
@@ -182,7 +185,7 @@ def link_oauth_account(request):
     except User.DoesNotExist:
         return JsonResponse({"error": "User with this email does not exist"}, status=404)
     except Exception as e:
-        logger.error(f"Error linking OAuth account: {str(e)}", exc_info=True)
+        logger.error(f"Error linking OAuth account: {e!s}", exc_info=True)
         return JsonResponse({"error": "Failed to link account", "message": str(e)}, status=500)
 
 
@@ -203,10 +206,16 @@ def oauth_status(request):
         JSON response with configuration status
     """
     google_client_id = (
-        getattr(settings, "SOCIALACCOUNT_PROVIDERS", {}).get("google", {}).get("APP", {}).get("client_id", "")
+        getattr(settings, "SOCIALACCOUNT_PROVIDERS", {})
+        .get("google", {})
+        .get("APP", {})
+        .get("client_id", "")
     )
     google_client_secret = (
-        getattr(settings, "SOCIALACCOUNT_PROVIDERS", {}).get("google", {}).get("APP", {}).get("secret", "")
+        getattr(settings, "SOCIALACCOUNT_PROVIDERS", {})
+        .get("google", {})
+        .get("APP", {})
+        .get("secret", "")
     )
 
     return JsonResponse(

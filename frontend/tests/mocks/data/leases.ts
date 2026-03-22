@@ -6,10 +6,10 @@ export const mockLeases: Lease[] = [
   {
     id: 1,
     apartment_id: 1,
-    apartment: mockApartments[0],
+    apartment: mockApartments[0]!,
     responsible_tenant_id: 1,
-    responsible_tenant: mockTenants[0],
-    tenants: [mockTenants[0]],
+    responsible_tenant: mockTenants[0]!,
+    tenants: [mockTenants[0]!],
     tenant_ids: [1],
     start_date: '2024-01-15',
     final_date: '2025-01-14',
@@ -29,10 +29,10 @@ export const mockLeases: Lease[] = [
   {
     id: 2,
     apartment_id: 2,
-    apartment: mockApartments[1],
+    apartment: mockApartments[1]!,
     responsible_tenant_id: 1,
-    responsible_tenant: mockTenants[0],
-    tenants: [mockTenants[0], mockTenants[1]],
+    responsible_tenant: mockTenants[0]!,
+    tenants: [mockTenants[0]!, mockTenants[1]!],
     tenant_ids: [1, 2],
     start_date: '2024-03-01',
     final_date: '2025-02-28',
@@ -52,10 +52,10 @@ export const mockLeases: Lease[] = [
   {
     id: 3,
     apartment_id: 3,
-    apartment: mockApartments[2],
+    apartment: mockApartments[2]!,
     responsible_tenant_id: 3,
-    responsible_tenant: mockTenants[2],
-    tenants: [mockTenants[2]],
+    responsible_tenant: mockTenants[2]!,
+    tenants: [mockTenants[2]!],
     tenant_ids: [3],
     start_date: '2024-06-01',
     final_date: '2025-05-31',
@@ -78,8 +78,8 @@ export const mockLeases: Lease[] = [
  * Factory to create mock lease with custom overrides
  */
 export function createMockLease(overrides: Partial<Lease> = {}): Lease {
-  const apartment = mockApartments[0];
-  const tenant = mockTenants[0];
+  const apartment = mockApartments[0]!;
+  const tenant = mockTenants[0]!;
   return {
     id: Math.floor(Math.random() * 1000) + 100,
     apartment_id: apartment.id ?? 1,

@@ -1,0 +1,502 @@
+{
+  "_instrucoes": {
+    "como_preencher": "Preencha cada seção abaixo com os dados reais. Campos com null são opcionais. Datas no formato YYYY-MM-DD.",
+    "parcelas": "Para compras parceladas, informe parcela_atual (qual parcela está pagando agora) e total_parcelas. O script calcula as parcelas restantes e gera as futuras.",
+    "valores": "Todos os valores monetários em reais, sem R$, sem ponto de milhar. Use ponto para decimal: 1500.00",
+    "datas": "Se não souber a data exata da compra, coloque a data aproximada. O importante é parcela_atual e total_parcelas.",
+    "is_paid_parcelas": "Parcelas anteriores à parcela_atual são marcadas como pagas automaticamente."
+  },
+
+  "configuracoes": {
+    "saldo_inicial": 0,
+    "data_saldo_inicial": "2026-03-01",
+    "notas": "Saldo inicial estimado em março/2026"
+  },
+
+  "categorias": [
+    {"nome": "Manutenção", "cor": "#EF4444", "descricao": "Reparos e manutenção dos prédios"},
+    {"nome": "Material de Construção", "cor": "#F97316", "descricao": "Cimento, tinta, ferragens, etc."},
+    {"nome": "Mercado", "cor": "#22C55E", "descricao": "Compras de supermercado"},
+    {"nome": "Farmácia", "cor": "#06B6D4", "descricao": "Medicamentos e produtos de farmácia"},
+    {"nome": "Gasolina", "cor": "#8B5CF6", "descricao": "Combustível"},
+    {"nome": "Ração/Sítio", "cor": "#A3E635", "descricao": "Ração para galinhas e despesas do sítio"},
+    {"nome": "Pessoal", "cor": "#EC4899", "descricao": "Gastos pessoais dos sogros"},
+    {"nome": "Vestuário", "cor": "#F59E0B", "descricao": "Roupas e calçados"},
+    {"nome": "Saúde", "cor": "#14B8A6", "descricao": "Consultas, exames, tratamentos"},
+    {"nome": "Eletrodoméstico", "cor": "#6366F1", "descricao": "Geladeira, fogão, etc."},
+    {"nome": "Móveis", "cor": "#78716C", "descricao": "Móveis para os imóveis ou sítio"},
+    {"nome": "Internet", "cor": "#3B82F6", "descricao": "Planos de internet"},
+    {"nome": "Outros", "cor": "#6B7280", "descricao": "Gastos que não se encaixam em outra categoria"}
+  ],
+
+  "pessoas": [
+    {
+      "nome": "Rodrigo",
+      "relacao": "filho",
+      "telefone": "",
+      "email": "",
+      "is_owner": false,
+      "is_employee": false,
+      "notas": ""
+    },
+    {
+      "nome": "Tiago",
+      "relacao": "filho",
+      "telefone": "",
+      "email": "",
+      "is_owner": true,
+      "is_employee": false,
+      "notas": "Proprietário dos kitnets 101 e 103 do prédio 836"
+    },
+    {
+      "nome": "Alvaro",
+      "relacao": "genro",
+      "telefone": "",
+      "email": "",
+      "is_owner": true,
+      "is_employee": false,
+      "notas": "Proprietário dos kitnets 200 e 203 do prédio 836"
+    },
+    {
+      "nome": "Junior",
+      "relacao": "filho",
+      "telefone": "",
+      "email": "",
+      "is_owner": false,
+      "is_employee": false,
+      "notas": ""
+    },
+    {
+      "nome": "_NOME_FUNCIONARIA_",
+      "relacao": "funcionária",
+      "telefone": "",
+      "email": "",
+      "is_owner": false,
+      "is_employee": true,
+      "notas": "Mora no kitnet 206 do prédio 850. Aluguel compensado no salário."
+    }
+  ],
+
+  "cartoes": [
+    {
+      "pessoa": "Rodrigo",
+      "apelido": "_NOME_CARTAO_1_RODRIGO_",
+      "ultimos_4_digitos": "",
+      "dia_fechamento": 1,
+      "dia_vencimento": 10,
+      "ativo": true
+    },
+    {
+      "pessoa": "Rodrigo",
+      "apelido": "_NOME_CARTAO_2_RODRIGO_",
+      "ultimos_4_digitos": "",
+      "dia_fechamento": 1,
+      "dia_vencimento": 10,
+      "ativo": true
+    },
+    {
+      "pessoa": "Rodrigo",
+      "apelido": "_NOME_CARTAO_3_RODRIGO_",
+      "ultimos_4_digitos": "",
+      "dia_fechamento": 1,
+      "dia_vencimento": 10,
+      "ativo": true
+    },
+    {
+      "pessoa": "Tiago",
+      "apelido": "_NOME_CARTAO_TIAGO_",
+      "ultimos_4_digitos": "",
+      "dia_fechamento": 1,
+      "dia_vencimento": 10,
+      "ativo": true
+    },
+    {
+      "pessoa": "Alvaro",
+      "apelido": "_NOME_CARTAO_1_ALVARO_",
+      "ultimos_4_digitos": "",
+      "dia_fechamento": 1,
+      "dia_vencimento": 10,
+      "ativo": true
+    },
+    {
+      "pessoa": "Alvaro",
+      "apelido": "_NOME_CARTAO_2_ALVARO_",
+      "ultimos_4_digitos": "",
+      "dia_fechamento": 1,
+      "dia_vencimento": 10,
+      "ativo": true
+    },
+    {
+      "pessoa": "Alvaro",
+      "apelido": "_NOME_CARTAO_3_ALVARO_",
+      "ultimos_4_digitos": "",
+      "dia_fechamento": 1,
+      "dia_vencimento": 10,
+      "ativo": true
+    }
+  ],
+
+  "recebimentos_pessoas": {
+    "_instrucoes": "Define o que cada pessoa TEM DIREITO a receber mensalmente do condomínio.",
+    "por_apartamento": [
+      {
+        "pessoa": "Tiago",
+        "predio_street_number": 836,
+        "apartamento_number": 101,
+        "data_inicio": "2026-01-01",
+        "data_fim": null,
+        "notas": "Proprietário"
+      },
+      {
+        "pessoa": "Tiago",
+        "predio_street_number": 836,
+        "apartamento_number": 103,
+        "data_inicio": "2026-01-01",
+        "data_fim": null,
+        "notas": "Proprietário"
+      },
+      {
+        "pessoa": "Alvaro",
+        "predio_street_number": 836,
+        "apartamento_number": 200,
+        "data_inicio": "2026-01-01",
+        "data_fim": null,
+        "notas": "Proprietário"
+      },
+      {
+        "pessoa": "Alvaro",
+        "predio_street_number": 836,
+        "apartamento_number": 203,
+        "data_inicio": "2026-01-01",
+        "data_fim": null,
+        "notas": "Proprietário"
+      }
+    ],
+    "estipendio_fixo": [
+      {
+        "pessoa": "Rodrigo",
+        "valor": 1000.00,
+        "data_inicio": "2026-01-01",
+        "data_fim": null,
+        "notas": "Equivalente a 1 kitnet"
+      },
+      {
+        "pessoa": "Junior",
+        "valor": 1000.00,
+        "data_inicio": "2026-01-01",
+        "data_fim": null,
+        "notas": "Equivalente a 1 kitnet"
+      }
+    ]
+  },
+
+  "proprietarios_apartamentos": {
+    "_instrucoes": "Vincula apartamentos a proprietários (Person). Apartamentos sem owner = receita dos sogros.",
+    "vinculos": [
+      {"predio_street_number": 836, "apartamento_number": 101, "pessoa": "Tiago"},
+      {"predio_street_number": 836, "apartamento_number": 103, "pessoa": "Tiago"},
+      {"predio_street_number": 836, "apartamento_number": 200, "pessoa": "Alvaro"},
+      {"predio_street_number": 836, "apartamento_number": 203, "pessoa": "Alvaro"}
+    ]
+  },
+
+  "leases_especiais": {
+    "_instrucoes": "Configura leases com comportamento especial.",
+    "prepaid": [
+      {
+        "predio_street_number": 836,
+        "apartamento_number": 113,
+        "prepaid_until": "2027-03-31",
+        "notas": "Inquilina pagou ~2 anos adiantado"
+      }
+    ],
+    "salary_offset": [
+      {
+        "predio_street_number": 850,
+        "apartamento_number": 206,
+        "notas": "Aluguel compensado no salário da funcionária"
+      }
+    ]
+  },
+
+  "compras_cartao": {
+    "_instrucoes": "Cada compra parcelada no cartão. parcela_atual = em qual parcela estamos AGORA (ex: se está pagando 3/10, coloque 3). data_compra = quando a compra foi feita. O script calcula os vencimentos das parcelas restantes com base no dia_vencimento do cartão.",
+    "items": [
+      {
+        "pessoa": "Rodrigo",
+        "cartao": "_NOME_CARTAO_1_RODRIGO_",
+        "descricao": "_DESCRICAO_DA_COMPRA_",
+        "valor_parcela": 0.00,
+        "parcela_atual": 1,
+        "total_parcelas": 1,
+        "data_compra": "2026-01-15",
+        "categoria": null,
+        "notas": ""
+      }
+    ]
+  },
+
+  "emprestimos_bancarios": {
+    "_instrucoes": "Empréstimos formais (consignado, pessoal, etc.) em nome dos filhos/genro.",
+    "items": [
+      {
+        "pessoa": "Rodrigo",
+        "descricao": "_DESCRICAO_EMPRESTIMO_",
+        "valor_total": 0.00,
+        "valor_parcela": 0.00,
+        "parcela_atual": 1,
+        "total_parcelas": 1,
+        "data_inicio": "2026-01-01",
+        "dia_vencimento": 10,
+        "banco": "_NOME_BANCO_",
+        "taxa_juros": null,
+        "categoria": null,
+        "notas": ""
+      }
+    ]
+  },
+
+  "emprestimos_pessoais": {
+    "_instrucoes": "Dinheiro emprestado diretamente entre familiares. Pode ser parcelado ou valor único.",
+    "items": [
+      {
+        "pessoa": "Rodrigo",
+        "descricao": "_DESCRICAO_EMPRESTIMO_",
+        "valor_total": 0.00,
+        "valor_parcela": 0.00,
+        "parcela_atual": 1,
+        "total_parcelas": 1,
+        "data_inicio": "2026-01-01",
+        "dia_vencimento": 10,
+        "categoria": null,
+        "notas": ""
+      }
+    ]
+  },
+
+  "contas_consumo": {
+    "_instrucoes": "Contas mensais de água e luz. Cadastre os últimos meses para que o sistema calcule a média para projeção. Se o valor é fixo (conta com tarifa social, etc.), coloque is_recurring=true e o valor em expected_monthly_amount.",
+    "agua": [
+      {
+        "predio_street_number": 836,
+        "historico_mensal": [
+          {"mes": "2026-01-01", "valor": 0.00, "pago": true, "data_pagamento": "2026-01-15"},
+          {"mes": "2026-02-01", "valor": 0.00, "pago": true, "data_pagamento": "2026-02-15"},
+          {"mes": "2026-03-01", "valor": 0.00, "pago": false, "data_pagamento": null}
+        ],
+        "dia_vencimento": 15,
+        "notas": ""
+      },
+      {
+        "predio_street_number": 850,
+        "historico_mensal": [
+          {"mes": "2026-01-01", "valor": 0.00, "pago": true, "data_pagamento": "2026-01-15"},
+          {"mes": "2026-02-01", "valor": 0.00, "pago": true, "data_pagamento": "2026-02-15"},
+          {"mes": "2026-03-01", "valor": 0.00, "pago": false, "data_pagamento": null}
+        ],
+        "dia_vencimento": 15,
+        "notas": ""
+      }
+    ],
+    "luz": [
+      {
+        "predio_street_number": 836,
+        "historico_mensal": [
+          {"mes": "2026-01-01", "valor": 0.00, "pago": true, "data_pagamento": "2026-01-15"},
+          {"mes": "2026-02-01", "valor": 0.00, "pago": true, "data_pagamento": "2026-02-15"},
+          {"mes": "2026-03-01", "valor": 0.00, "pago": false, "data_pagamento": null}
+        ],
+        "dia_vencimento": 20,
+        "notas": ""
+      },
+      {
+        "predio_street_number": 850,
+        "historico_mensal": [
+          {"mes": "2026-01-01", "valor": 0.00, "pago": true, "data_pagamento": "2026-01-15"},
+          {"mes": "2026-02-01", "valor": 0.00, "pago": true, "data_pagamento": "2026-02-15"},
+          {"mes": "2026-03-01", "valor": 0.00, "pago": false, "data_pagamento": null}
+        ],
+        "dia_vencimento": 20,
+        "notas": ""
+      }
+    ]
+  },
+
+  "parcelamentos_divida": {
+    "_instrucoes": "Dívidas acumuladas de água/luz/IPTU que foram negociadas em parcelas fixas.",
+    "items": [
+      {
+        "tipo": "water_bill",
+        "predio_street_number": 836,
+        "descricao": "Parcelamento dívida água prédio 836",
+        "valor_total_divida": 0.00,
+        "valor_parcela": 0.00,
+        "parcela_atual": 1,
+        "total_parcelas": 1,
+        "data_inicio": "2026-01-01",
+        "dia_vencimento": 15,
+        "categoria": null,
+        "notas": ""
+      }
+    ]
+  },
+
+  "iptu": {
+    "_instrucoes": "IPTU anual (parcelas normais da prefeitura) e parcelamento de dívida de IPTU atrasado. Ambos por prédio.",
+    "anual": [
+      {
+        "predio_street_number": 836,
+        "ano": 2026,
+        "descricao": "IPTU 2026 - Prédio 836",
+        "valor_total": 0.00,
+        "valor_parcela": 0.00,
+        "parcela_atual": 1,
+        "total_parcelas": 10,
+        "dia_vencimento": 10,
+        "data_primeira_parcela": "2026-01-10",
+        "notas": ""
+      },
+      {
+        "predio_street_number": 850,
+        "ano": 2026,
+        "descricao": "IPTU 2026 - Prédio 850",
+        "valor_total": 0.00,
+        "valor_parcela": 0.00,
+        "parcela_atual": 1,
+        "total_parcelas": 10,
+        "dia_vencimento": 10,
+        "data_primeira_parcela": "2026-01-10",
+        "notas": ""
+      }
+    ],
+    "divida": [
+      {
+        "predio_street_number": 836,
+        "descricao": "Parcelamento dívida IPTU prédio 836",
+        "valor_total_divida": 0.00,
+        "valor_parcela": 0.00,
+        "parcela_atual": 1,
+        "total_parcelas": 1,
+        "data_inicio": "2026-01-01",
+        "dia_vencimento": 10,
+        "notas": ""
+      }
+    ]
+  },
+
+  "gastos_fixos": {
+    "_instrucoes": "Gastos mensais recorrentes. O sistema projeta esses valores para meses futuros automaticamente.",
+    "items": [
+      {
+        "descricao": "Internet - Prédio 836",
+        "valor_mensal": 0.00,
+        "dia_vencimento": 10,
+        "predio_street_number": 836,
+        "categoria": "Internet",
+        "data_inicio": "2026-01-01",
+        "notas": ""
+      },
+      {
+        "descricao": "Internet - Prédio 850",
+        "valor_mensal": 0.00,
+        "dia_vencimento": 10,
+        "predio_street_number": 850,
+        "categoria": "Internet",
+        "data_inicio": "2026-01-01",
+        "notas": ""
+      },
+      {
+        "descricao": "Internet - Sítio",
+        "valor_mensal": 0.00,
+        "dia_vencimento": 10,
+        "predio_street_number": null,
+        "categoria": "Internet",
+        "data_inicio": "2026-01-01",
+        "notas": ""
+      },
+      {
+        "descricao": "Ração galinhas",
+        "valor_mensal": 0.00,
+        "dia_vencimento": null,
+        "predio_street_number": null,
+        "categoria": "Ração/Sítio",
+        "data_inicio": "2026-01-01",
+        "notas": ""
+      }
+    ]
+  },
+
+  "gastos_unicos": {
+    "_instrucoes": "Gastos avulsos que já aconteceram. Para registrar histórico.",
+    "items": [
+      {
+        "descricao": "_DESCRICAO_",
+        "valor": 0.00,
+        "data": "2026-03-01",
+        "pessoa": null,
+        "cartao": null,
+        "predio_street_number": null,
+        "categoria": null,
+        "pago": true,
+        "data_pagamento": "2026-03-01",
+        "notas": ""
+      }
+    ]
+  },
+
+  "receitas_extras": {
+    "_instrucoes": "Receitas que não são aluguel. Aposentadoria, valores avulsos, etc.",
+    "recorrentes": [
+      {
+        "descricao": "Aposentadoria",
+        "valor_mensal": 0.00,
+        "pessoa": null,
+        "data_inicio": "2026-01-01",
+        "notas": ""
+      }
+    ],
+    "avulsas": [
+      {
+        "descricao": "_DESCRICAO_",
+        "valor": 0.00,
+        "data": "2026-03-01",
+        "pessoa": null,
+        "predio_street_number": null,
+        "recebido": true,
+        "data_recebimento": "2026-03-01",
+        "notas": ""
+      }
+    ]
+  },
+
+  "pagamentos_aluguel": {
+    "_instrucoes": "Registro de aluguéis efetivamente recebidos. Preencha os meses passados para que o fluxo de caixa tenha dados reais. Use predio + apartamento para identificar o lease.",
+    "items": [
+      {
+        "predio_street_number": 836,
+        "apartamento_number": 101,
+        "mes_referencia": "2026-03-01",
+        "valor_pago": 0.00,
+        "data_pagamento": "2026-03-05",
+        "notas": ""
+      }
+    ]
+  },
+
+  "pagamentos_funcionaria": {
+    "_instrucoes": "Registro mensal do pagamento da funcionária. rent_offset é informativo (não sai do caixa).",
+    "items": [
+      {
+        "pessoa": "_NOME_FUNCIONARIA_",
+        "mes_referencia": "2026-03-01",
+        "salario_base": 0.00,
+        "valor_variavel": 0.00,
+        "rent_offset": 0.00,
+        "qtd_faxinas": 0,
+        "pago": true,
+        "data_pagamento": "2026-03-05",
+        "notas": ""
+      }
+    ]
+  }
+}

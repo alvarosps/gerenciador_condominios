@@ -35,7 +35,7 @@ import { toast } from 'sonner';
 import { useCreateApartment, useUpdateApartment } from '@/lib/api/hooks/use-apartments';
 import { useBuildings } from '@/lib/api/hooks/use-buildings';
 import { useFurniture } from '@/lib/api/hooks/use-furniture';
-import { Apartment } from '@/lib/schemas/apartment.schema';
+import { type Apartment } from '@/lib/schemas/apartment.schema';
 
 interface Props {
   open: boolean;
@@ -89,16 +89,16 @@ export function ApartmentFormModal({ open, apartment, onClose }: Props) {
       formMethods.reset({
         building_id: apartment.building_id,
         number: apartment.number,
-        rental_value: Number(apartment.rental_value),
-        cleaning_fee: Number(apartment.cleaning_fee),
+        rental_value: apartment.rental_value,
+        cleaning_fee: apartment.cleaning_fee,
         max_tenants: apartment.max_tenants,
-        furniture_ids: apartment.furnitures?.map((f) => f.id!) || [],
-        interfone_configured: apartment.interfone_configured || false,
-        is_rented: apartment.is_rented || false,
-        contract_generated: apartment.contract_generated || false,
-        contract_signed: apartment.contract_signed || false,
-        lease_date: apartment.lease_date || '',
-        last_rent_increase_date: apartment.last_rent_increase_date || '',
+        furniture_ids: apartment.furnitures?.map((f) => f.id).filter((id): id is number => id !== undefined) ?? [],
+        interfone_configured: apartment.interfone_configured ?? false,
+        is_rented: apartment.is_rented ?? false,
+        contract_generated: apartment.contract_generated ?? false,
+        contract_signed: apartment.contract_signed ?? false,
+        lease_date: apartment.lease_date ?? '',
+        last_rent_increase_date: apartment.last_rent_increase_date ?? '',
       });
     } else {
       formMethods.reset();
@@ -286,11 +286,11 @@ export function ApartmentFormModal({ open, apartment, onClose }: Props) {
                           <FormItem className="flex flex-row items-start space-x-3 space-y-0">
                             <FormControl>
                               <Checkbox
-                                checked={field.value?.includes(item.id!)}
+                                checked={item.id !== undefined && field.value?.includes(item.id)}
                                 onCheckedChange={(checked) => {
-                                  const current = field.value || [];
-                                  if (checked) {
-                                    field.onChange([...current, item.id!]);
+                                  const current = field.value ?? [];
+                                  if (checked && item.id !== undefined) {
+                                    field.onChange([...current, item.id]);
                                   } else {
                                     field.onChange(current.filter((id) => id !== item.id));
                                   }
@@ -387,7 +387,7 @@ export function ApartmentFormModal({ open, apartment, onClose }: Props) {
                   <FormItem>
                     <FormLabel>Data da Locação</FormLabel>
                     <FormControl>
-                      <Input type="date" {...field} value={field.value || ''} />
+                      <Input type="date" {...field} value={field.value ?? ''} />
                     </FormControl>
                     <FormDescription>Data em que o apartamento foi locado</FormDescription>
                     <FormMessage />
@@ -402,7 +402,7 @@ export function ApartmentFormModal({ open, apartment, onClose }: Props) {
                   <FormItem>
                     <FormLabel>Último Reajuste</FormLabel>
                     <FormControl>
-                      <Input type="date" {...field} value={field.value || ''} />
+                      <Input type="date" {...field} value={field.value ?? ''} />
                     </FormControl>
                     <FormDescription>Data do último reajuste de aluguel</FormDescription>
                     <FormMessage />

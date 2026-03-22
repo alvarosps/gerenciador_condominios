@@ -33,7 +33,11 @@ class IsAdminUser(permissions.BasePermission):
     """
 
     def has_permission(self, request, view):
-        return request.user and request.user.is_authenticated and (request.user.is_staff or request.user.is_superuser)
+        return (
+            request.user
+            and request.user.is_authenticated
+            and (request.user.is_staff or request.user.is_superuser)
+        )
 
 
 class IsOwnerOrAdmin(permissions.BasePermission):
@@ -89,12 +93,9 @@ class IsTenantOrAdmin(permissions.BasePermission):
                     return True
 
         # Check if user is the responsible tenant
-        if hasattr(obj, "responsible_tenant"):
-            if hasattr(obj.responsible_tenant, "user") and obj.responsible_tenant.user == request.user:
-                return True
-
-        # If no tenant relationship found, deny access
-        return False
+        return hasattr(obj, "responsible_tenant") and (
+            hasattr(obj.responsible_tenant, "user") and obj.responsible_tenant.user == request.user
+        )
 
 
 class ReadOnlyForNonAdmin(permissions.BasePermission):
@@ -133,7 +134,10 @@ class CanGenerateContract(permissions.BasePermission):
 
         # Responsible tenant can generate contract for their lease
         if hasattr(obj, "responsible_tenant"):
-            return hasattr(obj.responsible_tenant, "user") and obj.responsible_tenant.user == request.user
+            return (
+                hasattr(obj.responsible_tenant, "user")
+                and obj.responsible_tenant.user == request.user
+            )
 
         return False
 

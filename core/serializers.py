@@ -1,8 +1,34 @@
+from datetime import date
+from decimal import Decimal
+
+from django.contrib.auth import get_user_model
+from django.db.models import Sum
 from rest_framework import serializers
 
 from core.validators import BrazilianPhoneValidator, CNPJValidator, CPFValidator
 
-from .models import Apartment, Building, ContractRule, Dependent, Furniture, Landlord, Lease, Tenant
+from .models import (
+    Apartment,
+    Building,
+    ContractRule,
+    CreditCard,
+    Dependent,
+    EmployeePayment,
+    Expense,
+    ExpenseCategory,
+    ExpenseInstallment,
+    FinancialSettings,
+    Furniture,
+    Income,
+    Landlord,
+    Lease,
+    Person,
+    PersonIncome,
+    RentPayment,
+    Tenant,
+)
+
+User = get_user_model()
 
 
 class BuildingSerializer(serializers.ModelSerializer):
@@ -17,6 +43,23 @@ class FurnitureSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
+class PersonSimpleSerializer(serializers.ModelSerializer):
+    """Simplified PersonSerializer without credit_cards to avoid recursion."""
+
+    class Meta:
+        model = Person
+        fields = [
+            "id",
+            "name",
+            "relationship",
+            "phone",
+            "email",
+            "is_owner",
+            "is_employee",
+            "notes",
+        ]
+
+
 class ApartmentSerializer(serializers.ModelSerializer):
     furnitures = FurnitureSerializer(many=True, read_only=True)
     furniture_ids = serializers.PrimaryKeyRelatedField(
@@ -25,6 +68,14 @@ class ApartmentSerializer(serializers.ModelSerializer):
     building = BuildingSerializer(read_only=True)
     building_id = serializers.PrimaryKeyRelatedField(
         queryset=Building.objects.all(), source="building", write_only=True
+    )
+    owner = PersonSimpleSerializer(read_only=True)
+    owner_id = serializers.PrimaryKeyRelatedField(
+        queryset=Person.objects.all(),
+        source="owner",
+        write_only=True,
+        required=False,
+        allow_null=True,
     )
 
     class Meta:
@@ -45,6 +96,8 @@ class ApartmentSerializer(serializers.ModelSerializer):
             "last_rent_increase_date",
             "furnitures",
             "furniture_ids",
+            "owner",
+            "owner_id",
         ]
 
     def create(self, validated_data):
@@ -60,8 +113,14 @@ class ApartmentSerializer(serializers.ModelSerializer):
         furniture_ids = validated_data.pop("furniture_ids", None)
 
         # Track if rental_value or cleaning_fee changed for lease sync
-        rental_value_changed = "rental_value" in validated_data and validated_data["rental_value"] != instance.rental_value
-        cleaning_fee_changed = "cleaning_fee" in validated_data and validated_data["cleaning_fee"] != instance.cleaning_fee
+        rental_value_changed = (
+            "rental_value" in validated_data
+            and validated_data["rental_value"] != instance.rental_value
+        )
+        cleaning_fee_changed = (
+            "cleaning_fee" in validated_data
+            and validated_data["cleaning_fee"] != instance.cleaning_fee
+        )
 
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
@@ -83,7 +142,9 @@ class ApartmentSerializer(serializers.ModelSerializer):
                 update_fields.append("rental_value")
             if cleaning_fee_changed:
                 update_fields.append("cleaning_fee")
-            Lease.objects.filter(pk=lease.pk).update(**{f: getattr(lease, f) for f in update_fields})
+            Lease.objects.filter(pk=lease.pk).update(
+                **{f: getattr(lease, f) for f in update_fields}
+            )
 
         return instance
 
@@ -141,8 +202,12 @@ class TenantSerializer(serializers.ModelSerializer):
         """Cross-field validation for CPF/CNPJ based on is_company flag."""
         attrs = super().validate(attrs)
 
-        cpf_cnpj = attrs.get("cpf_cnpj", getattr(self.instance, "cpf_cnpj", None) if self.instance else None)
-        is_company = attrs.get("is_company", getattr(self.instance, "is_company", False) if self.instance else False)
+        cpf_cnpj = attrs.get(
+            "cpf_cnpj", getattr(self.instance, "cpf_cnpj", None) if self.instance else None
+        )
+        is_company = attrs.get(
+            "is_company", getattr(self.instance, "is_company", False) if self.instance else False
+        )
 
         if cpf_cnpj:
             try:
@@ -150,8 +215,8 @@ class TenantSerializer(serializers.ModelSerializer):
                     CNPJValidator()(cpf_cnpj)
                 else:
                     CPFValidator()(cpf_cnpj)
-            except Exception as e:
-                raise serializers.ValidationError({"cpf_cnpj": str(e)})
+            except serializers.ValidationError as e:
+                raise serializers.ValidationError({"cpf_cnpj": str(e)}) from e
 
         return attrs
 
@@ -233,6 +298,8 @@ class LeaseSerializer(serializers.ModelSerializer):
             "contract_signed",
             "interfone_configured",
             "warning_count",
+            "prepaid_until",
+            "is_salary_offset",
         ]
 
     def create(self, validated_data):
@@ -256,8 +323,14 @@ class LeaseSerializer(serializers.ModelSerializer):
         tenants = validated_data.pop("tenants", None)
 
         # Track if rental_value or cleaning_fee changed for apartment sync
-        rental_value_changed = "rental_value" in validated_data and validated_data["rental_value"] != instance.rental_value
-        cleaning_fee_changed = "cleaning_fee" in validated_data and validated_data["cleaning_fee"] != instance.cleaning_fee
+        rental_value_changed = (
+            "rental_value" in validated_data
+            and validated_data["rental_value"] != instance.rental_value
+        )
+        cleaning_fee_changed = (
+            "cleaning_fee" in validated_data
+            and validated_data["cleaning_fee"] != instance.cleaning_fee
+        )
 
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
@@ -323,8 +396,9 @@ class LandlordSerializer(serializers.ModelSerializer):
             except serializers.ValidationError:
                 try:
                     CNPJValidator()(value)
-                except serializers.ValidationError:
-                    raise serializers.ValidationError("CPF ou CNPJ inválido")
+                except serializers.ValidationError as exc:
+                    msg = "CPF ou CNPJ inválido"
+                    raise serializers.ValidationError(msg) from exc
         return value
 
     def validate_phone(self, value):
@@ -360,6 +434,387 @@ class ContractRuleReorderSerializer(serializers.Serializer):
     """
 
     rule_ids = serializers.ListField(
-        child=serializers.IntegerField(),
-        help_text="Lista ordenada de IDs das regras"
+        child=serializers.IntegerField(), help_text="Lista ordenada de IDs das regras"
     )
+
+
+# =============================================================================
+# FINANCIAL MODULE SERIALIZERS
+# =============================================================================
+
+
+class PersonSerializer(serializers.ModelSerializer):
+    credit_cards = serializers.SerializerMethodField()
+    user_id = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.all(),
+        source="user",
+        write_only=True,
+        required=False,
+        allow_null=True,
+    )
+
+    class Meta:
+        model = Person
+        fields = [
+            "id",
+            "name",
+            "relationship",
+            "phone",
+            "email",
+            "is_owner",
+            "is_employee",
+            "user",
+            "user_id",
+            "notes",
+            "credit_cards",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "user", "created_at", "updated_at"]
+
+    def get_credit_cards(self, obj):
+        return CreditCardSerializer(obj.credit_cards.all(), many=True).data
+
+
+class CreditCardSerializer(serializers.ModelSerializer):
+    person = PersonSimpleSerializer(read_only=True)
+    person_id = serializers.PrimaryKeyRelatedField(
+        queryset=Person.objects.all(), source="person", write_only=True
+    )
+
+    class Meta:
+        model = CreditCard
+        fields = [
+            "id",
+            "person",
+            "person_id",
+            "nickname",
+            "last_four_digits",
+            "closing_day",
+            "due_day",
+            "is_active",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "created_at", "updated_at"]
+
+
+class ExpenseCategorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ExpenseCategory
+        fields = ["id", "name", "description", "color", "created_at", "updated_at"]
+        read_only_fields = ["id", "created_at", "updated_at"]
+
+
+class ExpenseInstallmentSerializer(serializers.ModelSerializer):
+    is_overdue = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ExpenseInstallment
+        fields = [
+            "id",
+            "expense",
+            "installment_number",
+            "total_installments",
+            "amount",
+            "due_date",
+            "is_paid",
+            "paid_date",
+            "notes",
+            "is_overdue",
+        ]
+        read_only_fields = ["id"]
+
+    def get_is_overdue(self, obj) -> bool:
+        return not obj.is_paid and obj.due_date < date.today()
+
+
+class ExpenseSerializer(serializers.ModelSerializer):
+    person = PersonSimpleSerializer(read_only=True)
+    person_id = serializers.PrimaryKeyRelatedField(
+        queryset=Person.objects.all(),
+        source="person",
+        write_only=True,
+        required=False,
+        allow_null=True,
+    )
+    credit_card = CreditCardSerializer(read_only=True)
+    credit_card_id = serializers.PrimaryKeyRelatedField(
+        queryset=CreditCard.objects.all(),
+        source="credit_card",
+        write_only=True,
+        required=False,
+        allow_null=True,
+    )
+    building = BuildingSerializer(read_only=True)
+    building_id = serializers.PrimaryKeyRelatedField(
+        queryset=Building.objects.all(),
+        source="building",
+        write_only=True,
+        required=False,
+        allow_null=True,
+    )
+    category = ExpenseCategorySerializer(read_only=True)
+    category_id = serializers.PrimaryKeyRelatedField(
+        queryset=ExpenseCategory.objects.all(),
+        source="category",
+        write_only=True,
+        required=False,
+        allow_null=True,
+    )
+    installments = ExpenseInstallmentSerializer(many=True, read_only=True)
+    remaining_installments = serializers.SerializerMethodField()
+    total_paid = serializers.SerializerMethodField()
+    total_remaining = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Expense
+        fields = [
+            "id",
+            "description",
+            "expense_type",
+            "total_amount",
+            "expense_date",
+            "person",
+            "person_id",
+            "credit_card",
+            "credit_card_id",
+            "building",
+            "building_id",
+            "category",
+            "category_id",
+            "is_installment",
+            "total_installments",
+            "is_debt_installment",
+            "is_recurring",
+            "expected_monthly_amount",
+            "recurrence_day",
+            "is_paid",
+            "paid_date",
+            "bank_name",
+            "interest_rate",
+            "notes",
+            "installments",
+            "remaining_installments",
+            "total_paid",
+            "total_remaining",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "created_at", "updated_at"]
+
+    def get_remaining_installments(self, obj) -> int:
+        return obj.installments.filter(is_paid=False).count()
+
+    def get_total_paid(self, obj) -> str:
+        result = obj.installments.filter(is_paid=True).aggregate(total=Sum("amount"))
+        return str(result["total"] or Decimal(0))
+
+    def get_total_remaining(self, obj) -> str:
+        result = obj.installments.filter(is_paid=False).aggregate(total=Sum("amount"))
+        return str(result["total"] or Decimal(0))
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        expense_type = attrs.get("expense_type", "")
+
+        if expense_type == "card_purchase" and not attrs.get("credit_card"):
+            raise serializers.ValidationError(
+                {"credit_card_id": "Compra no cartão requer um cartão de crédito."}
+            )
+
+        if expense_type == "bank_loan" and not attrs.get("person"):
+            raise serializers.ValidationError(
+                {"person_id": "Empréstimo bancário requer uma pessoa."}
+            )
+
+        if expense_type in ("water_bill", "electricity_bill", "property_tax") and not attrs.get(
+            "building"
+        ):
+            raise serializers.ValidationError(
+                {"building_id": "Conta de utilidade requer um prédio."}
+            )
+
+        if attrs.get("is_installment") and not attrs.get("total_installments"):
+            raise serializers.ValidationError(
+                {"total_installments": "Despesa parcelada requer número total de parcelas."}
+            )
+
+        if attrs.get("is_recurring") and not attrs.get("expected_monthly_amount"):
+            raise serializers.ValidationError(
+                {"expected_monthly_amount": "Despesa recorrente requer valor mensal esperado."}
+            )
+
+        return attrs
+
+
+class PersonIncomeSerializer(serializers.ModelSerializer):
+    person = PersonSimpleSerializer(read_only=True)
+    person_id = serializers.PrimaryKeyRelatedField(
+        queryset=Person.objects.all(), source="person", write_only=True
+    )
+    apartment = ApartmentSerializer(read_only=True)
+    apartment_id = serializers.PrimaryKeyRelatedField(
+        queryset=Apartment.objects.all(),
+        source="apartment",
+        write_only=True,
+        required=False,
+        allow_null=True,
+    )
+    current_value = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PersonIncome
+        fields = [
+            "id",
+            "person",
+            "person_id",
+            "income_type",
+            "apartment",
+            "apartment_id",
+            "fixed_amount",
+            "start_date",
+            "end_date",
+            "is_active",
+            "notes",
+            "current_value",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "created_at", "updated_at"]
+
+    def get_current_value(self, obj) -> str:
+        if obj.income_type == "apartment_rent" and obj.apartment:
+            lease = getattr(obj.apartment, "lease", None)
+            if lease:
+                return str(lease.rental_value)
+            return str(Decimal(0))
+        if obj.income_type == "fixed_stipend" and obj.fixed_amount:
+            return str(obj.fixed_amount)
+        return str(Decimal(0))
+
+
+class IncomeSerializer(serializers.ModelSerializer):
+    person = PersonSimpleSerializer(read_only=True)
+    person_id = serializers.PrimaryKeyRelatedField(
+        queryset=Person.objects.all(),
+        source="person",
+        write_only=True,
+        required=False,
+        allow_null=True,
+    )
+    building = BuildingSerializer(read_only=True)
+    building_id = serializers.PrimaryKeyRelatedField(
+        queryset=Building.objects.all(),
+        source="building",
+        write_only=True,
+        required=False,
+        allow_null=True,
+    )
+    category = ExpenseCategorySerializer(read_only=True)
+    category_id = serializers.PrimaryKeyRelatedField(
+        queryset=ExpenseCategory.objects.all(),
+        source="category",
+        write_only=True,
+        required=False,
+        allow_null=True,
+    )
+
+    class Meta:
+        model = Income
+        fields = [
+            "id",
+            "description",
+            "amount",
+            "income_date",
+            "person",
+            "person_id",
+            "building",
+            "building_id",
+            "category",
+            "category_id",
+            "is_recurring",
+            "expected_monthly_amount",
+            "is_received",
+            "received_date",
+            "notes",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "created_at", "updated_at"]
+
+
+class RentPaymentSerializer(serializers.ModelSerializer):
+    lease = LeaseSerializer(read_only=True)
+    lease_id = serializers.PrimaryKeyRelatedField(
+        queryset=Lease.objects.all(), source="lease", write_only=True
+    )
+
+    class Meta:
+        model = RentPayment
+        fields = [
+            "id",
+            "lease",
+            "lease_id",
+            "reference_month",
+            "amount_paid",
+            "payment_date",
+            "notes",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "created_at", "updated_at"]
+
+    def validate_reference_month(self, value):
+        if value.day != 1:
+            msg = "O mês de referência deve ser o primeiro dia do mês."
+            raise serializers.ValidationError(msg)
+        return value
+
+
+class EmployeePaymentSerializer(serializers.ModelSerializer):
+    person = PersonSimpleSerializer(read_only=True)
+    person_id = serializers.PrimaryKeyRelatedField(
+        queryset=Person.objects.all(), source="person", write_only=True
+    )
+    total_paid = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+
+    class Meta:
+        model = EmployeePayment
+        fields = [
+            "id",
+            "person",
+            "person_id",
+            "reference_month",
+            "base_salary",
+            "variable_amount",
+            "rent_offset",
+            "cleaning_count",
+            "payment_date",
+            "is_paid",
+            "notes",
+            "total_paid",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "total_paid", "created_at", "updated_at"]
+
+    def validate_reference_month(self, value):
+        if value.day != 1:
+            msg = "O mês de referência deve ser o primeiro dia do mês."
+            raise serializers.ValidationError(msg)
+        return value
+
+
+class FinancialSettingsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FinancialSettings
+        fields = [
+            "id",
+            "initial_balance",
+            "initial_balance_date",
+            "notes",
+            "updated_at",
+            "updated_by",
+        ]
+        read_only_fields = ["id", "updated_at"]

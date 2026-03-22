@@ -11,9 +11,14 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 import os
+import platform
+import shutil
+from datetime import timedelta
 from pathlib import Path
 
 from decouple import Csv, config
+
+from .logging_config import LOGGING
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -23,7 +28,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = config("SECRET_KEY", default="django-insecure-b7ya%t^1&z1v#af1mlzjsm*$l9o^zj!h9a3*)tf@2k&z8b*^)h")
+SECRET_KEY = config(
+    "SECRET_KEY", default="django-insecure-b7ya%t^1&z1v#af1mlzjsm*$l9o^zj!h9a3*)tf@2k&z8b*^)h"
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config("DEBUG", default=True, cast=bool)
@@ -268,13 +275,16 @@ SPECTACULAR_SETTINGS = {
 }
 
 # JWT Settings (djangorestframework-simplejwt)
-from datetime import timedelta
 
 SIMPLE_JWT = {
     # Token lifetimes - Set to 1 year (365 days) for long-lived sessions
     # For development/personal use, effectively "never expires"
-    "ACCESS_TOKEN_LIFETIME": timedelta(days=config("JWT_ACCESS_TOKEN_LIFETIME_DAYS", default=365, cast=int)),
-    "REFRESH_TOKEN_LIFETIME": timedelta(days=config("JWT_REFRESH_TOKEN_LIFETIME_DAYS", default=365, cast=int)),
+    "ACCESS_TOKEN_LIFETIME": timedelta(
+        days=config("JWT_ACCESS_TOKEN_LIFETIME_DAYS", default=365, cast=int)
+    ),
+    "REFRESH_TOKEN_LIFETIME": timedelta(
+        days=config("JWT_REFRESH_TOKEN_LIFETIME_DAYS", default=365, cast=int)
+    ),
     # Token refresh settings - Disable rotation to prevent token invalidation issues
     "ROTATE_REFRESH_TOKENS": config("JWT_ROTATE_REFRESH_TOKENS", default=False, cast=bool),
     "BLACKLIST_AFTER_ROTATION": config("JWT_BLACKLIST_AFTER_ROTATION", default=False, cast=bool),
@@ -298,7 +308,9 @@ SIMPLE_JWT = {
 # Django-allauth Configuration
 ACCOUNT_AUTHENTICATION_METHOD = "username_email"  # Allow login with username or email
 ACCOUNT_EMAIL_REQUIRED = True  # Email is required
-ACCOUNT_EMAIL_VERIFICATION = "optional"  # Email verification optional (can be 'mandatory' in production)
+ACCOUNT_EMAIL_VERIFICATION = (
+    "optional"  # Email verification optional (can be 'mandatory' in production)
+)
 ACCOUNT_USERNAME_REQUIRED = True  # Username is required (Django default User model requires it)
 
 # Allow auto-linking of social accounts to existing users by email
@@ -362,8 +374,6 @@ def _detect_chrome_executable() -> str:
     Raises:
         FileNotFoundError: If no Chrome/Chromium installation is found
     """
-    import platform
-    import shutil
 
     system = platform.system().lower()
 
@@ -384,7 +394,7 @@ def _detect_chrome_executable() -> str:
             "/usr/local/bin/chromium",
             "/opt/homebrew/bin/chromium",
             # User-installed Chrome
-            os.path.expanduser("~/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"),
+            str(Path("~/Applications/Google Chrome.app/Contents/MacOS/Google Chrome").expanduser()),
         ],
         "linux": [
             "/usr/bin/google-chrome",
@@ -403,11 +413,15 @@ def _detect_chrome_executable() -> str:
 
     # Check each path
     for path in paths:
-        if os.path.isfile(path):
+        if Path(path).is_file():
             return path
 
     # Also check PATH environment
-    chrome_in_path = shutil.which("google-chrome") or shutil.which("chromium") or shutil.which("chromium-browser")
+    chrome_in_path = (
+        shutil.which("google-chrome")
+        or shutil.which("chromium")
+        or shutil.which("chromium-browser")
+    )
     if chrome_in_path:
         return chrome_in_path
 
@@ -422,7 +436,7 @@ def _detect_chrome_executable() -> str:
 
 # Chrome path from environment or auto-detected
 _env_chrome_path = config("CHROME_EXECUTABLE_PATH", default="")
-CHROME_EXECUTABLE_PATH = _env_chrome_path if _env_chrome_path else _detect_chrome_executable()
+CHROME_EXECUTABLE_PATH = _env_chrome_path or _detect_chrome_executable()
 PDF_OUTPUT_DIR = config("PDF_OUTPUT_DIR", default="contracts")
 PDF_GENERATION_TIMEOUT = config("PDF_GENERATION_TIMEOUT", default=30, cast=int)
 
@@ -431,7 +445,3 @@ DEFAULT_TAG_FEE_SINGLE = config("DEFAULT_TAG_FEE_SINGLE", default=50.00, cast=fl
 DEFAULT_TAG_FEE_MULTIPLE = config("DEFAULT_TAG_FEE_MULTIPLE", default=80.00, cast=float)
 LATE_FEE_PERCENTAGE = config("LATE_FEE_PERCENTAGE", default=0.05, cast=float)
 DAYS_PER_MONTH = config("DAYS_PER_MONTH", default=30, cast=int)
-
-# Logging Configuration
-# LOGGING is imported and used automatically by Django when present in settings module
-from .logging_config import LOGGING  # noqa: F401

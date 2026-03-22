@@ -1,7 +1,7 @@
-import axios, { type InternalAxiosRequestConfig } from 'axios';
+import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios';
 
 export const apiClient = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api',
+  baseURL: process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000/api',
   headers: {
     'Content-Type': 'application/json',
   },
@@ -21,8 +21,8 @@ apiClient.interceptors.request.use(
     }
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
+  (error: AxiosError) => {
+    return Promise.reject(error instanceof Error ? error : new Error(String(error)));
   }
 );
 
@@ -31,16 +31,16 @@ apiClient.interceptors.request.use(
  */
 apiClient.interceptors.response.use(
   (response) => response,
-  async (error) => {
-    const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
+  async (error: AxiosError & { config?: InternalAxiosRequestConfig & { _retry?: boolean } }) => {
+    const originalRequest = error.config;
 
     // If 401 Unauthorized and we haven't retried yet
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
       originalRequest._retry = true;
 
       try {
         if (typeof window === 'undefined') {
-          return Promise.reject(error);
+          return await Promise.reject(error instanceof Error ? error : new Error(String(error)));
         }
 
         const refreshToken = localStorage.getItem('refresh_token');
@@ -50,7 +50,7 @@ apiClient.interceptors.response.use(
 
         // Attempt to refresh the token
         const { data } = await axios.post<{ access: string }>(
-          `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'}/auth/token/refresh/`,
+          `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000/api'}/auth/token/refresh/`,
           { refresh: refreshToken }
         );
 
@@ -61,7 +61,7 @@ apiClient.interceptors.response.use(
         originalRequest.headers.Authorization = `Bearer ${data.access}`;
 
         // Retry the original request
-        return apiClient(originalRequest);
+        return await apiClient(originalRequest);
       } catch (refreshError) {
         // Refresh failed - clear auth and redirect to login
         if (typeof window !== 'undefined') {
@@ -75,10 +75,10 @@ apiClient.interceptors.response.use(
           window.location.href = '/login';
         }
 
-        return Promise.reject(refreshError);
+        return Promise.reject(refreshError instanceof Error ? refreshError : new Error(String(refreshError)));
       }
     }
 
-    return Promise.reject(error);
+    return Promise.reject(error instanceof Error ? error : new Error(String(error)));
   }
 );

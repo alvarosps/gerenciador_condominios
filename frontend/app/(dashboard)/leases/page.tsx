@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { DataTable } from '@/components/tables/data-table';
-import { LeaseFiltersCard, LeaseFilters } from './_components/lease-filters';
+import { LeaseFiltersCard, type LeaseFilters } from './_components/lease-filters';
 import { createLeaseColumns } from './_components/lease-table-columns';
 import { LeaseDeleteDialog, LeaseBulkDeleteDialog } from './_components/lease-dialogs';
 import {
@@ -28,7 +28,7 @@ import {
 } from '@/lib/api/hooks/use-leases';
 import { useApartments } from '@/lib/api/hooks/use-apartments';
 import { useTenants } from '@/lib/api/hooks/use-tenants';
-import { Lease } from '@/lib/schemas/lease.schema';
+import { type Lease } from '@/lib/schemas/lease.schema';
 import { leaseExportColumns } from '@/lib/hooks/use-export';
 import { useCrudPage } from '@/lib/hooks/use-crud-page';
 
@@ -118,7 +118,7 @@ export default function LeasesPage() {
 
   const handleDelete = useCallback((lease: Lease) => {
     crud.setItemToDelete(lease);
-    crud.handleDeleteClick(lease.id!);
+    if (lease.id !== undefined) crud.handleDeleteClick(lease.id);
   }, [crud]);
 
   // Memoize columns to prevent unnecessary re-renders
@@ -161,11 +161,11 @@ export default function LeasesPage() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
-              <DropdownMenuItem onClick={() => crud.handleExport('excel', leases || [])}>
+              <DropdownMenuItem onClick={() => crud.handleExport('excel', leases ?? [])}>
                 <FileSpreadsheet className="h-4 w-4 mr-2" />
                 Exportar para Excel
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => crud.handleExport('csv', leases || [])}>
+              <DropdownMenuItem onClick={() => crud.handleExport('csv', leases ?? [])}>
                 <FileText className="h-4 w-4 mr-2" />
                 Exportar para CSV
               </DropdownMenuItem>

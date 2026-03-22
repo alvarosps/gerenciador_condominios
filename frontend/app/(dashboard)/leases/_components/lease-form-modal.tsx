@@ -46,7 +46,7 @@ import { toast } from 'sonner';
 import { useCreateLease, useUpdateLease } from '@/lib/api/hooks/use-leases';
 import { useAvailableApartments } from '@/lib/api/hooks/use-apartments';
 import { useTenants } from '@/lib/api/hooks/use-tenants';
-import { Lease } from '@/lib/schemas/lease.schema';
+import { type Lease } from '@/lib/schemas/lease.schema';
 import { formatCurrency } from '@/lib/utils/formatters';
 
 interface Props {
@@ -100,7 +100,7 @@ export function LeaseFormModal({ open, lease, onClose }: Props) {
       formMethods.reset({
         apartment_id: lease.apartment?.id,
         responsible_tenant_id: lease.responsible_tenant?.id,
-        tenant_ids: lease.tenants?.map((t) => t.id!) || [],
+        tenant_ids: lease.tenants?.map((t) => t.id).filter((id): id is number => id !== undefined) ?? [],
         start_date: new Date(lease.start_date),
         validity_months: lease.validity_months,
         rental_value: lease.rental_value,
@@ -240,7 +240,7 @@ export function LeaseFormModal({ open, lease, onClose }: Props) {
                     </FormControl>
                     <SelectContent>
                       {tenants?.map((t) => (
-                        <SelectItem key={t.id} value={String(t.id!)}>
+                        <SelectItem key={t.id} value={String(t.id ?? '')}>
                           {t.name} - {t.cpf_cnpj}
                         </SelectItem>
                       ))}
@@ -268,11 +268,11 @@ export function LeaseFormModal({ open, lease, onClose }: Props) {
                           <input
                             type="checkbox"
                             id={`tenant-${t.id}`}
-                            checked={field.value?.includes(t.id!)}
+                            checked={t.id !== undefined && field.value?.includes(t.id)}
                             onChange={(e) => {
-                              const currentValue = field.value || [];
-                              if (e.target.checked) {
-                                field.onChange([...currentValue, t.id!]);
+                              const currentValue = field.value ?? [];
+                              if (e.target.checked && t.id !== undefined) {
+                                field.onChange([...currentValue, t.id]);
                               } else {
                                 field.onChange(currentValue.filter((id) => id !== t.id));
                               }
@@ -332,7 +332,7 @@ export function LeaseFormModal({ open, lease, onClose }: Props) {
                         selected={field.value}
                         onSelect={field.onChange}
                         locale={ptBR}
-                        initialFocus
+                        autoFocus
                       />
                     </PopoverContent>
                   </Popover>

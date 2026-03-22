@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
-import { Tenant, tenantSchema } from '@/lib/schemas/tenant.schema';
-import { PaginatedResponse, extractResults } from '@/lib/types/api';
+import { type Tenant, tenantSchema } from '@/lib/schemas/tenant.schema';
+import { type PaginatedResponse, extractResults } from '@/lib/types/api';
 
 /**
  * Hook to fetch all tenants with optional filters
@@ -42,7 +42,7 @@ export function useTenant(id: number | null) {
       const { data } = await apiClient.get<Tenant>(`/tenants/${id}/`);
       return tenantSchema.parse(data);
     },
-    enabled: !!id,
+    enabled: Boolean(id),
   });
 }
 
@@ -60,7 +60,7 @@ export function useCreateTenant() {
     },
     onSuccess: () => {
       // Invalidate tenants list to trigger refetch
-      queryClient.invalidateQueries({ queryKey: ['tenants'] });
+      void queryClient.invalidateQueries({ queryKey: ['tenants'] });
     },
   });
 }
@@ -86,8 +86,8 @@ export function useUpdateTenant() {
     },
     onSuccess: (data) => {
       // Invalidate both list and specific tenant cache
-      queryClient.invalidateQueries({ queryKey: ['tenants'] });
-      queryClient.invalidateQueries({ queryKey: ['tenants', data.id] });
+      void queryClient.invalidateQueries({ queryKey: ['tenants'] });
+      void queryClient.invalidateQueries({ queryKey: ['tenants', data.id] });
     },
   });
 }
@@ -104,7 +104,7 @@ export function useDeleteTenant() {
     },
     onSuccess: () => {
       // Invalidate tenants list to trigger refetch
-      queryClient.invalidateQueries({ queryKey: ['tenants'] });
+      void queryClient.invalidateQueries({ queryKey: ['tenants'] });
     },
   });
 }
