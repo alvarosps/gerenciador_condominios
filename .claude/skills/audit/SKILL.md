@@ -147,6 +147,70 @@ Audit: all acceptance criteria verified
 
 ---
 
+## Design Principles Audit — MANDATORY
+
+In EVERY audit, verify compliance with SOLID, DRY, KISS, YAGNI, and Clean Code. This is not optional. Search for and fix ALL violations.
+
+### What to Check
+
+| Violation | How to detect | Fix |
+|-----------|--------------|-----|
+| **Re-exports** | Module imports from X and re-exports it (`from x import Y` then `__all__ = [Y]`, or barrel `index.ts` files) | Remove re-export, update all consumers to import from the source |
+| **Backwards compatibility shims** | Old function/class kept alongside new one, deprecated wrappers, renamed `_old_name` vars | Delete old code, update all callers to use the new interface |
+| **Workarounds / quick wins** | Comments like "workaround", "hack", "temporary", "quick fix"; code that patches symptoms instead of root cause | Rewrite properly at the root cause |
+| **TODO/FIXME/HACK comments** | `grep -r "TODO\|FIXME\|HACK\|XXX"` in changed files | Fix the issue now or remove the comment |
+| **DRY violations** | Duplicated logic across functions/files (similar blocks of 3+ lines) | Extract into shared utility or base class |
+| **SRP violations** | Class/function doing multiple unrelated things; function > 30 lines with multiple sections | Split into focused units |
+| **Dead code** | Unused imports, unreachable branches, commented-out code, unused variables | Delete completely |
+| **Partial refactoring** | Interface changed but some callers still use old signature; renamed function but old name still referenced | Complete the refactoring across the entire codebase |
+| **God classes/functions** | Single class with too many responsibilities; function with too many parameters (>5) | Decompose into smaller, focused units |
+| **Circular dependencies** | Module A imports from B which imports from A | Restructure to break the cycle |
+| **Magic values** | Hardcoded numbers/strings without explanation | Extract to named constants |
+| **Over-engineering** | Abstractions used only once; patterns without justification; "just in case" code | Simplify to what is actually needed |
+| **Missing dependency registration** | New `import` of a third-party package not present in `requirements.txt`/`requirements-dev.txt` AND `pyproject.toml` | Add to all required files: `requirements.txt` or `requirements-dev.txt`, AND `pyproject.toml` |
+
+### How to Run Design Principles Check
+
+```bash
+# Search for re-exports in Python
+rg "from .+ import .+" --glob "**/__init__.py" | grep -v "^#"
+
+# Search for workaround/hack comments
+rg -i "workaround|hack|temporary|quick.?fix|FIXME|TODO|XXX|HACK" --glob "*.py" --glob "*.ts" --glob "*.tsx"
+
+# Search for dead imports
+ruff check --select F401
+
+# Search for duplicated code patterns
+# Manual review: look for similar blocks across files touched in this session
+
+# Search for re-exports in TypeScript (barrel files)
+rg "export \{.*\} from" --glob "*.ts" --glob "*.tsx" | grep "index\."
+rg "export \*" --glob "*.ts" --glob "*.tsx"
+
+# Verify new dependencies are registered in ALL places
+# For each new third-party import in changed files, check it exists in:
+# 1. requirements.txt (runtime) or requirements-dev.txt (dev/test)
+# 2. pyproject.toml [project.dependencies] or [project.optional-dependencies.dev]
+# If missing from ANY file, add it.
+```
+
+### Fix Protocol
+
+For EVERY violation found:
+1. Fix the violation properly — no workarounds, no "we'll fix it later"
+2. Update ALL affected files across the codebase
+3. Run linting and tests after each fix
+4. Verify no new violations were introduced by the fix
+
+**DO NOT:**
+- Skip a violation because "it's pre-existing" — if you touched the file, fix it
+- Add a TODO instead of fixing
+- Create a compatibility shim instead of updating callers
+- Leave partial refactoring "for the next session"
+
+---
+
 ## Audit Mindset
 
 Think like a QA engineer reviewing a contractor's work against the SOW (Statement of Work):

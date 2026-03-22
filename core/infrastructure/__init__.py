@@ -12,8 +12,8 @@ Provides:
 from .pdf_generator import (
     IPDFGenerator,
     PDFGenerationError,
+    PlaywrightPDFGenerator,
     PyppeteerPDFGenerator,
-    WeasyPrintPDFGenerator,
 )
 from .storage import FileSystemDocumentStorage, IDocumentStorage, S3DocumentStorage, StorageError
 
@@ -22,8 +22,8 @@ __all__ = [
     "IDocumentStorage",
     "IPDFGenerator",
     "PDFGenerationError",
+    "PlaywrightPDFGenerator",
     "PyppeteerPDFGenerator",
     "S3DocumentStorage",
     "StorageError",
-    "WeasyPrintPDFGenerator",
 ]

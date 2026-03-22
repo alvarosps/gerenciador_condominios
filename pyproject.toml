@@ -6,15 +6,17 @@ name = "condominios-manager"
 version = "0.1.0"
 description = "Property management system for rental properties in Brazil"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 license = {text = "MIT"}
 authors = [
     {name = "Alvaro Souza"}
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
-    "Framework :: Django :: 5.1",
-    "Programming Language :: Python :: 3.11",
+    "Framework :: Django :: 5.2",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
 ]
 
 [build-system]
@@ -213,7 +215,7 @@ ignore_errors = true
 [[tool.mypy.overrides]]
 module = [
     "num2words.*",
-    "pyppeteer.*",
+    "playwright.*",
     "jinja2.*",
     "dateutil.*",
     "factory.*",
