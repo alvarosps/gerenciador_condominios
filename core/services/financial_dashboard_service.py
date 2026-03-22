@@ -300,6 +300,7 @@ class FinancialDashboardService:
         expenses_in_month = Expense.objects.filter(
             expense_date__gte=month_start,
             expense_date__lt=next_month,
+            is_offset=False,
         )
 
         # Get grand total for percentage calculation

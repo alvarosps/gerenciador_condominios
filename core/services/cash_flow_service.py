@@ -258,6 +258,7 @@ class CashFlowService:
         qs = Expense.objects.filter(
             expense_type__in=[ExpenseType.WATER_BILL, ExpenseType.ELECTRICITY_BILL],
             is_debt_installment=False,
+            is_offset=False,
             expense_date__gte=month_start,
             expense_date__lt=next_month,
         ).select_related("building")
@@ -351,20 +352,32 @@ class CashFlowService:
         return employee_salary, details
 
     @staticmethod
-    def _collect_fixed_expenses() -> tuple[Decimal, list[dict[str, Any]]]:
+    def _collect_fixed_expenses(
+        month_start: date,
+    ) -> tuple[Decimal, list[dict[str, Any]]]:
         """Collect fixed recurring expense amounts and details."""
         qs = Expense.objects.filter(
             expense_type=ExpenseType.FIXED_EXPENSE,
             is_recurring=True,
+            is_offset=False,
             expected_monthly_amount__isnull=False,
-        )
+        ).select_related("person")
+
+        # Exclude expenses that ended before this month
+        qs = qs.exclude(end_date__lt=month_start)
 
         fixed_expenses = Decimal("0.00")
         details = []
         for exp in qs:
             amount = exp.expected_monthly_amount or Decimal("0.00")
             fixed_expenses += amount
-            details.append({"description": exp.description, "amount": amount})
+            details.append(
+                {
+                    "description": exp.description,
+                    "amount": amount,
+                    "person_name": exp.person.name if exp.person else None,
+                }
+            )
         return fixed_expenses, details
 
     @staticmethod
@@ -419,7 +432,9 @@ class CashFlowService:
         employee_salary, employee_salary_details = CashFlowService._collect_employee_salary(
             month_start
         )
-        fixed_expenses, fixed_expenses_details = CashFlowService._collect_fixed_expenses()
+        fixed_expenses, fixed_expenses_details = CashFlowService._collect_fixed_expenses(
+            month_start
+        )
         one_time_expenses, one_time_expenses_details = CashFlowService._collect_one_time_expenses(
             month_start, next_month
         )
@@ -592,18 +607,24 @@ class CashFlowService:
         installment_total = ExpenseInstallment.objects.filter(
             due_date__gte=month_start,
             due_date__lt=next_month,
+            expense__is_offset=False,
         ).aggregate(total=Coalesce(Sum("amount"), Decimal("0.00")))["total"]
         total += installment_total
 
         # Utility bills — average of last 3 months
         total += CashFlowService._get_projected_utility_average()
 
-        # Fixed expenses
-        fixed_total = Expense.objects.filter(
-            expense_type=ExpenseType.FIXED_EXPENSE,
-            is_recurring=True,
-            expected_monthly_amount__isnull=False,
-        ).aggregate(total=Coalesce(Sum("expected_monthly_amount"), Decimal("0.00")))["total"]
+        # Fixed expenses (respect end_date and exclude offsets)
+        fixed_total = (
+            Expense.objects.filter(
+                expense_type=ExpenseType.FIXED_EXPENSE,
+                is_recurring=True,
+                is_offset=False,
+                expected_monthly_amount__isnull=False,
+            )
+            .exclude(end_date__lt=month_start)
+            .aggregate(total=Coalesce(Sum("expected_monthly_amount"), Decimal("0.00")))["total"]
+        )
         total += fixed_total
 
         # Employee salary — use latest payment as projection
@@ -802,7 +823,27 @@ class CashFlowService:
                 }
             )
 
-        net_amount = receives - card_total - loan_total + offset_total
+        # Fixed expenses for this person (recurring monthly charges)
+        fixed_for_person = Expense.objects.filter(
+            expense_type=ExpenseType.FIXED_EXPENSE,
+            is_recurring=True,
+            person=person,
+            is_offset=False,
+        ).exclude(end_date__lt=month_start)
+
+        fixed_total = Decimal("0.00")
+        fixed_details = []
+        for exp in fixed_for_person:
+            amount = exp.expected_monthly_amount or exp.total_amount
+            fixed_total += amount
+            fixed_details.append(
+                {
+                    "description": exp.description,
+                    "amount": amount,
+                }
+            )
+
+        net_amount = receives - card_total - loan_total - fixed_total + offset_total
 
         # Payments made to this person for this month
         payments = PersonPayment.objects.filter(
@@ -833,6 +874,8 @@ class CashFlowService:
             "card_details": card_details,
             "loan_total": loan_total,
             "loan_details": loan_details,
+            "fixed_total": fixed_total,
+            "fixed_details": fixed_details,
             "offset_total": offset_total,
             "offset_details": offset_details,
             "net_amount": net_amount,

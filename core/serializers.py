@@ -615,6 +615,7 @@ class ExpenseSerializer(serializers.ModelSerializer):
             "recurrence_day",
             "is_paid",
             "paid_date",
+            "end_date",
             "is_offset",
             "bank_name",
             "interest_rate",

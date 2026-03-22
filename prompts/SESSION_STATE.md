@@ -2,8 +2,8 @@
 
 **Feature**: Módulo Financeiro Completo
 **Design Doc**: `docs/plans/2026-03-21-financial-module-design.md`
-**Total de Sessões**: 15
-**Sessão Atual**: 15 (concluída)
+**Total de Sessões**: 20
+**Sessão Atual**: 16 (concluída) — sessões 17-20 pendentes (frontend fixes + novas funcionalidades)
 
 ---
 
@@ -26,8 +26,24 @@
 | 13 | Frontend: Dashboard Financeiro | concluída | 6 widgets (BalanceCards, CashFlowChart, PersonSummaryCards, UpcomingInstallments, OverdueAlerts, CategoryBreakdownChart), interfaces corrigidas para match backend, type-check + build clean |
 | 14 | Frontend: Simulador | concluída | 6 componentes (scenario-builder, scenario-card, comparison-chart, comparison-table, impact-summary, page), useSimulation interfaces corrigidas para match backend, MSW handler atualizado, type-check + build + lint clean |
 | 15 | Permissões + E2E Tests + Polish | concluída | FinancialReadOnly permission, IsAuthenticated para Dashboard/CashFlow, is_staff no frontend, conditional UI em 7 páginas, export Excel (despesas/receitas/pagamentos), 6 E2E tests + 3 simulation tests, type-check + lint + build clean |
+| 16 | Backend: Correções críticas + gaps | concluída | except syntax fix (ObjectDoesNotExist), end_date Expense + migration 0016, is_offset filtering em 4 queries, fixed_total em person_summary, 11 testes regressão |
+| 17 | Frontend: Schemas/hooks/interfaces fixes | pendente | PersonPayment schema+hook, PersonIncome hook, fix CashFlowMonth+PersonSummary interfaces, is_offset em expense schema (6 gaps) |
+| 18 | Frontend: PersonPayments page + is_offset toggle | pendente | Página controle pagamentos a pessoas, PersonSummaryCards atualizado, toggle is_offset (3 gaps) |
+| 19 | Frontend: Controle Diário | pendente | DailyControlService + página com timeline, gráfico saldo diário, mark-paid inline |
+| 20 | Frontend: PersonIncome page + E2E + Polish | pendente | CRUD PersonIncome, 11 testes E2E, verificações finais |
 
 ---
+
+### Sessão 16 — Arquivos Criados
+- `tests/unit/test_financial/test_gap_fixes.py` — 11 testes de regressão (4 classes)
+- `core/migrations/0016_add_expense_end_date.py` — adiciona end_date ao Expense
+
+### Sessão 16 — Arquivos Modificados
+- `core/models.py` — end_date adicionado ao Expense
+- `core/serializers.py` — end_date adicionado ao ExpenseSerializer.fields
+- `core/services/simulation_service.py` — except syntax fixado com ObjectDoesNotExist, removido Lease import
+- `core/services/cash_flow_service.py` — _collect_fixed_expenses com end_date+is_offset+person, _collect_utility_bills com is_offset, _get_projected_expenses com is_offset, get_person_summary com fixed_total
+- `core/services/financial_dashboard_service.py` — get_expense_category_breakdown com is_offset
 
 ## Decisões Arquiteturais
 
@@ -48,6 +64,7 @@
 15. `FinancialDashboardViewSet` e `CashFlowViewSet` usam `IsAuthenticated` (não `FinancialReadOnly`) — qualquer usuário autenticado pode ler dashboard e rodar simulações.
 16. `FinancialSettingsViewSet` mudou de `IsAdminUser` para `FinancialReadOnly` — non-admin pode ler configurações mas não alterar.
 17. `is_staff` adicionado ao `User` interface no frontend (`auth-store.ts`) — usado para conditional rendering de botões de ação (criar/editar/excluir/marcar como pago).
+18. `except (A, B):` em Python 3.14 é reformatado por ruff para `except A, B:` que tem semântica diferente (PEP 758: catch A, assign to B). Workaround: usar `except ObjectDoesNotExist:` (base class Django) em vez de `except (Apartment.DoesNotExist, Lease.DoesNotExist):`.
 
 ## Arquivos Criados
 
