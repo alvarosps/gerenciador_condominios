@@ -3,7 +3,7 @@
 **Feature**: Módulo Financeiro Completo
 **Design Doc**: `docs/plans/2026-03-21-financial-module-design.md`
 **Total de Sessões**: 15
-**Sessão Atual**: 10 (concluída)
+**Sessão Atual**: 13 (concluída)
 
 ---
 
@@ -23,7 +23,7 @@
 | 10 | Frontend: Navegação + Páginas Base | concluída | Sidebar expansível, 4 páginas (Persons CRUD + cartões, Categories CRUD hierárquica, Settings singleton, Financial placeholder), use-financial-settings hook, type-check + build clean |
 | 11 | Frontend: Página de Despesas | pendente | |
 | 12 | Frontend: Income + RentPayments + Employees | pendente | |
-| 13 | Frontend: Dashboard Financeiro | pendente | |
+| 13 | Frontend: Dashboard Financeiro | concluída | 6 widgets (BalanceCards, CashFlowChart, PersonSummaryCards, UpcomingInstallments, OverdueAlerts, CategoryBreakdownChart), interfaces corrigidas para match backend, type-check + build clean |
 | 14 | Frontend: Simulador | pendente | |
 | 15 | Permissões + E2E Tests + Polish | pendente | |
 
@@ -39,6 +39,7 @@
 6. FinancialDashboardViewSet e CashFlowViewSet em `financial_dashboard_views.py` (não em `financial_views.py` que contém apenas ViewSets CRUD).
 7. `PersonSimple` schema em `credit-card.schema.ts` (não em `person.schema.ts`) para evitar dependência circular Person→CreditCard→Person. Person importa CreditCard; schemas que precisam de person nested (expense, income, etc.) importam PersonSimple de credit-card.schema.ts.
 8. `ExpenseCategory` usa `z.lazy()` para suportar subcategories recursivas no schema Zod.
+9. Interfaces dos hooks `use-financial-dashboard.ts` e `use-cash-flow.ts` foram corrigidas na sessão 13 para match com os campos reais do backend (sessão 09 criou interfaces especulativas que divergiam dos endpoints implementados nas sessões 07-08).
 
 ## Arquivos Criados
 
@@ -99,6 +100,13 @@
 - `frontend/app/(dashboard)/financial/settings/page.tsx` — Formulário singleton (GET/PUT)
 - `frontend/lib/api/hooks/use-financial-settings.ts` — useFinancialSettings + useUpdateFinancialSettings
 
+- `frontend/app/(dashboard)/financial/_components/balance-cards.tsx` — 4 stat cards com cor condicional
+- `frontend/app/(dashboard)/financial/_components/cash-flow-chart.tsx` — ComposedChart 12 meses (Bar + Line)
+- `frontend/app/(dashboard)/financial/_components/person-summary-cards.tsx` — Grid de cards por pessoa
+- `frontend/app/(dashboard)/financial/_components/upcoming-installments.tsx` — Lista scrollable com highlights
+- `frontend/app/(dashboard)/financial/_components/overdue-alerts.tsx` — Alertas vencidos ou mensagem positiva
+- `frontend/app/(dashboard)/financial/_components/category-breakdown-chart.tsx` — PieChart com cores das categorias
+
 ## Arquivos Modificados
 
 - `core/models.py` — 10 novos models (Person, CreditCard, ExpenseCategory, ExpenseType, Expense, ExpenseInstallment, PersonIncomeType, PersonIncome, Income, RentPayment, EmployeePayment, FinancialSettings) + `owner` em Apartment + `prepaid_until`/`is_salary_offset` em Lease
@@ -116,6 +124,12 @@
 - `frontend/components/layouts/sidebar.tsx` — Sub-menu expansível com chevron + active state
 - `frontend/.eslintrc.json` — no-unnecessary-type-parameters off para test files
 - `frontend/app/(dashboard)/tenants/page.tsx` — fix || → ?? (pre-existing lint error)
+- `frontend/app/(dashboard)/financial/page.tsx` — substituído placeholder por dashboard com 6 widgets
+- `frontend/lib/api/hooks/use-financial-dashboard.ts` — interfaces corrigidas para match backend (FinancialOverview, DebtByPerson, UpcomingInstallment, CategoryBreakdown)
+- `frontend/lib/api/hooks/use-cash-flow.ts` — CashFlowProjectionMonth corrigido para match backend (income_total, expenses_total, balance, cumulative_balance, is_projected)
+- `frontend/tests/mocks/handlers.ts` — MSW handlers atualizados para match novas interfaces
+- `frontend/lib/api/hooks/__tests__/use-financial-dashboard.test.tsx` — testes atualizados para novas interfaces
+- `frontend/lib/api/hooks/__tests__/use-cash-flow.test.tsx` — testes atualizados para novas interfaces
 
 ## Correções Pós-Design (sessão de brainstorming 2026-03-22)
 

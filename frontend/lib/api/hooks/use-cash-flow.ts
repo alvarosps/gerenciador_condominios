@@ -16,9 +16,11 @@ export interface CashFlowMonth {
 export interface CashFlowProjectionMonth {
   year: number;
   month: number;
-  projected_income: number;
-  projected_expenses: number;
-  projected_balance: number;
+  income_total: number;
+  expenses_total: number;
+  balance: number;
+  cumulative_balance: number;
+  is_projected: boolean;
 }
 
 export interface PersonSummary {

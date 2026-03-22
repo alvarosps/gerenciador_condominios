@@ -16,9 +16,9 @@ describe('useFinancialOverview', () => {
       { timeout: 5000 },
     );
 
-    expect(result.current.data?.total_expenses).toBeDefined();
-    expect(result.current.data?.total_income).toBeDefined();
-    expect(result.current.data?.net_balance).toBeDefined();
+    expect(result.current.data?.current_month_expenses).toBeDefined();
+    expect(result.current.data?.current_month_income).toBeDefined();
+    expect(result.current.data?.current_month_balance).toBeDefined();
   });
 });
 
