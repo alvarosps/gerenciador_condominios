@@ -8,7 +8,7 @@ paths:
 # Database Rules
 
 ## Migrations
-- Sequential numbering: currently at 0008
+- Sequential numbering: currently at 0012 (financial module)
 - Never manually edit existing migrations — create new ones
 - Always run `python manage.py makemigrations` then `python manage.py migrate`
 - Test migrations both forward and backward when possible

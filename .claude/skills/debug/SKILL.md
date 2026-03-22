@@ -1,9 +1,13 @@
 ---
 name: debug
 description: Systematic debugging workflow for investigating and fixing bugs
+argument-hint: "[bug-description]"
 ---
 
 # Debug Workflow
+
+Current branch: !`git branch --show-current`
+Recent changes: !`git log --oneline -5`
 
 ## 1. Reproduce
 - What action triggers the bug?
@@ -33,6 +37,5 @@ description: Systematic debugging workflow for investigating and fixing bugs
 
 ## 6. Verify
 - Write a regression test that would catch this bug
-- Run the full test suite: `python -m pytest` or `cd frontend && npm run test:unit`
-- Manually verify the fix if needed
+- Run: `ruff check && python -m pytest` or `cd frontend && npm run lint && npm run type-check`
 - Commit: `fix(scope): description of what was fixed`
