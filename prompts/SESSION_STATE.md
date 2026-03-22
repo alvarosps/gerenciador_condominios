@@ -3,7 +3,7 @@
 **Feature**: Módulo Financeiro Completo
 **Design Doc**: `docs/plans/2026-03-21-financial-module-design.md`
 **Total de Sessões**: 15
-**Sessão Atual**: 1 (concluída)
+**Sessão Atual**: 7 (concluída)
 
 ---
 
@@ -17,7 +17,7 @@
 | 04 | Backend: Expense ViewSets + Tests | pendente | |
 | 05 | Backend: Income/Payment ViewSets + Tests | pendente | |
 | 06 | Backend: CashFlowService + Tests | concluída | CashFlowService implementado |
-| 07 | Backend: FinancialDashboardService + Tests | pendente | |
+| 07 | Backend: FinancialDashboardService + Tests | concluída | 6 métodos, 21 testes passando |
 | 08 | Backend: SimulationService + Endpoints + Tests | pendente | |
 | 09 | Frontend: Schemas + API Hooks | pendente | |
 | 10 | Frontend: Navegação + Páginas Base | pendente | |
@@ -38,9 +38,12 @@
 ## Arquivos Criados
 
 ### Backend
+- `tests/unit/__init__.py`
 - `tests/unit/test_financial/__init__.py`
 - `tests/unit/test_financial/test_financial_models.py` — 44 testes
+- `tests/unit/test_financial/test_financial_dashboard_service.py` — 21 testes
 - `core/migrations/0012_add_financial_module.py`
+- `core/services/financial_dashboard_service.py` — 6 métodos estáticos
 
 ### Frontend
 - -
@@ -48,6 +51,7 @@
 ## Arquivos Modificados
 
 - `core/models.py` — 10 novos models (Person, CreditCard, ExpenseCategory, ExpenseType, Expense, ExpenseInstallment, PersonIncomeType, PersonIncome, Income, RentPayment, EmployeePayment, FinancialSettings) + `owner` em Apartment + `prepaid_until`/`is_salary_offset` em Lease
+- `pyproject.toml` — PLR2004 adicionado a per-file-ignores para tests (magic values em assertions)
 
 ## Correções Pós-Design (sessão de brainstorming 2026-03-22)
 
