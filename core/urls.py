@@ -10,7 +10,15 @@ from .views import (
     LeaseViewSet,
     TenantViewSet,
 )
-from .viewsets import ContractRuleViewSet, ContractTemplateViewSet, LandlordViewSet
+from .viewsets import (
+    ContractRuleViewSet,
+    ContractTemplateViewSet,
+    CreditCardViewSet,
+    ExpenseCategoryViewSet,
+    FinancialSettingsViewSet,
+    LandlordViewSet,
+    PersonViewSet,
+)
 
 router = DefaultRouter()
 router.register(r"buildings", BuildingViewSet)
@@ -24,6 +32,10 @@ router.register(
 )  # Contract template management
 router.register(r"landlords", LandlordViewSet, basename="landlords")  # Landlord configuration
 router.register(r"rules", ContractRuleViewSet, basename="rules")  # Contract rule management
+router.register(r"persons", PersonViewSet, basename="persons")
+router.register(r"credit-cards", CreditCardViewSet, basename="credit-cards")
+router.register(r"expense-categories", ExpenseCategoryViewSet, basename="expense-categories")
+router.register(r"financial-settings", FinancialSettingsViewSet, basename="financial-settings")
 
 urlpatterns = [
     path("api/", include(router.urls)),

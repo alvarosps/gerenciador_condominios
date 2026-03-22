@@ -9,8 +9,22 @@ for better separation of concerns:
 - rule_views: Contract rule management endpoints
 """
 
+from .financial_views import (
+    CreditCardViewSet,
+    ExpenseCategoryViewSet,
+    FinancialSettingsViewSet,
+    PersonViewSet,
+)
 from .landlord_views import LandlordViewSet
 from .rule_views import ContractRuleViewSet
 from .template_views import ContractTemplateViewSet
 
-__all__ = ["ContractRuleViewSet", "ContractTemplateViewSet", "LandlordViewSet"]
+__all__ = [
+    "ContractRuleViewSet",
+    "ContractTemplateViewSet",
+    "CreditCardViewSet",
+    "ExpenseCategoryViewSet",
+    "FinancialSettingsViewSet",
+    "LandlordViewSet",
+    "PersonViewSet",
+]
