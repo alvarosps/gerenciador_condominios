@@ -95,6 +95,8 @@ CRUD com visão mensal:
 
 ### Página de Funcionários (`employees/page.tsx`)
 
+Atualmente há apenas uma funcionária (Rosa): salário base R$800/mês + valor variável por serviços extras (faxinas em kitnets desocupados, etc.). O aluguel do kitnet 206/850 é compensado (informativo).
+
 Registros mensais de pagamento:
 
 **Colunas:**

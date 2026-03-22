@@ -40,7 +40,8 @@ python manage.py runserver                    # http://localhost:8000
 python -m pytest                              # Todos os testes (parallel, reuse-db)
 python -m pytest tests/unit/                  # Só unit tests
 python -m pytest --cov=core --cov-report=html # Com coverage
-pre-commit run --all-files                    # Lint/format (black, isort, flake8)
+ruff check && ruff format --check              # Lint/format (replaces black, isort, flake8)
+mypy core/                                     # Type checking with django-stubs
 
 # Frontend (cd frontend/)
 npm run dev                                   # http://localhost:4000
@@ -65,8 +66,9 @@ npm run lint && npm run type-check            # ESLint + TypeScript
 
 ## Convenções
 
-- Backend: Black (120 chars), isort (black profile), flake8 — enforced via pre-commit
-- Frontend: ESLint + Prettier + TypeScript strict, husky + lint-staged (pre-commit)
+- Backend: Ruff (100 chars, replaces black+isort+flake8+pylint) + mypy strict (django-stubs) — enforced via pre-commit
+- Frontend: ESLint strict-type-checked + Prettier + TypeScript strict (noUncheckedIndexedAccess) — husky + lint-staged
+- CRITICAL: Never use `# noqa`, `# type: ignore`, or `eslint-disable` comments — always fix the actual code
 - Validação brasileira: CPF (11 dígitos), CNPJ (14 dígitos), moeda R$ 1.500,00, data DD/MM/YYYY
 - Estado civil: Solteiro(a), Casado(a), Divorciado(a), Viúvo(a), União Estável
 
@@ -81,7 +83,7 @@ npm run lint && npm run type-check            # ESLint + TypeScript
 
 ## Migrations
 
-Sequenciais: 0001 (initial) → 0008 (audit + soft delete). `LeaseTenant` usa `db_table='core_lease_tenant_details'`.
+Sequenciais: 0001 (initial) → 0012 (financial module). `LeaseTenant` usa `db_table='core_lease_tenant_details'`.
 
 ## Env Vars
 

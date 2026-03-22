@@ -16,7 +16,7 @@
 | 03 | Backend: ViewSets Simples + Tests | pendente | |
 | 04 | Backend: Expense ViewSets + Tests | pendente | |
 | 05 | Backend: Income/Payment ViewSets + Tests | pendente | |
-| 06 | Backend: CashFlowService + Tests | pendente | |
+| 06 | Backend: CashFlowService + Tests | concluída | CashFlowService implementado |
 | 07 | Backend: FinancialDashboardService + Tests | pendente | |
 | 08 | Backend: SimulationService + Endpoints + Tests | pendente | |
 | 09 | Frontend: Schemas + API Hooks | pendente | |
@@ -48,6 +48,14 @@
 ## Arquivos Modificados
 
 - `core/models.py` — 10 novos models (Person, CreditCard, ExpenseCategory, ExpenseType, Expense, ExpenseInstallment, PersonIncomeType, PersonIncome, Income, RentPayment, EmployeePayment, FinancialSettings) + `owner` em Apartment + `prepaid_until`/`is_salary_offset` em Lease
+
+## Correções Pós-Design (sessão de brainstorming 2026-03-22)
+
+- Estipêndio Rodrigo/Junior: R$1.100 (não R$1.000)
+- Funcionária confirmada como Rosa: salário base R$800 + variável por serviços extras
+- Prepaid kitnet 113/836: recalculado para 2026-09-29 (inquilina mudou de kitnet R$1.150 para R$1.300 em jan/2026)
+- Sistema "pagar para morar": paga dia X para morar de X a X+1mês
+- Design doc e prompts 06, 12 atualizados com essas correções
 
 ## Problemas Conhecidos
 

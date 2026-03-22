@@ -14,19 +14,59 @@
   },
 
   "categorias": [
-    {"nome": "Manutenção", "cor": "#EF4444", "descricao": "Reparos e manutenção dos prédios"},
-    {"nome": "Material de Construção", "cor": "#F97316", "descricao": "Cimento, tinta, ferragens, etc."},
-    {"nome": "Mercado", "cor": "#22C55E", "descricao": "Compras de supermercado"},
-    {"nome": "Farmácia", "cor": "#06B6D4", "descricao": "Medicamentos e produtos de farmácia"},
-    {"nome": "Gasolina", "cor": "#8B5CF6", "descricao": "Combustível"},
-    {"nome": "Ração/Sítio", "cor": "#A3E635", "descricao": "Ração para galinhas e despesas do sítio"},
-    {"nome": "Pessoal", "cor": "#EC4899", "descricao": "Gastos pessoais dos sogros"},
-    {"nome": "Vestuário", "cor": "#F59E0B", "descricao": "Roupas e calçados"},
-    {"nome": "Saúde", "cor": "#14B8A6", "descricao": "Consultas, exames, tratamentos"},
-    {"nome": "Eletrodoméstico", "cor": "#6366F1", "descricao": "Geladeira, fogão, etc."},
-    {"nome": "Móveis", "cor": "#78716C", "descricao": "Móveis para os imóveis ou sítio"},
-    {"nome": "Internet", "cor": "#3B82F6", "descricao": "Planos de internet"},
-    {"nome": "Outros", "cor": "#6B7280", "descricao": "Gastos que não se encaixam em outra categoria"}
+    {
+      "nome": "Manutenção",
+      "cor": "#EF4444",
+      "descricao": "Reparos e manutenção dos prédios"
+    },
+    {
+      "nome": "Material de Construção",
+      "cor": "#F97316",
+      "descricao": "Cimento, tinta, ferragens, etc."
+    },
+    {
+      "nome": "Mercado",
+      "cor": "#22C55E",
+      "descricao": "Compras de supermercado"
+    },
+    {
+      "nome": "Farmácia",
+      "cor": "#06B6D4",
+      "descricao": "Medicamentos e produtos de farmácia"
+    },
+    { "nome": "Gasolina", "cor": "#8B5CF6", "descricao": "Combustível" },
+    {
+      "nome": "Ração/Sítio",
+      "cor": "#A3E635",
+      "descricao": "Ração para galinhas e despesas do sítio"
+    },
+    {
+      "nome": "Pessoal",
+      "cor": "#EC4899",
+      "descricao": "Gastos pessoais dos sogros"
+    },
+    { "nome": "Vestuário", "cor": "#F59E0B", "descricao": "Roupas e calçados" },
+    {
+      "nome": "Saúde",
+      "cor": "#14B8A6",
+      "descricao": "Consultas, exames, tratamentos"
+    },
+    {
+      "nome": "Eletrodoméstico",
+      "cor": "#6366F1",
+      "descricao": "Geladeira, fogão, etc."
+    },
+    {
+      "nome": "Móveis",
+      "cor": "#78716C",
+      "descricao": "Móveis para os imóveis ou sítio"
+    },
+    { "nome": "Internet", "cor": "#3B82F6", "descricao": "Planos de internet" },
+    {
+      "nome": "Outros",
+      "cor": "#6B7280",
+      "descricao": "Gastos que não se encaixam em outra categoria"
+    }
   ],
 
   "pessoas": [
@@ -67,7 +107,7 @@
       "notas": ""
     },
     {
-      "nome": "_NOME_FUNCIONARIA_",
+      "nome": "Rosa",
       "relacao": "funcionária",
       "telefone": "",
       "email": "",
@@ -175,14 +215,14 @@
     "estipendio_fixo": [
       {
         "pessoa": "Rodrigo",
-        "valor": 1000.00,
+        "valor": 1100.0,
         "data_inicio": "2026-01-01",
         "data_fim": null,
         "notas": "Equivalente a 1 kitnet"
       },
       {
         "pessoa": "Junior",
-        "valor": 1000.00,
+        "valor": 1100.0,
         "data_inicio": "2026-01-01",
         "data_fim": null,
         "notas": "Equivalente a 1 kitnet"
@@ -193,10 +233,26 @@
   "proprietarios_apartamentos": {
     "_instrucoes": "Vincula apartamentos a proprietários (Person). Apartamentos sem owner = receita dos sogros.",
     "vinculos": [
-      {"predio_street_number": 836, "apartamento_number": 101, "pessoa": "Tiago"},
-      {"predio_street_number": 836, "apartamento_number": 103, "pessoa": "Tiago"},
-      {"predio_street_number": 836, "apartamento_number": 200, "pessoa": "Alvaro"},
-      {"predio_street_number": 836, "apartamento_number": 203, "pessoa": "Alvaro"}
+      {
+        "predio_street_number": 836,
+        "apartamento_number": 101,
+        "pessoa": "Tiago"
+      },
+      {
+        "predio_street_number": 836,
+        "apartamento_number": 103,
+        "pessoa": "Tiago"
+      },
+      {
+        "predio_street_number": 836,
+        "apartamento_number": 200,
+        "pessoa": "Alvaro"
+      },
+      {
+        "predio_street_number": 836,
+        "apartamento_number": 203,
+        "pessoa": "Alvaro"
+      }
     ]
   },
 
@@ -206,8 +262,8 @@
       {
         "predio_street_number": 836,
         "apartamento_number": 113,
-        "prepaid_until": "2027-03-31",
-        "notas": "Inquilina pagou ~2 anos adiantado"
+        "prepaid_until": "2026-09-29",
+        "notas": "Pagou R$20.700 em 23/04/2025 (18x R$1.150). 9 meses no kitnet antigo (abr-dez/2025) = R$10.350. Mudou para kitnet R$1.300 em jan/2026. Crédito restante R$10.350 = 8 meses a R$1.300 (jan-ago/2026). R$50 absorvidos."
       }
     ],
     "salary_offset": [
@@ -226,7 +282,7 @@
         "pessoa": "Rodrigo",
         "cartao": "_NOME_CARTAO_1_RODRIGO_",
         "descricao": "_DESCRICAO_DA_COMPRA_",
-        "valor_parcela": 0.00,
+        "valor_parcela": 0.0,
         "parcela_atual": 1,
         "total_parcelas": 1,
         "data_compra": "2026-01-15",
@@ -242,8 +298,8 @@
       {
         "pessoa": "Rodrigo",
         "descricao": "_DESCRICAO_EMPRESTIMO_",
-        "valor_total": 0.00,
-        "valor_parcela": 0.00,
+        "valor_total": 0.0,
+        "valor_parcela": 0.0,
         "parcela_atual": 1,
         "total_parcelas": 1,
         "data_inicio": "2026-01-01",
@@ -262,8 +318,8 @@
       {
         "pessoa": "Rodrigo",
         "descricao": "_DESCRICAO_EMPRESTIMO_",
-        "valor_total": 0.00,
-        "valor_parcela": 0.00,
+        "valor_total": 0.0,
+        "valor_parcela": 0.0,
         "parcela_atual": 1,
         "total_parcelas": 1,
         "data_inicio": "2026-01-01",
@@ -280,9 +336,24 @@
       {
         "predio_street_number": 836,
         "historico_mensal": [
-          {"mes": "2026-01-01", "valor": 0.00, "pago": true, "data_pagamento": "2026-01-15"},
-          {"mes": "2026-02-01", "valor": 0.00, "pago": true, "data_pagamento": "2026-02-15"},
-          {"mes": "2026-03-01", "valor": 0.00, "pago": false, "data_pagamento": null}
+          {
+            "mes": "2026-01-01",
+            "valor": 0.0,
+            "pago": true,
+            "data_pagamento": "2026-01-15"
+          },
+          {
+            "mes": "2026-02-01",
+            "valor": 0.0,
+            "pago": true,
+            "data_pagamento": "2026-02-15"
+          },
+          {
+            "mes": "2026-03-01",
+            "valor": 0.0,
+            "pago": false,
+            "data_pagamento": null
+          }
         ],
         "dia_vencimento": 15,
         "notas": ""
@@ -290,9 +361,24 @@
       {
         "predio_street_number": 850,
         "historico_mensal": [
-          {"mes": "2026-01-01", "valor": 0.00, "pago": true, "data_pagamento": "2026-01-15"},
-          {"mes": "2026-02-01", "valor": 0.00, "pago": true, "data_pagamento": "2026-02-15"},
-          {"mes": "2026-03-01", "valor": 0.00, "pago": false, "data_pagamento": null}
+          {
+            "mes": "2026-01-01",
+            "valor": 0.0,
+            "pago": true,
+            "data_pagamento": "2026-01-15"
+          },
+          {
+            "mes": "2026-02-01",
+            "valor": 0.0,
+            "pago": true,
+            "data_pagamento": "2026-02-15"
+          },
+          {
+            "mes": "2026-03-01",
+            "valor": 0.0,
+            "pago": false,
+            "data_pagamento": null
+          }
         ],
         "dia_vencimento": 15,
         "notas": ""
@@ -302,9 +388,24 @@
       {
         "predio_street_number": 836,
         "historico_mensal": [
-          {"mes": "2026-01-01", "valor": 0.00, "pago": true, "data_pagamento": "2026-01-15"},
-          {"mes": "2026-02-01", "valor": 0.00, "pago": true, "data_pagamento": "2026-02-15"},
-          {"mes": "2026-03-01", "valor": 0.00, "pago": false, "data_pagamento": null}
+          {
+            "mes": "2026-01-01",
+            "valor": 0.0,
+            "pago": true,
+            "data_pagamento": "2026-01-15"
+          },
+          {
+            "mes": "2026-02-01",
+            "valor": 0.0,
+            "pago": true,
+            "data_pagamento": "2026-02-15"
+          },
+          {
+            "mes": "2026-03-01",
+            "valor": 0.0,
+            "pago": false,
+            "data_pagamento": null
+          }
         ],
         "dia_vencimento": 20,
         "notas": ""
@@ -312,9 +413,24 @@
       {
         "predio_street_number": 850,
         "historico_mensal": [
-          {"mes": "2026-01-01", "valor": 0.00, "pago": true, "data_pagamento": "2026-01-15"},
-          {"mes": "2026-02-01", "valor": 0.00, "pago": true, "data_pagamento": "2026-02-15"},
-          {"mes": "2026-03-01", "valor": 0.00, "pago": false, "data_pagamento": null}
+          {
+            "mes": "2026-01-01",
+            "valor": 0.0,
+            "pago": true,
+            "data_pagamento": "2026-01-15"
+          },
+          {
+            "mes": "2026-02-01",
+            "valor": 0.0,
+            "pago": true,
+            "data_pagamento": "2026-02-15"
+          },
+          {
+            "mes": "2026-03-01",
+            "valor": 0.0,
+            "pago": false,
+            "data_pagamento": null
+          }
         ],
         "dia_vencimento": 20,
         "notas": ""
@@ -329,8 +445,8 @@
         "tipo": "water_bill",
         "predio_street_number": 836,
         "descricao": "Parcelamento dívida água prédio 836",
-        "valor_total_divida": 0.00,
-        "valor_parcela": 0.00,
+        "valor_total_divida": 0.0,
+        "valor_parcela": 0.0,
         "parcela_atual": 1,
         "total_parcelas": 1,
         "data_inicio": "2026-01-01",
@@ -348,8 +464,8 @@
         "predio_street_number": 836,
         "ano": 2026,
         "descricao": "IPTU 2026 - Prédio 836",
-        "valor_total": 0.00,
-        "valor_parcela": 0.00,
+        "valor_total": 0.0,
+        "valor_parcela": 0.0,
         "parcela_atual": 1,
         "total_parcelas": 10,
         "dia_vencimento": 10,
@@ -360,8 +476,8 @@
         "predio_street_number": 850,
         "ano": 2026,
         "descricao": "IPTU 2026 - Prédio 850",
-        "valor_total": 0.00,
-        "valor_parcela": 0.00,
+        "valor_total": 0.0,
+        "valor_parcela": 0.0,
         "parcela_atual": 1,
         "total_parcelas": 10,
         "dia_vencimento": 10,
@@ -373,8 +489,8 @@
       {
         "predio_street_number": 836,
         "descricao": "Parcelamento dívida IPTU prédio 836",
-        "valor_total_divida": 0.00,
-        "valor_parcela": 0.00,
+        "valor_total_divida": 0.0,
+        "valor_parcela": 0.0,
         "parcela_atual": 1,
         "total_parcelas": 1,
         "data_inicio": "2026-01-01",
@@ -389,7 +505,7 @@
     "items": [
       {
         "descricao": "Internet - Prédio 836",
-        "valor_mensal": 0.00,
+        "valor_mensal": 0.0,
         "dia_vencimento": 10,
         "predio_street_number": 836,
         "categoria": "Internet",
@@ -398,7 +514,7 @@
       },
       {
         "descricao": "Internet - Prédio 850",
-        "valor_mensal": 0.00,
+        "valor_mensal": 0.0,
         "dia_vencimento": 10,
         "predio_street_number": 850,
         "categoria": "Internet",
@@ -407,7 +523,7 @@
       },
       {
         "descricao": "Internet - Sítio",
-        "valor_mensal": 0.00,
+        "valor_mensal": 0.0,
         "dia_vencimento": 10,
         "predio_street_number": null,
         "categoria": "Internet",
@@ -416,7 +532,7 @@
       },
       {
         "descricao": "Ração galinhas",
-        "valor_mensal": 0.00,
+        "valor_mensal": 0.0,
         "dia_vencimento": null,
         "predio_street_number": null,
         "categoria": "Ração/Sítio",
@@ -431,7 +547,7 @@
     "items": [
       {
         "descricao": "_DESCRICAO_",
-        "valor": 0.00,
+        "valor": 0.0,
         "data": "2026-03-01",
         "pessoa": null,
         "cartao": null,
@@ -449,7 +565,7 @@
     "recorrentes": [
       {
         "descricao": "Aposentadoria",
-        "valor_mensal": 0.00,
+        "valor_mensal": 0.0,
         "pessoa": null,
         "data_inicio": "2026-01-01",
         "notas": ""
@@ -458,7 +574,7 @@
     "avulsas": [
       {
         "descricao": "_DESCRICAO_",
-        "valor": 0.00,
+        "valor": 0.0,
         "data": "2026-03-01",
         "pessoa": null,
         "predio_street_number": null,
@@ -476,7 +592,7 @@
         "predio_street_number": 836,
         "apartamento_number": 101,
         "mes_referencia": "2026-03-01",
-        "valor_pago": 0.00,
+        "valor_pago": 0.0,
         "data_pagamento": "2026-03-05",
         "notas": ""
       }
@@ -487,15 +603,15 @@
     "_instrucoes": "Registro mensal do pagamento da funcionária. rent_offset é informativo (não sai do caixa).",
     "items": [
       {
-        "pessoa": "_NOME_FUNCIONARIA_",
+        "pessoa": "Rosa",
         "mes_referencia": "2026-03-01",
-        "salario_base": 0.00,
+        "salario_base": 800.00,
         "valor_variavel": 0.00,
         "rent_offset": 0.00,
         "qtd_faxinas": 0,
         "pago": true,
         "data_pagamento": "2026-03-05",
-        "notas": ""
+        "notas": "Salário fixo R$800 + variável por serviços extras (faxinas, etc). rent_offset = valor do aluguel do kitnet 206/850 (informativo, não sai do caixa)."
       }
     ]
   }

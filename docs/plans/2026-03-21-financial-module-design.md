@@ -25,17 +25,19 @@ O sistema atual gerencia prédios, apartamentos, inquilinos e contratos, mas nã
 
 | Pessoa | Relação | Proprietário | Recebe |
 |--------|---------|-------------|--------|
-| Rodrigo | Filho | Não | Estipêndio fixo R$1.000 + reembolso cartões/empréstimos |
+| Rodrigo | Filho | Não | Estipêndio fixo R$1.100 + reembolso cartões/empréstimos |
 | Tiago | Filho | Kitnets 101, 103 (prédio 836) | Aluguel dos kitnets + reembolso cartões/empréstimos |
 | Alvaro | Genro | Kitnets 200, 203 (prédio 836) | Aluguel dos kitnets + reembolso cartões/empréstimos |
-| Junior | Filho | Não | Estipêndio fixo R$1.000 + reembolso cartões/empréstimos |
+| Junior | Filho | Não | Estipêndio fixo R$1.100 + reembolso cartões/empréstimos |
+| Rosa | Funcionária | Não | R$800 fixo + variável por serviços extras. Mora no kitnet 206/850 (aluguel compensado) |
 
 ### 2.2 Receitas (Entradas)
 
 - **Aluguel**: Apenas apartamentos sem `owner` (pertencentes aos sogros) contam como receita do condomínio
 - **Apartamentos com owner**: O aluguel é repassado ao proprietário — não é receita do condomínio, é uma obrigação de saída
-- **Aluguel pré-pago**: Kitnet 113/836 pago até março/2027 — não gera receita mensal durante o período (dinheiro já foi recebido e gasto)
-- **Aluguel como salário**: Kitnet 206/850 — a inquilina é funcionária, o aluguel é compensado no salário, nunca conta como entrada
+- **Aluguel pré-pago**: Kitnet 113/836 — inquilina pagou R$20.700 em 23/04/2025 (18x R$1.150). Mudou para kitnet de R$1.300 em jan/2026. Crédito recalculado: 9 meses a R$1.150 + 8 meses a R$1.300. Pago até 29/09/2026. Não gera receita mensal durante o período (dinheiro já foi recebido e gasto)
+- **Aluguel como salário**: Kitnet 206/850 — Rosa (funcionária), o aluguel é compensado no salário, nunca conta como entrada
+- **Sistema "pagar para morar"**: Todos os aluguéis seguem o sistema onde o inquilino paga no dia X para morar do dia X até o dia X do mês seguinte (ex: paga dia 10/fev = período 10/fev a 10/mar)
 - **Receitas extras**: Aposentadoria, valores avulsos de outras fontes — registradas manualmente
 
 ### 2.3 Despesas (Saídas)
@@ -70,11 +72,11 @@ O sistema atual gerencia prédios, apartamentos, inquilinos e contratos, mas nã
 #### Gastos Únicos
 - Manutenções, compras, consertos — aparecem só no mês em que ocorrem
 
-#### Funcionária
+#### Funcionária (Rosa)
 - Mora no kitnet 206/850 (aluguel compensado — não entra nem sai do caixa)
 - Recebe salário com 3 componentes:
-  - Valor fixo mensal
-  - Valor variável por faxinas realizadas no mês
+  - Valor fixo mensal: R$800
+  - Valor variável por serviços extras realizados no mês (faxinas em kitnets desocupados, etc.)
   - Compensação do aluguel (informativo, sem movimentação de caixa)
 
 ### 2.4 Fluxo de Caixa
@@ -83,7 +85,7 @@ O sistema atual gerencia prédios, apartamentos, inquilinos e contratos, mas nã
 ```
 Receita bruta (aluguéis dos kitnets dos sogros + receitas extras)
 - Repasses aos proprietários (aluguéis dos kitnets com owner)
-- Estipêndios fixos (Rodrigo R$1.000, Junior R$1.000)
+- Estipêndios fixos (Rodrigo R$1.100, Junior R$1.100)
 - Total parcelas de cartões (todas as pessoas)
 - Total parcelas de empréstimos (bancários + pessoais)
 - Contas de consumo (água + luz de todos os prédios)

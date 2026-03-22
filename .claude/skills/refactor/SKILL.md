@@ -1,9 +1,12 @@
 ---
 name: refactor
 description: Safe refactoring with tests as safety net
+argument-hint: "[what-to-refactor]"
 ---
 
 # Refactor Workflow
+
+Current branch: !`git branch --show-current`
 
 ## 1. Pre-check
 - Run ALL tests first: `python -m pytest && cd frontend && npm run test:unit`
@@ -41,6 +44,6 @@ description: Safe refactoring with tests as safety net
 4. Run full lint + type-check
 
 ## 5. Verify
-- Run full test suite
-- Run lint: `pre-commit run --all-files` + `cd frontend && npm run lint && npm run type-check`
+- Run lint: `ruff check && ruff format --check && cd frontend && npm run lint && npm run type-check`
+- Run tests: `python -m pytest && cd frontend && npm run test:unit`
 - Commit: `refactor(scope): description`

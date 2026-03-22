@@ -63,9 +63,11 @@ Calcula receitas do mês:
 **Lógica para receitas de aluguel:**
 1. Buscar todos os leases ativos
 2. Excluir leases cujo `apartment.owner` não é null (aluguel vai para o proprietário, não para o condomínio)
-3. Excluir leases com `prepaid_until >= date(year, month, 1)` (já pago)
-4. Excluir leases com `is_salary_offset=True` (compensado no salário)
+3. Excluir leases com `prepaid_until >= date(year, month, 1)` (já pago — ex: kitnet 113/836 pago até 29/09/2026)
+4. Excluir leases com `is_salary_offset=True` (compensado no salário — ex: kitnet 206/850, funcionária Rosa)
 5. Para cada lease restante, verificar se existe `RentPayment` para aquele `reference_month`
+
+**Nota**: O sistema de aluguel é "pagar para morar" — o inquilino paga no dia X para morar do dia X ao dia X do mês seguinte. O `reference_month` no RentPayment representa o mês em que o pagamento foi feito (ex: 2026-03-01 = pagamento feito em março).
 
 **Método 2: `get_monthly_expenses(year: int, month: int) -> dict`**
 

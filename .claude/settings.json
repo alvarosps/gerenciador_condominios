@@ -1,4 +1,8 @@
 {
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
+    "DJANGO_SETTINGS_MODULE": "condominios_manager.settings"
+  },
   "permissions": {
     "allow": [
       "Bash(python manage.py runserver:*)",
@@ -8,6 +12,10 @@
       "Bash(python manage.py shell:*)",
       "Bash(python -m pytest:*)",
       "Bash(pre-commit run:*)",
+      "Bash(ruff:*)",
+      "Bash(ruff check:*)",
+      "Bash(ruff format:*)",
+      "Bash(mypy:*)",
       "Bash(cd frontend && npm run dev:*)",
       "Bash(cd frontend && npm run build:*)",
       "Bash(cd frontend && npm run lint:*)",
@@ -33,6 +41,7 @@
       "Bash(git rebase:*)",
       "Bash(git fetch:*)",
       "Bash(git remote -v:*)",
+      "Bash(git worktree:*)",
       "Bash(docker-compose up:*)",
       "Bash(docker-compose down:*)",
       "Bash(docker-compose logs:*)",

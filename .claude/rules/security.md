@@ -5,6 +5,12 @@
 - Token blacklisting on logout via `rest_framework_simplejwt.token_blacklist`
 - Never log tokens, passwords, or secrets
 
+## Authorization
+- Financial module: `FinancialReadOnly` permission — authenticated users can read, only is_staff can write
+- Existing CRUD: `IsAuthenticatedOrReadOnly`, `IsAdminUser`, `IsOwnerOrAdmin`, `IsTenantOrAdmin`
+- Permission classes defined in `core/permissions.py` — always use these, never inline permission checks
+- Frontend must hide create/edit/delete UI for non-admin users (conditional rendering based on user.is_staff)
+
 ## Data Validation
 - CPF/CNPJ validation is mandatory — use validators from `core/validators/`
 - Always validate user input at serializer level
