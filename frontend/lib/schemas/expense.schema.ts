@@ -25,6 +25,7 @@ export const expenseSchema = z.object({
   is_installment: z.boolean().default(false),
   total_installments: z.number().nullable().optional(),
   is_debt_installment: z.boolean().default(false),
+  is_offset: z.boolean().default(false),
   is_recurring: z.boolean().default(false),
   expected_monthly_amount: z
     .string()

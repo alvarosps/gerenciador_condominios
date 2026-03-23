@@ -3,7 +3,7 @@
 **Feature**: Módulo Financeiro Completo
 **Design Doc**: `docs/plans/2026-03-21-financial-module-design.md`
 **Total de Sessões**: 20
-**Sessão Atual**: 16 (concluída) — sessões 17-20 pendentes (frontend fixes + novas funcionalidades)
+**Sessão Atual**: 17 (concluída) — sessões 18-20 pendentes (frontend pages + novas funcionalidades)
 
 ---
 
@@ -27,12 +27,28 @@
 | 14 | Frontend: Simulador | concluída | 6 componentes (scenario-builder, scenario-card, comparison-chart, comparison-table, impact-summary, page), useSimulation interfaces corrigidas para match backend, MSW handler atualizado, type-check + build + lint clean |
 | 15 | Permissões + E2E Tests + Polish | concluída | FinancialReadOnly permission, IsAuthenticated para Dashboard/CashFlow, is_staff no frontend, conditional UI em 7 páginas, export Excel (despesas/receitas/pagamentos), 6 E2E tests + 3 simulation tests, type-check + lint + build clean |
 | 16 | Backend: Correções críticas + gaps | concluída | except syntax fix (ObjectDoesNotExist), end_date Expense + migration 0016, is_offset filtering em 4 queries, fixed_total em person_summary, 11 testes regressão |
-| 17 | Frontend: Schemas/hooks/interfaces fixes | pendente | PersonPayment schema+hook, PersonIncome hook, fix CashFlowMonth+PersonSummary interfaces, is_offset em expense schema (6 gaps) |
+| 17 | Frontend: Schemas/hooks/interfaces fixes | concluída | PersonPayment schema+hook, PersonIncome hook, CashFlowMonth+PersonSummary interfaces corrigidas, is_offset em expense schema+form+mocks, MSW handlers |
 | 18 | Frontend: PersonPayments page + is_offset toggle | pendente | Página controle pagamentos a pessoas, PersonSummaryCards atualizado, toggle is_offset (3 gaps) |
 | 19 | Frontend: Controle Diário | pendente | DailyControlService + página com timeline, gráfico saldo diário, mark-paid inline |
 | 20 | Frontend: PersonIncome page + E2E + Polish | pendente | CRUD PersonIncome, 11 testes E2E, verificações finais |
 
 ---
+
+### Sessão 17 — Arquivos Criados
+- `frontend/lib/schemas/person-payment.schema.ts` — PersonPayment schema + type
+- `frontend/lib/api/hooks/use-person-payments.ts` — CRUD hooks (4) + PersonPaymentFilters
+- `frontend/lib/api/hooks/use-person-incomes.ts` — CRUD hooks (4) + PersonIncomeFilters
+- `frontend/tests/mocks/data/person-payments.ts` — mock data + factory
+
+### Sessão 17 — Arquivos Modificados
+- `frontend/lib/schemas/expense.schema.ts` — adicionado `is_offset`
+- `frontend/lib/api/hooks/use-cash-flow.ts` — CashFlowMonth interface corrigida (income/expenses/balance nested), PersonSummary corrigida (receives, card_total, loan_total, offset_total, fixed_total, net_amount, total_paid, pending_balance)
+- `frontend/tests/mocks/handlers.ts` — handlers person-payments + person-incomes, cash-flow/monthly + person_summary atualizados para novas interfaces
+- `frontend/tests/mocks/data/index.ts` — exporta person-payments
+- `frontend/tests/mocks/data/expenses.ts` — is_offset adicionado em mock data
+- `frontend/lib/api/hooks/__tests__/use-cash-flow.test.tsx` — assertions atualizadas para nova CashFlowMonth
+- `frontend/lib/api/hooks/__tests__/use-expenses.test.tsx` — is_offset no create mutation test
+- `frontend/app/(dashboard)/financial/expenses/_components/expense-form-modal.tsx` — is_offset no form schema, defaultValues e reset
 
 ### Sessão 16 — Arquivos Criados
 - `tests/unit/test_financial/test_gap_fixes.py` — 11 testes de regressão (4 classes)

@@ -39,6 +39,7 @@ describe('useExpenses', () => {
       expense_date: '2026-03-22',
       is_installment: false,
       is_debt_installment: false,
+      is_offset: false,
       is_recurring: false,
       expected_monthly_amount: null,
       is_paid: false,

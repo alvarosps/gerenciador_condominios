@@ -9,3 +9,4 @@ export * from './tenants';
 export * from './leases';
 export * from './persons';
 export * from './expenses';
+export * from './person-payments';
