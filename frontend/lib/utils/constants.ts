@@ -43,6 +43,7 @@ export const ROUTES = {
   FINANCIAL_INCOMES: '/financial/incomes',
   FINANCIAL_RENT_PAYMENTS: '/financial/rent-payments',
   FINANCIAL_PERSONS: '/financial/persons',
+  FINANCIAL_PERSON_PAYMENTS: '/financial/person-payments',
   FINANCIAL_EMPLOYEES: '/financial/employees',
   FINANCIAL_CATEGORIES: '/financial/categories',
   FINANCIAL_SIMULATOR: '/financial/simulator',
