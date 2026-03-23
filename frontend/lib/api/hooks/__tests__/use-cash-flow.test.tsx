@@ -18,9 +18,9 @@ describe('useMonthlyCashFlow', () => {
 
     expect(result.current.data?.year).toBe(2026);
     expect(result.current.data?.month).toBe(3);
-    expect(result.current.data?.total_income).toBeDefined();
-    expect(result.current.data?.total_expenses).toBeDefined();
-    expect(result.current.data?.net_cash_flow).toBeDefined();
+    expect(result.current.data?.income.total).toBe(12000.0);
+    expect(result.current.data?.expenses.total).toBe(5200.0);
+    expect(result.current.data?.balance).toBe(6800.0);
   });
 });
 

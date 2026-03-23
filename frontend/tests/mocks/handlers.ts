@@ -14,6 +14,7 @@ import {
   mockLeases,
   mockPersons,
   mockExpenses,
+  mockPersonPayments,
   createMockBuilding,
   createMockFurniture,
   createMockApartment,
@@ -21,6 +22,7 @@ import {
   createMockLease,
   createMockPerson,
   createMockExpense,
+  createMockPersonPayment,
 } from './data';
 
 const API_BASE = 'http://localhost:8000/api';
@@ -33,6 +35,7 @@ let tenants = [...mockTenants];
 let leases = [...mockLeases];
 let persons = [...mockPersons];
 let expenses = [...mockExpenses];
+let personPayments = [...mockPersonPayments];
 
 // Helper to reset data between tests
 export function resetMockData() {
@@ -43,6 +46,7 @@ export function resetMockData() {
   leases = [...mockLeases];
   persons = [...mockPersons];
   expenses = [...mockExpenses];
+  personPayments = [...mockPersonPayments];
 }
 
 /**
@@ -755,13 +759,29 @@ const cashFlowHandlers = [
     return HttpResponse.json({
       year: 2026,
       month: 3,
-      total_income: 12000.0,
-      total_expenses: 5200.0,
-      net_cash_flow: 6800.0,
-      opening_balance: 10000.0,
-      closing_balance: 16800.0,
-      income_items: [],
-      expense_items: [],
+      income: {
+        rent_income: 10000.0,
+        rent_details: [
+          { apartment_id: 1, apartment_number: '101', building_name: '836', tenant_name: 'João Silva', rental_value: 1300.0, is_paid: true, payment_date: '2026-03-05' },
+        ],
+        extra_income: 2000.0,
+        extra_income_details: [],
+        total: 12000.0,
+      },
+      expenses: {
+        owner_repayments: 0,
+        person_stipends: 1100.0,
+        card_installments: 1500.0,
+        loan_installments: 500.0,
+        utility_bills: 300.0,
+        debt_installments: 0,
+        property_tax: 200.0,
+        employee_salary: 800.0,
+        fixed_expenses: 500.0,
+        one_time_expenses: 300.0,
+        total: 5200.0,
+      },
+      balance: 6800.0,
     });
   }),
 
@@ -779,11 +799,20 @@ const cashFlowHandlers = [
     return HttpResponse.json({
       person_id: 1,
       person_name: 'Rodrigo Souza',
-      year: 2026,
-      month: 3,
-      total_income: 1100.0,
-      total_expenses: 450.0,
-      net: 650.0,
+      receives: 1100.0,
+      receives_details: [{ description: 'Estipêndio fixo', amount: 1100.0, source: 'fixed_stipend' }],
+      card_total: 300.0,
+      card_details: [{ description: 'Supermercado', card_name: 'Trigg', installment: '2/3', amount: 150.0, due_date: '2026-03-10' }],
+      loan_total: 0,
+      loan_details: [],
+      offset_total: 100.0,
+      offset_details: [{ description: 'Presente sogra', installment: '1/2', amount: 100.0, due_date: '2026-03-15' }],
+      fixed_total: 0,
+      fixed_details: [],
+      net_amount: 900.0,
+      total_paid: 500.0,
+      payment_details: [{ amount: 500.0, payment_date: '2026-03-01', notes: 'Pagamento parcial' }],
+      pending_balance: 400.0,
     });
   }),
 
@@ -858,6 +887,92 @@ const employeePaymentHandlers = [
 ];
 
 /**
+ * Person payment handlers
+ */
+const personPaymentHandlers = [
+  http.get(`${API_BASE}/person-payments/`, async () => {
+    await delay(50);
+    return HttpResponse.json(personPayments);
+  }),
+
+  http.post(`${API_BASE}/person-payments/`, async ({ request }) => {
+    await delay(100);
+    const data = (await request.json()) as Record<string, unknown>;
+    const newPayment = createMockPersonPayment({ ...data, id: personPayments.length + 1 } as Partial<(typeof personPayments)[0]>);
+    personPayments.push(newPayment);
+    return HttpResponse.json(newPayment, { status: 201 });
+  }),
+
+  http.put(`${API_BASE}/person-payments/:id/`, async ({ params, request }) => {
+    await delay(100);
+    const id = Number(params.id);
+    const data = (await request.json()) as (typeof personPayments)[0];
+    const index = personPayments.findIndex((p) => p.id === id);
+    if (index === -1) {
+      return new HttpResponse(null, { status: 404 });
+    }
+    personPayments[index] = { ...personPayments[index], ...data };
+    return HttpResponse.json(personPayments[index]);
+  }),
+
+  http.delete(`${API_BASE}/person-payments/:id/`, async ({ params }) => {
+    await delay(100);
+    const id = Number(params.id);
+    const index = personPayments.findIndex((p) => p.id === id);
+    if (index === -1) {
+      return new HttpResponse(null, { status: 404 });
+    }
+    personPayments.splice(index, 1);
+    return new HttpResponse(null, { status: 204 });
+  }),
+];
+
+/**
+ * Person income handlers
+ */
+const personIncomeHandlers = [
+  http.get(`${API_BASE}/person-incomes/`, async () => {
+    await delay(50);
+    return HttpResponse.json([
+      {
+        id: 1,
+        person: { id: 1, name: 'Rodrigo Souza' },
+        person_id: 1,
+        income_type: 'fixed_stipend',
+        apartment: null,
+        apartment_id: null,
+        fixed_amount: 1100.0,
+        start_date: '2026-01-01',
+        end_date: null,
+        is_active: true,
+        notes: 'Estipêndio mensal',
+        current_value: 1100.0,
+        created_at: '2026-01-01T10:00:00Z',
+        updated_at: '2026-01-01T10:00:00Z',
+      },
+    ]);
+  }),
+
+  http.post(`${API_BASE}/person-incomes/`, async ({ request }) => {
+    await delay(100);
+    const data = (await request.json()) as Record<string, unknown>;
+    return HttpResponse.json({ id: 10, ...data }, { status: 201 });
+  }),
+
+  http.put(`${API_BASE}/person-incomes/:id/`, async ({ params, request }) => {
+    await delay(100);
+    const id = Number(params.id);
+    const data = (await request.json()) as Record<string, unknown>;
+    return HttpResponse.json({ id, ...data });
+  }),
+
+  http.delete(`${API_BASE}/person-incomes/:id/`, async () => {
+    await delay(100);
+    return new HttpResponse(null, { status: 204 });
+  }),
+];
+
+/**
  * All handlers combined
  */
 export const handlers = [
@@ -875,4 +990,6 @@ export const handlers = [
   ...cashFlowHandlers,
   ...incomeHandlers,
   ...employeePaymentHandlers,
+  ...personPaymentHandlers,
+  ...personIncomeHandlers,
 ];
