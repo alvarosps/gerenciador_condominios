@@ -9,7 +9,11 @@ for better separation of concerns:
 - rule_views: Contract rule management endpoints
 """
 
-from .financial_dashboard_views import CashFlowViewSet, FinancialDashboardViewSet
+from .financial_dashboard_views import (
+    CashFlowViewSet,
+    DailyControlViewSet,
+    FinancialDashboardViewSet,
+)
 from .financial_views import (
     CreditCardViewSet,
     EmployeePaymentViewSet,
@@ -32,6 +36,7 @@ __all__ = [
     "ContractRuleViewSet",
     "ContractTemplateViewSet",
     "CreditCardViewSet",
+    "DailyControlViewSet",
     "EmployeePaymentViewSet",
     "ExpenseCategoryViewSet",
     "ExpenseInstallmentViewSet",

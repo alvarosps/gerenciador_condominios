@@ -855,7 +855,7 @@
         "total_parcelas": 1,
         "data_compra": "2026-03-18",
         "data_proxima_parcela": null,
-        "categoria": "Pessoal",
+        "categoria": "Kitnets",
         "notas": ""
       },
       {
@@ -920,7 +920,7 @@
         "total_parcelas": 5,
         "data_compra": "2026-01-06",
         "data_proxima_parcela": "2026-03-03",
-        "categoria": null,
+        "categoria": "Kitnets",
         "notas": ""
       },
       {
@@ -932,7 +932,7 @@
         "total_parcelas": 3,
         "data_compra": "2026-01-06",
         "data_proxima_parcela": "2026-03-03",
-        "categoria": null,
+        "categoria": "Kitnets",
         "notas": ""
       },
       {
@@ -968,7 +968,7 @@
         "total_parcelas": 3,
         "data_compra": "2026-01-08",
         "data_proxima_parcela": "2026-03-03",
-        "categoria": null,
+        "categoria": "Pessoal",
         "notas": ""
       },
       {
@@ -1004,7 +1004,7 @@
         "total_parcelas": 3,
         "data_compra": "2026-02-13",
         "data_proxima_parcela": "2026-03-03",
-        "categoria": null,
+        "categoria": "Camila",
         "notas": ""
       },
 
@@ -1018,7 +1018,7 @@
         "total_parcelas": 1,
         "data_compra": "2026-02-13",
         "data_proxima_parcela": null,
-        "categoria": null,
+        "categoria": "Camila",
         "notas": ""
       },
       {
@@ -1030,7 +1030,7 @@
         "total_parcelas": 1,
         "data_compra": "2026-02-13",
         "data_proxima_parcela": null,
-        "categoria": null,
+        "categoria": "Camila",
         "notas": ""
       },
 
@@ -1063,7 +1063,7 @@
         "total_parcelas": 5,
         "data_compra": "2026-03-03",
         "data_proxima_parcela": "2026-04-03",
-        "categoria": null,
+        "categoria": "Kitnets",
         "notas": ""
       },
       {
@@ -1111,7 +1111,7 @@
         "total_parcelas": 3,
         "data_compra": "2026-03-20",
         "data_proxima_parcela": "2026-04-03",
-        "categoria": "Pessoal",
+        "categoria": "Camila",
         "notas": ""
       },
 
@@ -1125,7 +1125,7 @@
         "total_parcelas": 1,
         "data_compra": "2026-02-28",
         "data_proxima_parcela": null,
-        "categoria": "Pessoal",
+        "categoria": "Camila",
         "notas": ""
       },
       {
@@ -1137,7 +1137,7 @@
         "total_parcelas": 1,
         "data_compra": "2026-03-02",
         "data_proxima_parcela": null,
-        "categoria": "Pessoal",
+        "categoria": "Camila",
         "notas": ""
       },
       {
@@ -1492,7 +1492,7 @@
         "total_parcelas": 1,
         "data_compra": "2026-03-09",
         "data_proxima_parcela": null,
-        "categoria": "Pessoal",
+        "categoria": "Camila",
         "notas": ""
       },
       {
@@ -1528,7 +1528,7 @@
         "total_parcelas": 1,
         "data_compra": "2026-03-13",
         "data_proxima_parcela": null,
-        "categoria": "Pessoal",
+        "categoria": "Kitnets",
         "notas": ""
       },
       {
