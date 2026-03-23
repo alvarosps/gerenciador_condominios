@@ -124,6 +124,8 @@ const PERSON_OPTIONAL_TYPES = ['one_time_expense', 'fixed_expense'];
 const BUILDING_REQUIRED_TYPES = ['water_bill', 'electricity_bill', 'property_tax'];
 // Types that show building as optional
 const BUILDING_OPTIONAL_TYPES = ['fixed_expense', 'one_time_expense'];
+// Types that show is_offset toggle (desconto)
+const OFFSET_TYPES = ['card_purchase', 'bank_loan', 'personal_loan'];
 // Types that show installment fields
 const INSTALLMENT_TYPES = ['card_purchase', 'bank_loan', 'personal_loan'];
 // Types that show debt_installment toggle (utility bills)
@@ -241,6 +243,7 @@ export function ExpenseFormModal({ open, expense, onClose }: Props) {
   const showBuildingField = BUILDING_REQUIRED_TYPES.includes(watchedType) || BUILDING_OPTIONAL_TYPES.includes(watchedType);
   const showInstallmentFields = INSTALLMENT_TYPES.includes(watchedType);
   const showDebtInstallmentToggle = DEBT_INSTALLMENT_TYPES.includes(watchedType);
+  const showOffsetToggle = OFFSET_TYPES.includes(watchedType);
   const showBankFields = watchedType === 'bank_loan';
   const showFixedExpenseFields = watchedType === 'fixed_expense';
   const isEmployeeSalary = watchedType === 'employee_salary';
@@ -487,6 +490,31 @@ export function ExpenseFormModal({ open, expense, onClose }: Props) {
                       </FormItem>
                     )}
                   />
+                )}
+
+                {/* Offset toggle */}
+                {showOffsetToggle && (
+                  <div className="space-y-2 rounded-md border p-4">
+                    <FormField
+                      control={form.control}
+                      name="is_offset"
+                      render={({ field }) => (
+                        <FormItem className="flex items-center justify-between">
+                          <div>
+                            <FormLabel>Desconto (compra para os sogros/Camila)</FormLabel>
+                            {field.value && (
+                              <FormDescription>
+                                Este valor será subtraído do total da pessoa
+                              </FormDescription>
+                            )}
+                          </div>
+                          <FormControl>
+                            <Switch checked={field.value} onCheckedChange={field.onChange} />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
                 )}
 
                 {/* Building field */}

@@ -43,6 +43,7 @@ export function Sidebar() {
     { key: ROUTES.FINANCIAL_INCOMES, label: 'Receitas' },
     { key: ROUTES.FINANCIAL_RENT_PAYMENTS, label: 'Pgto. Aluguel' },
     { key: ROUTES.FINANCIAL_PERSONS, label: 'Pessoas' },
+    { key: ROUTES.FINANCIAL_PERSON_PAYMENTS, label: 'Pgto. Pessoas' },
     { key: ROUTES.FINANCIAL_EMPLOYEES, label: 'Funcionários' },
     { key: ROUTES.FINANCIAL_CATEGORIES, label: 'Categorias' },
     { key: ROUTES.FINANCIAL_SIMULATOR, label: 'Simulador' },

@@ -3,7 +3,7 @@
 **Feature**: Módulo Financeiro Completo
 **Design Doc**: `docs/plans/2026-03-21-financial-module-design.md`
 **Total de Sessões**: 20
-**Sessão Atual**: 17 (concluída) — sessões 18-20 pendentes (frontend pages + novas funcionalidades)
+**Sessão Atual**: 18 (concluída) — sessões 19-20 pendentes (frontend pages + novas funcionalidades)
 
 ---
 
@@ -28,7 +28,7 @@
 | 15 | Permissões + E2E Tests + Polish | concluída | FinancialReadOnly permission, IsAuthenticated para Dashboard/CashFlow, is_staff no frontend, conditional UI em 7 páginas, export Excel (despesas/receitas/pagamentos), 6 E2E tests + 3 simulation tests, type-check + lint + build clean |
 | 16 | Backend: Correções críticas + gaps | concluída | except syntax fix (ObjectDoesNotExist), end_date Expense + migration 0016, is_offset filtering em 4 queries, fixed_total em person_summary, 11 testes regressão |
 | 17 | Frontend: Schemas/hooks/interfaces fixes | concluída | PersonPayment schema+hook, PersonIncome hook, CashFlowMonth+PersonSummary interfaces corrigidas, is_offset em expense schema+form+mocks, MSW handlers |
-| 18 | Frontend: PersonPayments page + is_offset toggle | pendente | Página controle pagamentos a pessoas, PersonSummaryCards atualizado, toggle is_offset (3 gaps) |
+| 18 | Frontend: PersonPayments page + is_offset toggle | concluída | Página pagamentos a pessoas (summary cards + tabela), PersonMonthSummary reutilizável, PersonSummaryCards atualizado com usePersonSummary, is_offset toggle, form modal, type-check + build + lint clean |
 | 19 | Frontend: Controle Diário | pendente | DailyControlService + página com timeline, gráfico saldo diário, mark-paid inline |
 | 20 | Frontend: PersonIncome page + E2E + Polish | pendente | CRUD PersonIncome, 11 testes E2E, verificações finais |
 
@@ -49,6 +49,17 @@
 - `frontend/lib/api/hooks/__tests__/use-cash-flow.test.tsx` — assertions atualizadas para nova CashFlowMonth
 - `frontend/lib/api/hooks/__tests__/use-expenses.test.tsx` — is_offset no create mutation test
 - `frontend/app/(dashboard)/financial/expenses/_components/expense-form-modal.tsx` — is_offset no form schema, defaultValues e reset
+
+### Sessão 18 — Arquivos Criados
+- `frontend/app/(dashboard)/financial/person-payments/page.tsx` — Página com resumo mensal por pessoa + tabela histórico pagamentos
+- `frontend/app/(dashboard)/financial/person-payments/_components/person-payment-form-modal.tsx` — Form modal create/edit pagamento
+- `frontend/app/(dashboard)/financial/_components/person-month-summary.tsx` — Componente reutilizável breakdown completo pessoa/mês
+
+### Sessão 18 — Arquivos Modificados
+- `frontend/app/(dashboard)/financial/_components/person-summary-cards.tsx` — Reescrito para usar usePersonSummary (antes usava useDebtByPerson)
+- `frontend/app/(dashboard)/financial/expenses/_components/expense-form-modal.tsx` — Toggle is_offset para card_purchase/bank_loan/personal_loan
+- `frontend/lib/utils/constants.ts` — FINANCIAL_PERSON_PAYMENTS rota adicionada
+- `frontend/components/layouts/sidebar.tsx` — Link "Pgto. Pessoas" no submenu financeiro
 
 ### Sessão 16 — Arquivos Criados
 - `tests/unit/test_financial/test_gap_fixes.py` — 11 testes de regressão (4 classes)
@@ -170,6 +181,10 @@
 - `frontend/app/(dashboard)/financial/simulator/_components/comparison-chart.tsx` — ComposedChart com linhas base vs simulado + área delta
 - `frontend/app/(dashboard)/financial/simulator/_components/comparison-table.tsx` — Tabela mês a mês com deltas coloridos e total no rodapé
 - `frontend/app/(dashboard)/financial/simulator/_components/impact-summary.tsx` — Card resumo (impacto total, mês equilíbrio, saldos finais)
+
+- `frontend/app/(dashboard)/financial/person-payments/page.tsx` — Página pagamentos a pessoas (summary cards + tabela histórico)
+- `frontend/app/(dashboard)/financial/person-payments/_components/person-payment-form-modal.tsx` — Form modal create/edit pagamento a pessoa
+- `frontend/app/(dashboard)/financial/_components/person-month-summary.tsx` — Componente reutilizável breakdown completo pessoa/mês
 
 ## Arquivos Modificados
 
