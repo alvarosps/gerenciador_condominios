@@ -1,7 +1,8 @@
-"""Financial dashboard and cash flow ViewSets — read-only endpoints for aggregated metrics."""
+"""Financial dashboard, cash flow, and daily control ViewSets."""
 
 from datetime import date
 
+from django.core.exceptions import ObjectDoesNotExist
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
@@ -10,6 +11,7 @@ from rest_framework.response import Response
 
 from core.models import Person
 from core.services.cash_flow_service import MONTHS_IN_YEAR, CashFlowService
+from core.services.daily_control_service import DailyControlService
 from core.services.financial_dashboard_service import FinancialDashboardService
 from core.services.simulation_service import SimulationService
 
@@ -184,3 +186,94 @@ class CashFlowViewSet(viewsets.ViewSet):
             {"base": base, "simulated": simulated, "comparison": comparison},
             status=status.HTTP_200_OK,
         )
+
+
+class DailyControlViewSet(viewsets.ViewSet):
+    """ViewSet for daily financial control — breakdown, summary, and mark-paid."""
+
+    permission_classes = [IsAuthenticated]
+
+    @action(detail=False, methods=["get"])
+    def breakdown(self, request: Request) -> Response:
+        today = date.today()
+        try:
+            year = int(request.query_params.get("year", today.year))
+            month = int(request.query_params.get("month", today.month))
+        except ValueError:
+            return Response(
+                {"error": "Os parâmetros 'year' e 'month' devem ser inteiros válidos."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not (1 <= month <= MONTHS_IN_YEAR):
+            return Response(
+                {"error": "O parâmetro 'month' deve estar entre 1 e 12."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        result = DailyControlService.get_daily_breakdown(year, month)
+        return Response(result, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["get"])
+    def summary(self, request: Request) -> Response:
+        today = date.today()
+        try:
+            year = int(request.query_params.get("year", today.year))
+            month = int(request.query_params.get("month", today.month))
+        except ValueError:
+            return Response(
+                {"error": "Os parâmetros 'year' e 'month' devem ser inteiros válidos."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not (1 <= month <= MONTHS_IN_YEAR):
+            return Response(
+                {"error": "O parâmetro 'month' deve estar entre 1 e 12."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        result = DailyControlService.get_month_summary(year, month)
+        return Response(result, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["post"])
+    def mark_paid(self, request: Request) -> Response:
+        item_type = request.data.get("item_type")
+        item_id = request.data.get("item_id")
+        payment_date_str = request.data.get("payment_date")
+
+        if not item_type or not item_id:
+            return Response(
+                {"error": "Os campos 'item_type' e 'item_id' são obrigatórios."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not payment_date_str:
+            return Response(
+                {"error": "O campo 'payment_date' é obrigatório."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            item_id = int(item_id)
+        except (ValueError, TypeError):
+            return Response(
+                {"error": "O campo 'item_id' deve ser um inteiro."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            payment_date = date.fromisoformat(str(payment_date_str))
+        except ValueError:
+            return Response(
+                {"error": "O campo 'payment_date' deve estar no formato YYYY-MM-DD."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            result = DailyControlService.mark_item_paid(str(item_type), item_id, payment_date)
+        except ObjectDoesNotExist as e:
+            return Response({"error": str(e)}, status=status.HTTP_404_NOT_FOUND)
+        except ValueError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(result, status=status.HTTP_200_OK)

@@ -3,7 +3,7 @@
 **Feature**: Módulo Financeiro Completo
 **Design Doc**: `docs/plans/2026-03-21-financial-module-design.md`
 **Total de Sessões**: 20
-**Sessão Atual**: 18 (concluída) — sessões 19-20 pendentes (frontend pages + novas funcionalidades)
+**Sessão Atual**: 20 (concluída) — Módulo Financeiro COMPLETO
 
 ---
 
@@ -29,8 +29,8 @@
 | 16 | Backend: Correções críticas + gaps | concluída | except syntax fix (ObjectDoesNotExist), end_date Expense + migration 0016, is_offset filtering em 4 queries, fixed_total em person_summary, 11 testes regressão |
 | 17 | Frontend: Schemas/hooks/interfaces fixes | concluída | PersonPayment schema+hook, PersonIncome hook, CashFlowMonth+PersonSummary interfaces corrigidas, is_offset em expense schema+form+mocks, MSW handlers |
 | 18 | Frontend: PersonPayments page + is_offset toggle | concluída | Página pagamentos a pessoas (summary cards + tabela), PersonMonthSummary reutilizável, PersonSummaryCards atualizado com usePersonSummary, is_offset toggle, form modal, type-check + build + lint clean |
-| 19 | Frontend: Controle Diário | pendente | DailyControlService + página com timeline, gráfico saldo diário, mark-paid inline |
-| 20 | Frontend: PersonIncome page + E2E + Polish | pendente | CRUD PersonIncome, 11 testes E2E, verificações finais |
+| 19 | Frontend: Controle Diário | concluída | DailyControlService (3 métodos) + DailyControlViewSet (3 endpoints) + 16 testes passando + página com 4 widgets (summary cards, balance chart, timeline, day drawer) + filtros (tipo/status/pessoa/prédio) + mark-paid inline + type-check + build + lint clean |
+| 20 | Frontend: PersonIncome page + E2E + Polish | concluída | PersonIncome CRUD page + form modal adaptativo (rent/stipend), 5 novos E2E tests (11 total), sidebar link, polish verification, type-check + build + lint clean |
 
 ---
 
@@ -49,6 +49,32 @@
 - `frontend/lib/api/hooks/__tests__/use-cash-flow.test.tsx` — assertions atualizadas para nova CashFlowMonth
 - `frontend/lib/api/hooks/__tests__/use-expenses.test.tsx` — is_offset no create mutation test
 - `frontend/app/(dashboard)/financial/expenses/_components/expense-form-modal.tsx` — is_offset no form schema, defaultValues e reset
+
+### Sessão 20 — Arquivos Criados
+- `frontend/app/(dashboard)/financial/person-incomes/page.tsx` — CRUD PersonIncome (filtros pessoa/tipo/status, colunas adaptativas rent/stipend)
+- `frontend/app/(dashboard)/financial/person-incomes/_components/person-income-form-modal.tsx` — Form modal adaptativo (apartment_rent: select apt + lease info, fixed_stipend: input R$)
+
+### Sessão 20 — Arquivos Modificados
+- `frontend/lib/utils/constants.ts` — FINANCIAL_PERSON_INCOMES rota adicionada
+- `frontend/components/layouts/sidebar.tsx` — Link "Rendimentos" no submenu financeiro
+- `tests/e2e/test_financial_workflow.py` — 5 novos testes E2E (person_payment_flow, offset_reduces_person_total, cash_flow_projection_with_end_date, daily_control_breakdown, subcategory_expense)
+
+### Sessão 19 — Arquivos Criados
+- `core/services/daily_control_service.py` — DailyControlService com 3 métodos (breakdown, summary, mark_paid)
+- `tests/unit/test_financial/test_daily_control_service.py` — 16 testes (7 breakdown + 3 summary + 6 mark_paid)
+- `frontend/lib/api/hooks/use-daily-control.ts` — useDailyBreakdown, useDailySummary, useMarkItemPaid hooks
+- `frontend/app/(dashboard)/financial/daily/page.tsx` — Página controle diário com navegação mês, filtros, chart + timeline
+- `frontend/app/(dashboard)/financial/daily/_components/daily-summary-cards.tsx` — 4 cards (saldo, recebido, pago, vencidas)
+- `frontend/app/(dashboard)/financial/daily/_components/daily-balance-chart.tsx` — ComposedChart com barras + linha saldo acumulado
+- `frontend/app/(dashboard)/financial/daily/_components/daily-timeline.tsx` — Timeline agrupada por dia com status visual + mark-paid inline
+- `frontend/app/(dashboard)/financial/daily/_components/day-detail-drawer.tsx` — Sheet drawer detalhe do dia
+
+### Sessão 19 — Arquivos Modificados
+- `core/viewsets/financial_dashboard_views.py` — DailyControlViewSet adicionado (breakdown, summary, mark_paid endpoints)
+- `core/viewsets/__init__.py` — export DailyControlViewSet
+- `core/urls.py` — rota `daily-control` registrada
+- `frontend/lib/utils/constants.ts` — FINANCIAL_DAILY rota adicionada
+- `frontend/components/layouts/sidebar.tsx` — Link "Controle Diário" no submenu financeiro
 
 ### Sessão 18 — Arquivos Criados
 - `frontend/app/(dashboard)/financial/person-payments/page.tsx` — Página com resumo mensal por pessoa + tabela histórico pagamentos
