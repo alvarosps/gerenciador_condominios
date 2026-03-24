@@ -134,6 +134,19 @@ def invalidate_tenant_furniture_cache(sender, instance, action, **kwargs):
 
 
 @receiver(post_save, sender=Lease)
+def sync_apartment_is_rented(sender, instance, **kwargs):
+    """Sync apartment.is_rented when lease is created, updated, or soft-deleted."""
+    is_rented = not instance.is_deleted
+    Apartment.objects.filter(pk=instance.apartment_id).update(is_rented=is_rented)
+
+
+@receiver(post_delete, sender=Lease)
+def sync_apartment_is_rented_on_delete(sender, instance, **kwargs):
+    """Sync apartment.is_rented when lease is hard-deleted."""
+    Apartment.objects.filter(pk=instance.apartment_id).update(is_rented=False)
+
+
+@receiver(post_save, sender=Lease)
 def invalidate_lease_cache_on_save(sender, instance, created, **kwargs):
     """
     Invalidate Lease caches when a Lease is created or updated.
@@ -249,6 +262,7 @@ def disconnect_all_signals():
     post_save.disconnect(sender=Building)
     post_save.disconnect(sender=Apartment)
     post_save.disconnect(sender=Tenant)
+    post_save.disconnect(sync_apartment_is_rented, sender=Lease)
     post_save.disconnect(sender=Lease)
     post_save.disconnect(sender=Furniture)
     post_save.disconnect(sender=Dependent)
@@ -257,6 +271,7 @@ def disconnect_all_signals():
     post_delete.disconnect(sender=Building)
     post_delete.disconnect(sender=Apartment)
     post_delete.disconnect(sender=Tenant)
+    post_delete.disconnect(sync_apartment_is_rented_on_delete, sender=Lease)
     post_delete.disconnect(sender=Lease)
     post_delete.disconnect(sender=Furniture)
     post_delete.disconnect(sender=Dependent)

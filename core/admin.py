@@ -43,8 +43,6 @@ class LeaseAdmin(admin.ModelAdmin):
         "responsible_tenant",
         "start_date",
         "validity_months",
-        "due_day",
-        "rental_value",
         "contract_generated",
         "contract_signed",
     )
