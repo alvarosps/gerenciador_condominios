@@ -31,14 +31,16 @@ def current_user(request: Request) -> Response:
     user = request.user
     if not user.is_authenticated:
         return Response({"error": "Authentication required"}, status=401)
-    return Response({
-        "id": user.pk,
-        "email": user.email,
-        "first_name": user.first_name,
-        "last_name": user.last_name,
-        "is_staff": user.is_staff,
-        "is_superuser": user.is_superuser,
-    })
+    return Response(
+        {
+            "id": user.pk,
+            "email": user.email,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "is_staff": user.is_staff,
+            "is_superuser": user.is_superuser,
+        }
+    )
 
 
 def get_tokens_for_user(user: Any) -> dict[str, str]:
