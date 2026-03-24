@@ -10,9 +10,13 @@ Enterprise-grade logging with:
 - Windows-safe file rotation (handles permission errors)
 """
 
+import errno
+import logging
 import logging.handlers
 import sys
 from pathlib import Path
+
+_ERRNO_PERMISSION_DENIED = errno.EACCES
 
 
 class WindowsSafeRotatingFileHandler(logging.handlers.RotatingFileHandler):
@@ -23,7 +27,7 @@ class WindowsSafeRotatingFileHandler(logging.handlers.RotatingFileHandler):
     try to rotate the same log file simultaneously.
     """
 
-    def doRollover(self):
+    def doRollover(self) -> None:
         """
         Do a rollover, catching Windows permission errors.
 
@@ -35,12 +39,14 @@ class WindowsSafeRotatingFileHandler(logging.handlers.RotatingFileHandler):
             super().doRollover()
         except PermissionError:
             # File is locked by another process (common on Windows with pytest)
-            # Skip rotation this time - will try again next time
-            pass
+            logging.getLogger(__name__).debug(
+                "Log rotation skipped: file in use by another process"
+            )
         except OSError as e:
-            # Catch other OS errors during rotation
-            if e.errno == 13:  # Permission denied
-                pass
+            if e.errno == _ERRNO_PERMISSION_DENIED:
+                logging.getLogger(__name__).debug(
+                    "Log rotation skipped: permission denied (errno %d)", e.errno
+                )
             else:
                 raise
 

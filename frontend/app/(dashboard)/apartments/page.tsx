@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { SearchableSelect, SearchableSelectOption } from '@/components/ui/searchable-select';
+import { SearchableSelect, type SearchableSelectOption } from '@/components/ui/searchable-select';
 import { Input } from '@/components/ui/input';
 import {
   AlertDialog,
@@ -39,15 +39,11 @@ import {
   FileText,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { DataTable, Column } from '@/components/tables/data-table';
+import { DataTable, type Column } from '@/components/tables/data-table';
 import { ApartmentFormModal } from './_components/apartment-form-modal';
-import {
-  useApartments,
-  useDeleteApartment,
-  useUpdateApartment,
-} from '@/lib/api/hooks/use-apartments';
+import { useApartments, useDeleteApartment } from '@/lib/api/hooks/use-apartments';
 import { useBuildings } from '@/lib/api/hooks/use-buildings';
-import { Apartment } from '@/lib/schemas/apartment.schema';
+import { type Apartment } from '@/lib/schemas/apartment.schema';
 import { formatCurrency } from '@/lib/utils/formatters';
 import { apartmentExportColumns } from '@/lib/hooks/use-export';
 import { useCrudPage } from '@/lib/hooks/use-crud-page';
@@ -64,7 +60,6 @@ export default function ApartmentsPage() {
   const { data: apartments, isLoading, error } = useApartments(filters);
   const { data: buildings } = useBuildings();
   const deleteMutation = useDeleteApartment();
-  const updateMutation = useUpdateApartment();
 
   // Use the consolidated CRUD hook for all state management
   const crud = useCrudPage<Apartment>({
@@ -97,18 +92,6 @@ export default function ApartmentsPage() {
     });
   };
 
-  const handleBulkStatusChange = (isRented: boolean) => {
-    if (!apartments) return;
-    crud.bulkOps.handleBulkStatusChange(
-      apartments,
-      async (data) => {
-        await updateMutation.mutateAsync(data);
-      },
-      'is_rented',
-      isRented
-    );
-  };
-
   const columns: Column<Apartment>[] = [
     {
       title: 'Prédio',
@@ -117,10 +100,10 @@ export default function ApartmentsPage() {
       render: (_, record) => (
         <div>
           <div className="font-medium">{record.building?.name}</div>
-          <div className="text-xs text-gray-500">Nº {record.building?.street_number}</div>
+          <div className="text-xs text-muted-foreground">Nº {record.building?.street_number}</div>
         </div>
       ),
-      sorter: (a: Apartment, b: Apartment) => (a.building?.name || '').localeCompare(b.building?.name || ''),
+      sorter: (a: Apartment, b: Apartment) => (a.building?.name ?? '').localeCompare(b.building?.name ?? ''),
     },
     {
       title: 'Apto',
@@ -150,7 +133,7 @@ export default function ApartmentsPage() {
       key: 'is_rented',
       width: 120,
       render: (value) => (
-        <Badge variant={value ? 'destructive' : 'default'} className={value ? '' : 'bg-green-600'}>
+        <Badge variant={value ? 'destructive' : 'default'} className={value ? '' : 'bg-success text-success-foreground'}>
           {value ? 'Alugado' : 'Disponível'}
         </Badge>
       ),
@@ -165,7 +148,7 @@ export default function ApartmentsPage() {
       dataIndex: 'max_tenants',
       key: 'max_tenants',
       width: 100,
-      render: (value) => `Máx ${value}`,
+      render: (value) => `Máx ${String(value)}`,
     },
     {
       title: 'Móveis',
@@ -174,7 +157,7 @@ export default function ApartmentsPage() {
       render: (_, record) => (
         <div className="flex items-center gap-1">
           <Home className="h-4 w-4" />
-          <span>{record.furnitures?.length || 0}</span>
+          <span>{record.furnitures?.length ?? 0}</span>
         </div>
       ),
     },
@@ -198,7 +181,7 @@ export default function ApartmentsPage() {
             size="sm"
             onClick={() => {
               crud.setItemToDelete(record);
-              crud.handleDeleteClick(record.id!);
+              if (record.id !== undefined) crud.handleDeleteClick(record.id);
             }}
             disabled={crud.isDeleting}
           >
@@ -221,7 +204,7 @@ export default function ApartmentsPage() {
       <div className="mb-4 flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold">Apartamentos</h1>
-          <p className="text-gray-600 mt-1">
+          <p className="text-muted-foreground mt-1">
             Gerencie os apartamentos disponíveis para locação
           </p>
         </div>
@@ -237,11 +220,11 @@ export default function ApartmentsPage() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
-              <DropdownMenuItem onClick={() => crud.handleExport('excel', apartments || [])}>
+              <DropdownMenuItem onClick={() => crud.handleExport('excel', apartments ?? [])}>
                 <FileSpreadsheet className="h-4 w-4 mr-2" />
                 Exportar para Excel
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => crud.handleExport('csv', apartments || [])}>
+              <DropdownMenuItem onClick={() => crud.handleExport('csv', apartments ?? [])}>
                 <FileText className="h-4 w-4 mr-2" />
                 Exportar para CSV
               </DropdownMenuItem>
@@ -255,27 +238,13 @@ export default function ApartmentsPage() {
       </div>
 
       {crud.bulkOps.hasSelection && (
-        <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded flex justify-between items-center">
-          <span className="text-blue-700 font-medium">
+        <div className="mb-4 p-4 bg-primary/5 border border-primary/20 rounded flex justify-between items-center">
+          <span className="text-primary font-medium">
             {crud.bulkOps.selectionCount} {crud.bulkOps.selectionCount === 1 ? 'apartamento selecionado' : 'apartamentos selecionados'}
           </span>
           <div className="flex gap-2">
             <Button variant="outline" onClick={crud.bulkOps.clearSelection}>
               Cancelar Seleção
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => handleBulkStatusChange(false)}
-              disabled={updateMutation.isPending}
-            >
-              Marcar como Disponível
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => handleBulkStatusChange(true)}
-              disabled={updateMutation.isPending}
-            >
-              Marcar como Alugado
             </Button>
             <Button
               variant="destructive"
@@ -291,8 +260,8 @@ export default function ApartmentsPage() {
 
       {/* Filters */}
       <Card className="mb-4 p-4">
-        <div className="flex gap-4 flex-wrap items-end">
-          <div className="flex-1 min-w-[200px]">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div>
             <label className="block text-sm font-medium mb-2">Prédio</label>
             <SearchableSelect
               value={filters.building_id ? String(filters.building_id) : 'all'}
@@ -305,7 +274,7 @@ export default function ApartmentsPage() {
             />
           </div>
 
-          <div className="flex-1 min-w-[150px]">
+          <div>
             <label className="block text-sm font-medium mb-2">Status</label>
             <Select
               value={filters.is_rented !== undefined ? String(filters.is_rented) : undefined}
@@ -326,12 +295,12 @@ export default function ApartmentsPage() {
             </Select>
           </div>
 
-          <div className="flex-1 min-w-[150px]">
+          <div>
             <label className="block text-sm font-medium mb-2">Valor Mínimo</label>
             <Input
               type="number"
               placeholder="R$ 0"
-              value={filters.min_price || ''}
+              value={filters.min_price ?? ''}
               onChange={(e) =>
                 setFilters({
                   ...filters,
@@ -342,12 +311,12 @@ export default function ApartmentsPage() {
             />
           </div>
 
-          <div className="flex-1 min-w-[150px]">
+          <div>
             <label className="block text-sm font-medium mb-2">Valor Máximo</label>
             <Input
               type="number"
               placeholder="R$ 99999"
-              value={filters.max_price || ''}
+              value={filters.max_price ?? ''}
               onChange={(e) =>
                 setFilters({
                   ...filters,
@@ -359,9 +328,11 @@ export default function ApartmentsPage() {
           </div>
 
           {hasActiveFilters && (
-            <Button variant="outline" onClick={clearFilters}>
-              Limpar Filtros
-            </Button>
+            <div className="flex items-end">
+              <Button variant="outline" onClick={clearFilters} className="w-full">
+                Limpar Filtros
+              </Button>
+            </div>
           )}
         </div>
       </Card>

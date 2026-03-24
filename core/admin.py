@@ -30,7 +30,7 @@ class DependentInline(admin.TabularInline):
 
 @admin.register(Tenant)
 class TenantAdmin(admin.ModelAdmin):
-    list_display = ("id", "name", "cpf_cnpj", "phone", "is_company", "rent_due_day")
+    list_display = ("id", "name", "cpf_cnpj", "phone", "is_company", "due_day")
     search_fields = ("name", "cpf_cnpj")
     inlines = [DependentInline]
 
@@ -43,8 +43,6 @@ class LeaseAdmin(admin.ModelAdmin):
         "responsible_tenant",
         "start_date",
         "validity_months",
-        "due_day",
-        "rental_value",
         "contract_generated",
         "contract_signed",
     )

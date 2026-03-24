@@ -5,19 +5,16 @@ Provides a foundation for domain-specific services with generic
 database operations using Django ORM.
 """
 
-from __future__ import annotations
-
 import logging
-from typing import Generic, List, Optional, Type, TypeVar
+from typing import Any
 
+from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Model, QuerySet
-
-ModelType = TypeVar("ModelType", bound=Model)
 
 logger = logging.getLogger(__name__)
 
 
-class BaseService(Generic[ModelType]):
+class BaseService[ModelType: Model]:
     """
     Generic base service class for common CRUD operations.
 
@@ -33,7 +30,7 @@ class BaseService(Generic[ModelType]):
                 ...
     """
 
-    model: Type[ModelType]
+    model: type[ModelType]
 
     def __init__(self) -> None:
         """Initialize service with logger."""
@@ -51,9 +48,9 @@ class BaseService(Generic[ModelType]):
             >>> queryset = service.get_queryset()
             >>> active_leases = queryset.filter(contract_generated=True)
         """
-        return self.model.objects.all()
+        return self.model._default_manager.all()
 
-    def get_by_id(self, pk: int) -> Optional[ModelType]:
+    def get_by_id(self, pk: int) -> ModelType | None:
         """
         Retrieve an object by its primary key.
 
@@ -71,13 +68,14 @@ class BaseService(Generic[ModelType]):
         """
         try:
             instance = self.get_queryset().get(pk=pk)
-            self.logger.debug(f"Retrieved {self.model.__name__} with id {pk}")
-            return instance
-        except self.model.DoesNotExist:
+        except ObjectDoesNotExist:
             self.logger.warning(f"{self.model.__name__} with id {pk} not found")
             return None
+        else:
+            self.logger.debug(f"Retrieved {self.model.__name__} with id {pk}")
+            return instance
 
-    def get_all(self) -> List[ModelType]:
+    def get_all(self) -> list[ModelType]:
         """
         Get all objects.
 
@@ -93,7 +91,7 @@ class BaseService(Generic[ModelType]):
         self.logger.debug(f"Retrieved {len(instances)} {self.model.__name__} instances")
         return instances
 
-    def create(self, **kwargs) -> ModelType:
+    def create(self, **kwargs: Any) -> ModelType:
         """
         Create a new object.
 
@@ -106,9 +104,7 @@ class BaseService(Generic[ModelType]):
         Examples:
             >>> service = TenantService()
             >>> tenant = service.create(
-            ...     name="John Doe",
-            ...     cpf_cnpj="12345678901",
-            ...     phone="11999999999"
+            ...     name="John Doe", cpf_cnpj="12345678901", phone="11999999999"
             ... )
         """
         instance = self.model(**kwargs)
@@ -116,7 +112,7 @@ class BaseService(Generic[ModelType]):
         self.logger.info(f"Created {self.model.__name__} with id {instance.pk}")
         return instance
 
-    def update(self, instance: ModelType, **kwargs) -> ModelType:
+    def update(self, instance: ModelType, **kwargs: Any) -> ModelType:
         """
         Update an existing object.
 
@@ -189,7 +185,7 @@ class BaseService(Generic[ModelType]):
         self.logger.debug(f"Total {self.model.__name__} count: {count}")
         return count
 
-    def filter(self, **kwargs) -> List[ModelType]:
+    def filter(self, **kwargs: Any) -> list[ModelType]:
         """
         Filter objects by field values.
 
@@ -204,5 +200,7 @@ class BaseService(Generic[ModelType]):
             >>> active_leases = service.filter(contract_generated=True)
         """
         instances = list(self.get_queryset().filter(**kwargs))
-        self.logger.debug(f"Filtered {len(instances)} {self.model.__name__} instances with {kwargs}")
+        self.logger.debug(
+            f"Filtered {len(instances)} {self.model.__name__} instances with {kwargs}"
+        )
         return instances

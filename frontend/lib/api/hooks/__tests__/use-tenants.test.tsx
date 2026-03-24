@@ -23,7 +23,7 @@ describe('useTenants', () => {
 
       // Should have fetched tenants
       expect(result.current.data).toHaveLength(mockTenants.length);
-      expect(result.current.data?.[0].name).toBe(mockTenants[0].name);
+      expect(result.current.data?.[0]?.name).toBe(mockTenants[0]?.name);
     });
 
     it('should include individual and company tenants', async () => {
@@ -33,8 +33,8 @@ describe('useTenants', () => {
 
       await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
-      const individuals = result.current.data?.filter((t) => !t.is_company) || [];
-      const companies = result.current.data?.filter((t) => t.is_company) || [];
+      const individuals = result.current.data?.filter((t) => !t.is_company) ?? [];
+      const companies = result.current.data?.filter((t) => t.is_company) ?? [];
 
       expect(individuals.length).toBeGreaterThan(0);
       expect(companies.length).toBeGreaterThan(0);
@@ -50,10 +50,10 @@ describe('useTenants', () => {
       await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
       expect(result.current.data?.id).toBe(1);
-      expect(result.current.data?.name).toBe(mockTenants[0].name);
+      expect(result.current.data?.name).toBe(mockTenants[0]?.name);
     });
 
-    it('should not fetch when ID is null', async () => {
+    it('should not fetch when ID is null', () => {
       const { result } = renderHook(() => useTenant(null), {
         wrapper: createWrapper(),
       });
@@ -91,7 +91,6 @@ describe('useTenants', () => {
         email: 'joao.novo@email.com',
         marital_status: 'Solteiro',
         profession: 'Desenvolvedor',
-        deposit_amount: null,
         furnitures: [],
         dependents: [],
       };
@@ -116,7 +115,6 @@ describe('useTenants', () => {
         email: 'familia.silva@email.com',
         marital_status: 'Casado',
         profession: 'Contador',
-        deposit_amount: null,
         furnitures: [],
         dependents: [
           { name: 'Filho 1', phone: '(11) 91111-2222' },
@@ -138,7 +136,7 @@ describe('useTenants', () => {
 
       const updatedTenant = {
         ...mockTenants[0],
-        id: mockTenants[0].id ?? 1,
+        id: mockTenants[0]?.id ?? 1,
         name: 'Updated Tenant Name',
       };
 

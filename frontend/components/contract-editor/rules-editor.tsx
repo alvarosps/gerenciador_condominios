@@ -14,7 +14,7 @@ import {
   useDeleteContractRule,
   useReorderContractRules,
   useToggleContractRule,
-  ContractRule,
+  type ContractRule,
 } from '@/lib/api/hooks/use-contract-rules';
 import { RuleEditModal } from './rule-edit-modal';
 import { showDeleteConfirm } from '@/components/shared/confirm-dialog';
@@ -68,7 +68,9 @@ export function RulesEditor() {
       if (draggedIndex !== -1 && dragOverIndex !== -1) {
         // Create new order array
         const newRules = [...rules];
-        const [draggedItem] = newRules.splice(draggedIndex, 1);
+        const spliced = newRules.splice(draggedIndex, 1);
+        const draggedItem = spliced[0];
+        if (!draggedItem) return;
         newRules.splice(dragOverIndex, 0, draggedItem);
 
         // Send reorder request
@@ -197,9 +199,9 @@ export function RulesEditor() {
         </Button>
       </CardHeader>
       <CardContent>
-        {rules && rules.length === 0 ? (
+        {rules?.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
-            Nenhuma regra cadastrada. Clique em "Nova Regra" para adicionar.
+            Nenhuma regra cadastrada. Clique em &quot;Nova Regra&quot; para adicionar.
           </div>
         ) : (
           <div className="space-y-2">
@@ -301,7 +303,7 @@ export function RulesEditor() {
 
       {/* Edit Modal */}
       <RuleEditModal
-        open={!!editingRule}
+        open={Boolean(editingRule)}
         onOpenChange={(open) => !open && setEditingRule(null)}
         onSave={(content) => editingRule && handleUpdate(editingRule.id, content)}
         initialContent={editingRule?.content}

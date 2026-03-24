@@ -15,12 +15,10 @@ Usage:
     pdf_bytes = storage.retrieve("document.pdf")
 """
 
-from __future__ import annotations
-
 import logging
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Optional
+from typing import cast
 
 # Try to import boto3 for S3 support (optional dependency)
 try:
@@ -45,7 +43,7 @@ class IDocumentStorage(ABC):
     """
 
     @abstractmethod
-    def save(self, file_path: str, content: bytes, metadata: Optional[dict] = None) -> str:
+    def save(self, file_path: str, content: bytes, metadata: dict | None = None) -> str:
         """
         Save a document to storage.
 
@@ -60,7 +58,6 @@ class IDocumentStorage(ABC):
         Raises:
             StorageError: If save operation fails
         """
-        pass
 
     @abstractmethod
     def retrieve(self, file_path: str) -> bytes:
@@ -77,7 +74,6 @@ class IDocumentStorage(ABC):
             StorageError: If retrieve operation fails
             FileNotFoundError: If document doesn't exist
         """
-        pass
 
     @abstractmethod
     def delete(self, file_path: str) -> bool:
@@ -93,7 +89,6 @@ class IDocumentStorage(ABC):
         Raises:
             StorageError: If delete operation fails
         """
-        pass
 
     @abstractmethod
     def exists(self, file_path: str) -> bool:
@@ -106,10 +101,9 @@ class IDocumentStorage(ABC):
         Returns:
             bool: True if document exists, False otherwise
         """
-        pass
 
     @abstractmethod
-    def get_url(self, file_path: str, expiry: Optional[int] = None) -> str:
+    def get_url(self, file_path: str, expiry: int | None = None) -> str:
         """
         Get a URL to access the document.
 
@@ -123,7 +117,6 @@ class IDocumentStorage(ABC):
         Raises:
             StorageError: If URL generation fails
         """
-        pass
 
 
 class FileSystemDocumentStorage(IDocumentStorage):
@@ -152,7 +145,7 @@ class FileSystemDocumentStorage(IDocumentStorage):
         self.base_path.mkdir(parents=True, exist_ok=True)
         logger.info(f"FileSystemDocumentStorage initialized at: {self.base_path}")
 
-    def save(self, file_path: str, content: bytes, metadata: Optional[dict] = None) -> str:
+    def save(self, file_path: str, content: bytes, metadata: dict | None = None) -> str:
         """
         Save document to local filesystem.
 
@@ -167,21 +160,18 @@ class FileSystemDocumentStorage(IDocumentStorage):
         Raises:
             StorageError: If save fails
         """
+        full_path = self.base_path / file_path
+        full_path.parent.mkdir(parents=True, exist_ok=True)
+
         try:
-            full_path = self.base_path / file_path
-
-            # Create parent directories if needed
-            full_path.parent.mkdir(parents=True, exist_ok=True)
-
-            # Write content
             full_path.write_bytes(content)
-
+        except OSError as e:
+            logger.exception(f"Failed to save document {file_path}")
+            msg = f"Failed to save document: {e}"
+            raise StorageError(msg) from e
+        else:
             logger.info(f"Document saved: {full_path}")
             return str(full_path.absolute())
-
-        except Exception as e:
-            logger.error(f"Failed to save document {file_path}: {e}")
-            raise StorageError(f"Failed to save document: {e}") from e
 
     def retrieve(self, file_path: str) -> bytes:
         """
@@ -197,21 +187,21 @@ class FileSystemDocumentStorage(IDocumentStorage):
             FileNotFoundError: If file doesn't exist
             StorageError: If read fails
         """
+        full_path = self.base_path / file_path
+
+        if not full_path.exists():
+            msg = f"Document not found: {file_path}"
+            raise FileNotFoundError(msg)
+
         try:
-            full_path = self.base_path / file_path
-
-            if not full_path.exists():
-                raise FileNotFoundError(f"Document not found: {file_path}")
-
             content = full_path.read_bytes()
+        except OSError as e:
+            logger.exception(f"Failed to retrieve document {file_path}")
+            msg = f"Failed to retrieve document: {e}"
+            raise StorageError(msg) from e
+        else:
             logger.debug(f"Document retrieved: {full_path}")
             return content
-
-        except FileNotFoundError:
-            raise
-        except Exception as e:
-            logger.error(f"Failed to retrieve document {file_path}: {e}")
-            raise StorageError(f"Failed to retrieve document: {e}") from e
 
     def delete(self, file_path: str) -> bool:
         """
@@ -226,19 +216,20 @@ class FileSystemDocumentStorage(IDocumentStorage):
         Raises:
             StorageError: If delete fails
         """
+        full_path = self.base_path / file_path
+
+        if not full_path.exists():
+            return False
+
         try:
-            full_path = self.base_path / file_path
-
-            if not full_path.exists():
-                return False
-
             full_path.unlink()
+        except OSError as e:
+            logger.exception(f"Failed to delete document {file_path}")
+            msg = f"Failed to delete document: {e}"
+            raise StorageError(msg) from e
+        else:
             logger.info(f"Document deleted: {full_path}")
             return True
-
-        except Exception as e:
-            logger.error(f"Failed to delete document {file_path}: {e}")
-            raise StorageError(f"Failed to delete document: {e}") from e
 
     def exists(self, file_path: str) -> bool:
         """
@@ -253,7 +244,7 @@ class FileSystemDocumentStorage(IDocumentStorage):
         full_path = self.base_path / file_path
         return full_path.exists()
 
-    def get_url(self, file_path: str, expiry: Optional[int] = None) -> str:
+    def get_url(self, file_path: str, expiry: int | None = None) -> str:
         """
         Get file:// URL for local file.
 
@@ -270,7 +261,8 @@ class FileSystemDocumentStorage(IDocumentStorage):
         full_path = self.base_path / file_path
 
         if not full_path.exists():
-            raise FileNotFoundError(f"Document not found: {file_path}")
+            msg = f"Document not found: {file_path}"
+            raise FileNotFoundError(msg)
 
         return full_path.as_uri()
 
@@ -298,8 +290,8 @@ class S3DocumentStorage(IDocumentStorage):
         self,
         bucket_name: str,
         region: str = "us-east-1",
-        aws_access_key_id: Optional[str] = None,
-        aws_secret_access_key: Optional[str] = None,
+        aws_access_key_id: str | None = None,
+        aws_secret_access_key: str | None = None,
     ):
         """
         Initialize S3 storage.
@@ -311,7 +303,8 @@ class S3DocumentStorage(IDocumentStorage):
             aws_secret_access_key: AWS secret key (optional)
         """
         if not HAS_BOTO3:
-            raise StorageError("boto3 not installed. Install with: pip install boto3")
+            msg = "boto3 not installed. Install with: pip install boto3"
+            raise StorageError(msg)
 
         self.bucket_name = bucket_name
         self.region = region
@@ -326,7 +319,7 @@ class S3DocumentStorage(IDocumentStorage):
         self.s3_client = boto3.client("s3", region_name=region, **session_kwargs)
         logger.info(f"S3DocumentStorage initialized for bucket: {bucket_name}")
 
-    def save(self, file_path: str, content: bytes, metadata: Optional[dict] = None) -> str:
+    def save(self, file_path: str, content: bytes, metadata: dict | None = None) -> str:
         """
         Save document to S3.
 
@@ -341,24 +334,24 @@ class S3DocumentStorage(IDocumentStorage):
         Raises:
             StorageError: If upload fails
         """
-        try:
-            extra_args = {}
-            if metadata:
-                extra_args["Metadata"] = metadata
+        extra_args = {}
+        if metadata:
+            extra_args["Metadata"] = metadata
 
+        try:
             self.s3_client.put_object(
                 Bucket=self.bucket_name,
                 Key=file_path,
                 Body=content,
                 **extra_args,
             )
-
+        except OSError as e:
+            logger.exception(f"Failed to upload to S3 {file_path}")
+            msg = f"Failed to save document to S3: {e}"
+            raise StorageError(msg) from e
+        else:
             logger.info(f"Document uploaded to S3: s3://{self.bucket_name}/{file_path}")
             return f"s3://{self.bucket_name}/{file_path}"
-
-        except Exception as e:
-            logger.error(f"Failed to upload to S3 {file_path}: {e}")
-            raise StorageError(f"Failed to save document to S3: {e}") from e
 
     def retrieve(self, file_path: str) -> bytes:
         """
@@ -376,17 +369,19 @@ class S3DocumentStorage(IDocumentStorage):
         """
         try:
             response = self.s3_client.get_object(Bucket=self.bucket_name, Key=file_path)
-            content = response["Body"].read()
-            logger.debug(f"Document retrieved from S3: {file_path}")
-            return content
-
-        except Exception as e:
+            content = cast(bytes, response["Body"].read())
+        except OSError as e:
             # Check if it's a NoSuchKey error
             error_code = getattr(e, "response", {}).get("Error", {}).get("Code", "")
-            if error_code == "404" or error_code == "NoSuchKey":
-                raise FileNotFoundError(f"Document not found in S3: {file_path}")
-            logger.error(f"Failed to retrieve from S3 {file_path}: {e}")
-            raise StorageError(f"Failed to retrieve document from S3: {e}") from e
+            if error_code in {"404", "NoSuchKey"}:
+                msg = f"Document not found in S3: {file_path}"
+                raise FileNotFoundError(msg) from e
+            logger.exception(f"Failed to retrieve from S3 {file_path}")
+            msg = f"Failed to retrieve document from S3: {e}"
+            raise StorageError(msg) from e
+        else:
+            logger.debug(f"Document retrieved from S3: {file_path}")
+            return content
 
     def delete(self, file_path: str) -> bool:
         """
@@ -403,12 +398,12 @@ class S3DocumentStorage(IDocumentStorage):
         """
         try:
             self.s3_client.delete_object(Bucket=self.bucket_name, Key=file_path)
+        except OSError:
+            logger.exception("Failed to delete S3 object: %s", file_path)
+            return False
+        else:
             logger.info(f"Document deleted from S3: {file_path}")
             return True
-
-        except Exception as e:
-            logger.error(f"Failed to delete from S3 {file_path}: {e}")
-            return False
 
     def exists(self, file_path: str) -> bool:
         """
@@ -422,15 +417,12 @@ class S3DocumentStorage(IDocumentStorage):
         """
         try:
             self.s3_client.head_object(Bucket=self.bucket_name, Key=file_path)
-            return True
-        except Exception as e:
-            # Check if it's a 404/NoSuchKey error
-            error_code = getattr(e, "response", {}).get("Error", {}).get("Code", "")
-            if error_code == "404" or error_code == "NoSuchKey":
-                return False
+        except Exception:
             return False
+        else:
+            return True
 
-    def get_url(self, file_path: str, expiry: Optional[int] = None) -> str:
+    def get_url(self, file_path: str, expiry: int | None = None) -> str:
         """
         Get URL to access S3 object.
 
@@ -450,19 +442,20 @@ class S3DocumentStorage(IDocumentStorage):
                 return f"https://{self.bucket_name}.s3.{self.region}.amazonaws.com/{file_path}"
 
             # Generate presigned URL with expiry
-            url = self.s3_client.generate_presigned_url(
-                "get_object",
-                Params={"Bucket": self.bucket_name, "Key": file_path},
-                ExpiresIn=expiry,
+            return cast(
+                str,
+                self.s3_client.generate_presigned_url(
+                    "get_object",
+                    Params={"Bucket": self.bucket_name, "Key": file_path},
+                    ExpiresIn=expiry,
+                ),
             )
-            return url
 
         except Exception as e:
-            logger.error(f"Failed to generate S3 URL for {file_path}: {e}")
-            raise StorageError(f"Failed to generate presigned URL: {e}") from e
+            logger.exception(f"Failed to generate S3 URL for {file_path}")
+            msg = f"Failed to generate presigned URL: {e}"
+            raise StorageError(msg) from e
 
 
 class StorageError(Exception):
     """Exception raised when storage operations fail."""
-
-    pass

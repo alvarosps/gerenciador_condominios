@@ -14,7 +14,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { FilePlus, Download, CheckCircle, Info, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useGenerateContract } from '@/lib/api/hooks/use-leases';
-import { Lease } from '@/lib/schemas/lease.schema';
+import { type Lease } from '@/lib/schemas/lease.schema';
 import { formatCurrency } from '@/lib/utils/formatters';
 import { format, parseISO } from 'date-fns';
 
@@ -43,7 +43,7 @@ export function ContractGenerateModal({ open, lease, onClose }: Props) {
 
   const handleDownload = () => {
     if (pdfPath) {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000/api';
       // Extract relative path from full Windows path (e.g., "C:\...\contracts\836\file.pdf" -> "contracts/836/file.pdf")
       const relativePath = pdfPath.replace(/\\/g, '/').replace(/^.*?(contracts\/)/, '$1');
       const downloadUrl = `${apiUrl.replace('/api', '')}/${relativePath}`;
@@ -67,15 +67,15 @@ export function ContractGenerateModal({ open, lease, onClose }: Props) {
 
         <div className="space-y-4">
           {pdfPath ? (
-            <div className="border border-green-200 bg-green-50 rounded-lg p-4">
+            <div className="border border-success/20 bg-success/10 rounded-lg p-4">
               <div className="flex items-start gap-3">
-                <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
+                <CheckCircle className="h-5 w-5 text-success flex-shrink-0 mt-0.5" />
                 <div className="space-y-2 flex-1 min-w-0">
-                  <p className="font-medium text-green-900">Contrato Gerado com Sucesso!</p>
-                  <p className="text-sm text-green-800">
+                  <p className="font-medium text-success">Contrato Gerado com Sucesso!</p>
+                  <p className="text-sm text-success">
                     O contrato foi gerado e salvo no servidor.
                   </p>
-                  <p className="text-sm text-green-800">
+                  <p className="text-sm text-success">
                     Clique em &quot;Baixar Contrato&quot; para visualizar o PDF.
                   </p>
                 </div>
@@ -97,57 +97,57 @@ export function ContractGenerateModal({ open, lease, onClose }: Props) {
                 <CardContent className="pt-6">
                   <dl className="space-y-3">
                     <div className="flex justify-between py-2 border-b">
-                      <dt className="font-medium text-sm text-gray-600">Apartamento</dt>
-                      <dd className="text-sm text-gray-900">
+                      <dt className="font-medium text-sm text-muted-foreground">Apartamento</dt>
+                      <dd className="text-sm text-foreground">
                         {lease.apartment?.building?.name} - Apto {lease.apartment?.number}
                       </dd>
                     </div>
                     <div className="flex justify-between py-2 border-b">
-                      <dt className="font-medium text-sm text-gray-600">Inquilino Responsável</dt>
-                      <dd className="text-sm text-gray-900">
+                      <dt className="font-medium text-sm text-muted-foreground">Inquilino Responsável</dt>
+                      <dd className="text-sm text-foreground">
                         {lease.responsible_tenant?.name}
                       </dd>
                     </div>
                     <div className="flex justify-between py-2 border-b">
-                      <dt className="font-medium text-sm text-gray-600">Total de Inquilinos</dt>
-                      <dd className="text-sm text-gray-900">
+                      <dt className="font-medium text-sm text-muted-foreground">Total de Inquilinos</dt>
+                      <dd className="text-sm text-foreground">
                         {lease.tenants?.length || 0}
                       </dd>
                     </div>
                     <div className="flex justify-between py-2 border-b">
-                      <dt className="font-medium text-sm text-gray-600">Data de Início</dt>
-                      <dd className="text-sm text-gray-900">
+                      <dt className="font-medium text-sm text-muted-foreground">Data de Início</dt>
+                      <dd className="text-sm text-foreground">
                         {format(parseISO(lease.start_date), 'dd/MM/yyyy')}
                       </dd>
                     </div>
                     <div className="flex justify-between py-2 border-b">
-                      <dt className="font-medium text-sm text-gray-600">Validade</dt>
-                      <dd className="text-sm text-gray-900">
+                      <dt className="font-medium text-sm text-muted-foreground">Validade</dt>
+                      <dd className="text-sm text-foreground">
                         {lease.validity_months} meses
                       </dd>
                     </div>
                     <div className="flex justify-between py-2 border-b">
-                      <dt className="font-medium text-sm text-gray-600">Valor do Aluguel</dt>
-                      <dd className="text-sm text-gray-900">
-                        {formatCurrency(lease.rental_value)}
+                      <dt className="font-medium text-sm text-muted-foreground">Valor do Aluguel</dt>
+                      <dd className="text-sm text-foreground">
+                        {formatCurrency(lease.apartment?.rental_value ?? 0)}
                       </dd>
                     </div>
                     <div className="flex justify-between py-2 border-b">
-                      <dt className="font-medium text-sm text-gray-600">Taxa de Limpeza</dt>
-                      <dd className="text-sm text-gray-900">
-                        {formatCurrency(lease.cleaning_fee)}
+                      <dt className="font-medium text-sm text-muted-foreground">Taxa de Limpeza</dt>
+                      <dd className="text-sm text-foreground">
+                        {formatCurrency(lease.apartment?.cleaning_fee ?? 0)}
                       </dd>
                     </div>
                     <div className="flex justify-between py-2 border-b">
-                      <dt className="font-medium text-sm text-gray-600">Taxa de Tag</dt>
-                      <dd className="text-sm text-gray-900">
+                      <dt className="font-medium text-sm text-muted-foreground">Taxa de Tag</dt>
+                      <dd className="text-sm text-foreground">
                         {formatCurrency(lease.tag_fee)}
                       </dd>
                     </div>
                     <div className="flex justify-between py-2">
-                      <dt className="font-medium text-sm text-gray-600">Dia de Vencimento</dt>
-                      <dd className="text-sm text-gray-900">
-                        Dia {lease.due_day} de cada mês
+                      <dt className="font-medium text-sm text-muted-foreground">Dia de Vencimento</dt>
+                      <dd className="text-sm text-foreground">
+                        Dia {lease.responsible_tenant?.due_day ?? '-'} de cada mês
                       </dd>
                     </div>
                   </dl>

@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { DataTable } from '@/components/tables/data-table';
-import { LeaseFiltersCard, LeaseFilters } from './_components/lease-filters';
+import { LeaseFiltersCard, type LeaseFilters } from './_components/lease-filters';
 import { createLeaseColumns } from './_components/lease-table-columns';
 import { LeaseDeleteDialog, LeaseBulkDeleteDialog } from './_components/lease-dialogs';
 import {
@@ -28,7 +28,7 @@ import {
 } from '@/lib/api/hooks/use-leases';
 import { useApartments } from '@/lib/api/hooks/use-apartments';
 import { useTenants } from '@/lib/api/hooks/use-tenants';
-import { Lease } from '@/lib/schemas/lease.schema';
+import { type Lease } from '@/lib/schemas/lease.schema';
 import { leaseExportColumns } from '@/lib/hooks/use-export';
 import { useCrudPage } from '@/lib/hooks/use-crud-page';
 
@@ -118,7 +118,7 @@ export default function LeasesPage() {
 
   const handleDelete = useCallback((lease: Lease) => {
     crud.setItemToDelete(lease);
-    crud.handleDeleteClick(lease.id!);
+    if (lease.id !== undefined) crud.handleDeleteClick(lease.id);
   }, [crud]);
 
   // Memoize columns to prevent unnecessary re-renders
@@ -145,7 +145,7 @@ export default function LeasesPage() {
       <div className="mb-4 flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold">Locações</h1>
-          <p className="text-gray-600 mt-1">
+          <p className="text-muted-foreground mt-1">
             Gerencie os contratos de locação dos apartamentos
           </p>
         </div>
@@ -161,11 +161,11 @@ export default function LeasesPage() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
-              <DropdownMenuItem onClick={() => crud.handleExport('excel', leases || [])}>
+              <DropdownMenuItem onClick={() => crud.handleExport('excel', leases ?? [])}>
                 <FileSpreadsheet className="h-4 w-4 mr-2" />
                 Exportar para Excel
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => crud.handleExport('csv', leases || [])}>
+              <DropdownMenuItem onClick={() => crud.handleExport('csv', leases ?? [])}>
                 <FileText className="h-4 w-4 mr-2" />
                 Exportar para CSV
               </DropdownMenuItem>
@@ -180,8 +180,8 @@ export default function LeasesPage() {
 
       {/* Bulk Selection Banner */}
       {crud.bulkOps.hasSelection && (
-        <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded flex justify-between items-center">
-          <span className="text-blue-700 font-medium">
+        <div className="mb-4 p-4 bg-info/10 border border-info/20 rounded flex justify-between items-center">
+          <span className="text-info font-medium">
             {crud.bulkOps.selectionCount} {crud.bulkOps.selectionCount === 1 ? 'locação selecionada' : 'locações selecionadas'}
           </span>
           <div className="flex gap-2">

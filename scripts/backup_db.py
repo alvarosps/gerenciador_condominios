@@ -23,7 +23,7 @@ Date: 2025-10-19
 import os
 import subprocess
 import sys
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 # Add project root to Python path to import settings
@@ -50,21 +50,13 @@ def verify_utf8_encoding(file_path):
         bool: True if file is valid UTF-8, False otherwise
     """
     try:
-        with open(file_path, "rb") as f:
-            content = f.read()
-
-        # Try to decode as UTF-8
-        content.decode("utf-8")
-
-        # Check for common encoding issues (replacement characters)
+        content = Path(file_path).read_bytes()
         decoded = content.decode("utf-8")
-        if "\ufffd" in decoded:
-            # Contains replacement characters - indicates encoding issues
-            return False
-
-        return True
     except UnicodeDecodeError:
         return False
+    else:
+        # Check for common encoding issues (replacement characters)
+        return "\ufffd" not in decoded
 
 
 def backup_database():
@@ -97,7 +89,7 @@ def backup_database():
     print(f"\nBackup Directory: {backup_dir}")
 
     # Generate backup filename with timestamp
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now(tz=UTC).strftime("%Y%m%d_%H%M%S")
     backup_file = backup_dir / f"backup_{db_name}_{timestamp}.sql"
 
     print(f"Backup File: {backup_file}")
@@ -137,41 +129,9 @@ def backup_database():
 
     try:
         # Execute pg_dump
-        subprocess.run(cmd, env=env, check=True, capture_output=True, text=True)
-
-        # Check if backup file was created
-        if backup_file.exists():
-            # Prepend \encoding UTF8 command for psql to ensure proper encoding on restore
-            # This must be at the very beginning so psql reads the file in UTF-8
-            with open(backup_file, "rb") as f:
-                original_content = f.read()
-
-            with open(backup_file, "wb") as f:
-                # Write psql encoding directive first (this is a psql meta-command)
-                f.write(b"\\encoding UTF8\n\n")
-                f.write(original_content)
-
-            # Verify the backup file is valid UTF-8
-            if not verify_utf8_encoding(backup_file):
-                print("\n[WARNING] Backup file may have encoding issues")
-                print("         This could indicate corrupted data in the database")
-
-            file_size = backup_file.stat().st_size
-            file_size_mb = file_size / (1024 * 1024)
-
-            print("\n" + "=" * 60)
-            print("[OK] BACKUP SUCCESSFUL")
-            print("=" * 60)
-            print(f"Backup File: {backup_file}")
-            print(f"File Size: {file_size_mb:.2f} MB")
-            print(f"Timestamp: {timestamp}")
-            print("\nTo restore this backup, run:")
-            print(f"  psql -h {db_host} -p {db_port} -U {db_user} -d {db_name} < {backup_file}")
-            print("=" * 60)
-
-            return backup_file
-        else:
-            raise FileNotFoundError("Backup file was not created")
+        subprocess.run(
+            cmd, env=env, check=True, capture_output=True, text=True
+        )  # S603: trusted list args
 
     except subprocess.CalledProcessError as e:
         print("\n" + "=" * 60)
@@ -200,13 +160,35 @@ def backup_database():
         print("=" * 60)
         return None
 
-    except Exception as e:
+    else:
+        if not backup_file.exists():
+            print("\n[FAILED] Backup file was not created by pg_dump")
+            return None
+
+        # Prepend \encoding UTF8 command for psql to ensure proper encoding on restore
+        # This must be at the very beginning so psql reads the file in UTF-8
+        original_content = backup_file.read_bytes()
+        backup_file.write_bytes(b"\\encoding UTF8\n\n" + original_content)
+
+        # Verify the backup file is valid UTF-8
+        if not verify_utf8_encoding(backup_file):
+            print("\n[WARNING] Backup file may have encoding issues")
+            print("         This could indicate corrupted data in the database")
+
+        file_size = backup_file.stat().st_size
+        file_size_mb = file_size / (1024 * 1024)
+
         print("\n" + "=" * 60)
-        print("[FAILED] BACKUP FAILED")
+        print("[OK] BACKUP SUCCESSFUL")
         print("=" * 60)
-        print(f"Unexpected error: {e}")
+        print(f"Backup File: {backup_file}")
+        print(f"File Size: {file_size_mb:.2f} MB")
+        print(f"Timestamp: {timestamp}")
+        print("\nTo restore this backup, run:")
+        print(f"  psql -h {db_host} -p {db_port} -U {db_user} -d {db_name} < {backup_file}")
         print("=" * 60)
-        return None
+
+        return backup_file
 
 
 def list_existing_backups():
@@ -218,8 +200,10 @@ def list_existing_backups():
     # Include both .sql and legacy .backup files
     sql_backups = list(backup_dir.glob("backup_*.sql"))
     legacy_backups = list(backup_dir.glob("backup_*.backup"))
-    backups = sorted(sql_backups + legacy_backups, key=lambda f: f.stat().st_mtime, reverse=True)
-    return backups
+    return sorted(sql_backups + legacy_backups, key=lambda f: f.stat().st_mtime, reverse=True)
+
+
+_MAX_SHOWN_BACKUPS = 5
 
 
 def main():
@@ -228,21 +212,18 @@ def main():
     existing_backups = list_existing_backups()
     if existing_backups:
         print(f"\nExisting backups ({len(existing_backups)}):")
-        for i, backup in enumerate(existing_backups[:5], 1):  # Show last 5
+        for i, backup in enumerate(existing_backups[:_MAX_SHOWN_BACKUPS], 1):
             file_size = backup.stat().st_size / (1024 * 1024)
             print(f"  {i}. {backup.name} ({file_size:.2f} MB)")
-        if len(existing_backups) > 5:
-            print(f"  ... and {len(existing_backups) - 5} more")
+        if len(existing_backups) > _MAX_SHOWN_BACKUPS:
+            print(f"  ... and {len(existing_backups) - _MAX_SHOWN_BACKUPS} more")
         print()
 
     # Perform backup
     backup_file = backup_database()
 
     # Exit with appropriate status code
-    if backup_file:
-        sys.exit(0)
-    else:
-        sys.exit(1)
+    sys.exit(0 if backup_file else 1)
 
 
 if __name__ == "__main__":

@@ -11,7 +11,7 @@ export default function DashboardPage() {
     <div>
       <div className="mb-6">
         <h1 className="text-3xl font-bold">Dashboard</h1>
-        <p className="text-gray-600 mt-1">
+        <p className="text-muted-foreground mt-1">
           Visão geral do sistema de gestão de condomínios
         </p>
       </div>

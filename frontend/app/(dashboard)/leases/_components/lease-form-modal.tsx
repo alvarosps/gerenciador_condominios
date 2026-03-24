@@ -22,6 +22,7 @@ import {
   FormDescription,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Select,
   SelectContent,
@@ -46,7 +47,7 @@ import { toast } from 'sonner';
 import { useCreateLease, useUpdateLease } from '@/lib/api/hooks/use-leases';
 import { useAvailableApartments } from '@/lib/api/hooks/use-apartments';
 import { useTenants } from '@/lib/api/hooks/use-tenants';
-import { Lease } from '@/lib/schemas/lease.schema';
+import { type Lease } from '@/lib/schemas/lease.schema';
 import { formatCurrency } from '@/lib/utils/formatters';
 
 interface Props {
@@ -63,10 +64,10 @@ const leaseFormSchema = z.object({
   validity_months: z.number()
     .min(1, 'Validade deve ser no mínimo 1 mês')
     .max(60, 'Validade deve ser no máximo 60 meses'),
-  rental_value: z.number().min(0, 'Valor não pode ser negativo'),
-  cleaning_fee: z.number().min(0, 'Valor não pode ser negativo'),
   tag_fee: z.number().min(0, 'Valor não pode ser negativo'),
-  due_day: z.number().min(1, 'Dia deve ser no mínimo 1').max(31, 'Dia deve ser no máximo 31'),
+  deposit_amount: z.number().min(0, 'Valor não pode ser negativo').optional().nullable(),
+  cleaning_fee_paid: z.boolean(),
+  tag_deposit_paid: z.boolean(),
 });
 
 type LeaseFormValues = z.infer<typeof leaseFormSchema>;
@@ -85,28 +86,31 @@ export function LeaseFormModal({ open, lease, onClose }: Props) {
       tenant_ids: [],
       start_date: undefined,
       validity_months: 12,
-      rental_value: 0,
-      cleaning_fee: 0,
       tag_fee: 50,
-      due_day: 10,
+      deposit_amount: null,
+      cleaning_fee_paid: false,
+      tag_deposit_paid: false,
     },
   });
 
   const selectedApartmentId = formMethods.watch('apartment_id');
   const selectedApartment = apartments?.find(apt => apt.id === selectedApartmentId);
 
+  const selectedResponsibleTenantId = formMethods.watch('responsible_tenant_id');
+  const selectedResponsibleTenant = tenants?.find(t => t.id === selectedResponsibleTenantId);
+
   useEffect(() => {
     if (lease) {
       formMethods.reset({
         apartment_id: lease.apartment?.id,
         responsible_tenant_id: lease.responsible_tenant?.id,
-        tenant_ids: lease.tenants?.map((t) => t.id!) || [],
+        tenant_ids: lease.tenants?.map((t) => t.id).filter((id): id is number => id !== undefined) ?? [],
         start_date: new Date(lease.start_date),
         validity_months: lease.validity_months,
-        rental_value: lease.rental_value,
-        cleaning_fee: lease.cleaning_fee,
         tag_fee: lease.tag_fee,
-        due_day: lease.due_day,
+        deposit_amount: lease.deposit_amount ?? null,
+        cleaning_fee_paid: lease.cleaning_fee_paid ?? false,
+        tag_deposit_paid: lease.tag_deposit_paid ?? false,
       });
     } else {
       formMethods.reset({
@@ -115,21 +119,13 @@ export function LeaseFormModal({ open, lease, onClose }: Props) {
         tenant_ids: [],
         start_date: undefined,
         validity_months: 12,
-        rental_value: 0,
-        cleaning_fee: 0,
         tag_fee: 50,
-        due_day: 10,
+        deposit_amount: null,
+        cleaning_fee_paid: false,
+        tag_deposit_paid: false,
       });
     }
   }, [lease, formMethods]);
-
-  // Auto-fill rental value and cleaning fee when apartment changes
-  useEffect(() => {
-    if (selectedApartment && !lease) {
-      formMethods.setValue('rental_value', selectedApartment.rental_value);
-      formMethods.setValue('cleaning_fee', selectedApartment.cleaning_fee);
-    }
-  }, [selectedApartment, formMethods, lease]);
 
   // Watch responsible_tenant_id to auto-sync with tenant_ids for single-tenant apartments
   const responsibleTenantId = formMethods.watch('responsible_tenant_id');
@@ -144,8 +140,15 @@ export function LeaseFormModal({ open, lease, onClose }: Props) {
   const handleSubmit = async (values: LeaseFormValues) => {
     try {
       const payload = {
-        ...values,
+        apartment_id: values.apartment_id,
+        responsible_tenant_id: values.responsible_tenant_id,
+        tenant_ids: values.tenant_ids,
         start_date: format(values.start_date, 'yyyy-MM-dd'),
+        validity_months: values.validity_months,
+        tag_fee: values.tag_fee,
+        deposit_amount: values.deposit_amount ?? null,
+        cleaning_fee_paid: values.cleaning_fee_paid,
+        tag_deposit_paid: values.tag_deposit_paid,
       };
 
       if (lease?.id) {
@@ -184,7 +187,7 @@ export function LeaseFormModal({ open, lease, onClose }: Props) {
             <Alert>
               <Info className="h-4 w-4" />
               <AlertDescription>
-                Os valores de aluguel e taxa de limpeza serão preenchidos automaticamente ao selecionar o apartamento.
+                Os valores de aluguel e taxa de limpeza são definidos no cadastro do apartamento. O dia de vencimento é definido no cadastro do inquilino.
               </AlertDescription>
             </Alert>
 
@@ -240,7 +243,7 @@ export function LeaseFormModal({ open, lease, onClose }: Props) {
                     </FormControl>
                     <SelectContent>
                       {tenants?.map((t) => (
-                        <SelectItem key={t.id} value={String(t.id!)}>
+                        <SelectItem key={t.id} value={String(t.id ?? '')}>
                           {t.name} - {t.cpf_cnpj}
                         </SelectItem>
                       ))}
@@ -268,16 +271,16 @@ export function LeaseFormModal({ open, lease, onClose }: Props) {
                           <input
                             type="checkbox"
                             id={`tenant-${t.id}`}
-                            checked={field.value?.includes(t.id!)}
+                            checked={t.id !== undefined && field.value?.includes(t.id)}
                             onChange={(e) => {
-                              const currentValue = field.value || [];
-                              if (e.target.checked) {
-                                field.onChange([...currentValue, t.id!]);
+                              const currentValue = field.value ?? [];
+                              if (e.target.checked && t.id !== undefined) {
+                                field.onChange([...currentValue, t.id]);
                               } else {
                                 field.onChange(currentValue.filter((id) => id !== t.id));
                               }
                             }}
-                            className="h-4 w-4 rounded border-gray-300"
+                            className="h-4 w-4 rounded border-border"
                           />
                           <label
                             htmlFor={`tenant-${t.id}`}
@@ -332,7 +335,7 @@ export function LeaseFormModal({ open, lease, onClose }: Props) {
                         selected={field.value}
                         onSelect={field.onChange}
                         locale={ptBR}
-                        initialFocus
+                        autoFocus
                       />
                     </PopoverContent>
                   </Popover>
@@ -361,62 +364,6 @@ export function LeaseFormModal({ open, lease, onClose }: Props) {
                   <FormDescription>
                     Número de meses de duração do contrato
                   </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* Rental Value */}
-            <FormField
-              control={formMethods.control}
-              name="rental_value"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Valor do Aluguel</FormLabel>
-                  <FormControl>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-sm text-muted-foreground">
-                        R$
-                      </span>
-                      <Input
-                        type="number"
-                        min={0}
-                        step="0.01"
-                        placeholder="0.00"
-                        className="pl-10"
-                        {...field}
-                        onChange={(e) => field.onChange(Number(e.target.value))}
-                      />
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* Cleaning Fee */}
-            <FormField
-              control={formMethods.control}
-              name="cleaning_fee"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Taxa de Limpeza</FormLabel>
-                  <FormControl>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-sm text-muted-foreground">
-                        R$
-                      </span>
-                      <Input
-                        type="number"
-                        min={0}
-                        step="0.01"
-                        placeholder="0.00"
-                        className="pl-10"
-                        {...field}
-                        onChange={(e) => field.onChange(Number(e.target.value))}
-                      />
-                    </div>
-                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
@@ -453,42 +400,102 @@ export function LeaseFormModal({ open, lease, onClose }: Props) {
               )}
             />
 
-            {/* Due Day */}
+            {/* Deposit Amount */}
             <FormField
               control={formMethods.control}
-              name="due_day"
+              name="deposit_amount"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Dia de Vencimento</FormLabel>
+                  <FormLabel>Valor do Depósito</FormLabel>
                   <FormControl>
-                    <Input
-                      type="number"
-                      min={1}
-                      max={31}
-                      placeholder="Ex: 10"
-                      {...field}
-                      onChange={(e) => field.onChange(Number(e.target.value))}
-                    />
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-sm text-muted-foreground">
+                        R$
+                      </span>
+                      <Input
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        placeholder="0.00"
+                        className="pl-10"
+                        value={field.value ?? ''}
+                        onChange={(e) => field.onChange(e.target.value === '' ? null : Number(e.target.value))}
+                      />
+                    </div>
                   </FormControl>
                   <FormDescription>
-                    Dia do mês para vencimento do aluguel
+                    Valor do depósito caução (opcional)
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
             />
 
-            {selectedApartment && (
+            <Separator />
+            <div className="text-sm font-medium">Confirmações de Pagamento</div>
+
+            {/* Cleaning Fee Paid */}
+            <FormField
+              control={formMethods.control}
+              name="cleaning_fee_paid"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                  <FormControl>
+                    <Checkbox
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                  <div className="space-y-1 leading-none">
+                    <FormLabel>Taxa de Limpeza Paga</FormLabel>
+                    <FormDescription>
+                      Marque se a taxa de limpeza inicial foi paga pelo inquilino
+                    </FormDescription>
+                  </div>
+                </FormItem>
+              )}
+            />
+
+            {/* Tag Deposit Paid */}
+            <FormField
+              control={formMethods.control}
+              name="tag_deposit_paid"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                  <FormControl>
+                    <Checkbox
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                  <div className="space-y-1 leading-none">
+                    <FormLabel>Depósito de Tag Pago</FormLabel>
+                    <FormDescription>
+                      Marque se o depósito da tag de acesso foi pago pelo inquilino
+                    </FormDescription>
+                  </div>
+                </FormItem>
+              )}
+            />
+
+            {(selectedApartment ?? selectedResponsibleTenant) && (
               <Card>
                 <CardContent className="pt-6">
                   <div className="text-sm space-y-1">
-                    <div className="font-medium mb-2">Resumo do Apartamento Selecionado:</div>
-                    <div>• Prédio: {selectedApartment.building?.name}</div>
-                    <div>• Apartamento: {selectedApartment.number}</div>
-                    <div>• Aluguel: {formatCurrency(selectedApartment.rental_value)}</div>
-                    <div>• Limpeza: {formatCurrency(selectedApartment.cleaning_fee)}</div>
-                    <div>• Máx. Inquilinos: {selectedApartment.max_tenants}</div>
-                    <div>• Móveis incluídos: {selectedApartment.furnitures?.length || 0}</div>
+                    <div className="font-medium mb-2">Resumo do Apartamento e Inquilino Selecionados:</div>
+                    {selectedApartment && (
+                      <>
+                        <div>• Prédio: {selectedApartment.building?.name}</div>
+                        <div>• Apartamento: {selectedApartment.number}</div>
+                        <div>• Aluguel: {formatCurrency(selectedApartment.rental_value)}</div>
+                        <div>• Limpeza: {formatCurrency(selectedApartment.cleaning_fee)}</div>
+                        <div>• Máx. Inquilinos: {selectedApartment.max_tenants}</div>
+                        <div>• Móveis incluídos: {selectedApartment.furnitures?.length ?? 0}</div>
+                      </>
+                    )}
+                    {selectedResponsibleTenant?.due_day !== null && selectedResponsibleTenant?.due_day !== undefined && (
+                      <div>• Dia de Vencimento: Dia {selectedResponsibleTenant.due_day}</div>
+                    )}
                   </div>
                 </CardContent>
               </Card>

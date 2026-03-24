@@ -51,7 +51,7 @@ export function SearchableSelect({
 
   const selectedLabel = React.useMemo(() => {
     const selected = options.find((opt) => opt.value === value);
-    return selected?.label || placeholder;
+    return selected?.label ?? placeholder;
   }, [options, value, placeholder]);
 
   const handleSelect = (optionValue: string) => {

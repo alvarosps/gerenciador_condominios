@@ -73,10 +73,19 @@ export function formatDate(date: string | Date | null | undefined): string {
 }
 
 /**
+ * Format month/year in Portuguese (e.g., "Março/2026")
+ */
+export function formatMonthYear(year: number, month: number): string {
+  const date = new Date(year, month - 1, 1);
+  const formatted = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(date);
+  return formatted.charAt(0).toUpperCase() + formatted.slice(1);
+}
+
+/**
  * Format date to ISO format (YYYY-MM-DD) for API
  */
 export function formatDateISO(date: Date | null | undefined): string {
   if (!date) return '';
   if (isNaN(date.getTime())) return '';
-  return date.toISOString().split('T')[0];
+  return date.toISOString().split('T')[0] ?? '';
 }

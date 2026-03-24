@@ -1,7 +1,7 @@
 'use client';
 
 import { DependentFormList } from '../dependent-form-list';
-import { StepProps } from './types';
+import { type StepProps } from './types';
 
 export function DependentsStep({ formMethods }: StepProps) {
   return (

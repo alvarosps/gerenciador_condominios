@@ -9,8 +9,44 @@ for better separation of concerns:
 - rule_views: Contract rule management endpoints
 """
 
+from .financial_dashboard_views import (
+    CashFlowViewSet,
+    DailyControlViewSet,
+    FinancialDashboardViewSet,
+)
+from .financial_views import (
+    CreditCardViewSet,
+    EmployeePaymentViewSet,
+    ExpenseCategoryViewSet,
+    ExpenseInstallmentViewSet,
+    ExpenseViewSet,
+    FinancialSettingsViewSet,
+    IncomeViewSet,
+    PersonIncomeViewSet,
+    PersonPaymentViewSet,
+    PersonViewSet,
+    RentPaymentViewSet,
+)
 from .landlord_views import LandlordViewSet
 from .rule_views import ContractRuleViewSet
 from .template_views import ContractTemplateViewSet
 
-__all__ = ["ContractTemplateViewSet", "ContractRuleViewSet", "LandlordViewSet"]
+__all__ = [
+    "CashFlowViewSet",
+    "ContractRuleViewSet",
+    "ContractTemplateViewSet",
+    "CreditCardViewSet",
+    "DailyControlViewSet",
+    "EmployeePaymentViewSet",
+    "ExpenseCategoryViewSet",
+    "ExpenseInstallmentViewSet",
+    "ExpenseViewSet",
+    "FinancialDashboardViewSet",
+    "FinancialSettingsViewSet",
+    "IncomeViewSet",
+    "LandlordViewSet",
+    "PersonIncomeViewSet",
+    "PersonPaymentViewSet",
+    "PersonViewSet",
+    "RentPaymentViewSet",
+]
