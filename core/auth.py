@@ -14,11 +14,28 @@ from django.contrib.auth import get_user_model
 from django.http import JsonResponse
 from django.shortcuts import redirect
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.request import Request
+from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def current_user(request: Request) -> Response:
+    """Return the authenticated user's profile."""
+    user = request.user
+    return Response({
+        "id": user.pk,
+        "email": user.email,
+        "first_name": user.first_name,
+        "last_name": user.last_name,
+        "is_staff": user.is_staff,
+        "is_superuser": user.is_superuser,
+    })
 
 
 def get_tokens_for_user(user):

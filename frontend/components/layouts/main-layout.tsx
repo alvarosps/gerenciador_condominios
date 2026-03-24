@@ -1,14 +1,29 @@
 'use client';
 
+import { useEffect } from 'react';
 import { Sidebar } from './sidebar';
 import { Header } from './header';
 import { type ReactNode } from 'react';
+import { useAuthStore } from '@/store/auth-store';
+import { apiClient } from '@/lib/api/client';
+import type { User } from '@/store/auth-store';
 
 interface MainLayoutProps {
   children: ReactNode;
 }
 
 export function MainLayout({ children }: MainLayoutProps) {
+  const { user, token, setUser } = useAuthStore();
+
+  // Fetch user profile if we have a token but no user data (e.g., old session)
+  useEffect(() => {
+    if (token && !user) {
+      void apiClient.get<User>('/auth/me/').then(({ data }) => {
+        setUser(data);
+      });
+    }
+  }, [token, user, setUser]);
+
   return (
     <div className="min-h-screen">
       {/* Fixed Sidebar - Hidden on mobile, visible on md+ */}

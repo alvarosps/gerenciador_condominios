@@ -87,6 +87,7 @@ export function IncomeSummaryCard({ data, monthLabel }: { data: DashboardSummary
               </p>
               {income_summary.extra_incomes.map((inc) => (
                 <p key={inc.description} className="text-xs text-muted-foreground">
+                  {inc.person_name ? `${inc.person_name} — ` : ''}
                   {inc.description}: {formatCurrency(inc.amount)}
                   {inc.is_recurring ? ' (mensal)' : ''}
                 </p>
