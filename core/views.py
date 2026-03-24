@@ -293,19 +293,23 @@ class LeaseViewSet(viewsets.ModelViewSet):
         """
         queryset = super().get_queryset()
 
-        if self.action == "list":
-            # Optimize for list view: load all related data in minimal queries
-            queryset = queryset.select_related(
-                "apartment",  # OneToOne: Lease -> Apartment
-                "apartment__building",  # ForeignKey: Apartment -> Building
-                "responsible_tenant",  # ForeignKey: Lease -> Tenant (responsible)
-            ).prefetch_related(
+        # Always load apartment and responsible_tenant — needed by all actions
+        # (calculate_late_fee, change_due_date, generate_contract access these)
+        queryset = queryset.select_related(
+            "apartment",  # OneToOne: Lease -> Apartment
+            "apartment__building",  # ForeignKey: Apartment -> Building
+            "responsible_tenant",  # ForeignKey: Lease -> Tenant (responsible)
+        )
+
+        if self.action in ["list", "retrieve"]:
+            queryset = queryset.prefetch_related(
                 "tenants",  # ManyToMany: Lease -> Tenants (all tenants)
                 "tenants__dependents",  # Reverse FK: Tenant -> Dependents
                 "tenants__furnitures",  # ManyToMany: Tenant -> Furnitures (tenant's own)
                 "apartment__furnitures",  # ManyToMany: Apartment -> Furnitures (apartment's)
             )
 
+        if self.action == "list":
             params = self.request.query_params
 
             apartment_id = params.get("apartment_id")
@@ -317,14 +321,6 @@ class LeaseViewSet(viewsets.ModelViewSet):
                 queryset = queryset.filter(responsible_tenant_id=responsible_tenant_id)
 
             queryset = self._apply_lease_status_filters(queryset, params)
-
-        elif self.action == "retrieve":
-            # Optimize for detail view: same as list but for single object
-            queryset = queryset.select_related(
-                "apartment", "apartment__building", "responsible_tenant"
-            ).prefetch_related(
-                "tenants", "tenants__dependents", "tenants__furnitures", "apartment__furnitures"
-            )
 
         return queryset
 
@@ -389,7 +385,9 @@ class LeaseViewSet(viewsets.ModelViewSet):
 
         # Delegate to service layer
         result = FeeCalculatorService.calculate_late_fee(
-            rental_value=lease.rental_value, due_day=lease.due_day, current_date=date.today()
+            rental_value=lease.apartment.rental_value,
+            due_day=lease.responsible_tenant.due_day,
+            current_date=date.today(),
         )
 
         # Return appropriate response
@@ -423,14 +421,15 @@ class LeaseViewSet(viewsets.ModelViewSet):
 
             # Delegate fee calculation to service layer
             fee_result = FeeCalculatorService.calculate_due_date_change_fee(
-                rental_value=lease.rental_value,
-                current_due_day=lease.due_day,
+                rental_value=lease.apartment.rental_value,
+                current_due_day=lease.responsible_tenant.due_day,
                 new_due_day=new_due_day,
             )
 
-            # Update the due date
-            lease.due_day = new_due_day
-            lease.save()
+            # Update the due date on the tenant (source of truth)
+            tenant = lease.responsible_tenant
+            tenant.due_day = new_due_day
+            tenant.save(update_fields=["due_day"])
 
             return Response(
                 {"message": "Dia de vencimento alterado.", "fee": fee_result["fee"]},
