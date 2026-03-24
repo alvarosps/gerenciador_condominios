@@ -153,7 +153,7 @@ export function createLeaseColumns(handlers: LeaseActionHandlers): Column<Lease>
       render: (_, record: Lease) => {
         const { status, color } = getLeaseStatus(record);
         return (
-          <Badge className={cn(badgeVariants[color] ?? 'bg-gray-100 text-gray-800')}>
+          <Badge className={cn(badgeVariants[color] ?? 'bg-muted text-muted-foreground')}>
             {status}
           </Badge>
         );
@@ -169,7 +169,7 @@ export function createLeaseColumns(handlers: LeaseActionHandlers): Column<Lease>
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Badge className={cn(badgeVariants[color] ?? 'bg-gray-100 text-gray-800', 'cursor-help')}>
+                <Badge className={cn(badgeVariants[color] ?? 'bg-muted text-muted-foreground', 'cursor-help')}>
                   {label}
                 </Badge>
               </TooltipTrigger>

@@ -299,7 +299,7 @@ export default function ContractTemplatePage() {
             <TabsContent value="preview" className="mt-0">
               <div
                 style={{ height: '65vh', overflow: 'auto' }}
-                className="border rounded p-4 bg-white"
+                className="border rounded p-4 bg-card"
               >
                 {previewHtml ? (
                   <iframe

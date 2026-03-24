@@ -193,7 +193,7 @@ function ExpenseDetailContent() {
               {(data.stipend_details?.length ?? 0) > 0 && (data.stipend_total ?? 0) > 0 && (
                 <ExpenseAccordion
                   title="Estipêndios"
-                  color="text-purple-600 dark:text-purple-400"
+                  color="text-primary"
                   items={data.stipend_details ?? []}
                   total={data.stipend_total ?? 0}
                   onEdit={setEditTarget}
