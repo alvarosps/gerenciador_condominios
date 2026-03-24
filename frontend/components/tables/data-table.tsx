@@ -50,6 +50,8 @@ interface DataTableProps<T extends Record<string, unknown>> {
   };
   rowKey?: string | ((record: T) => string);
   rowSelection?: RowSelection<T>;
+  defaultSortKey?: string;
+  defaultSortDirection?: 'asc' | 'desc';
 }
 
 export function DataTable<T extends Record<string, unknown>>({
@@ -59,6 +61,8 @@ export function DataTable<T extends Record<string, unknown>>({
   pagination = {},
   rowKey = 'key',
   rowSelection,
+  defaultSortKey,
+  defaultSortDirection,
 }: DataTableProps<T>) {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(
@@ -66,8 +70,8 @@ export function DataTable<T extends Record<string, unknown>>({
       ? pagination.pageSize
       : PAGINATION.DEFAULT_PAGE_SIZE
   );
-  const [sortKey, setSortKey] = useState<string | null>(null);
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc' | null>(null);
+  const [sortKey, setSortKey] = useState<string | null>(defaultSortKey ?? null);
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc' | null>(defaultSortDirection ?? null);
 
   const showPagination = pagination !== false;
   const paginationConfig = typeof pagination === 'object' ? pagination : {};

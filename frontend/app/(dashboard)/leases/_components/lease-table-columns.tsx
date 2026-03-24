@@ -110,6 +110,7 @@ export function createLeaseColumns(handlers: LeaseActionHandlers): Column<Lease>
       render: (_, record: Lease) => (
         <div className="font-medium">Apto {record.apartment?.number}</div>
       ),
+      sorter: (a: Lease, b: Lease) => (a.apartment?.number ?? 0) - (b.apartment?.number ?? 0),
     },
     {
       title: 'Inquilino Responsável',
