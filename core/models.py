@@ -242,14 +242,10 @@ class Apartment(AuditMixin, SoftDeleteMixin, models.Model):
     Attributes:
         building: Parent building containing this apartment
         number: Apartment number within the building
-        interfone_configured: Whether intercom is configured
-        contract_generated: Whether rental contract has been generated
-        contract_signed: Whether contract has been signed
         rental_value: Monthly rental amount
         cleaning_fee: One-time cleaning fee
         max_tenants: Maximum allowed tenants
-        is_rented: Current rental status
-        lease_date: Date when current lease started
+        is_rented: Current rental status — updated automatically via Lease signal
         last_rent_increase_date: Date of most recent rent increase
         furnitures: Furniture items included with apartment
 
@@ -259,11 +255,6 @@ class Apartment(AuditMixin, SoftDeleteMixin, models.Model):
 
     building = models.ForeignKey(Building, on_delete=models.CASCADE, related_name="apartments")
     number = models.PositiveIntegerField(help_text="Número único do apartamento no prédio")
-    interfone_configured = models.BooleanField(
-        default=False, help_text="Indica se o interfone está configurado"
-    )
-    contract_generated = models.BooleanField(default=False, help_text="Contrato foi gerado?")
-    contract_signed = models.BooleanField(default=False, help_text="Contrato foi assinado?")
 
     rental_value = models.DecimalField(
         max_digits=10,
@@ -276,8 +267,9 @@ class Apartment(AuditMixin, SoftDeleteMixin, models.Model):
     )
     max_tenants = models.PositiveIntegerField(help_text="Número máximo de inquilinos permitidos")
 
-    is_rented = models.BooleanField(default=False, help_text="Apartamento alugado ou não")
-    lease_date = models.DateField(blank=True, null=True, help_text="Data da locação (caso alugado)")
+    is_rented = models.BooleanField(
+        default=False, help_text="Atualizado automaticamente via signal de Lease"
+    )
     last_rent_increase_date = models.DateField(
         blank=True, null=True, help_text="Data do último reajuste do aluguel"
     )
@@ -331,10 +323,8 @@ class Tenant(AuditMixin, SoftDeleteMixin, models.Model):
         phone: Contact phone number
         marital_status: Marital status (for individuals)
         profession: Occupation or business type
-        deposit_amount: Security deposit amount
-        cleaning_fee_paid: Whether cleaning fee has been paid
-        tag_deposit_paid: Whether tag deposit has been paid
         due_day: Day of month when rent is due
+        warning_count: Number of rule violation warnings issued to this tenant
         furnitures: Furniture items owned by tenant
 
     Inherits audit fields (created_at, updated_at, created_by, updated_by)
@@ -389,19 +379,6 @@ class Tenant(AuditMixin, SoftDeleteMixin, models.Model):
     profession = models.CharField(max_length=100, help_text="Profissão")
 
     # Dados financeiros e administrativos
-    deposit_amount = models.DecimalField(
-        max_digits=10,
-        decimal_places=2,
-        null=True,
-        blank=True,
-        help_text="Valor da caução, se houver",
-    )
-    cleaning_fee_paid = models.BooleanField(
-        default=False, help_text="Indica se pagou a taxa de limpeza"
-    )
-    tag_deposit_paid = models.BooleanField(
-        default=False, help_text="Indica se o caução das tags já foi pago"
-    )
     due_day = models.PositiveIntegerField(
         help_text="Dia do vencimento do aluguel",
         default=1,
@@ -504,14 +481,13 @@ class Lease(AuditMixin, SoftDeleteMixin, models.Model):
                           not formally registered as tenants.
         start_date: Lease start date
         validity_months: Duration of lease in months
-        due_day: Day of month when rent is due
-        rental_value: Monthly rent amount
-        cleaning_fee: One-time cleaning fee
         tag_fee: Tag/key deposit amount
+        deposit_amount: Security deposit amount paid by tenant
+        cleaning_fee_paid: Whether the cleaning fee has been paid
+        tag_deposit_paid: Whether the tag deposit has been paid
         contract_generated: Whether contract PDF has been generated
         contract_signed: Whether contract has been signed
         interfone_configured: Whether intercom has been configured
-        warning_count: Number of rule violation warnings
     """
 
     apartment = models.OneToOneField(Apartment, on_delete=models.CASCADE, related_name="lease")
@@ -535,17 +511,7 @@ class Lease(AuditMixin, SoftDeleteMixin, models.Model):
         db_index=True,  # Add index for date range queries
     )
     validity_months = models.PositiveIntegerField(help_text="Validade do contrato em meses")
-    due_day = models.PositiveIntegerField(
-        help_text="Dia do vencimento do aluguel",
-        validators=[validate_due_day],  # Validate 1-31 range
-    )
 
-    rental_value = models.DecimalField(
-        max_digits=10, decimal_places=2, help_text="Valor do aluguel"
-    )
-    cleaning_fee = models.DecimalField(
-        max_digits=10, decimal_places=2, help_text="Valor da taxa de limpeza"
-    )
     tag_fee = models.DecimalField(
         max_digits=10, decimal_places=2, help_text="Valor da caução da tag", default=0
     )
@@ -554,12 +520,8 @@ class Lease(AuditMixin, SoftDeleteMixin, models.Model):
     deposit_amount = models.DecimalField(
         max_digits=10, decimal_places=2, null=True, blank=True, help_text="Valor da caução"
     )
-    cleaning_fee_paid = models.BooleanField(
-        default=False, help_text="Taxa de limpeza paga"
-    )
-    tag_deposit_paid = models.BooleanField(
-        default=False, help_text="Caução de tags paga"
-    )
+    cleaning_fee_paid = models.BooleanField(default=False, help_text="Taxa de limpeza paga")
+    tag_deposit_paid = models.BooleanField(default=False, help_text="Caução de tags paga")
 
     contract_generated = models.BooleanField(
         default=False, help_text="Indica se o contrato foi gerado"
@@ -569,10 +531,6 @@ class Lease(AuditMixin, SoftDeleteMixin, models.Model):
     )
     interfone_configured = models.BooleanField(
         default=False, help_text="Indica se o interfone foi configurado"
-    )
-
-    warning_count = models.PositiveIntegerField(
-        default=0, help_text="Número de avisos do inquilino por descumprimento das regras"
     )
 
     # Financial fields
@@ -596,7 +554,6 @@ class Lease(AuditMixin, SoftDeleteMixin, models.Model):
             models.Index(fields=["apartment", "start_date"], name="lease_apt_date_idx"),
             models.Index(fields=["responsible_tenant", "start_date"], name="lease_tenant_date_idx"),
             models.Index(fields=["contract_generated", "start_date"], name="lease_status_date_idx"),
-            models.Index(fields=["due_day", "start_date"], name="lease_due_date_idx"),
         ]
 
     def __str__(self) -> str:
