@@ -498,7 +498,7 @@ class Lease(AuditMixin, SoftDeleteMixin, models.Model):
         interfone_configured: Whether intercom has been configured
     """
 
-    apartment = models.OneToOneField(Apartment, on_delete=models.CASCADE, related_name="lease")
+    apartment = models.ForeignKey(Apartment, on_delete=models.CASCADE, related_name="leases")
     responsible_tenant = models.ForeignKey(
         Tenant,
         on_delete=models.PROTECT,
@@ -562,6 +562,13 @@ class Lease(AuditMixin, SoftDeleteMixin, models.Model):
             models.Index(fields=["apartment", "start_date"], name="lease_apt_date_idx"),
             models.Index(fields=["responsible_tenant", "start_date"], name="lease_tenant_date_idx"),
             models.Index(fields=["contract_generated", "start_date"], name="lease_status_date_idx"),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["apartment"],
+                condition=models.Q(is_deleted=False),
+                name="unique_active_lease_per_apartment",
+            )
         ]
 
     def __str__(self) -> str:
