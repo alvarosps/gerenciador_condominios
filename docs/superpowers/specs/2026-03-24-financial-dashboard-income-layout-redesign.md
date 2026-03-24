@@ -51,7 +51,7 @@ The "Kitnets Não Alugados" card is removed from the top row. This information n
 
 ### Colors
 - **Condomínio**: `#3b82f6` (blue-500) — primary income, goes to cash
-- **Owner cards**: Use distinct colors per owner. First owner `#f59e0b` (amber-500), second `#a855f7` (purple-500). If more owners exist, extend palette.
+- **Owner cards**: Fixed palette by index: `['#f59e0b', '#a855f7', '#06b6d4', '#ec4899', '#14b8a6']` (amber, purple, cyan, pink, teal). Cycle if more than 5 owners.
 - **Kitnets não alugados**: `#f59e0b` (amber-500) — warning/opportunity color
 - **Total/Outras Entradas**: `#22c55e` (green-500) — positive income
 - **Despesas**: `#f97316` (orange-500) — expense color
@@ -90,6 +90,8 @@ No backend changes needed. The existing `dashboard_summary` API already returns 
 
 Currently `current_month_income = condominium_income + extra_income_total`. The new "Total Entradas" card needs: `total_monthly_income + extra_income_total` (includes owner incomes).
 
+**IMPORTANT**: Do NOT use `current_month_income` for the "Total Entradas" card — it excludes owner rents. Compute from `income_summary.total_monthly_income + income_summary.extra_income_total` directly.
+
 This can be computed on the frontend from existing data — no API change required.
 
 ## Files to Modify
@@ -99,8 +101,9 @@ This can be computed on the frontend from existing data — no API change requir
 1. **`frontend/app/(dashboard)/financial/_components/balance-cards.tsx`**
    - Remove "Kitnets Não Alugados" card (4th card → 3 cards)
    - Rename "Entradas no Mês" to "Total Entradas no Mês"
-   - Change value to include owner incomes: `total_monthly_income + extra_income_total`
+   - Change value to include owner incomes: `income_summary.total_monthly_income + income_summary.extra_income_total` (NOT `current_month_income`)
    - Update grid from `lg:grid-cols-4` to `lg:grid-cols-3`
+   - Update `BalanceCardsSkeleton` to also render 3 cards with `lg:grid-cols-3`
 
 2. **`frontend/app/(dashboard)/financial/_components/income-summary-card.tsx`**
    - Complete rewrite of layout:
@@ -119,13 +122,14 @@ This can be computed on the frontend from existing data — no API change requir
 4. **`frontend/app/(dashboard)/financial/page.tsx`**
    - Update layout: BalanceCards → IncomeSummaryCard → OtherIncomeCard
    - Pass correct props to new component structure
+   - **Do NOT change** `CashFlowChart.currentMonthOverride` — it must keep using `current_month_income` (condominium only), not the new total
 
 ## Testing
 
 - Visual verification: Compare mockup (`.superpowers/brainstorm/139506-1774386578/layout-page-final.html`) with implementation
 - Responsive: Check layout at desktop (1280px+), tablet (768px), mobile (375px)
 - Edge cases:
-  - Zero owners (no owner cards, only condominium)
-  - Zero vacant kitnets (potential bar hidden or shows "Todos alugados")
-  - Zero extra incomes (Outras Entradas card hidden)
+  - Zero owners: only the Condomínio card is shown (takes full width of the distribution row). Arrow text and structure remain the same.
+  - Zero vacant kitnets: the entire potential bar section is hidden (not rendered)
+  - Zero extra incomes: the Outras Entradas card (Row 3) is hidden (not rendered)
   - Single extra income vs multiple
