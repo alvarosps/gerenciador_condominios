@@ -16,9 +16,9 @@ export function LatePaymentsAlert() {
 
   if (!data || data.total_late_leases === 0) {
     return (
-      <Alert className="border-green-200 bg-green-50">
-        <CheckCircle2 className="h-4 w-4 text-green-600" />
-        <AlertDescription className="text-green-800">
+      <Alert className="border-success/20 bg-success/10">
+        <CheckCircle2 className="h-4 w-4 text-success" />
+        <AlertDescription className="text-success-foreground">
           <strong>Parabéns!</strong> Não há pagamentos em atraso. Todos os inquilinos estão em dia com os pagamentos.
         </AlertDescription>
       </Alert>
@@ -28,17 +28,17 @@ export function LatePaymentsAlert() {
   const totalLateFees = parseFloat(data.total_late_fees) || 0;
 
   return (
-    <Card className="border-red-200">
+    <Card className="border-destructive/20">
       <CardHeader>
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <div className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-red-500" />
+            <AlertTriangle className="h-5 w-5 text-destructive" />
             <CardTitle className="text-lg">Pagamentos em Atraso</CardTitle>
             <Badge variant="destructive">{data.total_late_leases}</Badge>
           </div>
           <div className="text-right">
             <div className="text-xs text-muted-foreground">Total em Multas</div>
-            <div className="text-lg font-bold text-red-600">
+            <div className="text-lg font-bold text-destructive">
               {formatCurrency(totalLateFees)}
             </div>
           </div>
@@ -65,7 +65,7 @@ export function LatePaymentsAlert() {
                 </div>
                 <div className="text-sm">
                   <span className="text-muted-foreground">Multa: </span>
-                  <span className="font-bold text-red-600">
+                  <span className="font-bold text-destructive">
                     {formatCurrency(parseFloat(item.late_fee) || 0)}
                   </span>
                 </div>
