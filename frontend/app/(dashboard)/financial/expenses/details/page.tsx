@@ -209,7 +209,7 @@ function ExpenseDetailContent() {
               const mapToDetail = (item: Record<string, unknown>, idx: number): ExpenseDetailItem => ({
                 expense_id: (item.expense_id as number) ?? 0,
                 installment_id: (item.installment_id as number) ?? null,
-                description: String(item.description ?? ''),
+                description: typeof item.description === 'string' ? item.description : '',
                 amount: Number(item.amount ?? 0),
                 card_name: null,
                 installment_number: (item.installment_number as number) ?? null,
@@ -219,7 +219,7 @@ function ExpenseDetailContent() {
                 category_color: (item.category_color as string) ?? null,
                 subcategory_id: null,
                 subcategory_name: null,
-                notes: (item.notes as string) ?? (item.installment ? String(item.installment) : String(idx)),
+                notes: typeof item.notes === 'string' ? item.notes : (item.installment !== null && item.installment !== undefined ? `${item.installment as number}` : String(idx)),
               });
 
               const billItems = (building.bills ?? []).map((bill, i) => mapToDetail(bill as unknown as Record<string, unknown>, i));

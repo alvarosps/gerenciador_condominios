@@ -164,7 +164,7 @@ export function ExpenseEditModal({ mode, item, personId, onClose, onSaved }: Pro
         is_offset: false,
       });
     }
-  }, [item, isCreate, form]);
+  }, [item, isCreate, form, hasInstallment]);
 
   useEffect(() => {
     form.setValue('subcategory_id', null);
@@ -198,7 +198,7 @@ export function ExpenseEditModal({ mode, item, personId, onClose, onSaved }: Pro
           category_id: effectiveCategoryId,
           person_id: personId ?? null,
           notes: pendingValues.notes,
-          is_installment: Boolean(isParcelado),
+          is_installment: isParcelado,
           total_installments: isParcelado ? totalParcelas : null,
           is_recurring: isFixed,
           expected_monthly_amount: isFixed ? parcelaAmount : null,
@@ -260,7 +260,7 @@ export function ExpenseEditModal({ mode, item, personId, onClose, onSaved }: Pro
           total_amount: totalAmount,
           category_id: effectiveCategoryId,
           notes: pendingValues.notes,
-          is_installment: Boolean(isParcelado),
+          is_installment: isParcelado,
           total_installments: isParcelado ? totalParcelas : null,
           is_offset: pendingValues.is_offset,
           installments,

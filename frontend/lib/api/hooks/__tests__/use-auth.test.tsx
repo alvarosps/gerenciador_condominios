@@ -16,7 +16,7 @@ import { useLogin, useRegister, useRefreshToken, useCurrentUser } from '../use-a
 import { createWrapper } from '@/tests/test-utils';
 
 // Use vi.hoisted so mock variables are available inside vi.mock factory
-const { mockSetAuth, mockSetTokens, mockSetToken, mockClearAuth, authStoreMock } = vi.hoisted(() => {
+const { authStoreMock } = vi.hoisted(() => {
   const mockSetAuth = vi.fn();
   const mockSetTokens = vi.fn();
   const mockSetToken = vi.fn();
