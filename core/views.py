@@ -289,7 +289,7 @@ class LeaseViewSet(viewsets.ModelViewSet):
         Also applies filters based on query parameters.
 
         Phase 5 Query Optimization:
-        - select_related: For ForeignKey and OneToOne (apartment, building, responsible_tenant)
+        - select_related: For ForeignKey relations (apartment, building, responsible_tenant)
         - prefetch_related: For ManyToMany (tenants, dependents) and reverse relations
 
         This reduces queries from ~301 to ~4 for the list endpoint.
@@ -299,7 +299,7 @@ class LeaseViewSet(viewsets.ModelViewSet):
         # Always load apartment and responsible_tenant — needed by all actions
         # (calculate_late_fee, change_due_date, generate_contract access these)
         queryset = queryset.select_related(
-            "apartment",  # OneToOne: Lease -> Apartment
+            "apartment",  # ForeignKey: Lease -> Apartment
             "apartment__building",  # ForeignKey: Apartment -> Building
             "responsible_tenant",  # ForeignKey: Lease -> Tenant (responsible)
         )
