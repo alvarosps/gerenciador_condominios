@@ -334,7 +334,7 @@ class Tenant(AuditMixin, SoftDeleteMixin, models.Model):
         deposit_amount: Security deposit amount
         cleaning_fee_paid: Whether cleaning fee has been paid
         tag_deposit_paid: Whether tag deposit has been paid
-        rent_due_day: Day of month when rent is due
+        due_day: Day of month when rent is due
         furnitures: Furniture items owned by tenant
 
     Inherits audit fields (created_at, updated_at, created_by, updated_by)
@@ -402,7 +402,11 @@ class Tenant(AuditMixin, SoftDeleteMixin, models.Model):
     tag_deposit_paid = models.BooleanField(
         default=False, help_text="Indica se o caução das tags já foi pago"
     )
-    rent_due_day = models.PositiveIntegerField(help_text="Dia do vencimento do aluguel", default=1)
+    due_day = models.PositiveIntegerField(
+        help_text="Dia do vencimento do aluguel",
+        default=1,
+        validators=[validate_due_day],
+    )
     warning_count = models.PositiveIntegerField(
         default=0, help_text="Quantidade de avisos do inquilino"
     )
