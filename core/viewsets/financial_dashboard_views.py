@@ -70,6 +70,49 @@ class FinancialDashboardViewSet(viewsets.ViewSet):
         data = FinancialDashboardService.get_expense_category_breakdown(year=year, month=month)
         return Response(data, status=status.HTTP_200_OK)
 
+    @action(detail=False, methods=["get"], url_path="dashboard_summary")
+    def dashboard_summary(self, request: Request) -> Response:
+        today = date.today()
+        try:
+            year = int(request.query_params.get("year", today.year))
+            month = int(request.query_params.get("month", today.month))
+        except ValueError:
+            return Response(
+                {"error": "Os parâmetros 'year' e 'month' devem ser inteiros válidos."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        data = FinancialDashboardService.get_dashboard_summary(year=year, month=month)
+        return Response(data, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["get"], url_path="expense_detail")
+    def expense_detail(self, request: Request) -> Response:
+        detail_type = request.query_params.get("type")
+        if not detail_type:
+            return Response(
+                {"error": "O parâmetro 'type' é obrigatório."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        detail_id_str = request.query_params.get("id")
+        detail_id = int(detail_id_str) if detail_id_str else None
+
+        today = date.today()
+        try:
+            year = int(request.query_params.get("year", today.year))
+            month = int(request.query_params.get("month", today.month))
+        except ValueError:
+            return Response(
+                {"error": "Os parâmetros 'year' e 'month' devem ser inteiros válidos."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            data = FinancialDashboardService.get_expense_detail(detail_type, detail_id, year, month)
+        except (Person.DoesNotExist, ValueError) as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(data, status=status.HTTP_200_OK)
+
 
 class CashFlowViewSet(viewsets.ViewSet):
     """ViewSet for cash flow calculation and simulation endpoints."""

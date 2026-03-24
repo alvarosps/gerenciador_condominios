@@ -72,6 +72,8 @@ export function ExpenseFiltersCard({ filters, onFiltersChange }: Props) {
       building_id: undefined,
       category_id: undefined,
       is_paid: undefined,
+      is_recurring: undefined,
+      is_offset: undefined,
       date_from: undefined,
       date_to: undefined,
     });
@@ -228,6 +230,52 @@ export function ExpenseFiltersCard({ filters, onFiltersChange }: Props) {
                 <SelectItem value="all">Todos</SelectItem>
                 <SelectItem value="paid">Pago</SelectItem>
                 <SelectItem value="pending">Pendente</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Recorrente */}
+          <div className="flex-1 min-w-[130px]">
+            <label className="block text-sm font-medium mb-2">Recorrente</label>
+            <Select
+              value={filters.is_recurring === undefined ? 'all' : filters.is_recurring ? 'yes' : 'no'}
+              onValueChange={(value) =>
+                onFiltersChange({
+                  ...filters,
+                  is_recurring: value === 'all' ? undefined : value === 'yes',
+                })
+              }
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Todos" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="yes">Sim</SelectItem>
+                <SelectItem value="no">Não</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Desconto */}
+          <div className="flex-1 min-w-[130px]">
+            <label className="block text-sm font-medium mb-2">Desconto</label>
+            <Select
+              value={filters.is_offset === undefined ? 'all' : filters.is_offset ? 'yes' : 'no'}
+              onValueChange={(value) =>
+                onFiltersChange({
+                  ...filters,
+                  is_offset: value === 'all' ? undefined : value === 'yes',
+                })
+              }
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Todos" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="yes">Sim</SelectItem>
+                <SelectItem value="no">Não</SelectItem>
               </SelectContent>
             </Select>
           </div>

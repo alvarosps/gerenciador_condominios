@@ -5,7 +5,7 @@ interface RawExpenseCategory {
   name: string;
   description?: string;
   color?: string;
-  parent?: RawExpenseCategory | null;
+  parent?: RawExpenseCategory | number | null;
   parent_id?: number | null;
   subcategories?: RawExpenseCategory[];
   created_at?: string;
@@ -18,7 +18,7 @@ export const expenseCategorySchema: z.ZodType<RawExpenseCategory> = z.lazy(() =>
     name: z.string().min(1, 'Nome é obrigatório'),
     description: z.string().optional().default(''),
     color: z.string().optional().default('#6B7280'),
-    parent: expenseCategorySchema.nullable().optional(),
+    parent: z.union([expenseCategorySchema, z.number(), z.null()]).optional(),
     parent_id: z.number().nullable().optional(),
     subcategories: z.array(expenseCategorySchema).default([]),
     created_at: z.string().optional(),

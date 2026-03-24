@@ -245,6 +245,54 @@ class ExpenseViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(expense)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+    @action(detail=True, methods=["post"])
+    def rebuild(self, request: Request, pk: str | None = None) -> Response:
+        """Overwrite expense fields and rebuild all installments from scratch."""
+        expense = self.get_object()
+
+        # Update expense fields
+        for field in (
+            "description",
+            "total_amount",
+            "category_id",
+            "notes",
+            "is_installment",
+            "total_installments",
+            "is_offset",
+        ):
+            if field in request.data:
+                if field == "category_id":
+                    expense.category_id = request.data[field]
+                else:
+                    setattr(expense, field, request.data[field])
+        expense.save()
+
+        # Hard-delete ALL existing installments (bypass soft delete)
+        ExpenseInstallment.all_objects.filter(expense=expense).delete()
+
+        # Create new installments from provided list
+        new_installments = request.data.get("installments", [])
+        to_create = [
+            ExpenseInstallment(
+                expense=expense,
+                installment_number=inst_data["installment_number"],
+                total_installments=inst_data["total_installments"],
+                amount=inst_data["amount"],
+                due_date=inst_data["due_date"],
+                is_paid=inst_data.get("is_paid", False),
+                paid_date=inst_data.get("paid_date"),
+                created_by=request.user,
+                updated_by=request.user,
+            )
+            for inst_data in new_installments
+        ]
+        if to_create:
+            ExpenseInstallment.objects.bulk_create(to_create)
+
+        expense = self.get_queryset().get(pk=expense.pk)
+        serializer = self.get_serializer(expense)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
 
 class ExpenseInstallmentViewSet(viewsets.ModelViewSet):
     serializer_class = ExpenseInstallmentSerializer

@@ -631,6 +631,7 @@ class FinancialDataImporter:
         if not items:
             return
 
+        items = [i for i in items if "_comentario" not in i]
         print(f"\n[10/15] Empréstimos pessoais ({len(items)})...")
         for item in items:
             person = self._get_person(item["pessoa"])

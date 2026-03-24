@@ -11,6 +11,7 @@ export interface ExpenseFilters {
   category_id?: number;
   is_paid?: boolean;
   is_recurring?: boolean;
+  is_offset?: boolean;
 }
 
 export function useExpenses(filters?: ExpenseFilters) {

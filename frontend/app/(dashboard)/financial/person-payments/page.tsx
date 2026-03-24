@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -179,9 +179,9 @@ export default function PersonPaymentsPage() {
     [crud, handleDelete, isAdmin],
   );
 
-  if (error) {
-    toast.error('Erro ao carregar pagamentos');
-  }
+  useEffect(() => {
+    if (error) toast.error('Erro ao carregar pagamentos');
+  }, [error]);
 
   return (
     <div>
