@@ -15,24 +15,28 @@ import { renderHook, waitFor } from '@testing-library/react';
 import { useLogin, useRegister, useRefreshToken, useCurrentUser } from '../use-auth';
 import { createWrapper } from '@/tests/test-utils';
 
-// Mock the auth store with proper function implementations
-const mockSetAuth = vi.fn();
-const mockSetTokens = vi.fn();
-const mockSetToken = vi.fn();
-const mockClearAuth = vi.fn();
+// Use vi.hoisted so mock variables are available inside vi.mock factory
+const { mockSetAuth, mockSetTokens, mockSetToken, mockClearAuth, authStoreMock } = vi.hoisted(() => {
+  const mockSetAuth = vi.fn();
+  const mockSetTokens = vi.fn();
+  const mockSetToken = vi.fn();
+  const mockClearAuth = vi.fn();
 
-const authStoreMock = (selector: (state: Record<string, unknown>) => unknown): unknown => {
-  const mockState: Record<string, unknown> = {
-    user: { id: 1, email: 'test@example.com', first_name: 'Test', last_name: 'User' },
-    accessToken: 'mock-access-token',
-    refreshToken: 'mock-refresh-token-67890',
-    setAuth: mockSetAuth,
-    setTokens: mockSetTokens,
-    setToken: mockSetToken,
-    clearAuth: mockClearAuth,
+  const authStoreMock = (selector: (state: Record<string, unknown>) => unknown): unknown => {
+    const mockState: Record<string, unknown> = {
+      user: { id: 1, email: 'test@example.com', first_name: 'Test', last_name: 'User' },
+      accessToken: 'mock-access-token',
+      refreshToken: 'mock-refresh-token-67890',
+      setAuth: mockSetAuth,
+      setTokens: mockSetTokens,
+      setToken: mockSetToken,
+      clearAuth: mockClearAuth,
+    };
+    return selector(mockState);
   };
-  return selector(mockState);
-};
+
+  return { mockSetAuth, mockSetTokens, mockSetToken, mockClearAuth, authStoreMock };
+});
 
 vi.mock('@/store/auth-store', () => ({
   useAuthStore: vi.fn(authStoreMock),
