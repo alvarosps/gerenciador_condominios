@@ -198,12 +198,15 @@ export default function TenantsPage() {
       },
       render: (_: unknown, record: Tenant) => {
         const lease = record.id !== undefined ? leaseByTenantId.get(record.id) : undefined;
+        if (!lease) {
+          return <Badge variant="secondary">Não</Badge>;
+        }
+        const aptNumber = lease.apartment?.number;
+        const buildingNumber = lease.apartment?.building?.street_number;
+        const location = aptNumber && buildingNumber ? ` ${String(aptNumber)}/${String(buildingNumber)}` : '';
         return (
-          <Badge
-            variant={lease ? 'default' : 'secondary'}
-            className={lease ? 'bg-success text-success-foreground' : ''}
-          >
-            {lease ? 'Sim' : 'Não'}
+          <Badge className="bg-success text-success-foreground">
+            Sim{location}
           </Badge>
         );
       },
