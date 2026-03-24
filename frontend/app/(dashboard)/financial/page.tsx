@@ -21,7 +21,7 @@ export default function FinancialDashboardPage() {
     <div className="space-y-6">
       <div className="mb-2">
         <h1 className="text-3xl font-bold">Dashboard Financeiro</h1>
-        <p className="text-gray-600 mt-1">Visão geral das finanças — {monthLabel}</p>
+        <p className="text-muted-foreground mt-1">Visão geral das finanças — {monthLabel}</p>
       </div>
 
       {isLoading && <BalanceCardsSkeleton />}

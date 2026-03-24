@@ -12,7 +12,7 @@ export function IncomeSummaryCard({ data, monthLabel }: { data: DashboardSummary
     <Card>
       <CardHeader className="pb-3">
         <CardTitle className="text-base font-semibold flex items-center gap-2">
-          <Building2 className="h-5 w-5 text-blue-500" />
+          <Building2 className="h-5 w-5 text-info" />
           Resumo de Entradas — {monthLabel}
         </CardTitle>
       </CardHeader>
@@ -21,7 +21,7 @@ export function IncomeSummaryCard({ data, monthLabel }: { data: DashboardSummary
           {/* Total entradas mensal */}
           <div className="space-y-1">
             <p className="text-xs text-muted-foreground font-medium">Total Entradas Mensal</p>
-            <p className="text-xl font-bold text-blue-600">
+            <p className="text-xl font-bold text-info">
               {formatCurrency(income_summary.total_monthly_income)}
             </p>
             <p className="text-xs text-muted-foreground">
@@ -36,7 +36,7 @@ export function IncomeSummaryCard({ data, monthLabel }: { data: DashboardSummary
                 <Users className="h-3 w-3" />
                 Entradas {owner.person_name}
               </p>
-              <p className="text-xl font-bold text-purple-600">
+              <p className="text-xl font-bold text-primary">
                 {formatCurrency(owner.total)}
               </p>
               <p className="text-xs text-muted-foreground">
@@ -51,7 +51,7 @@ export function IncomeSummaryCard({ data, monthLabel }: { data: DashboardSummary
               <Home className="h-3 w-3" />
               Kitnets Não Alugados
             </p>
-            <p className="text-xl font-bold text-amber-500">
+            <p className="text-xl font-bold text-warning">
               {formatCurrency(income_summary.vacant_lost_rent)}
             </p>
             <p className="text-xs text-muted-foreground">
@@ -67,7 +67,7 @@ export function IncomeSummaryCard({ data, monthLabel }: { data: DashboardSummary
           {/* Entradas condomínio */}
           <div className="space-y-1">
             <p className="text-xs text-muted-foreground font-medium">Entradas Condomínio</p>
-            <p className="text-xl font-bold text-green-600">
+            <p className="text-xl font-bold text-success">
               {formatCurrency(income_summary.condominium_income)}
             </p>
             <p className="text-xs text-muted-foreground">
@@ -82,7 +82,7 @@ export function IncomeSummaryCard({ data, monthLabel }: { data: DashboardSummary
                 <PlusCircle className="h-3 w-3" />
                 Outras Entradas
               </p>
-              <p className="text-xl font-bold text-teal-600">
+              <p className="text-xl font-bold text-success">
                 {formatCurrency(income_summary.extra_income_total)}
               </p>
               {income_summary.extra_incomes.map((inc) => (

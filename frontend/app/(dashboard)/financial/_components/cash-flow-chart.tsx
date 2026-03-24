@@ -65,11 +65,11 @@ function CustomTooltip({
       </p>
       <p className="text-sm">
         <span className="text-muted-foreground">Receitas: </span>
-        <span className="font-medium text-green-600">{formatCurrency(item.income)}</span>
+        <span className="font-medium text-success">{formatCurrency(item.income)}</span>
       </p>
       <p className="text-sm">
         <span className="text-muted-foreground">Despesas: </span>
-        <span className="font-medium text-red-600">{formatCurrency(item.expenses)}</span>
+        <span className="font-medium text-destructive">{formatCurrency(item.expenses)}</span>
       </p>
       <p className="text-sm">
         <span className="text-muted-foreground">Saldo Mês: </span>
@@ -77,7 +77,7 @@ function CustomTooltip({
       </p>
       <p className="text-sm border-t mt-1 pt-1">
         <span className="text-muted-foreground">Saldo Acumulado: </span>
-        <span className="font-medium text-blue-600">{formatCurrency(item.cumulative)}</span>
+        <span className="font-medium text-info">{formatCurrency(item.cumulative)}</span>
       </p>
     </div>
   );
@@ -187,7 +187,7 @@ export function CashFlowChart({
               yAxisId="left"
               dataKey="income"
               name="Receitas"
-              fill="#22c55e"
+              fill="var(--success)"
               radius={[4, 4, 0, 0]}
               opacity={0.9}
             />
@@ -195,7 +195,7 @@ export function CashFlowChart({
               yAxisId="left"
               dataKey="expenses"
               name="Despesas"
-              fill="#ef4444"
+              fill="var(--destructive)"
               radius={[4, 4, 0, 0]}
               opacity={0.9}
             />
@@ -204,7 +204,7 @@ export function CashFlowChart({
               type="monotone"
               dataKey="cumulative"
               name="Saldo Acumulado"
-              stroke="#3b82f6"
+              stroke="var(--info)"
               strokeWidth={2}
               dot={{ r: 4 }}
             />
