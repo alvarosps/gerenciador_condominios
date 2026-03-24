@@ -280,7 +280,7 @@ export function LeaseFormModal({ open, lease, onClose }: Props) {
                                 field.onChange(currentValue.filter((id) => id !== t.id));
                               }
                             }}
-                            className="h-4 w-4 rounded border-gray-300"
+                            className="h-4 w-4 rounded border-border"
                           />
                           <label
                             htmlFor={`tenant-${t.id}`}

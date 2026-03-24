@@ -93,11 +93,11 @@ export function getMinimumPeriodStatus(lease: Lease) {
 
 export function createLeaseColumns(handlers: LeaseActionHandlers): Column<Lease>[] {
   const badgeVariants: Record<string, string> = {
-    blue: 'bg-blue-100 text-blue-800 hover:bg-blue-200',
-    red: 'bg-red-100 text-red-800 hover:bg-red-200',
-    orange: 'bg-orange-100 text-orange-800 hover:bg-orange-200',
-    green: 'bg-green-100 text-green-800 hover:bg-green-200',
-    yellow: 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200',
+    blue: 'bg-info/10 text-info hover:bg-info/20',
+    red: 'bg-destructive/10 text-destructive hover:bg-destructive/20',
+    orange: 'bg-warning/10 text-warning hover:bg-warning/20',
+    green: 'bg-success/10 text-success hover:bg-success/20',
+    yellow: 'bg-warning/10 text-warning hover:bg-warning/20',
   };
 
   return [
@@ -108,7 +108,7 @@ export function createLeaseColumns(handlers: LeaseActionHandlers): Column<Lease>
       render: (_, record: Lease) => (
         <div>
           <div className="font-medium">{record.apartment?.building?.name}</div>
-          <div className="text-xs text-gray-500">
+          <div className="text-xs text-muted-foreground">
             Apto {record.apartment?.number}
           </div>
         </div>
@@ -122,7 +122,7 @@ export function createLeaseColumns(handlers: LeaseActionHandlers): Column<Lease>
         <div>
           <div className="font-medium">{record.responsible_tenant?.name}</div>
           {record.tenants && record.tenants.length > 1 && (
-            <div className="text-xs text-gray-500">
+            <div className="text-xs text-muted-foreground">
               +{record.tenants.length - 1} inquilino(s)
             </div>
           )}
@@ -136,10 +136,10 @@ export function createLeaseColumns(handlers: LeaseActionHandlers): Column<Lease>
       render: (_, record: Lease) => (
         <div className="text-sm">
           <div>{format(parseISO(record.start_date), 'dd/MM/yyyy')}</div>
-          <div className="text-gray-500">
+          <div className="text-muted-foreground">
             até {record.final_date ? format(parseISO(record.final_date), 'dd/MM/yyyy') : 'N/A'}
           </div>
-          <div className="text-xs text-gray-400">
+          <div className="text-xs text-muted-foreground">
             {record.validity_months} meses
           </div>
         </div>
@@ -206,10 +206,10 @@ export function createLeaseColumns(handlers: LeaseActionHandlers): Column<Lease>
       render: (_, record: Lease) => (
         <div className="flex flex-col items-center gap-1">
           {record.contract_generated && (
-            <Badge className="bg-green-100 text-green-800">Gerado</Badge>
+            <Badge className="bg-success/10 text-success">Gerado</Badge>
           )}
           {record.contract_signed && (
-            <Badge className="bg-blue-100 text-blue-800">Assinado</Badge>
+            <Badge className="bg-info/10 text-info">Assinado</Badge>
           )}
           {!record.contract_generated && !record.contract_signed && (
             <Badge variant="secondary">Pendente</Badge>
