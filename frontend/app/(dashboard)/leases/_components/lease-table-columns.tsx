@@ -128,6 +128,8 @@ export function createLeaseColumns(handlers: LeaseActionHandlers): Column<Lease>
           )}
         </div>
       ),
+      sorter: (a: Lease, b: Lease) =>
+        (a.responsible_tenant?.name ?? '').localeCompare(b.responsible_tenant?.name ?? ''),
     },
     {
       title: 'Período',
@@ -158,6 +160,12 @@ export function createLeaseColumns(handlers: LeaseActionHandlers): Column<Lease>
           </Badge>
         );
       },
+      sorter: (a: Lease, b: Lease) => {
+        const priority: Record<string, number> = { red: 0, orange: 1, green: 2, blue: 3 };
+        const aColor = getLeaseStatus(a).color;
+        const bColor = getLeaseStatus(b).color;
+        return (priority[aColor] ?? 4) - (priority[bColor] ?? 4);
+      },
     },
     {
       title: 'Período Mínimo',
@@ -182,6 +190,13 @@ export function createLeaseColumns(handlers: LeaseActionHandlers): Column<Lease>
             </Tooltip>
           </TooltipProvider>
         );
+      },
+      sorter: (a: Lease, b: Lease) => {
+        const aStatus = getMinimumPeriodStatus(a);
+        const bStatus = getMinimumPeriodStatus(b);
+        const aVal = aStatus.completed ? -1 : aStatus.monthsRemaining;
+        const bVal = bStatus.completed ? -1 : bStatus.monthsRemaining;
+        return aVal - bVal;
       },
     },
     {
@@ -216,6 +231,14 @@ export function createLeaseColumns(handlers: LeaseActionHandlers): Column<Lease>
           )}
         </div>
       ),
+      sorter: (a: Lease, b: Lease) => {
+        const contractPriority = (l: Lease): number => {
+          if (l.contract_signed) return 0;
+          if (l.contract_generated) return 1;
+          return 2;
+        };
+        return contractPriority(a) - contractPriority(b);
+      },
     },
     {
       title: 'Ações',
