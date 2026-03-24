@@ -121,7 +121,7 @@ export function ApartmentFormModal({ open, apartment, onClose }: Props) {
             {apartment && (
               <Badge
                 variant={apartment.is_rented ? 'destructive' : 'default'}
-                className={apartment.is_rented ? '' : 'bg-green-600'}
+                className={apartment.is_rented ? '' : 'bg-success text-success-foreground'}
               >
                 {apartment.is_rented ? 'Alugado' : 'Disponível'}
               </Badge>

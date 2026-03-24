@@ -107,8 +107,8 @@ export default function SettingsPage() {
       </div>
 
       {isNewLandlord && (
-        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-md">
-          <p className="text-blue-700">
+        <div className="mb-6 p-4 bg-primary/5 border border-primary/20 rounded-md">
+          <p className="text-primary">
             Nenhum locador configurado. Preencha os dados abaixo para criar o
             primeiro registro.
           </p>
