@@ -4,7 +4,6 @@ Provides overview, debt breakdowns, upcoming/overdue installments,
 and expense category analysis for the financial dashboard widgets.
 """
 
-import contextlib
 from collections.abc import Callable
 from datetime import date, timedelta
 from decimal import Decimal
@@ -638,7 +637,7 @@ class FinancialDashboardService:
             except Lease.DoesNotExist:
                 continue
 
-            rental_value = lease.rental_value
+            rental_value = apt.rental_value
 
             # Salary offset apartments: rent is compensation, not real income
             if lease.is_salary_offset:
@@ -682,10 +681,7 @@ class FinancialDashboardService:
         vacant_by_building: dict[str, list[str]] = {}
         vacant_list: list[dict[str, Any]] = []
         for apt in vacant_apartments:
-            # Try to get last known rental value from existing lease
-            rental_value = Decimal("0.00")
-            with contextlib.suppress(Lease.DoesNotExist):
-                rental_value = apt.lease.rental_value
+            rental_value = apt.rental_value
             vacant_lost_rent += rental_value
             building_name = apt.building.street_number
             if building_name not in vacant_by_building:
@@ -867,11 +863,11 @@ class FinancialDashboardService:
             is_salary_offset=True,
         ).select_related("apartment", "apartment__building", "responsible_tenant")
         for lease in salary_offset_leases:
-            employee_total += lease.rental_value
+            employee_total += lease.apartment.rental_value
             apt_label = f"{lease.apartment.number}/{lease.apartment.building.street_number}"
             employee_details.append({
                 "description": f"{lease.responsible_tenant.name} — Aluguel Apto {apt_label}",
-                "amount": lease.rental_value,
+                "amount": lease.apartment.rental_value,
             })
 
         all_totals = (
@@ -1713,14 +1709,14 @@ class FinancialDashboardService:
             apartment__is_rented=True,
             is_salary_offset=True,
         ).select_related("apartment", "apartment__building", "responsible_tenant"):
-            employee_total += lease.rental_value
+            employee_total += lease.apartment.rental_value
             apt_label = f"{lease.apartment.number}/{lease.apartment.building.street_number}"
             employee_details.append(
                 {
                     "expense_id": None,
                     "installment_id": None,
                     "description": f"{lease.responsible_tenant.name} — Aluguel Apto {apt_label}",
-                    "amount": lease.rental_value,
+                    "amount": lease.apartment.rental_value,
                     "notes": "Compensação salarial (aluguel não gera receita)",
                     "category_name": None,
                     "category_color": None,

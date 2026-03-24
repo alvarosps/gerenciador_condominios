@@ -5,7 +5,6 @@ Provides monthly income/expense calculations, cash flow projection,
 and per-person financial summaries.
 """
 
-from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
@@ -77,7 +76,7 @@ class CashFlowService:
         rent_details = []
 
         for lease in leases:
-            rent_income += lease.rental_value
+            rent_income += lease.apartment.rental_value
             payment = rent_payments.get(lease.id)
             rent_details.append(
                 {
@@ -85,7 +84,7 @@ class CashFlowService:
                     "apartment_number": str(lease.apartment.number),
                     "building_name": lease.apartment.building.street_number,
                     "tenant_name": lease.responsible_tenant.name,
-                    "rental_value": lease.rental_value,
+                    "rental_value": lease.apartment.rental_value,
                     "is_paid": payment is not None,
                     "payment_date": payment.payment_date if payment else None,
                 }
@@ -169,13 +168,13 @@ class CashFlowService:
         owner_repayments = Decimal("0.00")
         details = []
         for lease in owner_leases:
-            owner_repayments += lease.rental_value
+            owner_repayments += lease.apartment.rental_value
             details.append(
                 {
                     "person_name": lease.apartment.owner.name,
                     "apartment_number": str(lease.apartment.number),
                     "building_name": lease.apartment.building.street_number,
-                    "amount": lease.rental_value,
+                    "amount": lease.apartment.rental_value,
                 }
             )
         return owner_repayments, details
@@ -573,7 +572,7 @@ class CashFlowService:
             .exclude(is_salary_offset=True)
         )
         for lease in leases:
-            rent_income += lease.rental_value
+            rent_income += lease.apartment.rental_value
 
         # Recurring extra income
         recurring_income = Income.objects.filter(
@@ -598,7 +597,7 @@ class CashFlowService:
             apartment__owner__isnull=False,
         )
         for lease in owner_leases:
-            owner_total += lease.rental_value
+            owner_total += lease.apartment.rental_value
         total += owner_total
 
         # Person stipends
@@ -716,12 +715,12 @@ class CashFlowService:
             except Lease.DoesNotExist:
                 pass
             else:
-                receives += lease.rental_value
+                receives += lease.apartment.rental_value
                 receives_details.append(
                     {
                         "apartment_number": str(apt.number),
                         "building_name": apt.building.street_number,
-                        "rental_value": lease.rental_value,
+                        "rental_value": lease.apartment.rental_value,
                         "source": "apartment_rent",
                     }
                 )
