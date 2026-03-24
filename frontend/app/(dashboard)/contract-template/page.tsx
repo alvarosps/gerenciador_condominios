@@ -366,7 +366,7 @@ export default function ContractTemplatePage() {
                   <li><code className="bg-gray-100 px-1 py-0.5 rounded text-sm">{'{{ rental_value }}'}</code> - Valor do aluguel (número)</li>
                   <li><code className="bg-gray-100 px-1 py-0.5 rounded text-sm">{'{{ cleaning_fee }}'}</code> - Taxa de limpeza</li>
                   <li><code className="bg-gray-100 px-1 py-0.5 rounded text-sm">{'{{ valor_tags }}'}</code> - Valor das tags (50 ou 80)</li>
-                  <li><code className="bg-gray-100 px-1 py-0.5 rounded text-sm">{'{{ lease.due_day }}'}</code> - Dia de vencimento</li>
+                  <li><code className="bg-gray-100 px-1 py-0.5 rounded text-sm">{'{{ tenant.due_day }}'}</code> - Dia de vencimento</li>
                   <li><code className="bg-gray-100 px-1 py-0.5 rounded text-sm">{'{{ lease.number_of_tenants }}'}</code> - Número de inquilinos</li>
                 </ul>
 
@@ -385,8 +385,8 @@ export default function ContractTemplatePage() {
 
                 <h3 className="text-lg font-semibold mb-3">Condicionais</h3>
                 <pre className="bg-gray-100 p-4 rounded text-sm overflow-x-auto">
-{`{% if tenant.deposit_amount and tenant.deposit_amount > 0 %}
-  <p>Caução: {{ tenant.deposit_amount | currency }}</p>
+{`{% if lease.deposit_amount and lease.deposit_amount > 0 %}
+  <p>Caução: {{ lease.deposit_amount | currency }}</p>
 {% endif %}`}
                 </pre>
               </div>
