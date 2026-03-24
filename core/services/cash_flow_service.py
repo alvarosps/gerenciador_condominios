@@ -709,21 +709,18 @@ class CashFlowService:
         receives_details = []
 
         owned_apartments = Apartment.objects.filter(owner=person, is_rented=True).select_related(
-            "building", "lease"
+            "building"
         )
 
         for apt in owned_apartments:
-            try:
-                lease = apt.lease
-            except Lease.DoesNotExist:
-                pass
-            else:
-                receives += lease.apartment.rental_value
+            lease = apt.leases.first()
+            if lease is not None:
+                receives += apt.rental_value
                 receives_details.append(
                     {
                         "apartment_number": str(apt.number),
                         "building_name": apt.building.street_number,
-                        "rental_value": lease.apartment.rental_value,
+                        "rental_value": apt.rental_value,
                         "source": "apartment_rent",
                     }
                 )

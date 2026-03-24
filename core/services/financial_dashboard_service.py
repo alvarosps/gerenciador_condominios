@@ -631,7 +631,7 @@ class FinancialDashboardService:
 
         # All rented apartments with active leases (including owner apartments)
         rented_apartments = Apartment.objects.filter(is_rented=True).select_related(
-            "building", "owner", "lease"
+            "building", "owner"
         )
 
         owner_income_map: dict[str, dict[str, Any]] = {}
@@ -640,9 +640,8 @@ class FinancialDashboardService:
         salary_offset_apartments: list[dict[str, Any]] = []
 
         for apt in rented_apartments:
-            try:
-                lease = apt.lease
-            except Lease.DoesNotExist:
+            lease = apt.leases.first()
+            if lease is None:
                 continue
 
             rental_value = apt.rental_value
