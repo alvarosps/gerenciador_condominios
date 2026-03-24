@@ -27,15 +27,8 @@ export const tenantSchema = z.object({
   marital_status: z.string().optional().nullable(),
   profession: z.string().optional().nullable(),
   is_company: z.boolean().default(false),
-  deposit_amount: z
-    .string()
-    .or(z.number())
-    .optional()
-    .nullable()
-    .transform((val) => (val ? Number(val) : null)),
-  cleaning_fee_paid: z.boolean().optional(),
-  tag_deposit_paid: z.boolean().optional(),
-  rent_due_day: z.number().optional().nullable(),
+  due_day: z.number().optional().nullable(),
+  warning_count: z.number().optional(),
   furnitures: z.array(furnitureSchema).default([]),
   furniture_ids: z.array(z.number()).optional(),
   dependents: z.array(dependentSchema).default([]),
