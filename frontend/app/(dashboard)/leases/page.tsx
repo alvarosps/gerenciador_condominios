@@ -145,7 +145,7 @@ export default function LeasesPage() {
       <div className="mb-4 flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold">Locações</h1>
-          <p className="text-gray-600 mt-1">
+          <p className="text-muted-foreground mt-1">
             Gerencie os contratos de locação dos apartamentos
           </p>
         </div>
@@ -180,8 +180,8 @@ export default function LeasesPage() {
 
       {/* Bulk Selection Banner */}
       {crud.bulkOps.hasSelection && (
-        <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded flex justify-between items-center">
-          <span className="text-blue-700 font-medium">
+        <div className="mb-4 p-4 bg-info/10 border border-info/20 rounded flex justify-between items-center">
+          <span className="text-info font-medium">
             {crud.bulkOps.selectionCount} {crud.bulkOps.selectionCount === 1 ? 'locação selecionada' : 'locações selecionadas'}
           </span>
           <div className="flex gap-2">
