@@ -3,7 +3,12 @@
 import { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Card } from '@/components/ui/card';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
 import {
   Select,
   SelectContent,
@@ -11,7 +16,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { SearchableSelect, type SearchableSelectOption } from '@/components/ui/searchable-select';
 import { Input } from '@/components/ui/input';
 import {
   AlertDialog,
@@ -48,20 +52,19 @@ import { formatCurrency } from '@/lib/utils/formatters';
 import { apartmentExportColumns } from '@/lib/hooks/use-export';
 import { useCrudPage } from '@/lib/hooks/use-crud-page';
 
-export default function ApartmentsPage() {
-  // Page-specific filters state
-  const [filters, setFilters] = useState({
-    building_id: undefined as number | undefined,
-    is_rented: undefined as boolean | undefined,
-    min_price: undefined as number | undefined,
-    max_price: undefined as number | undefined,
-  });
+interface ApartmentFilters {
+  is_rented?: boolean;
+  min_price?: number;
+  max_price?: number;
+}
 
-  const { data: apartments, isLoading, error } = useApartments(filters);
+export default function ApartmentsPage() {
+  const [filtersByBuilding, setFiltersByBuilding] = useState<Record<number, ApartmentFilters>>({});
+
+  const { data: apartments, isLoading, error } = useApartments({});
   const { data: buildings } = useBuildings();
   const deleteMutation = useDeleteApartment();
 
-  // Use the consolidated CRUD hook for all state management
   const crud = useCrudPage<Apartment>({
     entityName: 'apartamento',
     entityNamePlural: 'apartamentos',
@@ -72,39 +75,45 @@ export default function ApartmentsPage() {
     deleteErrorMessage: 'Erro ao excluir apartamento. Verifique se não há locações vinculadas.',
   });
 
-  const buildingOptions: SearchableSelectOption[] = useMemo(() => {
-    const options: SearchableSelectOption[] = [{ value: 'all', label: 'Todos os prédios' }];
-    buildings?.forEach((b) => {
-      options.push({
-        value: String(b.id),
-        label: `${b.name} - ${b.street_number}`,
-      });
+  const groupedApartments = useMemo(() => {
+    const map = new Map<number, Apartment[]>();
+    apartments?.forEach((apt) => {
+      const buildingId = apt.building?.id;
+      if (buildingId === undefined) return;
+      const existing = map.get(buildingId) ?? [];
+      existing.push(apt);
+      map.set(buildingId, existing);
     });
-    return options;
-  }, [buildings]);
+    return map;
+  }, [apartments]);
 
-  const clearFilters = () => {
-    setFilters({
-      building_id: undefined,
-      is_rented: undefined,
-      min_price: undefined,
-      max_price: undefined,
+  const getFilters = (buildingId: number): ApartmentFilters =>
+    filtersByBuilding[buildingId] ?? {};
+
+  const updateFilter = (buildingId: number, updates: Partial<ApartmentFilters>): void => {
+    setFiltersByBuilding((prev) => ({
+      ...prev,
+      [buildingId]: { ...getFilters(buildingId), ...updates },
+    }));
+  };
+
+  const clearFilters = (buildingId: number): void => {
+    setFiltersByBuilding((prev) =>
+      Object.fromEntries(Object.entries(prev).filter(([key]) => Number(key) !== buildingId)),
+    );
+  };
+
+  const getFilteredApartments = (buildingId: number, apts: Apartment[]): Apartment[] => {
+    const filters = getFilters(buildingId);
+    return apts.filter((apt) => {
+      if (filters.is_rented !== undefined && apt.is_rented !== filters.is_rented) return false;
+      if (filters.min_price !== undefined && apt.rental_value < filters.min_price) return false;
+      if (filters.max_price !== undefined && apt.rental_value > filters.max_price) return false;
+      return true;
     });
   };
 
   const columns: Column<Apartment>[] = [
-    {
-      title: 'Prédio',
-      key: 'building',
-      width: 200,
-      render: (_, record) => (
-        <div>
-          <div className="font-medium">{record.building?.name}</div>
-          <div className="text-xs text-muted-foreground">Nº {record.building?.street_number}</div>
-        </div>
-      ),
-      sorter: (a: Apartment, b: Apartment) => (a.building?.name ?? '').localeCompare(b.building?.name ?? ''),
-    },
     {
       title: 'Apto',
       dataIndex: 'number',
@@ -133,10 +142,14 @@ export default function ApartmentsPage() {
       key: 'is_rented',
       width: 120,
       render: (value) => (
-        <Badge variant={value ? 'destructive' : 'default'} className={value ? '' : 'bg-success text-success-foreground'}>
+        <Badge
+          variant={value ? 'destructive' : 'default'}
+          className={value ? '' : 'bg-success text-success-foreground'}
+        >
           {value ? 'Alugado' : 'Disponível'}
         </Badge>
       ),
+      sorter: (a: Apartment, b: Apartment) => Number(a.is_rented) - Number(b.is_rented),
       filters: [
         { text: 'Disponível', value: false },
         { text: 'Alugado', value: true },
@@ -168,11 +181,7 @@ export default function ApartmentsPage() {
       fixed: 'right',
       render: (_, record: Apartment) => (
         <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => crud.openEditModal(record)}
-          >
+          <Button variant="ghost" size="sm" onClick={() => crud.openEditModal(record)}>
             <Pencil className="h-4 w-4 mr-1" />
             Editar
           </Button>
@@ -196,8 +205,6 @@ export default function ApartmentsPage() {
   if (error) {
     toast.error('Erro ao carregar apartamentos');
   }
-
-  const hasActiveFilters = Object.values(filters).some((value) => value !== undefined);
 
   return (
     <div>
@@ -240,7 +247,8 @@ export default function ApartmentsPage() {
       {crud.bulkOps.hasSelection && (
         <div className="mb-4 p-4 bg-primary/5 border border-primary/20 rounded flex justify-between items-center">
           <span className="text-primary font-medium">
-            {crud.bulkOps.selectionCount} {crud.bulkOps.selectionCount === 1 ? 'apartamento selecionado' : 'apartamentos selecionados'}
+            {crud.bulkOps.selectionCount}{' '}
+            {crud.bulkOps.selectionCount === 1 ? 'apartamento selecionado' : 'apartamentos selecionados'}
           </span>
           <div className="flex gap-2">
             <Button variant="outline" onClick={crud.bulkOps.clearSelection}>
@@ -258,92 +266,107 @@ export default function ApartmentsPage() {
         </div>
       )}
 
-      {/* Filters */}
-      <Card className="mb-4 p-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div>
-            <label className="block text-sm font-medium mb-2">Prédio</label>
-            <SearchableSelect
-              value={filters.building_id ? String(filters.building_id) : 'all'}
-              onValueChange={(value) =>
-                setFilters({ ...filters, building_id: value === 'all' ? undefined : Number(value) })
-              }
-              options={buildingOptions}
-              placeholder="Todos os prédios"
-              searchPlaceholder="Buscar prédio..."
-            />
-          </div>
+      <Accordion type="multiple" className="space-y-4">
+        {buildings?.map((building) => {
+          const buildingId = building.id;
+          if (buildingId === undefined) return null;
+          const apts = groupedApartments.get(buildingId) ?? [];
+          const filteredApts = getFilteredApartments(buildingId, apts);
+          const filters = getFilters(buildingId);
+          const hasActiveFilters =
+            filters.is_rented !== undefined ||
+            filters.min_price !== undefined ||
+            filters.max_price !== undefined;
 
-          <div>
-            <label className="block text-sm font-medium mb-2">Status</label>
-            <Select
-              value={filters.is_rented !== undefined ? String(filters.is_rented) : undefined}
-              onValueChange={(value) =>
-                setFilters({
-                  ...filters,
-                  is_rented: value ? value === 'true' : undefined,
-                })
-              }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Todos" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="false">Disponível</SelectItem>
-                <SelectItem value="true">Alugado</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          return (
+            <AccordionItem key={buildingId} value={String(buildingId)}>
+              <AccordionTrigger className="px-4">
+                <div className="flex items-center gap-2">
+                  <span>
+                    {building.name} — Nº {building.street_number}
+                  </span>
+                  <Badge variant="secondary">{apts.length} apartamentos</Badge>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="px-4 pb-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Status</label>
+                    <Select
+                      value={
+                        filters.is_rented !== undefined ? String(filters.is_rented) : undefined
+                      }
+                      onValueChange={(value) =>
+                        updateFilter(buildingId, {
+                          is_rented: value ? value === 'true' : undefined,
+                        })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Todos" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="false">Disponível</SelectItem>
+                        <SelectItem value="true">Alugado</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-2">Valor Mínimo</label>
-            <Input
-              type="number"
-              placeholder="R$ 0"
-              value={filters.min_price ?? ''}
-              onChange={(e) =>
-                setFilters({
-                  ...filters,
-                  min_price: e.target.value ? Number(e.target.value) : undefined,
-                })
-              }
-              min={0}
-            />
-          </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Valor Mínimo</label>
+                    <Input
+                      type="number"
+                      placeholder="R$ 0"
+                      value={filters.min_price ?? ''}
+                      onChange={(e) =>
+                        updateFilter(buildingId, {
+                          min_price: e.target.value ? Number(e.target.value) : undefined,
+                        })
+                      }
+                      min={0}
+                    />
+                  </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-2">Valor Máximo</label>
-            <Input
-              type="number"
-              placeholder="R$ 99999"
-              value={filters.max_price ?? ''}
-              onChange={(e) =>
-                setFilters({
-                  ...filters,
-                  max_price: e.target.value ? Number(e.target.value) : undefined,
-                })
-              }
-              min={0}
-            />
-          </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Valor Máximo</label>
+                    <Input
+                      type="number"
+                      placeholder="R$ 99999"
+                      value={filters.max_price ?? ''}
+                      onChange={(e) =>
+                        updateFilter(buildingId, {
+                          max_price: e.target.value ? Number(e.target.value) : undefined,
+                        })
+                      }
+                      min={0}
+                    />
+                  </div>
 
-          {hasActiveFilters && (
-            <div className="flex items-end">
-              <Button variant="outline" onClick={clearFilters} className="w-full">
-                Limpar Filtros
-              </Button>
-            </div>
-          )}
-        </div>
-      </Card>
+                  {hasActiveFilters && (
+                    <div className="flex items-end">
+                      <Button
+                        variant="outline"
+                        onClick={() => clearFilters(buildingId)}
+                        className="w-full"
+                      >
+                        Limpar Filtros
+                      </Button>
+                    </div>
+                  )}
+                </div>
 
-      <DataTable<Apartment>
-        columns={columns}
-        dataSource={apartments}
-        loading={isLoading}
-        rowKey="id"
-        rowSelection={crud.bulkOps.rowSelection}
-      />
+                <DataTable<Apartment>
+                  columns={columns}
+                  dataSource={filteredApts}
+                  loading={isLoading}
+                  rowKey="id"
+                  rowSelection={crud.bulkOps.rowSelection}
+                />
+              </AccordionContent>
+            </AccordionItem>
+          );
+        })}
+      </Accordion>
 
       <ApartmentFormModal
         open={crud.isModalOpen}
@@ -356,7 +379,9 @@ export default function ApartmentsPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir apartamento</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja excluir o apartamento {crud.itemToDelete?.number ? `nº ${crud.itemToDelete.number}` : ''}? Esta ação não pode ser desfeita.
+              Tem certeza que deseja excluir o apartamento{' '}
+              {crud.itemToDelete?.number ? `nº ${crud.itemToDelete.number}` : ''}? Esta ação não
+              pode ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -378,8 +403,8 @@ export default function ApartmentsPage() {
             <AlertDialogTitle>Excluir apartamentos selecionados</AlertDialogTitle>
             <AlertDialogDescription>
               Tem certeza que deseja excluir {crud.bulkOps.selectionCount}{' '}
-              {crud.bulkOps.selectionCount === 1 ? 'apartamento' : 'apartamentos'}? Esta ação não pode
-              ser desfeita.
+              {crud.bulkOps.selectionCount === 1 ? 'apartamento' : 'apartamentos'}? Esta ação não
+              pode ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
