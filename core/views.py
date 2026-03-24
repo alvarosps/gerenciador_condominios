@@ -28,6 +28,7 @@ from .serializers import (
     TenantSerializer,
 )
 from .services import ContractService, DashboardService, FeeCalculatorService
+from .services.lease_service import terminate_lease, transfer_lease
 
 logger = logging.getLogger(__name__)
 
@@ -457,6 +458,34 @@ class LeaseViewSet(viewsets.ModelViewSet):
                 {"error": "Erro interno ao alterar vencimento"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+    @action(detail=True, methods=["post"], url_path="terminate")
+    def terminate(self, request: Request, pk: int | None = None) -> Response:
+        """Terminate a lease contract."""
+        if not request.user.is_staff:
+            return Response(
+                {"detail": "Apenas administradores podem encerrar contratos."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        lease = self.get_object()
+        terminate_lease(lease.id, request.user)
+        return Response({"detail": "Contrato encerrado com sucesso."}, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"], url_path="transfer")
+    def transfer(self, request: Request, pk: int | None = None) -> Response:
+        """Transfer a lease to a new apartment."""
+        if not request.user.is_staff:
+            return Response(
+                {"detail": "Apenas administradores podem transferir contratos."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        lease = self.get_object()
+        try:
+            new_lease = transfer_lease(lease.id, request.data.copy(), request.user)
+        except ValueError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        serializer = self.get_serializer(new_lease)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
 class DashboardViewSet(viewsets.ViewSet):
