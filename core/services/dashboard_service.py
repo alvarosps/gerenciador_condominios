@@ -13,7 +13,7 @@ Provides:
 import logging
 from datetime import date, timedelta
 from decimal import Decimal
-from typing import Any
+from typing import Any, cast
 
 from django.db.models import Count, Q, Sum
 from django.db.models.functions import Coalesce
@@ -312,8 +312,8 @@ class DashboardService:
             )
 
             if result["is_late"]:
-                late_days = result["late_days"]
-                late_fee = result["late_fee"]
+                late_days = cast(int, result["late_days"])
+                late_fee = cast(Decimal, result["late_fee"])
                 total_late_fees += late_fee
                 total_late_days += late_days
 

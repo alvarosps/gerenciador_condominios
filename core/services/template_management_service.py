@@ -232,7 +232,7 @@ class TemplateManagementService:
         return html_content
 
     @classmethod
-    def list_backups(cls) -> list[dict[str, str]]:
+    def list_backups(cls) -> list[dict[str, object]]:
         """
         List all template backups.
 

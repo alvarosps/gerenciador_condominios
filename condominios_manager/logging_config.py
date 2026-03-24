@@ -27,7 +27,7 @@ class WindowsSafeRotatingFileHandler(logging.handlers.RotatingFileHandler):
     try to rotate the same log file simultaneously.
     """
 
-    def doRollover(self):
+    def doRollover(self) -> None:
         """
         Do a rollover, catching Windows permission errors.
 

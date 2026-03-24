@@ -16,6 +16,7 @@ import logging
 from django.core.exceptions import ObjectDoesNotExist
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
+from rest_framework.request import Request
 from rest_framework.response import Response
 
 from ..permissions import IsAdminUser
@@ -37,7 +38,7 @@ class ContractTemplateViewSet(viewsets.ViewSet):
     permission_classes = [IsAdminUser]
 
     @action(detail=False, methods=["get"], url_path="current")
-    def get_template(self, request):
+    def get_template(self, request: Request) -> Response:
         """
         Get current contract template HTML.
 
@@ -72,7 +73,7 @@ class ContractTemplateViewSet(viewsets.ViewSet):
             )
 
     @action(detail=False, methods=["post"], url_path="save")
-    def save_template(self, request):
+    def save_template(self, request: Request) -> Response:
         """
         Save contract template HTML with automatic backup.
 
@@ -126,7 +127,7 @@ class ContractTemplateViewSet(viewsets.ViewSet):
             )
 
     @action(detail=False, methods=["post"], url_path="preview")
-    def preview_template(self, request):
+    def preview_template(self, request: Request) -> Response:
         """
         Render template with sample data for preview.
 
@@ -172,7 +173,7 @@ class ContractTemplateViewSet(viewsets.ViewSet):
             )
 
     @action(detail=False, methods=["get"], url_path="backups")
-    def list_backups(self, request):
+    def list_backups(self, request: Request) -> Response:
         """
         List all template backups.
 
@@ -212,7 +213,7 @@ class ContractTemplateViewSet(viewsets.ViewSet):
             )
 
     @action(detail=False, methods=["post"], url_path="restore")
-    def restore_backup(self, request):
+    def restore_backup(self, request: Request) -> Response:
         """
         Restore a template from backup.
 

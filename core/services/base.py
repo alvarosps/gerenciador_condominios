@@ -5,19 +5,16 @@ Provides a foundation for domain-specific services with generic
 database operations using Django ORM.
 """
 
-from __future__ import annotations
-
 import logging
-from typing import Generic, TypeVar
+from typing import Any
 
+from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Model, QuerySet
-
-ModelType = TypeVar("ModelType", bound=Model)
 
 logger = logging.getLogger(__name__)
 
 
-class BaseService(Generic[ModelType]):
+class BaseService[ModelType: Model]:
     """
     Generic base service class for common CRUD operations.
 
@@ -51,7 +48,7 @@ class BaseService(Generic[ModelType]):
             >>> queryset = service.get_queryset()
             >>> active_leases = queryset.filter(contract_generated=True)
         """
-        return self.model.objects.all()
+        return self.model._default_manager.all()
 
     def get_by_id(self, pk: int) -> ModelType | None:
         """
@@ -71,7 +68,7 @@ class BaseService(Generic[ModelType]):
         """
         try:
             instance = self.get_queryset().get(pk=pk)
-        except self.model.DoesNotExist:
+        except ObjectDoesNotExist:
             self.logger.warning(f"{self.model.__name__} with id {pk} not found")
             return None
         else:
@@ -94,7 +91,7 @@ class BaseService(Generic[ModelType]):
         self.logger.debug(f"Retrieved {len(instances)} {self.model.__name__} instances")
         return instances
 
-    def create(self, **kwargs) -> ModelType:
+    def create(self, **kwargs: Any) -> ModelType:
         """
         Create a new object.
 
@@ -115,7 +112,7 @@ class BaseService(Generic[ModelType]):
         self.logger.info(f"Created {self.model.__name__} with id {instance.pk}")
         return instance
 
-    def update(self, instance: ModelType, **kwargs) -> ModelType:
+    def update(self, instance: ModelType, **kwargs: Any) -> ModelType:
         """
         Update an existing object.
 
@@ -188,7 +185,7 @@ class BaseService(Generic[ModelType]):
         self.logger.debug(f"Total {self.model.__name__} count: {count}")
         return count
 
-    def filter(self, **kwargs) -> list[ModelType]:
+    def filter(self, **kwargs: Any) -> list[ModelType]:
         """
         Filter objects by field values.
 
