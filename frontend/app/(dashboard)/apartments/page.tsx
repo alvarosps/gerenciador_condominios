@@ -266,6 +266,14 @@ export default function ApartmentsPage() {
         </div>
       )}
 
+      {isLoading ? (
+        <div className="flex items-center justify-center p-12 border rounded-md">
+          <div className="flex flex-col items-center gap-2">
+            <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+            <p className="text-sm text-muted-foreground">Carregando apartamentos...</p>
+          </div>
+        </div>
+      ) : (
       <Accordion type="multiple" className="space-y-4">
         {buildings?.map((building) => {
           const buildingId = building.id;
@@ -370,6 +378,7 @@ export default function ApartmentsPage() {
           );
         })}
       </Accordion>
+      )}
 
       <ApartmentFormModal
         open={crud.isModalOpen}
