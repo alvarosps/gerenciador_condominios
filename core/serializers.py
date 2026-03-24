@@ -61,6 +61,34 @@ class PersonSimpleSerializer(serializers.ModelSerializer):
         ]
 
 
+class TenantSimpleSerializer(serializers.ModelSerializer):
+    """Simplified TenantSerializer with only id and name."""
+
+    class Meta:
+        model = Tenant
+        fields = ["id", "name"]
+        read_only_fields = fields
+
+
+class LeaseNestedForApartmentSerializer(serializers.ModelSerializer):
+    """Lightweight lease info for embedding in ApartmentSerializer."""
+
+    responsible_tenant = TenantSimpleSerializer(read_only=True)
+
+    class Meta:
+        model = Lease
+        fields = [
+            "id",
+            "contract_generated",
+            "contract_signed",
+            "interfone_configured",
+            "start_date",
+            "validity_months",
+            "responsible_tenant",
+        ]
+        read_only_fields = fields
+
+
 class ApartmentSerializer(serializers.ModelSerializer):
     furnitures = FurnitureSerializer(many=True, read_only=True)
     furniture_ids = serializers.PrimaryKeyRelatedField(
@@ -78,6 +106,7 @@ class ApartmentSerializer(serializers.ModelSerializer):
         required=False,
         allow_null=True,
     )
+    lease = LeaseNestedForApartmentSerializer(read_only=True)
 
     class Meta:
         model = Apartment
@@ -86,20 +115,18 @@ class ApartmentSerializer(serializers.ModelSerializer):
             "building",
             "building_id",
             "number",
-            "interfone_configured",
-            "contract_generated",
-            "contract_signed",
             "rental_value",
             "cleaning_fee",
             "max_tenants",
             "is_rented",
-            "lease_date",
             "last_rent_increase_date",
             "furnitures",
             "furniture_ids",
             "owner",
             "owner_id",
+            "lease",
         ]
+        read_only_fields = ["is_rented"]
 
     def create(self, validated_data):
         """Create apartment with furniture relationships."""
@@ -110,18 +137,8 @@ class ApartmentSerializer(serializers.ModelSerializer):
         return apartment
 
     def update(self, instance, validated_data):
-        """Update apartment with furniture relationships and sync rental_value to lease."""
+        """Update apartment with furniture relationships."""
         furniture_ids = validated_data.pop("furniture_ids", None)
-
-        # Track if rental_value or cleaning_fee changed for lease sync
-        rental_value_changed = (
-            "rental_value" in validated_data
-            and validated_data["rental_value"] != instance.rental_value
-        )
-        cleaning_fee_changed = (
-            "cleaning_fee" in validated_data
-            and validated_data["cleaning_fee"] != instance.cleaning_fee
-        )
 
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
@@ -129,23 +146,6 @@ class ApartmentSerializer(serializers.ModelSerializer):
 
         if furniture_ids is not None:
             instance.furnitures.set(furniture_ids)
-
-        # Sync rental_value and cleaning_fee to active lease if changed
-        if (rental_value_changed or cleaning_fee_changed) and hasattr(instance, "lease"):
-            lease = instance.lease
-            if rental_value_changed:
-                lease.rental_value = instance.rental_value
-            if cleaning_fee_changed:
-                lease.cleaning_fee = instance.cleaning_fee
-            # Use update_fields to avoid triggering lease validation
-            update_fields = []
-            if rental_value_changed:
-                update_fields.append("rental_value")
-            if cleaning_fee_changed:
-                update_fields.append("cleaning_fee")
-            Lease.objects.filter(pk=lease.pk).update(
-                **{f: getattr(lease, f) for f in update_fields}
-            )
 
         return instance
 
@@ -184,10 +184,8 @@ class TenantSerializer(serializers.ModelSerializer):
             "phone",
             "marital_status",
             "profession",
-            "deposit_amount",
-            "cleaning_fee_paid",
-            "tag_deposit_paid",
-            "rent_due_day",
+            "due_day",
+            "warning_count",
             "dependents",
             "furnitures",
             "furniture_ids",
@@ -291,47 +289,28 @@ class LeaseSerializer(serializers.ModelSerializer):
             "number_of_tenants",
             "start_date",
             "validity_months",
-            "due_day",
-            "rental_value",
-            "cleaning_fee",
             "tag_fee",
+            "deposit_amount",
+            "cleaning_fee_paid",
+            "tag_deposit_paid",
             "contract_generated",
             "contract_signed",
             "interfone_configured",
-            "warning_count",
             "prepaid_until",
             "is_salary_offset",
         ]
 
     def create(self, validated_data):
-        """Create lease and sync rental_value/cleaning_fee to apartment."""
+        """Create lease with tenant relationships."""
         tenants = validated_data.pop("tenants", [])
         lease = Lease.objects.create(**validated_data)
         if tenants:
             lease.tenants.set(tenants)
-
-        # Sync rental_value and cleaning_fee to apartment
-        apartment = lease.apartment
-        Apartment.objects.filter(pk=apartment.pk).update(
-            rental_value=lease.rental_value,
-            cleaning_fee=lease.cleaning_fee,
-        )
-
         return lease
 
     def update(self, instance, validated_data):
-        """Update lease and sync rental_value/cleaning_fee to apartment."""
+        """Update lease with tenant relationships."""
         tenants = validated_data.pop("tenants", None)
-
-        # Track if rental_value or cleaning_fee changed for apartment sync
-        rental_value_changed = (
-            "rental_value" in validated_data
-            and validated_data["rental_value"] != instance.rental_value
-        )
-        cleaning_fee_changed = (
-            "cleaning_fee" in validated_data
-            and validated_data["cleaning_fee"] != instance.cleaning_fee
-        )
 
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
@@ -339,15 +318,6 @@ class LeaseSerializer(serializers.ModelSerializer):
 
         if tenants is not None:
             instance.tenants.set(tenants)
-
-        # Sync rental_value and cleaning_fee to apartment if changed
-        if rental_value_changed or cleaning_fee_changed:
-            update_data = {}
-            if rental_value_changed:
-                update_data["rental_value"] = instance.rental_value
-            if cleaning_fee_changed:
-                update_data["cleaning_fee"] = instance.cleaning_fee
-            Apartment.objects.filter(pk=instance.apartment_id).update(**update_data)
 
         return instance
 
@@ -711,10 +681,7 @@ class PersonIncomeSerializer(serializers.ModelSerializer):
 
     def get_current_value(self, obj) -> str:
         if obj.income_type == "apartment_rent" and obj.apartment:
-            lease = getattr(obj.apartment, "lease", None)
-            if lease:
-                return str(lease.rental_value)
-            return str(Decimal(0))
+            return str(obj.apartment.rental_value)
         if obj.income_type == "fixed_stipend" and obj.fixed_amount:
             return str(obj.fixed_amount)
         return str(Decimal(0))
