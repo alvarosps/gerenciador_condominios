@@ -119,7 +119,7 @@ export function Sidebar() {
   };
 
   return (
-    <div className="h-full bg-white flex flex-col">
+    <div className="h-full bg-card flex flex-col">
       <div className="p-4 border-b">
         <h1 className="text-xl font-bold text-primary">Condomínios Manager</h1>
       </div>
