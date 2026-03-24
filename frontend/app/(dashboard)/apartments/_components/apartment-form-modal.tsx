@@ -78,7 +78,7 @@ export function ApartmentFormModal({ open, apartment, onClose }: Props) {
   useEffect(() => {
     if (apartment) {
       formMethods.reset({
-        building_id: apartment.building_id,
+        building_id: apartment.building?.id,
         number: apartment.number,
         rental_value: apartment.rental_value,
         cleaning_fee: apartment.cleaning_fee,

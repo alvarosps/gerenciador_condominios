@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
@@ -44,6 +43,7 @@ import { toast } from 'sonner';
 import { DataTable, type Column } from '@/components/tables/data-table';
 import { TenantFormWizard } from './_components/tenant-form-wizard';
 import { TenantLeaseModal } from './_components/tenant-lease-modal';
+import { ContractViewModal } from './_components/contract-view-modal';
 import {
   useTenants,
   useDeleteTenant,
@@ -56,8 +56,6 @@ import { tenantExportColumns } from '@/lib/hooks/use-export';
 import { useCrudPage } from '@/lib/hooks/use-crud-page';
 
 export default function TenantsPage() {
-  const router = useRouter();
-
   // Page-specific filters state
   const [filters, setFilters] = useState({
     is_company: undefined as boolean | undefined,
@@ -90,6 +88,9 @@ export default function TenantsPage() {
     setSelectedTenant(null);
     setSelectedLease(null);
   };
+
+  // Contract view modal state
+  const [contractViewLease, setContractViewLease] = useState<Lease | null>(null);
 
   // Use the consolidated CRUD hook for all state management
   const crud = useCrudPage<Tenant>({
@@ -162,6 +163,11 @@ export default function TenantsPage() {
       key: 'has_lease',
       width: 130,
       align: 'center' as const,
+      sorter: (a: Tenant, b: Tenant) => {
+        const aHas = a.id !== undefined && leaseByTenantId.has(a.id) ? 1 : 0;
+        const bHas = b.id !== undefined && leaseByTenantId.has(b.id) ? 1 : 0;
+        return aHas - bHas;
+      },
       render: (_: unknown, record: Tenant) => {
         const lease = record.id !== undefined ? leaseByTenantId.get(record.id) : undefined;
         return (
@@ -228,7 +234,7 @@ export default function TenantsPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => router.push('/leases')}
+            onClick={() => setContractViewLease(lease)}
           >
             Ver
           </Button>
@@ -413,6 +419,7 @@ export default function TenantsPage() {
         loading={isLoading || leasesLoading}
         rowKey="id"
         rowSelection={crud.bulkOps.rowSelection}
+        pagination={{ pageSize: 50 }}
       />
 
       <TenantFormWizard
@@ -430,6 +437,12 @@ export default function TenantsPage() {
           onClose={closeTenantLeaseModal}
         />
       )}
+
+      <ContractViewModal
+        open={contractViewLease !== null}
+        lease={contractViewLease}
+        onClose={() => setContractViewLease(null)}
+      />
 
       <AlertDialog open={crud.deleteDialogOpen} onOpenChange={crud.setDeleteDialogOpen}>
         <AlertDialogContent>
