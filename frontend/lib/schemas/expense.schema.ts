@@ -36,6 +36,7 @@ export const expenseSchema = z.object({
   recurrence_day: z.number().nullable().optional(),
   is_paid: z.boolean().default(false),
   paid_date: z.string().nullable().optional(),
+  end_date: z.string().nullable().optional(),
   bank_name: z.string().optional().default(''),
   interest_rate: z
     .string()

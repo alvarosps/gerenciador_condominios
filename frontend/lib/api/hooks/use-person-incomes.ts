@@ -51,9 +51,8 @@ export function useUpdatePersonIncome() {
       const response = await apiClient.put<PersonIncome>(`/person-incomes/${data.id}/`, updateData);
       return response.data;
     },
-    onSuccess: (data) => {
+    onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['person-incomes'] });
-      void queryClient.invalidateQueries({ queryKey: ['person-incomes', data.id] });
       void queryClient.invalidateQueries({ queryKey: ['cash-flow'] });
     },
   });

@@ -855,6 +855,12 @@ class PersonPaymentSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
 
+    def validate_reference_month(self, value):
+        if value.day != 1:
+            msg = "O mês de referência deve ser o primeiro dia do mês."
+            raise serializers.ValidationError(msg)
+        return value
+
 
 class FinancialSettingsSerializer(serializers.ModelSerializer):
     class Meta:

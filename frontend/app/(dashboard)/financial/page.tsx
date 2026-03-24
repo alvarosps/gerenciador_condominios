@@ -1,30 +1,60 @@
 'use client';
 
-import { BalanceCards } from './_components/balance-cards';
+import { Card, CardContent } from '@/components/ui/card';
+import { useDashboardSummary } from '@/lib/api/hooks/use-financial-dashboard';
+import { formatMonthYear } from '@/lib/utils/formatters';
+import { BalanceCards, BalanceCardsSkeleton } from './_components/balance-cards';
+import { IncomeSummaryCard } from './_components/income-summary-card';
+import { ExpenseSummaryCard } from './_components/expense-summary-card';
+import { OverdueSection } from './_components/overdue-section';
 import { CashFlowChart } from './_components/cash-flow-chart';
-import { PersonSummaryCards } from './_components/person-summary-cards';
-import { UpcomingInstallments } from './_components/upcoming-installments';
-import { OverdueAlerts } from './_components/overdue-alerts';
 import { CategoryBreakdownChart } from './_components/category-breakdown-chart';
 
 export default function FinancialDashboardPage() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth() + 1;
+  const { data, isLoading, error } = useDashboardSummary(year, month);
+  const monthLabel = formatMonthYear(year, month);
+
   return (
     <div className="space-y-6">
       <div className="mb-2">
         <h1 className="text-3xl font-bold">Dashboard Financeiro</h1>
-        <p className="text-gray-600 mt-1">Visão geral das finanças</p>
+        <p className="text-gray-600 mt-1">Visão geral das finanças — {monthLabel}</p>
       </div>
 
-      <BalanceCards />
+      {isLoading && <BalanceCardsSkeleton />}
 
-      <CashFlowChart />
+      {error && !data && (
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-center text-muted-foreground">Erro ao carregar dashboard</p>
+          </CardContent>
+        </Card>
+      )}
 
-      <PersonSummaryCards />
+      {data && (
+        <>
+          <BalanceCards data={data} monthLabel={monthLabel} />
+          <IncomeSummaryCard data={data} monthLabel={monthLabel} />
+          <ExpenseSummaryCard data={data} monthLabel={monthLabel} />
+          <OverdueSection items={data.overdue_items} />
+        </>
+      )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <UpcomingInstallments />
-        <OverdueAlerts />
-      </div>
+      <CashFlowChart
+        currentMonthOverride={
+          data
+            ? {
+                year,
+                month,
+                income: data.current_month_income,
+                expenses: data.current_month_expenses,
+              }
+            : undefined
+        }
+      />
 
       <CategoryBreakdownChart />
     </div>

@@ -84,6 +84,7 @@ const expenseFormSchema = z.object({
   recurrence_day: z.number().nullable(),
   bank_name: z.string(),
   interest_rate: z.number().nullable(),
+  end_date: z.string().nullable(),
   notes: z.string(),
 });
 
@@ -161,6 +162,7 @@ export function ExpenseFormModal({ open, expense, onClose }: Props) {
       recurrence_day: null,
       bank_name: '',
       interest_rate: null,
+      end_date: null,
       notes: '',
     },
   });
@@ -212,6 +214,7 @@ export function ExpenseFormModal({ open, expense, onClose }: Props) {
         recurrence_day: expense.recurrence_day ?? null,
         bank_name: expense.bank_name ?? '',
         interest_rate: expense.interest_rate ?? null,
+        end_date: expense.end_date ?? null,
         notes: expense.notes ?? '',
       });
     } else {
@@ -233,6 +236,7 @@ export function ExpenseFormModal({ open, expense, onClose }: Props) {
         recurrence_day: null,
         bank_name: '',
         interest_rate: null,
+        end_date: null,
         notes: '',
       });
     }
@@ -272,9 +276,8 @@ export function ExpenseFormModal({ open, expense, onClose }: Props) {
 
       onClose();
       form.reset();
-    } catch (error) {
+    } catch {
       toast.error('Erro ao salvar despesa');
-      console.error('Save error:', error);
     }
   };
 
@@ -740,6 +743,23 @@ export function ExpenseFormModal({ open, expense, onClose }: Props) {
                               onChange={(e) =>
                                 field.onChange(e.target.value ? Number(e.target.value) : null)
                               }
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="end_date"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Data de T\u00e9rmino (opcional)</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="date"
+                              value={field.value ?? ''}
+                              onChange={(e) => field.onChange(e.target.value || null)}
                             />
                           </FormControl>
                           <FormMessage />

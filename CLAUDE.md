@@ -27,6 +27,16 @@ Building (street_number unique) → Apartment (number unique per building)
 Apartment → Lease (OneToOne) → Tenant (responsible + M2M via LeaseTenant)
 Tenant (cpf_cnpj unique) → Dependent (FK)
 Furniture ↔ Apartment (M2M), Furniture ↔ Tenant (M2M)
+
+--- Módulo Financeiro (ver docs/LESSONS_LEARNED.md para detalhes completos) ---
+Person → CreditCard (1:N), PersonIncome (1:N), PersonPayment (1:N), EmployeePayment (1:N)
+Expense → ExpenseInstallment (1:N), vinculado opcionalmente a Person, CreditCard, Building, ExpenseCategory
+ExpenseCategory → subcategorias (self FK via parent)
+Income, RentPayment, FinancialSettings (singleton)
+Apartment.owner → Person (kitnets com owner = receita repassada, não do condomínio)
+Lease.prepaid_until, Lease.is_salary_offset — casos especiais de aluguel
+Expense.is_offset — descontos (subtraídos do total da pessoa, SEMPRE filtrar com is_offset=False)
+Expense.end_date — data fim para gastos fixos recorrentes
 ```
 
 **Mixins em todos os models:** `AuditMixin` (created/updated_at/by), `SoftDeleteMixin` (is_deleted, deleted_at/by)
@@ -91,13 +101,28 @@ npm run lint && npm run type-check            # ESLint + TypeScript
 - Templates: `/api/templates/current/`, `save/`, `backups/`, `restore/`, `preview/`
 - Dashboard: `financial_summary/`, `late_payment_summary/`, `lease_metrics/`, `tenant_statistics/`, `building_statistics/`
 - Export: `/api/{resource}/export/excel/`, `/api/{resource}/export/csv/`
+- Financeiro CRUD: `persons`, `credit-cards`, `expense-categories`, `expenses`, `expense-installments`, `incomes`, `rent-payments`, `employee-payments`, `person-incomes`, `person-payments`, `financial-settings`
+- Financeiro Dashboard: `financial-dashboard/{overview,debt_by_person,debt_by_type,upcoming_installments,overdue_installments,category_breakdown}`
+- Financeiro Cash Flow: `cash-flow/{monthly,projection,person_summary,simulate}`
+- Financeiro Controle Diário: `daily-control/{breakdown,summary,mark_paid}`
 
 ## Migrations
 
-Sequenciais: 0001 (initial) → 0012 (financial module). `LeaseTenant` usa `db_table='core_lease_tenant_details'`.
+Sequenciais: 0001 (initial) → 0016 (expense end_date). `LeaseTenant` usa `db_table='core_lease_tenant_details'`.
+Financeiro: 0012 (financial module) → 0013 (category parent) → 0014 (is_offset) → 0015 (person payment) → 0016 (end_date)
 
 ## Env Vars
 
-- Backend `.env`: `SECRET_KEY`, `DEBUG`, `DATABASE_URL`, `GOOGLE_CLIENT_ID/SECRET`
+- Backend `.env`: `SECRET_KEY`, `DEBUG`, `DB_PORT` (default 5432, atualmente 5433), `GOOGLE_CLIENT_ID/SECRET`
 - Frontend `.env.local`: `NEXT_PUBLIC_API_URL=http://localhost:8000/api`
 - CORS: `localhost:4000`, `localhost:6000`
+
+## Documentação do Módulo Financeiro
+
+- **LEIA PRIMEIRO**: `docs/LESSONS_LEARNED.md` — contexto completo do negócio, todas as regras, armadilhas, e decisões arquiteturais
+- Design doc: `docs/plans/2026-03-21-financial-module-design.md`
+- Prompts de sessão: `prompts/01-*.md` a `prompts/20-*.md`
+- Estado das sessões: `prompts/SESSION_STATE.md`
+- Dados iniciais: `scripts/data/financial_data_template.json`
+- Script importação: `scripts/import_financial_data.py` (suporta `--dry-run` e `--clear-first`)
+- Parser faturas Itaú: `scripts/parse_itau_fatura.py`

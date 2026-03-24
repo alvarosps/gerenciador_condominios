@@ -156,11 +156,15 @@ class CashFlowService:
     def _collect_owner_repayments(
         month_start: date, next_month: date
     ) -> tuple[Decimal, list[dict[str, Any]]]:
-        """Collect owner repayment amounts and details."""
-        owner_leases = Lease.objects.filter(
-            apartment__is_rented=True,
-            apartment__owner__isnull=False,
-        ).select_related("apartment", "apartment__owner", "apartment__building")
+        """Collect owner repayment amounts and details for leases active in the given month."""
+        owner_leases = (
+            Lease.objects.filter(
+                apartment__is_rented=True,
+                apartment__owner__isnull=False,
+            )
+            .filter(start_date__lte=month_start)
+            .select_related("apartment", "apartment__owner", "apartment__building")
+        )
 
         owner_repayments = Decimal("0.00")
         details = []
@@ -177,12 +181,17 @@ class CashFlowService:
         return owner_repayments, details
 
     @staticmethod
-    def _collect_person_stipends() -> tuple[Decimal, list[dict[str, Any]]]:
-        """Collect fixed stipend amounts and details."""
-        stipends = PersonIncome.objects.filter(
-            income_type=PersonIncomeType.FIXED_STIPEND,
-            is_active=True,
-        ).select_related("person")
+    def _collect_person_stipends(month_start: date) -> tuple[Decimal, list[dict[str, Any]]]:
+        """Collect fixed stipend amounts and details, filtered to stipends active in the given month."""
+        stipends = (
+            PersonIncome.objects.filter(
+                income_type=PersonIncomeType.FIXED_STIPEND,
+                is_active=True,
+            )
+            .filter(start_date__lte=month_start)
+            .exclude(end_date__lt=month_start)
+            .select_related("person")
+        )
 
         person_stipends = Decimal("0.00")
         details = []
@@ -387,6 +396,7 @@ class CashFlowService:
         """Collect one-time expense amounts and details."""
         qs = Expense.objects.filter(
             expense_type=ExpenseType.ONE_TIME_EXPENSE,
+            is_offset=False,
             expense_date__gte=month_start,
             expense_date__lt=next_month,
         )
@@ -413,7 +423,7 @@ class CashFlowService:
         owner_repayments, owner_repayments_details = CashFlowService._collect_owner_repayments(
             month_start, next_month
         )
-        person_stipends, person_stipends_details = CashFlowService._collect_person_stipends()
+        person_stipends, person_stipends_details = CashFlowService._collect_person_stipends(month_start)
         card_installments, card_installments_details = CashFlowService._collect_card_installments(
             month_start, next_month
         )
@@ -507,12 +517,8 @@ class CashFlowService:
         current_month = today.month
 
         # Get initial balance from FinancialSettings
-        initial_balance = Decimal("0.00")
-        try:
-            settings = FinancialSettings.objects.get(pk=1)
-            initial_balance = settings.initial_balance
-        except FinancialSettings.DoesNotExist:
-            pass
+        settings = FinancialSettings.objects.first()
+        initial_balance = settings.initial_balance if settings else Decimal("0.00")
 
         projection = []
         cumulative_balance = initial_balance
@@ -627,16 +633,16 @@ class CashFlowService:
         )
         total += fixed_total
 
-        # Employee salary — use latest payment as projection
-        latest_month_per_person = EmployeePayment.objects.values("person").annotate(
-            latest_month=Max("reference_month")
+        # Employee salary — use latest payment per person as projection (avoids N+1).
+        # Step 1: for each person get the pk of their most-recent payment (one query).
+        # Step 2: fetch those payments in bulk (one query).
+        latest_pk_per_person = (
+            EmployeePayment.objects.values("person")
+            .annotate(max_pk=Max("pk"))
+            .values_list("max_pk", flat=True)
         )
-        for entry in latest_month_per_person:
-            ep = EmployeePayment.objects.get(
-                person_id=entry["person"],
-                reference_month=entry["latest_month"],
-            )
-            total += ep.total_paid
+        latest_payments = EmployeePayment.objects.filter(pk__in=latest_pk_per_person)
+        total += sum(ep.total_paid for ep in latest_payments)
 
         return total
 
@@ -646,6 +652,7 @@ class CashFlowService:
         utility_expenses = Expense.objects.filter(
             expense_type__in=[ExpenseType.WATER_BILL, ExpenseType.ELECTRICITY_BILL],
             is_debt_installment=False,
+            is_offset=False,
         ).order_by("-expense_date")[:90]  # Last ~3 months of records
 
         if not utility_expenses:
@@ -675,6 +682,7 @@ class CashFlowService:
             Expense.objects.filter(
                 expense_type__in=[ExpenseType.WATER_BILL, ExpenseType.ELECTRICITY_BILL],
                 is_debt_installment=False,
+                is_offset=False,
             )
             .filter(month_filters)
             .aggregate(total=Coalesce(Sum("total_amount"), Decimal("0.00")))["total"]

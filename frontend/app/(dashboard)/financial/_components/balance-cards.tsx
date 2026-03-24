@@ -1,9 +1,9 @@
 'use client';
 
-import { DollarSign, TrendingUp, TrendingDown, AlertTriangle } from 'lucide-react';
+import { DollarSign, TrendingDown, TrendingUp, Home } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useFinancialOverview } from '@/lib/api/hooks/use-financial-dashboard';
+import type { DashboardSummary } from '@/lib/api/hooks/use-financial-dashboard';
 import { formatCurrency } from '@/lib/utils/formatters';
 import { cn } from '@/lib/utils';
 
@@ -22,45 +22,93 @@ function BalanceCardSkeleton() {
   );
 }
 
-export function BalanceCards() {
-  const { data, isLoading, error } = useFinancialOverview();
+export function BalanceCardsSkeleton() {
+  return (
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <BalanceCardSkeleton />
+      <BalanceCardSkeleton />
+      <BalanceCardSkeleton />
+      <BalanceCardSkeleton />
+    </div>
+  );
+}
 
-  if (isLoading) {
-    return (
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <BalanceCardSkeleton />
-        <BalanceCardSkeleton />
-        <BalanceCardSkeleton />
-        <BalanceCardSkeleton />
-      </div>
-    );
-  }
-
-  if (error || !data) {
-    return (
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-center text-muted-foreground">Erro ao carregar resumo</p>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
+export function BalanceCards({ data, monthLabel }: { data: DashboardSummary; monthLabel: string }) {
   const balance = typeof data.current_month_balance === 'string'
     ? parseFloat(data.current_month_balance)
     : data.current_month_balance;
 
-  const totalDebt = typeof data.total_debt === 'string'
-    ? parseFloat(data.total_debt)
-    : data.total_debt;
+  const totalIncome = typeof data.current_month_income === 'string'
+    ? parseFloat(data.current_month_income)
+    : data.current_month_income;
+
+  const extraTotal = typeof data.income_summary.extra_income_total === 'string'
+    ? parseFloat(data.income_summary.extra_income_total)
+    : data.income_summary.extra_income_total;
 
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
       <Card className="hover:shadow-md transition-shadow">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Saldo do Mês</CardTitle>
+          <CardTitle className="text-sm font-medium">Entradas no Mês — {monthLabel}</CardTitle>
+          <TrendingUp className="h-5 w-5 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-3xl font-bold text-blue-600">
+            {formatCurrency(totalIncome)}
+          </div>
+          <p className="text-xs text-muted-foreground mt-2">
+            {data.income_summary.condominium_kitnet_count} kitnets
+            {extraTotal > 0 ? ` + outras entradas` : ''}
+          </p>
+        </CardContent>
+      </Card>
+
+      <Card className="hover:shadow-md transition-shadow">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Kitnets Não Alugados</CardTitle>
+          <Home className="h-5 w-5 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          <div className={cn(
+            'text-3xl font-bold',
+            data.income_summary.vacant_count > 0 ? 'text-amber-500' : 'text-green-600',
+          )}>
+            {formatCurrency(data.income_summary.vacant_lost_rent)}
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">
+            Não alugados: {data.income_summary.vacant_count}
+          </p>
+          {data.income_summary.vacant_by_building.map((b) => (
+            <p key={b.building_name} className="text-xs text-muted-foreground">
+              Prédio {b.building_name}: {b.apartments.join(', ')}
+            </p>
+          ))}
+          {data.income_summary.vacant_count === 0 && (
+            <p className="text-xs text-muted-foreground">Todos alugados</p>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="hover:shadow-md transition-shadow">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Despesas — {monthLabel}</CardTitle>
+          <TrendingDown className="h-5 w-5 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-3xl font-bold text-orange-500">
+            {formatCurrency(data.current_month_expenses)}
+          </div>
+          <p className="text-xs text-muted-foreground mt-2">
+            Mês: {formatCurrency(data.monthly_expenses)}
+            {data.overdue_total > 0 && ` + Atrasos: ${formatCurrency(data.overdue_total)}`}
+          </p>
+        </CardContent>
+      </Card>
+
+      <Card className="hover:shadow-md transition-shadow">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Saldo — {monthLabel}</CardTitle>
           <DollarSign className="h-5 w-5 text-muted-foreground" />
         </CardHeader>
         <CardContent>
@@ -68,45 +116,6 @@ export function BalanceCards() {
             {formatCurrency(balance)}
           </div>
           <p className="text-xs text-muted-foreground mt-2">Receitas - Despesas</p>
-        </CardContent>
-      </Card>
-
-      <Card className="hover:shadow-md transition-shadow">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Receitas do Mês</CardTitle>
-          <TrendingUp className="h-5 w-5 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-3xl font-bold text-blue-600">
-            {formatCurrency(data.current_month_income)}
-          </div>
-          <p className="text-xs text-muted-foreground mt-2">Total de receitas</p>
-        </CardContent>
-      </Card>
-
-      <Card className="hover:shadow-md transition-shadow">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Despesas do Mês</CardTitle>
-          <TrendingDown className="h-5 w-5 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-3xl font-bold text-orange-500">
-            {formatCurrency(data.current_month_expenses)}
-          </div>
-          <p className="text-xs text-muted-foreground mt-2">Total de despesas</p>
-        </CardContent>
-      </Card>
-
-      <Card className="hover:shadow-md transition-shadow">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Dívida Total</CardTitle>
-          <AlertTriangle className="h-5 w-5 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-3xl font-bold text-red-600">
-            {formatCurrency(totalDebt)}
-          </div>
-          <p className="text-xs text-muted-foreground mt-2">Parcelas não pagas</p>
         </CardContent>
       </Card>
     </div>

@@ -83,7 +83,11 @@ function CustomTooltip({
   );
 }
 
-export function CashFlowChart() {
+export function CashFlowChart({
+  currentMonthOverride,
+}: {
+  currentMonthOverride?: { year: number; month: number; income: number; expenses: number };
+}) {
   const { data, isLoading, error } = useCashFlowProjection(12);
 
   if (isLoading) {
@@ -125,7 +129,35 @@ export function CashFlowChart() {
     );
   }
 
-  const chartData = toChartData(data);
+  // Override current month with dashboard values for consistency
+  let projectionData = data;
+  if (currentMonthOverride) {
+    const { year, month, income, expenses } = currentMonthOverride;
+    let cumulativeDelta = 0;
+    projectionData = data.map((m) => {
+      if (m.year === year && m.month === month) {
+        const newBalance = income - expenses;
+        const oldBalance = m.income_total - m.expenses_total;
+        cumulativeDelta = newBalance - oldBalance;
+        return {
+          ...m,
+          income_total: income,
+          expenses_total: expenses,
+          balance: newBalance,
+          cumulative_balance: m.cumulative_balance + cumulativeDelta,
+        };
+      }
+      if (cumulativeDelta !== 0) {
+        return {
+          ...m,
+          cumulative_balance: m.cumulative_balance + cumulativeDelta,
+        };
+      }
+      return m;
+    });
+  }
+
+  const chartData = toChartData(projectionData);
 
   return (
     <Card className="hover:shadow-md transition-shadow">
