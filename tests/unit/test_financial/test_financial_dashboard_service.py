@@ -1,7 +1,5 @@
 """Tests for FinancialDashboardService."""
 
-from __future__ import annotations
-
 from datetime import date
 from decimal import Decimal
 
