@@ -51,6 +51,7 @@ def tenant_cf(admin_user):
         phone="11988886666",
         marital_status="Solteiro(a)",
         profession="Analista",
+        due_day=10,
         created_by=admin_user,
         updated_by=admin_user,
     )
@@ -63,7 +64,6 @@ def apartment_cf(building_cf, admin_user):
         number=701,
         rental_value=Decimal("1500.00"),
         max_tenants=2,
-        is_rented=True,
         created_by=admin_user,
         updated_by=admin_user,
     )
@@ -74,11 +74,8 @@ def lease_cf(apartment_cf, tenant_cf, admin_user):
     return Lease.objects.create(
         apartment=apartment_cf,
         responsible_tenant=tenant_cf,
-        rental_value=Decimal("1500.00"),
-        due_day=10,
         start_date=date(2026, 1, 1),
         validity_months=12,
-        cleaning_fee=Decimal("200.00"),
         tag_fee=Decimal("50.00"),
         created_by=admin_user,
         updated_by=admin_user,

@@ -202,14 +202,10 @@ def sample_apartment_data() -> dict[str, Any]:
     """
     return {
         "number": 101,
-        "interfone_configured": False,
-        "contract_generated": False,
-        "contract_signed": False,
         "rental_value": Decimal("1500.00"),
         "cleaning_fee": Decimal("200.00"),
         "max_tenants": 2,
         "is_rented": False,
-        "lease_date": None,
         "last_rent_increase_date": None,
     }
 
@@ -241,10 +237,8 @@ def sample_tenant_data() -> dict[str, Any]:
         "phone": "(11) 98765-4321",
         "marital_status": "Casado(a)",
         "profession": "Engenheiro",
-        "deposit_amount": Decimal("1500.00"),
-        "cleaning_fee_paid": False,
-        "tag_deposit_paid": False,
-        "rent_due_day": 10,
+        "due_day": 10,
+        "warning_count": 0,
     }
 
 
@@ -271,14 +265,13 @@ def sample_lease_data() -> dict[str, Any]:
     return {
         "start_date": date.today(),
         "validity_months": 12,
-        "due_day": 10,
-        "rental_value": Decimal("1500.00"),
-        "cleaning_fee": Decimal("200.00"),
         "tag_fee": Decimal("80.00"),
+        "deposit_amount": None,
+        "cleaning_fee_paid": False,
+        "tag_deposit_paid": False,
         "contract_generated": False,
         "contract_signed": False,
         "interfone_configured": False,
-        "warning_count": 0,
         "number_of_tenants": 1,
     }
 
