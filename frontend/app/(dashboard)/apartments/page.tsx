@@ -361,6 +361,9 @@ export default function ApartmentsPage() {
                   loading={isLoading}
                   rowKey="id"
                   rowSelection={crud.bulkOps.rowSelection}
+                  defaultSortKey="number"
+                  defaultSortDirection="asc"
+                  pagination={{ pageSize: 40 }}
                 />
               </AccordionContent>
             </AccordionItem>
