@@ -183,7 +183,7 @@ const TEMPLATE_VARIABLES: VariableDefinition[] = [
     category: 'locacao',
   },
   {
-    name: 'lease.due_day',
+    name: 'tenant.due_day',
     label: 'Dia de Vencimento',
     description: 'Dia do mês',
     category: 'locacao',

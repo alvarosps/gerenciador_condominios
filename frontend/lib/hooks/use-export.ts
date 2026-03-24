@@ -265,16 +265,27 @@ export const leaseExportColumns = [
     format: (value: unknown) => format(new Date(toStr(value)), 'dd/MM/yyyy'),
   },
   { key: 'validity_months' as const, label: 'Validade (meses)' },
-  { key: 'due_day' as const, label: 'Dia de Vencimento' },
   {
-    key: 'rental_value' as const,
-    label: 'Valor do Aluguel',
-    format: (value: unknown) => formatCurrency(Number(value) || 0),
+    key: 'responsible_tenant' as const,
+    label: 'Dia de Vencimento',
+    format: (value: unknown) => {
+      if (value && typeof value === 'object' && 'due_day' in value) {
+        const day = value.due_day;
+        if (typeof day === 'number') return String(day);
+        if (typeof day === 'string') return day;
+      }
+      return '';
+    },
   },
   {
-    key: 'cleaning_fee' as const,
+    key: 'apartment' as const,
+    label: 'Valor do Aluguel',
+    format: (value: unknown) => (value && typeof value === 'object' && 'rental_value' in value ? formatCurrency(Number(value.rental_value) || 0) : formatCurrency(0)),
+  },
+  {
+    key: 'apartment' as const,
     label: 'Taxa de Limpeza',
-    format: (value: unknown) => formatCurrency(Number(value) || 0),
+    format: (value: unknown) => (value && typeof value === 'object' && 'cleaning_fee' in value ? formatCurrency(Number(value.cleaning_fee) || 0) : formatCurrency(0)),
   },
   {
     key: 'tag_fee' as const,
