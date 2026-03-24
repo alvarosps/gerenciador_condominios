@@ -188,7 +188,7 @@ export default function PersonPaymentsPage() {
       <div className="mb-4 flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold">Pagamentos a Pessoas</h1>
-          <p className="text-gray-600 mt-1">
+          <p className="text-muted-foreground mt-1">
             Controle de pagamentos mensais às pessoas
           </p>
         </div>

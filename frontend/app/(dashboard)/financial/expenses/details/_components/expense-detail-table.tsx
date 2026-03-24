@@ -80,7 +80,7 @@ export function ExpenseDetailTable({
               <td className="py-2 px-2 text-muted-foreground text-xs max-w-[120px] truncate">
                 {item.notes ?? '—'}
               </td>
-              <td className="py-2 px-2 text-right font-medium text-red-600">
+              <td className="py-2 px-2 text-right font-medium text-destructive">
                 {formatCurrency(item.amount)}
               </td>
               <td className="py-2 px-2 text-center">
@@ -96,7 +96,7 @@ export function ExpenseDetailTable({
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-7 w-7 text-red-600 hover:text-red-700"
+                    className="h-7 w-7 text-destructive hover:text-destructive/80"
                     onClick={() => onDelete(item)}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
@@ -112,7 +112,7 @@ export function ExpenseDetailTable({
         <button
           type="button"
           onClick={() => setShowAll(true)}
-          className="w-full text-center text-sm text-blue-600 hover:underline py-3"
+          className="w-full text-center text-sm text-info hover:underline py-3"
         >
           Ver todos ({items.length} itens)
         </button>

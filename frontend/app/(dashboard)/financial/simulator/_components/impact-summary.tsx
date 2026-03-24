@@ -55,7 +55,7 @@ export function ImpactSummary({ comparison, base, simulated }: ImpactSummaryProp
         <div>
           <p className="text-sm text-muted-foreground">Impacto Total 12 meses</p>
           <p
-            className={`text-2xl font-bold ${totalImpact >= 0 ? 'text-green-600' : 'text-red-600'}`}
+            className={`text-2xl font-bold ${totalImpact >= 0 ? 'text-success' : 'text-destructive'}`}
           >
             {totalImpact >= 0 ? '+' : ''}
             {formatCurrency(totalImpact)}
@@ -77,7 +77,7 @@ export function ImpactSummary({ comparison, base, simulated }: ImpactSummaryProp
           <div>
             <p className="text-sm text-muted-foreground">Saldo Final Simulado</p>
             <p
-              className={`text-lg font-semibold ${simulatedFinal >= baseFinal ? 'text-green-600' : 'text-red-600'}`}
+              className={`text-lg font-semibold ${simulatedFinal >= baseFinal ? 'text-success' : 'text-destructive'}`}
             >
               {formatCurrency(simulatedFinal)}
             </p>

@@ -137,7 +137,7 @@ export function CreditCardSection({ personId, creditCards }: CreditCardSectionPr
             <div
               key={card.id}
               className={`flex items-center justify-between rounded px-3 py-2 ${
-                editingCardId === card.id ? 'bg-blue-50 border border-blue-200' : 'bg-muted/50'
+                editingCardId === card.id ? 'bg-info/10 border border-info/20' : 'bg-muted/50'
               }`}
             >
               <div className="flex items-center gap-3">

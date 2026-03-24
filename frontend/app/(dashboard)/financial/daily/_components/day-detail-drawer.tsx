@@ -40,7 +40,7 @@ function MarkPaidButton({
       disabled={isPending}
       onClick={() => onMarkPaid({ item_type: itemType, item_id: itemId, payment_date: dateStr })}
     >
-      <CheckCircle2 className="h-4 w-4 text-green-600" />
+      <CheckCircle2 className="h-4 w-4 text-success" />
     </Button>
   );
 }
@@ -76,7 +76,7 @@ function EntryItem({
 }) {
   return (
     <div className="flex items-start gap-3 py-3">
-      <ArrowDownCircle className="h-5 w-5 text-green-500 shrink-0 mt-0.5" />
+      <ArrowDownCircle className="h-5 w-5 text-success shrink-0 mt-0.5" />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm font-medium">{entry.description}</span>
@@ -90,11 +90,11 @@ function EntryItem({
       </div>
       <div className="flex items-center gap-2 shrink-0">
         {entry.paid ? (
-          <Badge className="bg-green-100 text-green-800 hover:bg-green-100 text-xs">Pago</Badge>
+          <Badge className="bg-success/10 text-success hover:bg-success/10 text-xs">Pago</Badge>
         ) : (
           <Badge variant="secondary" className="text-xs">Pendente</Badge>
         )}
-        <span className="text-sm font-bold text-green-600">{formatCurrency(entry.amount)}</span>
+        <span className="text-sm font-bold text-success">{formatCurrency(entry.amount)}</span>
         {isAdmin && !entry.paid && entry.id !== undefined && (
           <MarkPaidButton
             itemType="income"
@@ -125,8 +125,8 @@ function ExitItem({
   const overdue = isOverdueExit(exit, dateStr);
 
   return (
-    <div className={cn('flex items-start gap-3 py-3', overdue && 'bg-red-50 -mx-2 px-2 rounded')}>
-      <ArrowUpCircle className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
+    <div className={cn('flex items-start gap-3 py-3', overdue && 'bg-destructive/10 -mx-2 px-2 rounded')}>
+      <ArrowUpCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm font-medium">{exit.description}</span>
@@ -141,13 +141,13 @@ function ExitItem({
       </div>
       <div className="flex items-center gap-2 shrink-0">
         {exit.paid ? (
-          <Badge className="bg-green-100 text-green-800 hover:bg-green-100 text-xs">Pago</Badge>
+          <Badge className="bg-success/10 text-success hover:bg-success/10 text-xs">Pago</Badge>
         ) : overdue ? (
           <Badge variant="destructive" className="text-xs">Vencida</Badge>
         ) : (
           <Badge variant="secondary" className="text-xs">Pendente</Badge>
         )}
-        <span className="text-sm font-bold text-red-600">{formatCurrency(exit.amount)}</span>
+        <span className="text-sm font-bold text-destructive">{formatCurrency(exit.amount)}</span>
         {isAdmin && !exit.paid && (
           <Button
             variant="ghost"
@@ -163,7 +163,7 @@ function ExitItem({
               })
             }
           >
-            <CheckCircle2 className="h-4 w-4 text-green-600" />
+            <CheckCircle2 className="h-4 w-4 text-success" />
           </Button>
         )}
       </div>
@@ -212,17 +212,17 @@ export function DayDetailDrawer({ day, open, onClose }: Props) {
         <div className="mt-6 space-y-6">
           {/* Summary row */}
           <div className="grid grid-cols-3 gap-3 text-center">
-            <div className="bg-green-50 rounded-lg p-3">
+            <div className="bg-success/10 rounded-lg p-3">
               <p className="text-xs text-muted-foreground">Entradas</p>
-              <p className="text-sm font-bold text-green-600">{formatCurrency(totalEntries)}</p>
+              <p className="text-sm font-bold text-success">{formatCurrency(totalEntries)}</p>
             </div>
-            <div className="bg-red-50 rounded-lg p-3">
+            <div className="bg-destructive/10 rounded-lg p-3">
               <p className="text-xs text-muted-foreground">Saídas</p>
-              <p className="text-sm font-bold text-red-600">{formatCurrency(totalExits)}</p>
+              <p className="text-sm font-bold text-destructive">{formatCurrency(totalExits)}</p>
             </div>
-            <div className={cn('rounded-lg p-3', day.cumulative_balance >= 0 ? 'bg-blue-50' : 'bg-red-50')}>
+            <div className={cn('rounded-lg p-3', day.cumulative_balance >= 0 ? 'bg-info/10' : 'bg-destructive/10')}>
               <p className="text-xs text-muted-foreground">Saldo Acumulado</p>
-              <p className={cn('text-sm font-bold', day.cumulative_balance >= 0 ? 'text-blue-600' : 'text-red-600')}>
+              <p className={cn('text-sm font-bold', day.cumulative_balance >= 0 ? 'text-info' : 'text-destructive')}>
                 {formatCurrency(day.cumulative_balance)}
               </p>
             </div>
@@ -231,7 +231,7 @@ export function DayDetailDrawer({ day, open, onClose }: Props) {
           {/* Entries section */}
           {day.entries.length > 0 && (
             <div>
-              <h3 className="text-sm font-semibold text-green-700 mb-2 flex items-center gap-1">
+              <h3 className="text-sm font-semibold text-success mb-2 flex items-center gap-1">
                 <ArrowDownCircle className="h-4 w-4" />
                 Entradas ({day.entries.length})
               </h3>
@@ -249,7 +249,7 @@ export function DayDetailDrawer({ day, open, onClose }: Props) {
               </div>
               <div className="flex justify-between pt-2 mt-2 border-t text-sm">
                 <span className="text-muted-foreground">Subtotal entradas</span>
-                <span className="font-bold text-green-600">{formatCurrency(totalEntries)}</span>
+                <span className="font-bold text-success">{formatCurrency(totalEntries)}</span>
               </div>
             </div>
           )}
@@ -259,7 +259,7 @@ export function DayDetailDrawer({ day, open, onClose }: Props) {
           {/* Exits section */}
           {day.exits.length > 0 && (
             <div>
-              <h3 className="text-sm font-semibold text-red-700 mb-2 flex items-center gap-1">
+              <h3 className="text-sm font-semibold text-destructive mb-2 flex items-center gap-1">
                 <ArrowUpCircle className="h-4 w-4" />
                 Saídas ({day.exits.length})
               </h3>
@@ -277,7 +277,7 @@ export function DayDetailDrawer({ day, open, onClose }: Props) {
               </div>
               <div className="flex justify-between pt-2 mt-2 border-t text-sm">
                 <span className="text-muted-foreground">Subtotal saídas</span>
-                <span className="font-bold text-red-600">{formatCurrency(totalExits)}</span>
+                <span className="font-bold text-destructive">{formatCurrency(totalExits)}</span>
               </div>
             </div>
           )}

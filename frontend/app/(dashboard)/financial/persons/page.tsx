@@ -119,7 +119,7 @@ export default function PersonsPage() {
       <div className="mb-4 flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold">Pessoas</h1>
-          <p className="text-gray-600 mt-1">Gerencie pessoas, proprietários e seus cartões de crédito</p>
+          <p className="text-muted-foreground mt-1">Gerencie pessoas, proprietários e seus cartões de crédito</p>
         </div>
         <Button onClick={crud.openCreateModal}>
           <Plus className="h-4 w-4 mr-2" />

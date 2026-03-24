@@ -142,7 +142,7 @@ function ExpenseDetailContent() {
               {(data.card_details?.length ?? 0) > 0 && (data.card_total ?? 0) > 0 && (
                 <ExpenseAccordion
                   title="Cartões"
-                  color="text-orange-600"
+                  color="text-warning"
                   items={data.card_details ?? []}
                   total={data.card_total ?? 0}
                   onEdit={setEditTarget}
@@ -153,7 +153,7 @@ function ExpenseDetailContent() {
               {(data.loan_details?.length ?? 0) > 0 && (data.loan_total ?? 0) > 0 && (
                 <ExpenseAccordion
                   title="Empréstimos"
-                  color="text-red-600"
+                  color="text-destructive"
                   items={data.loan_details ?? []}
                   total={data.loan_total ?? 0}
                   onEdit={setEditTarget}
@@ -163,7 +163,7 @@ function ExpenseDetailContent() {
               {(data.fixed_details?.length ?? 0) > 0 && (data.fixed_total ?? 0) > 0 && (
                 <ExpenseAccordion
                   title="Despesas Fixas"
-                  color="text-gray-600"
+                  color="text-muted-foreground"
                   items={data.fixed_details ?? []}
                   total={data.fixed_total ?? 0}
                   onEdit={setEditTarget}
@@ -173,7 +173,7 @@ function ExpenseDetailContent() {
               {(data.one_time_details?.length ?? 0) > 0 && (data.one_time_total ?? 0) > 0 && (
                 <ExpenseAccordion
                   title="Gastos Únicos"
-                  color="text-blue-600"
+                  color="text-info"
                   items={data.one_time_details ?? []}
                   total={data.one_time_total ?? 0}
                   onEdit={setEditTarget}
@@ -183,7 +183,7 @@ function ExpenseDetailContent() {
               {(data.offset_details?.length ?? 0) > 0 && (data.offset_total ?? 0) > 0 && (
                 <ExpenseAccordion
                   title="Descontos"
-                  color="text-green-600"
+                  color="text-success"
                   items={data.offset_details ?? []}
                   total={data.offset_total ?? 0}
                   onEdit={setEditTarget}
@@ -193,7 +193,7 @@ function ExpenseDetailContent() {
               {(data.stipend_details?.length ?? 0) > 0 && (data.stipend_total ?? 0) > 0 && (
                 <ExpenseAccordion
                   title="Estipêndios"
-                  color="text-purple-600"
+                  color="text-purple-600 dark:text-purple-400"
                   items={data.stipend_details ?? []}
                   total={data.stipend_total ?? 0}
                   onEdit={setEditTarget}
@@ -231,7 +231,7 @@ function ExpenseDetailContent() {
                 <ExpenseAccordion
                   key={building.building_name}
                   title={`Prédio ${building.building_name}`}
-                  color="text-amber-600"
+                  color="text-warning"
                   items={allItems}
                   total={building.total}
                   onEdit={hasEditableItems ? setEditTarget : () => undefined}
@@ -243,7 +243,7 @@ function ExpenseDetailContent() {
           {!UTILITY_TYPES.includes(type) && type !== 'person' && (
             <ExpenseAccordion
               title={LABELS[type] ?? type}
-              color="text-gray-600"
+              color="text-muted-foreground"
               items={data.details ?? []}
               total={data.total ?? 0}
               onEdit={type === 'employee' ? () => undefined : setEditTarget}
