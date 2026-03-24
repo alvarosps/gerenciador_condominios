@@ -191,7 +191,7 @@ export function DataTable<T extends Record<string, unknown>>({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-md border">
+      <div className="rounded-md border overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
@@ -257,7 +257,7 @@ export function DataTable<T extends Record<string, unknown>>({
       </div>
 
       {showPagination && dataSource.length > 0 && (
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
           <div className="text-sm text-muted-foreground">
             {start + 1}-{Math.min(end, total)} de {total} itens
           </div>
