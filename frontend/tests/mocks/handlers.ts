@@ -6,6 +6,7 @@
  */
 
 import { http, HttpResponse, delay } from 'msw';
+import type { Expense } from '@/lib/schemas/expense.schema';
 import {
   mockBuildings,
   mockFurniture,
@@ -453,6 +454,19 @@ const authHandlers = [
     return HttpResponse.json({ detail: 'Token is invalid or expired' }, { status: 401 });
   }),
 
+  // Login (JWT token endpoint used by useLogin)
+  http.post(`${API_BASE}/auth/token/`, async ({ request }) => {
+    await delay(100);
+    const data = (await request.json()) as { username: string; password: string };
+    if (data.username === 'testuser' && data.password === 'password123') {
+      return HttpResponse.json({
+        access: 'mock-access-token-12345',
+        refresh: 'mock-refresh-token-67890',
+      });
+    }
+    return HttpResponse.json({ detail: 'Invalid credentials' }, { status: 401 });
+  }),
+
   // Logout
   http.post(`${API_BASE}/auth/logout/`, async () => {
     await delay(50);
@@ -461,6 +475,17 @@ const authHandlers = [
 
   // Get current user
   http.get(`${API_BASE}/auth/user/`, async () => {
+    await delay(50);
+    return HttpResponse.json({
+      id: 1,
+      email: 'test@example.com',
+      first_name: 'Test',
+      last_name: 'User',
+    });
+  }),
+
+  // Get current user (me endpoint)
+  http.get(`${API_BASE}/auth/me/`, async () => {
     await delay(50);
     return HttpResponse.json({
       id: 1,
@@ -653,6 +678,29 @@ const expenseHandlers = [
       installments_created: expense.total_installments ?? 1,
     });
   }),
+
+  http.put(`${API_BASE}/expenses/:id/`, async ({ params, request }) => {
+    await delay(100);
+    const id = Number(params.id);
+    const data = (await request.json()) as Expense;
+    const index = expenses.findIndex((e) => e.id === id);
+    if (index === -1) {
+      return new HttpResponse(null, { status: 404 });
+    }
+    expenses[index] = { ...expenses[index], ...data };
+    return HttpResponse.json(expenses[index]);
+  }),
+
+  http.delete(`${API_BASE}/expenses/:id/`, async ({ params }) => {
+    await delay(100);
+    const id = Number(params.id);
+    const index = expenses.findIndex((e) => e.id === id);
+    if (index === -1) {
+      return new HttpResponse(null, { status: 404 });
+    }
+    expenses.splice(index, 1);
+    return new HttpResponse(null, { status: 204 });
+  }),
 ];
 
 /**
@@ -753,6 +801,59 @@ const financialDashboardHandlers = [
       { category_id: 2, category_name: 'Kitnets', color: '#10b981', total: 1700.0, percentage: 32.7, count: 3 },
       { category_id: 3, category_name: 'Carros', color: '#f59e0b', total: 1000.0, percentage: 19.2, count: 2 },
     ]);
+  }),
+
+  http.get(`${API_BASE}/financial-dashboard/dashboard_summary/`, async () => {
+    await delay(50);
+    return HttpResponse.json({
+      year: 2026,
+      month: 3,
+      overdue_items: [],
+      income_summary: {
+        total_monthly_income: 12000,
+        all_apartments: [],
+        owner_incomes: [],
+        owner_total: 0,
+        vacant_kitnets: [],
+        vacant_by_building: [],
+        vacant_count: 0,
+        vacant_lost_rent: 0,
+        condominium_income: 10000,
+        condominium_kitnet_count: 8,
+        extra_incomes: [],
+        extra_income_total: 2000,
+      },
+      expense_summary: {
+        by_person: [],
+        water: { total: 0, by_building: [] },
+        electricity: { total: 0, by_building: [] },
+        iptu: { total: 0, by_building: [] },
+        internet: { total: 0, details: [] },
+        celular: { total: 0, details: [] },
+        sitio: { total: 0, details: [] },
+        outros_fixed: { total: 0, details: [] },
+        employee: { total: 0, details: [] },
+        total: 5200,
+      },
+      overdue_total: 0,
+      monthly_expenses: 5200,
+      current_month_income: 12000,
+      current_month_expenses: 5200,
+      current_month_balance: 6800,
+    });
+  }),
+
+  http.get(`${API_BASE}/financial-dashboard/expense_detail/`, async () => {
+    await delay(50);
+    return HttpResponse.json({
+      detail_type: 'person',
+      person_id: 1,
+      person_name: 'Rodrigo Souza',
+      total: 800,
+      total_paid: 500,
+      pending: 300,
+      is_payable: true,
+    });
   }),
 ];
 
@@ -870,7 +971,27 @@ const cashFlowHandlers = [
 const incomeHandlers = [
   http.get(`${API_BASE}/incomes/`, async () => {
     await delay(50);
-    return HttpResponse.json([]);
+    return HttpResponse.json([
+      {
+        id: 1,
+        description: 'Aluguel extra escritório',
+        amount: 2000,
+        income_date: '2026-03-01',
+        person: { id: 3, name: 'Alvaro Souza', relationship: 'Proprietário', phone: '', email: '', is_owner: true, is_employee: false, notes: '' },
+        person_id: 3,
+        building: null,
+        building_id: null,
+        category: null,
+        category_id: null,
+        is_recurring: false,
+        expected_monthly_amount: null,
+        is_received: false,
+        received_date: null,
+        notes: '',
+        created_at: '2026-03-01T00:00:00Z',
+        updated_at: '2026-03-01T00:00:00Z',
+      },
+    ]);
   }),
   http.post(`${API_BASE}/incomes/:id/mark_received/`, async () => {
     await delay(100);
@@ -884,11 +1005,42 @@ const incomeHandlers = [
 const employeePaymentHandlers = [
   http.get(`${API_BASE}/employee-payments/`, async () => {
     await delay(50);
-    return HttpResponse.json([]);
+    return HttpResponse.json([
+      {
+        id: 1,
+        person: { id: 2, name: 'Maria Funcionária', relationship: 'Funcionária', phone: '', email: '', is_owner: false, is_employee: true, notes: '' },
+        person_id: 2,
+        reference_month: '2026-03-01',
+        base_salary: 1320,
+        variable_amount: 0,
+        rent_offset: 0,
+        cleaning_count: 10,
+        payment_date: null,
+        is_paid: false,
+        notes: '',
+        total_paid: 0,
+        created_at: '2026-03-01T00:00:00Z',
+        updated_at: '2026-03-01T00:00:00Z',
+      },
+    ]);
   }),
-  http.post(`${API_BASE}/employee-payments/:id/mark_paid/`, async () => {
+  http.post(`${API_BASE}/employee-payments/:id/mark_paid/`, async ({ params }) => {
     await delay(100);
-    return HttpResponse.json({ is_paid: true, payment_date: '2026-03-22' });
+    const id = Number(params.id);
+    return HttpResponse.json({
+      id,
+      person: { id: 2, name: 'Maria Funcionária', relationship: 'Funcionária', phone: '', email: '', is_owner: false, is_employee: true, notes: '' },
+      person_id: 2,
+      reference_month: '2026-03-01',
+      base_salary: 1320,
+      variable_amount: 0,
+      rent_offset: 0,
+      cleaning_count: 10,
+      is_paid: true,
+      payment_date: '2026-03-22',
+      notes: '',
+      total_paid: 1320,
+    });
   }),
 ];
 
@@ -934,6 +1086,406 @@ const personPaymentHandlers = [
 ];
 
 /**
+ * Contract rule handlers
+ */
+const contractRuleHandlers = [
+  http.get(`${API_BASE}/rules/`, ({ request }) => {
+    const url = new URL(request.url);
+    const activeOnly = url.searchParams.get('is_active');
+    const mockRules = [
+      { id: 1, content: 'O inquilino deve pagar até o dia 5.', order: 1, is_active: true, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' },
+      { id: 2, content: 'É proibido animais sem autorização.', order: 2, is_active: true, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' },
+      { id: 3, content: 'Regra inativa para testes.', order: 3, is_active: false, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' },
+    ];
+    if (activeOnly === 'true') {
+      return HttpResponse.json(mockRules.filter((r) => r.is_active));
+    }
+    return HttpResponse.json(mockRules);
+  }),
+
+  http.get(`${API_BASE}/rules/:id/`, ({ params }) => {
+    const id = Number(params.id);
+    const mockRules = [
+      { id: 1, content: 'O inquilino deve pagar até o dia 5.', order: 1, is_active: true, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' },
+    ];
+    const rule = mockRules.find((r) => r.id === id);
+    if (!rule) return new HttpResponse(null, { status: 404 });
+    return HttpResponse.json(rule);
+  }),
+
+  http.post(`${API_BASE}/rules/`, async ({ request }) => {
+    await delay(100);
+    const data = (await request.json()) as Record<string, unknown>;
+    return HttpResponse.json({ id: 10, order: 10, is_active: true, ...data, created_at: '2026-03-24T00:00:00Z', updated_at: '2026-03-24T00:00:00Z' }, { status: 201 });
+  }),
+
+  http.patch(`${API_BASE}/rules/:id/`, async ({ params, request }) => {
+    await delay(100);
+    const id = Number(params.id);
+    const data = (await request.json()) as Record<string, unknown>;
+    return HttpResponse.json({ id, content: 'Default content', order: 1, is_active: true, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-03-24T00:00:00Z', ...data });
+  }),
+
+  http.delete(`${API_BASE}/rules/:id/`, ({ params }) => {
+    const id = Number(params.id);
+    if (id === 9999) return new HttpResponse(null, { status: 404 });
+    return new HttpResponse(null, { status: 204 });
+  }),
+
+  http.post(`${API_BASE}/rules/reorder/`, async ({ request }) => {
+    await delay(100);
+    const data = (await request.json()) as { rule_ids: number[] };
+    return HttpResponse.json({ message: `${data.rule_ids.length} rules reordered` });
+  }),
+];
+
+/**
+ * Credit card handlers
+ */
+const creditCardHandlers = [
+  http.get(`${API_BASE}/credit-cards/`, () => {
+    return HttpResponse.json([
+      { id: 1, person: { id: 1, name: 'Rodrigo Souza', relationship: 'Filho', phone: '', email: '', is_owner: false, is_employee: false, notes: '' }, person_id: 1, nickname: 'Nubank Rodrigo', last_four_digits: '1234', closing_day: 10, due_day: 17, is_active: true, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' },
+      { id: 2, person: { id: 3, name: 'Alvaro Souza', relationship: 'Proprietário', phone: '', email: '', is_owner: true, is_employee: false, notes: '' }, person_id: 3, nickname: 'Trigg', last_four_digits: '5678', closing_day: 5, due_day: 12, is_active: true, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' },
+    ]);
+  }),
+
+  http.get(`${API_BASE}/credit-cards/:id/`, ({ params }) => {
+    const id = Number(params.id);
+    const cards = [
+      { id: 1, person: { id: 1, name: 'Rodrigo Souza', relationship: 'Filho', phone: '', email: '', is_owner: false, is_employee: false, notes: '' }, person_id: 1, nickname: 'Nubank Rodrigo', last_four_digits: '1234', closing_day: 10, due_day: 17, is_active: true, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' },
+    ];
+    const card = cards.find((c) => c.id === id);
+    if (!card) return new HttpResponse(null, { status: 404 });
+    return HttpResponse.json(card);
+  }),
+
+  http.post(`${API_BASE}/credit-cards/`, async ({ request }) => {
+    await delay(100);
+    const data = (await request.json()) as Record<string, unknown>;
+    return HttpResponse.json({ id: 10, ...data, created_at: '2026-03-24T00:00:00Z', updated_at: '2026-03-24T00:00:00Z' }, { status: 201 });
+  }),
+
+  http.put(`${API_BASE}/credit-cards/:id/`, async ({ params, request }) => {
+    await delay(100);
+    const id = Number(params.id);
+    const data = (await request.json()) as Record<string, unknown>;
+    return HttpResponse.json({ id, nickname: 'Default', closing_day: 10, due_day: 17, is_active: true, ...data });
+  }),
+
+  http.delete(`${API_BASE}/credit-cards/:id/`, ({ params }) => {
+    const id = Number(params.id);
+    if (id === 9999) return new HttpResponse(null, { status: 404 });
+    return new HttpResponse(null, { status: 204 });
+  }),
+];
+
+/**
+ * Daily control handlers
+ */
+const dailyControlHandlers = [
+  http.get(`${API_BASE}/daily-control/breakdown/`, () => {
+    return HttpResponse.json([
+      {
+        date: '2026-03-01',
+        day_of_week: 'Domingo',
+        entries: [{ type: 'rent', description: 'Aluguel Apto 101', amount: 1300, expected: true, paid: true, payment_date: '2026-03-01' }],
+        exits: [{ type: 'fixed_expense', id: 1, description: 'Internet', amount: 120, due: false, paid: false }],
+        total_entries: 1300,
+        total_exits: 120,
+        day_balance: 1180,
+        cumulative_balance: 1180,
+      },
+    ]);
+  }),
+
+  http.get(`${API_BASE}/daily-control/summary/`, () => {
+    return HttpResponse.json({
+      total_expected_income: 12000,
+      total_received_income: 10000,
+      total_expected_expenses: 5200,
+      total_paid_expenses: 3000,
+      overdue_count: 2,
+      overdue_total: 500,
+      upcoming_7_days_count: 5,
+      upcoming_7_days_total: 1200,
+      current_balance: 7000,
+      projected_balance: 6800,
+    });
+  }),
+
+  http.post(`${API_BASE}/daily-control/mark_paid/`, async ({ request }) => {
+    await delay(100);
+    const data = (await request.json()) as { item_type: string; item_id: number; payment_date: string };
+    return HttpResponse.json({ success: true, item_type: data.item_type, item_id: data.item_id });
+  }),
+];
+
+/**
+ * Employee payment handlers (extended)
+ */
+const employeePaymentExtendedHandlers = [
+  http.get(`${API_BASE}/employee-payments/:id/`, ({ params }) => {
+    const id = Number(params.id);
+    if (id === 9999) return new HttpResponse(null, { status: 404 });
+    return HttpResponse.json({
+      id,
+      person: { id: 2, name: 'Maria Funcionária', relationship: 'Funcionária', phone: '', email: '', is_owner: false, is_employee: true, notes: '' },
+      person_id: 2,
+      reference_month: '2026-03-01',
+      base_salary: 1320,
+      variable_amount: 0,
+      rent_offset: 0,
+      cleaning_count: 10,
+      payment_date: null,
+      is_paid: false,
+      notes: '',
+      total_paid: 0,
+      created_at: '2026-03-01T00:00:00Z',
+      updated_at: '2026-03-01T00:00:00Z',
+    });
+  }),
+
+  http.post(`${API_BASE}/employee-payments/`, async ({ request }) => {
+    await delay(100);
+    const data = (await request.json()) as Record<string, unknown>;
+    return HttpResponse.json({ id: 10, ...data, total_paid: 0, created_at: '2026-03-24T00:00:00Z', updated_at: '2026-03-24T00:00:00Z' }, { status: 201 });
+  }),
+
+  http.put(`${API_BASE}/employee-payments/:id/`, async ({ params, request }) => {
+    await delay(100);
+    const id = Number(params.id);
+    const data = (await request.json()) as Record<string, unknown>;
+    return HttpResponse.json({ id, base_salary: 1320, variable_amount: 0, rent_offset: 0, cleaning_count: 10, is_paid: false, reference_month: '2026-03-01', ...data });
+  }),
+
+  http.delete(`${API_BASE}/employee-payments/:id/`, ({ params }) => {
+    const id = Number(params.id);
+    if (id === 9999) return new HttpResponse(null, { status: 404 });
+    return new HttpResponse(null, { status: 204 });
+  }),
+];
+
+/**
+ * Expense category handlers
+ */
+const expenseCategoryHandlers = [
+  http.get(`${API_BASE}/expense-categories/`, () => {
+    return HttpResponse.json([
+      { id: 1, name: 'Pessoal', description: 'Gastos pessoais', color: '#3b82f6', parent: null, parent_id: null, subcategories: [{ id: 4, name: 'Cartão', description: '', color: '#6B7280', parent: 1, parent_id: 1, subcategories: [] }], created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' },
+      { id: 2, name: 'Kitnets', description: 'Gastos das kitnets', color: '#10b981', parent: null, parent_id: null, subcategories: [], created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' },
+    ]);
+  }),
+
+  http.get(`${API_BASE}/expense-categories/:id/`, ({ params }) => {
+    const id = Number(params.id);
+    if (id === 9999) return new HttpResponse(null, { status: 404 });
+    return HttpResponse.json({ id, name: 'Pessoal', description: 'Gastos pessoais', color: '#3b82f6', parent: null, parent_id: null, subcategories: [] });
+  }),
+
+  http.post(`${API_BASE}/expense-categories/`, async ({ request }) => {
+    await delay(100);
+    const data = (await request.json()) as Record<string, unknown>;
+    return HttpResponse.json({ id: 10, ...data, subcategories: [], created_at: '2026-03-24T00:00:00Z', updated_at: '2026-03-24T00:00:00Z' }, { status: 201 });
+  }),
+
+  http.put(`${API_BASE}/expense-categories/:id/`, async ({ params, request }) => {
+    await delay(100);
+    const id = Number(params.id);
+    const data = (await request.json()) as Record<string, unknown>;
+    if (id === 9999) return new HttpResponse(null, { status: 404 });
+    return HttpResponse.json({ id, name: 'Default', color: '#6B7280', subcategories: [], ...data });
+  }),
+
+  http.delete(`${API_BASE}/expense-categories/:id/`, ({ params }) => {
+    const id = Number(params.id);
+    if (id === 9999) return new HttpResponse(null, { status: 404 });
+    return new HttpResponse(null, { status: 204 });
+  }),
+];
+
+/**
+ * Income extended handlers
+ */
+const incomeExtendedHandlers = [
+  http.get(`${API_BASE}/incomes/:id/`, ({ params }) => {
+    const id = Number(params.id);
+    if (id === 9999) return new HttpResponse(null, { status: 404 });
+    return HttpResponse.json({
+      id,
+      description: 'Aluguel extra escritório',
+      amount: 2000,
+      income_date: '2026-03-01',
+      person: { id: 3, name: 'Alvaro Souza', relationship: 'Proprietário', phone: '', email: '', is_owner: true, is_employee: false, notes: '' },
+      person_id: 3,
+      building: null,
+      building_id: null,
+      category: null,
+      category_id: null,
+      is_recurring: false,
+      expected_monthly_amount: null,
+      is_received: false,
+      received_date: null,
+      notes: '',
+      created_at: '2026-03-01T00:00:00Z',
+      updated_at: '2026-03-01T00:00:00Z',
+    });
+  }),
+
+  http.post(`${API_BASE}/incomes/`, async ({ request }) => {
+    await delay(100);
+    const data = (await request.json()) as Record<string, unknown>;
+    return HttpResponse.json({ id: 10, ...data, created_at: '2026-03-24T00:00:00Z', updated_at: '2026-03-24T00:00:00Z' }, { status: 201 });
+  }),
+
+  http.put(`${API_BASE}/incomes/:id/`, async ({ params, request }) => {
+    await delay(100);
+    const id = Number(params.id);
+    const data = (await request.json()) as Record<string, unknown>;
+    if (id === 9999) return new HttpResponse(null, { status: 404 });
+    return HttpResponse.json({ id, description: 'Default', amount: 1000, income_date: '2026-03-01', is_received: false, is_recurring: false, notes: '', ...data });
+  }),
+
+  http.delete(`${API_BASE}/incomes/:id/`, ({ params }) => {
+    const id = Number(params.id);
+    if (id === 9999) return new HttpResponse(null, { status: 404 });
+    return new HttpResponse(null, { status: 204 });
+  }),
+];
+
+/**
+ * Financial settings handlers
+ */
+const financialSettingsHandlers = [
+  http.get(`${API_BASE}/financial-settings/current/`, () => {
+    return HttpResponse.json({
+      id: 1,
+      initial_balance: 10000,
+      initial_balance_date: '2026-01-01',
+      notes: 'Saldo inicial do sistema',
+      updated_at: '2026-03-01T00:00:00Z',
+      updated_by: 1,
+    });
+  }),
+
+  http.put(`${API_BASE}/financial-settings/current/`, async ({ request }) => {
+    await delay(100);
+    const data = (await request.json()) as Record<string, unknown>;
+    return HttpResponse.json({ id: 1, initial_balance: 10000, initial_balance_date: '2026-01-01', notes: '', ...data, updated_at: '2026-03-24T00:00:00Z' });
+  }),
+];
+
+/**
+ * Landlord handlers
+ */
+const landlordHandlers = [
+  http.get(`${API_BASE}/landlords/current/`, () => {
+    return HttpResponse.json({
+      id: 1,
+      name: 'João da Silva',
+      nationality: 'Brasileira',
+      marital_status: 'Casado(a)',
+      cpf_cnpj: '12345678901',
+      rg: '1234567',
+      phone: '(11) 99999-9999',
+      email: 'joao@email.com',
+      street: 'Rua das Flores',
+      street_number: '123',
+      complement: 'Apto 1',
+      neighborhood: 'Jardins',
+      city: 'São Paulo',
+      state: 'SP',
+      zip_code: '01310-100',
+      country: 'Brasil',
+      is_active: true,
+      full_address: 'Rua das Flores, 123 - Apto 1 - Jardins, São Paulo - SP, 01310-100',
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z',
+    });
+  }),
+
+  http.put(`${API_BASE}/landlords/current/`, async ({ request }) => {
+    await delay(100);
+    const data = (await request.json()) as Record<string, unknown>;
+    return HttpResponse.json({
+      id: 1,
+      name: 'João da Silva',
+      nationality: 'Brasileira',
+      marital_status: 'Casado(a)',
+      cpf_cnpj: '12345678901',
+      phone: '(11) 99999-9999',
+      street: 'Rua das Flores',
+      street_number: '123',
+      neighborhood: 'Jardins',
+      city: 'São Paulo',
+      state: 'SP',
+      zip_code: '01310-100',
+      country: 'Brasil',
+      is_active: true,
+      ...data,
+      updated_at: '2026-03-24T00:00:00Z',
+    });
+  }),
+];
+
+/**
+ * Rent payment handlers
+ */
+const rentPaymentHandlers = [
+  http.get(`${API_BASE}/rent-payments/`, () => {
+    return HttpResponse.json([
+      {
+        id: 1,
+        lease: { id: 1, apartment_id: 1, responsible_tenant_id: 1, start_date: '2024-01-01', validity_months: 12, tag_fee: 50, deposit_amount: null, cleaning_fee_paid: true, tag_deposit_paid: true, contract_generated: true, pdf_path: null },
+        lease_id: 1,
+        reference_month: '2026-03-01',
+        amount_paid: 1300,
+        payment_date: '2026-03-05',
+        notes: '',
+        created_at: '2026-03-05T00:00:00Z',
+        updated_at: '2026-03-05T00:00:00Z',
+      },
+    ]);
+  }),
+
+  http.get(`${API_BASE}/rent-payments/:id/`, ({ params }) => {
+    const id = Number(params.id);
+    if (id === 9999) return new HttpResponse(null, { status: 404 });
+    return HttpResponse.json({
+      id,
+      lease: { id: 1, apartment_id: 1, responsible_tenant_id: 1, start_date: '2024-01-01', validity_months: 12, tag_fee: 50, deposit_amount: null, cleaning_fee_paid: true, tag_deposit_paid: true, contract_generated: true, pdf_path: null },
+      lease_id: 1,
+      reference_month: '2026-03-01',
+      amount_paid: 1300,
+      payment_date: '2026-03-05',
+      notes: '',
+      created_at: '2026-03-05T00:00:00Z',
+      updated_at: '2026-03-05T00:00:00Z',
+    });
+  }),
+
+  http.post(`${API_BASE}/rent-payments/`, async ({ request }) => {
+    await delay(100);
+    const data = (await request.json()) as Record<string, unknown>;
+    return HttpResponse.json({ id: 10, ...data, created_at: '2026-03-24T00:00:00Z', updated_at: '2026-03-24T00:00:00Z' }, { status: 201 });
+  }),
+
+  http.put(`${API_BASE}/rent-payments/:id/`, async ({ params, request }) => {
+    await delay(100);
+    const id = Number(params.id);
+    const data = (await request.json()) as Record<string, unknown>;
+    if (id === 9999) return new HttpResponse(null, { status: 404 });
+    return HttpResponse.json({ id, reference_month: '2026-03-01', amount_paid: 1300, payment_date: '2026-03-05', notes: '', ...data });
+  }),
+
+  http.delete(`${API_BASE}/rent-payments/:id/`, ({ params }) => {
+    const id = Number(params.id);
+    if (id === 9999) return new HttpResponse(null, { status: 404 });
+    return new HttpResponse(null, { status: 204 });
+  }),
+];
+
+/**
  * Person income handlers
  */
 const personIncomeHandlers = [
@@ -942,7 +1494,7 @@ const personIncomeHandlers = [
     return HttpResponse.json([
       {
         id: 1,
-        person: { id: 1, name: 'Rodrigo Souza' },
+        person: { id: 1, name: 'Rodrigo Souza', relationship: 'Filho', phone: '', email: '', is_owner: false, is_employee: false, notes: '' },
         person_id: 1,
         income_type: 'fixed_stipend',
         apartment: null,
@@ -995,7 +1547,16 @@ export const handlers = [
   ...financialDashboardHandlers,
   ...cashFlowHandlers,
   ...incomeHandlers,
+  ...incomeExtendedHandlers,
   ...employeePaymentHandlers,
+  ...employeePaymentExtendedHandlers,
   ...personPaymentHandlers,
   ...personIncomeHandlers,
+  ...contractRuleHandlers,
+  ...creditCardHandlers,
+  ...dailyControlHandlers,
+  ...expenseCategoryHandlers,
+  ...financialSettingsHandlers,
+  ...landlordHandlers,
+  ...rentPaymentHandlers,
 ];
