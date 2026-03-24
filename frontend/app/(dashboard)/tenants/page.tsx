@@ -48,7 +48,7 @@ import {
   useTenants,
   useDeleteTenant,
 } from '@/lib/api/hooks/use-tenants';
-import { useLeases } from '@/lib/api/hooks/use-leases';
+import { useLeases, usePatchLease } from '@/lib/api/hooks/use-leases';
 import { type Tenant } from '@/lib/schemas/tenant.schema';
 import { type Lease } from '@/lib/schemas/lease.schema';
 import { formatCPFOrCNPJ, formatBrazilianPhone } from '@/lib/utils/formatters';
@@ -91,6 +91,34 @@ export default function TenantsPage() {
 
   // Contract view modal state
   const [contractViewLease, setContractViewLease] = useState<Lease | null>(null);
+
+  // Toggle confirmation modal state
+  const [toggleConfirm, setToggleConfirm] = useState<{
+    lease: Lease;
+    field: 'contract_signed' | 'interfone_configured';
+  } | null>(null);
+  const patchLease = usePatchLease();
+
+  const handleToggleConfirm = async () => {
+    if (!toggleConfirm) return;
+    const { lease, field } = toggleConfirm;
+    const leaseId = lease.id;
+    if (leaseId === undefined) return;
+    try {
+      await patchLease.mutateAsync({
+        id: leaseId,
+        [field]: !lease[field],
+      });
+      toast.success(
+        field === 'contract_signed'
+          ? (lease.contract_signed ? 'Assinatura revertida' : 'Contrato marcado como assinado')
+          : (lease.interfone_configured ? 'Interfone desconfigurado' : 'Interfone marcado como configurado')
+      );
+    } catch {
+      toast.error('Erro ao atualizar');
+    }
+    setToggleConfirm(null);
+  };
 
   // Use the consolidated CRUD hook for all state management
   const crud = useCrudPage<Tenant>({
@@ -190,11 +218,12 @@ export default function TenantsPage() {
         if (!lease) return <span className="text-muted-foreground">—</span>;
         return (
           <Badge
-            className={
+            className={`cursor-pointer ${
               lease.contract_signed
-                ? 'bg-info/10 text-info'
-                : 'bg-warning/10 text-warning'
-            }
+                ? 'bg-info/10 text-info hover:bg-info/20'
+                : 'bg-warning/10 text-warning hover:bg-warning/20'
+            }`}
+            onClick={() => setToggleConfirm({ lease, field: 'contract_signed' })}
           >
             {lease.contract_signed ? 'Sim' : 'Não'}
           </Badge>
@@ -211,11 +240,12 @@ export default function TenantsPage() {
         if (!lease) return <span className="text-muted-foreground">—</span>;
         return (
           <Badge
-            className={
+            className={`cursor-pointer ${
               lease.interfone_configured
-                ? 'bg-success/10 text-success'
-                : 'bg-warning/10 text-warning'
-            }
+                ? 'bg-success/10 text-success hover:bg-success/20'
+                : 'bg-warning/10 text-warning hover:bg-warning/20'
+            }`}
+            onClick={() => setToggleConfirm({ lease, field: 'interfone_configured' })}
           >
             {lease.interfone_configured ? 'Configurado' : 'Pendente'}
           </Badge>
@@ -443,6 +473,36 @@ export default function TenantsPage() {
         lease={contractViewLease}
         onClose={() => setContractViewLease(null)}
       />
+
+      <AlertDialog open={toggleConfirm !== null} onOpenChange={() => setToggleConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {toggleConfirm?.field === 'contract_signed'
+                ? (toggleConfirm.lease.contract_signed ? 'Reverter assinatura' : 'Confirmar assinatura')
+                : (toggleConfirm?.lease.interfone_configured ? 'Desconfigurar interfone' : 'Confirmar interfone')}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {toggleConfirm?.field === 'contract_signed'
+                ? (toggleConfirm.lease.contract_signed
+                    ? 'Deseja reverter a assinatura do contrato?'
+                    : 'O contrato foi assinado?')
+                : (toggleConfirm?.lease.interfone_configured
+                    ? 'Deseja desconfigurar o interfone?'
+                    : 'O interfone foi cadastrado?')}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => void handleToggleConfirm()}
+              disabled={patchLease.isPending}
+            >
+              {patchLease.isPending ? 'Salvando...' : 'Confirmar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={crud.deleteDialogOpen} onOpenChange={crud.setDeleteDialogOpen}>
         <AlertDialogContent>
