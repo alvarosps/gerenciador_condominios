@@ -1,6 +1,12 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
@@ -187,28 +193,25 @@ export default function TenantsPage() {
       render: (value) => formatBrazilianPhone(value as string),
     },
     {
-      title: 'Contrato Ativo',
+      title: 'Kitnet',
       key: 'has_lease',
-      width: 130,
+      width: 120,
       align: 'center' as const,
-      sorter: (a: Tenant, b: Tenant) => {
-        const aHas = a.id !== undefined && leaseByTenantId.has(a.id) ? 1 : 0;
-        const bHas = b.id !== undefined && leaseByTenantId.has(b.id) ? 1 : 0;
-        return aHas - bHas;
-      },
       render: (_: unknown, record: Tenant) => {
         const lease = record.id !== undefined ? leaseByTenantId.get(record.id) : undefined;
         if (!lease) {
-          return <Badge variant="secondary">Não</Badge>;
+          return <span className="text-muted-foreground">—</span>;
         }
         const aptNumber = lease.apartment?.number;
         const buildingNumber = lease.apartment?.building?.street_number;
-        const location = aptNumber && buildingNumber ? ` ${String(aptNumber)}/${String(buildingNumber)}` : '';
-        return (
-          <Badge className="bg-success text-success-foreground">
-            Sim{location}
-          </Badge>
-        );
+        if (aptNumber && buildingNumber) {
+          return (
+            <Badge className="bg-success text-success-foreground">
+              {String(aptNumber)}/{String(buildingNumber)}
+            </Badge>
+          );
+        }
+        return <Badge className="bg-success text-success-foreground">Ativo</Badge>;
       },
     },
     {
@@ -328,6 +331,20 @@ export default function TenantsPage() {
     },
   ];
 
+  // Split tenants into active lease / no lease groups
+  const { tenantsWithLease, tenantsWithoutLease } = useMemo(() => {
+    const withLease: Tenant[] = [];
+    const withoutLease: Tenant[] = [];
+    tenants?.forEach((tenant) => {
+      if (tenant.id !== undefined && leaseByTenantId.has(tenant.id)) {
+        withLease.push(tenant);
+      } else {
+        withoutLease.push(tenant);
+      }
+    });
+    return { tenantsWithLease: withLease, tenantsWithoutLease: withoutLease };
+  }, [tenants, leaseByTenantId]);
+
   if (error) {
     toast.error('Erro ao carregar inquilinos');
   }
@@ -446,14 +463,58 @@ export default function TenantsPage() {
         </CardContent>
       </Card>
 
-      <DataTable<Tenant>
-        columns={columns}
-        dataSource={tenants}
-        loading={isLoading || leasesLoading}
-        rowKey="id"
-        rowSelection={crud.bulkOps.rowSelection}
-        pagination={{ pageSize: 50 }}
-      />
+      {isLoading || leasesLoading ? (
+        <div className="flex items-center justify-center p-12 border rounded-md">
+          <div className="flex flex-col items-center gap-2">
+            <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+            <p className="text-sm text-muted-foreground">Carregando inquilinos...</p>
+          </div>
+        </div>
+      ) : (
+        <Accordion type="multiple" defaultValue={['with-lease']} className="space-y-4">
+          <AccordionItem value="with-lease">
+            <AccordionTrigger className="px-4">
+              <div className="flex items-center gap-2">
+                <span>Com Contrato Ativo</span>
+                <Badge variant="secondary">{tenantsWithLease.length} inquilinos</Badge>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="px-4 pb-4">
+              <DataTable<Tenant>
+                columns={columns}
+                dataSource={tenantsWithLease}
+                loading={false}
+                rowKey="id"
+                rowSelection={crud.bulkOps.rowSelection}
+                defaultSortKey="name"
+                defaultSortDirection="asc"
+                pagination={{ pageSize: 50 }}
+              />
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="without-lease">
+            <AccordionTrigger className="px-4">
+              <div className="flex items-center gap-2">
+                <span>Sem Contrato Ativo</span>
+                <Badge variant="secondary">{tenantsWithoutLease.length} inquilinos</Badge>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="px-4 pb-4">
+              <DataTable<Tenant>
+                columns={columns}
+                dataSource={tenantsWithoutLease}
+                loading={false}
+                rowKey="id"
+                rowSelection={crud.bulkOps.rowSelection}
+                defaultSortKey="name"
+                defaultSortDirection="asc"
+                pagination={{ pageSize: 50 }}
+              />
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
+      )}
 
       <TenantFormWizard
         open={crud.isModalOpen}
