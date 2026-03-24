@@ -4,7 +4,21 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
-import { useLeases, useLease, useCreateLease, useUpdateLease, useDeleteLease, useGenerateContract } from '../use-leases';
+import {
+  useLeases,
+  useLease,
+  useCreateLease,
+  useUpdateLease,
+  useDeleteLease,
+  useGenerateContract,
+  useCalculateLateFee,
+  useChangeDueDate,
+  useActiveLeases,
+  useExpiredLeases,
+  useExpiringSoonLeases,
+  useApartmentLeases,
+  useTenantLeases,
+} from '../use-leases';
 import { createWrapper, createTestQueryClient } from '@/tests/test-utils';
 import { mockLeases } from '@/tests/mocks/data';
 
@@ -172,6 +186,121 @@ describe('useLeases', () => {
       await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
       expect(invalidateSpy).toHaveBeenCalled();
+    });
+  });
+
+  describe('useCalculateLateFee', () => {
+    it('should calculate late fee for a lease', async () => {
+      const { result } = renderHook(() => useCalculateLateFee(), {
+        wrapper: createWrapper(),
+      });
+
+      result.current.mutate({ leaseId: 1, payment_date: '2026-03-24' });
+
+      await waitFor(() => expect(result.current.isSuccess).toBe(true), { timeout: 5000 });
+
+      expect(result.current.data?.days_late).toBeDefined();
+      expect(result.current.data?.daily_rate).toBeDefined();
+    });
+
+    it('should handle 404 for non-existent lease', async () => {
+      const { result } = renderHook(() => useCalculateLateFee(), {
+        wrapper: createWrapper(),
+      });
+
+      result.current.mutate({ leaseId: 9999, payment_date: '2026-03-24' });
+
+      await waitFor(() => expect(result.current.isError).toBe(true), { timeout: 5000 });
+    });
+  });
+
+  describe('useChangeDueDate', () => {
+    it('should change due date for a lease', async () => {
+      const queryClient = createTestQueryClient();
+      const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+
+      const { result } = renderHook(() => useChangeDueDate(), {
+        wrapper: createWrapper(queryClient),
+      });
+
+      result.current.mutate({ leaseId: 1, new_due_day: 15 });
+
+      await waitFor(() => expect(result.current.isSuccess).toBe(true), { timeout: 5000 });
+
+      expect(result.current.data?.new_due_day).toBe(15);
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['leases', 1] });
+    });
+  });
+
+  describe('derived hooks', () => {
+    it('useActiveLeases should filter active leases', async () => {
+      const { result } = renderHook(() => useActiveLeases(), {
+        wrapper: createWrapper(),
+      });
+
+      await waitFor(() => expect(result.current.isSuccess).toBe(true), { timeout: 5000 });
+
+      expect(result.current.data).toBeDefined();
+    });
+
+    it('useExpiredLeases should filter expired leases', async () => {
+      const { result } = renderHook(() => useExpiredLeases(), {
+        wrapper: createWrapper(),
+      });
+
+      await waitFor(() => expect(result.current.isSuccess).toBe(true), { timeout: 5000 });
+
+      expect(result.current.data).toBeDefined();
+    });
+
+    it('useExpiringSoonLeases should filter leases expiring soon', async () => {
+      const { result } = renderHook(() => useExpiringSoonLeases(), {
+        wrapper: createWrapper(),
+      });
+
+      await waitFor(() => expect(result.current.isSuccess).toBe(true), { timeout: 5000 });
+
+      expect(result.current.data).toBeDefined();
+    });
+
+    it('useApartmentLeases should filter by apartment ID', async () => {
+      const { result } = renderHook(() => useApartmentLeases(1), {
+        wrapper: createWrapper(),
+      });
+
+      await waitFor(() => expect(result.current.isSuccess).toBe(true), { timeout: 5000 });
+
+      expect(result.current.data).toBeDefined();
+    });
+
+    it('useApartmentLeases should fetch all leases when apartmentId is null', async () => {
+      const { result } = renderHook(() => useApartmentLeases(null), {
+        wrapper: createWrapper(),
+      });
+
+      await waitFor(() => expect(result.current.isSuccess).toBe(true), { timeout: 5000 });
+
+      expect(result.current.data).toBeDefined();
+    });
+
+    it('useTenantLeases should filter by tenant ID', async () => {
+      const { result } = renderHook(() => useTenantLeases(1), {
+        wrapper: createWrapper(),
+      });
+
+      await waitFor(() => expect(result.current.isSuccess).toBe(true), { timeout: 5000 });
+
+      expect(result.current.data).toBeDefined();
+    });
+
+    it('useTenantLeases should fetch all leases when tenantId is null', async () => {
+      const { result } = renderHook(() => useTenantLeases(null), {
+        wrapper: createWrapper(),
+      });
+
+      await waitFor(() => expect(result.current.isSuccess).toBe(true), { timeout: 5000 });
+
+      expect(result.current.data).toBeDefined();
     });
   });
 });

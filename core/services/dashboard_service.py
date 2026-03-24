@@ -237,7 +237,7 @@ class DashboardService:
             total_apartments=Count("apartments"),
             rented_apartments=Count("apartments", filter=Q(apartments__is_rented=True)),
             total_revenue=Coalesce(
-                Sum("apartments__lease__rental_value", filter=Q(apartments__is_rented=True)),
+                Sum("apartments__rental_value", filter=Q(apartments__is_rented=True)),
                 Decimal("0.00"),
             ),
         ).values("id", "street_number", "total_apartments", "rented_apartments", "total_revenue")
