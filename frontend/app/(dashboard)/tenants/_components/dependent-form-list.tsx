@@ -1,6 +1,6 @@
 'use client';
 
-import { useFieldArray, UseFormReturn } from 'react-hook-form';
+import { useFieldArray, type UseFormReturn } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -23,15 +23,12 @@ interface TenantFormValues {
   phone_alternate?: string;
   profession: string;
   marital_status: string;
-  dependents?: Array<{
+  dependents?: {
     name: string;
     phone: string;
-  }>;
+  }[];
   furniture_ids?: number[];
-  deposit_amount?: number | null;
-  cleaning_fee_paid?: boolean;
-  tag_deposit_paid?: boolean;
-  rent_due_day?: number;
+  due_day?: number;
 }
 
 interface Props {

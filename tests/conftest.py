@@ -5,15 +5,16 @@ This module provides shared fixtures and configuration for all tests.
 """
 
 import os
-from datetime import date, timedelta
+from datetime import date
 from decimal import Decimal
-from typing import Any, Dict
-
-from django.conf import settings
-from django.core.management import call_command
-from rest_framework.test import APIClient
+from typing import Any
 
 import pytest
+from django.conf import settings
+from django.core.management import call_command
+from django.test import override_settings
+from freezegun import freeze_time as _freeze_time
+from rest_framework.test import APIClient
 
 # Ensure test settings are applied
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "condominios_manager.settings")
@@ -42,7 +43,6 @@ def django_db_setup(django_db_setup, django_db_blocker):
     with django_db_blocker.unblock():
         # Run migrations
         call_command("migrate", "--noinput")
-    yield
     # Cleanup is handled automatically by pytest-django
 
 
@@ -113,7 +113,6 @@ def enable_db_access_for_all_tests(db):
     Automatically enable database access for all tests.
     This removes the need to mark each test with @pytest.mark.django_db
     """
-    pass
 
 
 @pytest.fixture
@@ -160,7 +159,7 @@ def mock_chrome_path(monkeypatch):
 @pytest.fixture
 def mock_pdf_generation(mocker, mock_pdf_output_dir):
     """
-    Mocks the PDF generation process to avoid actually launching Chrome/pyppeteer.
+    Mocks the PDF generation process to avoid actually launching Chrome/Playwright.
     This allows the generate_contract code to execute without external dependencies.
 
     Usage:
@@ -168,27 +167,32 @@ def mock_pdf_generation(mocker, mock_pdf_output_dir):
             response = client.post('/api/leases/1/generate_contract/')
             assert response.status_code == 200
     """
-    # Mock asyncio.run to prevent actual pyppeteer execution
-    # The mock will allow the code to run but skip the async PDF generation
-    mock_run = mocker.patch("core.views.asyncio.run")
-    mock_run.return_value = None  # Simulate successful PDF generation
+    # Mock Playwright's sync_playwright to prevent actual browser launch
+    mock_playwright = mocker.patch(
+        "core.services.contract_service.ContractService.generate_pdf_from_html"
+    )
+    mock_playwright.return_value = None
 
-    return mock_run
+    return mock_playwright
 
 
 @pytest.fixture
-def sample_building_data() -> Dict[str, Any]:
+def sample_building_data() -> dict[str, Any]:
     """
     Provides sample building data for tests.
 
     Returns:
         Dict containing valid building data
     """
-    return {"street_number": 836, "name": "Edifício Teste", "address": "Rua Teste, 836 - Bairro Teste"}
+    return {
+        "street_number": 836,
+        "name": "Edifício Teste",
+        "address": "Rua Teste, 836 - Bairro Teste",
+    }
 
 
 @pytest.fixture
-def sample_apartment_data() -> Dict[str, Any]:
+def sample_apartment_data() -> dict[str, Any]:
     """
     Provides sample apartment data for tests.
     Note: Requires a building_id to be added.
@@ -198,20 +202,16 @@ def sample_apartment_data() -> Dict[str, Any]:
     """
     return {
         "number": 101,
-        "interfone_configured": False,
-        "contract_generated": False,
-        "contract_signed": False,
         "rental_value": Decimal("1500.00"),
         "cleaning_fee": Decimal("200.00"),
         "max_tenants": 2,
         "is_rented": False,
-        "lease_date": None,
         "last_rent_increase_date": None,
     }
 
 
 @pytest.fixture
-def sample_furniture_data() -> Dict[str, Any]:
+def sample_furniture_data() -> dict[str, Any]:
     """
     Provides sample furniture data for tests.
 
@@ -222,7 +222,7 @@ def sample_furniture_data() -> Dict[str, Any]:
 
 
 @pytest.fixture
-def sample_tenant_data() -> Dict[str, Any]:
+def sample_tenant_data() -> dict[str, Any]:
     """
     Provides sample tenant data for tests.
 
@@ -237,15 +237,13 @@ def sample_tenant_data() -> Dict[str, Any]:
         "phone": "(11) 98765-4321",
         "marital_status": "Casado(a)",
         "profession": "Engenheiro",
-        "deposit_amount": Decimal("1500.00"),
-        "cleaning_fee_paid": False,
-        "tag_deposit_paid": False,
-        "rent_due_day": 10,
+        "due_day": 10,
+        "warning_count": 0,
     }
 
 
 @pytest.fixture
-def sample_dependent_data() -> Dict[str, Any]:
+def sample_dependent_data() -> dict[str, Any]:
     """
     Provides sample dependent data for tests.
 
@@ -256,7 +254,7 @@ def sample_dependent_data() -> Dict[str, Any]:
 
 
 @pytest.fixture
-def sample_lease_data() -> Dict[str, Any]:
+def sample_lease_data() -> dict[str, Any]:
     """
     Provides sample lease data for tests.
     Note: Requires apartment_id, responsible_tenant_id, and tenant_ids.
@@ -267,14 +265,13 @@ def sample_lease_data() -> Dict[str, Any]:
     return {
         "start_date": date.today(),
         "validity_months": 12,
-        "due_day": 10,
-        "rental_value": Decimal("1500.00"),
-        "cleaning_fee": Decimal("200.00"),
         "tag_fee": Decimal("80.00"),
+        "deposit_amount": None,
+        "cleaning_fee_paid": False,
+        "tag_deposit_paid": False,
         "contract_generated": False,
         "contract_signed": False,
         "interfone_configured": False,
-        "warning_count": 0,
         "number_of_tenants": 1,
     }
 
@@ -285,7 +282,7 @@ def cleanup_test_contracts():
     Cleans up any test contract files created during tests.
     Runs after test completion.
     """
-    yield
+    return
     # Cleanup logic would go here if needed
     # Currently handled by tmp_path fixture
 
@@ -301,7 +298,6 @@ def freeze_time():
                 # Test code here
                 pass
     """
-    from freezegun import freeze_time as _freeze_time
 
     return _freeze_time
 
@@ -317,7 +313,6 @@ def settings_override():
                 # Test code with DEBUG=False
                 pass
     """
-    from django.test import override_settings
 
     return override_settings
 
@@ -346,7 +341,9 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "view: View/API endpoint tests")
     config.addinivalue_line("markers", "util: Utility function tests")
     config.addinivalue_line("markers", "factory: Factory/fixture tests")
-    config.addinivalue_line("markers", "infrastructure: Infrastructure abstraction tests (PDF generators, storage)")
+    config.addinivalue_line(
+        "markers", "infrastructure: Infrastructure abstraction tests (PDF generators, storage)"
+    )
 
 
 def pytest_collection_modifyitems(config, items):

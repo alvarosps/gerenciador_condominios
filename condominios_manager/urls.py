@@ -19,11 +19,10 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
-
 from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerView
 from rest_framework_simplejwt.views import TokenBlacklistView, TokenObtainPairView, TokenRefreshView
 
-from core.auth import google_oauth_callback, link_oauth_account, oauth_status
+from core.auth import current_user, google_oauth_callback, link_oauth_account, oauth_status
 
 urlpatterns = [
     # Django admin
@@ -40,6 +39,8 @@ urlpatterns = [
         name="swagger-ui",
     ),
     path("api/schema/redoc/", SpectacularRedocView.as_view(url_name="schema"), name="redoc"),
+    # Current user profile
+    path("api/auth/me/", current_user, name="current_user"),
     # Custom OAuth endpoints
     path("api/auth/oauth/google/callback/", google_oauth_callback, name="google_oauth_callback"),
     path("api/auth/oauth/link/", link_oauth_account, name="link_oauth_account"),

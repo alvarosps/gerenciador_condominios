@@ -11,7 +11,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { formatCPFOrCNPJ } from '@/lib/utils/formatters';
-import { StepProps } from './types';
+import { type StepProps } from './types';
 
 export function BasicInfoStep({ formMethods }: StepProps) {
   return (

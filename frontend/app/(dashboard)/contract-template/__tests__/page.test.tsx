@@ -16,7 +16,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { ReactNode } from 'react';
+import { type ReactNode } from 'react';
 import ContractTemplatePage from '../page';
 import * as hooks from '@/lib/api/hooks/use-contract-template';
 
@@ -38,6 +38,29 @@ vi.mock('@monaco-editor/react', () => ({
       {...props}
     />
   ),
+}));
+
+// Mock WysiwygEditor — page defaults to wysiwyg mode, so this is what the tests interact with
+vi.mock('@/components/contract-editor', () => ({
+  WysiwygEditor: ({
+    value,
+    onChange,
+  }: {
+    value: string;
+    onChange: (v: string) => void;
+    className?: string;
+  }) => (
+    <textarea
+      data-testid="monaco-editor"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+    />
+  ),
+}));
+
+// Mock RulesEditor — rendered in the "rules" tab
+vi.mock('@/components/contract-editor/rules-editor', () => ({
+  RulesEditor: () => <div data-testid="rules-editor" />,
 }));
 
 // Mock sonner toast
@@ -103,7 +126,7 @@ function createMockQueryResult(overrides: Partial<ReturnType<typeof hooks.useTem
   } as ReturnType<typeof hooks.useTemplateBackups>;
 }
 
-function createMockMutationResult<T = ReturnType<typeof hooks.useSaveContractTemplate>>(overrides: Partial<T> = {}): T {
+function createMockMutationResult<T = ReturnType<typeof hooks.useSaveContractTemplate>>(overrides: Record<string, unknown> = {}): T {
   return {
     mutateAsync: vi.fn(),
     isPending: false,
@@ -348,7 +371,7 @@ describe('ContractTemplatePage', () => {
       );
 
       vi.spyOn(hooks, 'useSaveContractTemplate').mockReturnValue(
-        createMockMutationResult<ReturnType<typeof hooks.useSaveContractTemplate>>({ mutateAsync: mockSave })
+        createMockMutationResult({ mutateAsync: mockSave })
       );
 
       vi.spyOn(hooks, 'usePreviewContractTemplate').mockReturnValue(
@@ -398,7 +421,7 @@ describe('ContractTemplatePage', () => {
       );
 
       vi.spyOn(hooks, 'useSaveContractTemplate').mockReturnValue(
-        createMockMutationResult<ReturnType<typeof hooks.useSaveContractTemplate>>({ mutateAsync: mockSave })
+        createMockMutationResult({ mutateAsync: mockSave })
       );
 
       vi.spyOn(hooks, 'usePreviewContractTemplate').mockReturnValue(
@@ -451,7 +474,7 @@ describe('ContractTemplatePage', () => {
       );
 
       vi.spyOn(hooks, 'useSaveContractTemplate').mockReturnValue(
-        createMockMutationResult<ReturnType<typeof hooks.useSaveContractTemplate>>({ mutateAsync: mockSave })
+        createMockMutationResult({ mutateAsync: mockSave })
       );
 
       vi.spyOn(hooks, 'usePreviewContractTemplate').mockReturnValue(
@@ -711,7 +734,7 @@ describe('ContractTemplatePage', () => {
   });
 
   describe('Backup Modal', () => {
-    it('should render backups button', async () => {
+    it('should render backups button', () => {
       vi.spyOn(hooks, 'useContractTemplate').mockReturnValue({
         data: { content: '<html>Test</html>' },
         isLoading: false,

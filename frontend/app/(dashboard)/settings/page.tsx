@@ -25,7 +25,7 @@ import { toast } from 'sonner';
 import { useLandlord, useUpdateLandlord } from '@/lib/api/hooks/use-landlord';
 import {
   landlordFormSchema,
-  LandlordFormData,
+  type LandlordFormData,
 } from '@/lib/schemas/landlord.schema';
 import { MARITAL_STATUS_OPTIONS } from '@/lib/utils/constants';
 
@@ -58,21 +58,21 @@ export default function SettingsPage() {
   useEffect(() => {
     if (landlord) {
       form.reset({
-        name: landlord.name || '',
-        nationality: landlord.nationality || 'Brasileira',
-        marital_status: landlord.marital_status || '',
-        cpf_cnpj: landlord.cpf_cnpj || '',
-        rg: landlord.rg || '',
-        phone: landlord.phone || '',
-        email: landlord.email || '',
-        street: landlord.street || '',
-        street_number: landlord.street_number || '',
-        complement: landlord.complement || '',
-        neighborhood: landlord.neighborhood || '',
-        city: landlord.city || '',
-        state: landlord.state || '',
-        zip_code: landlord.zip_code || '',
-        country: landlord.country || 'Brasil',
+        name: landlord.name ?? '',
+        nationality: landlord.nationality ?? 'Brasileira',
+        marital_status: landlord.marital_status ?? '',
+        cpf_cnpj: landlord.cpf_cnpj ?? '',
+        rg: landlord.rg ?? '',
+        phone: landlord.phone ?? '',
+        email: landlord.email ?? '',
+        street: landlord.street ?? '',
+        street_number: landlord.street_number ?? '',
+        complement: landlord.complement ?? '',
+        neighborhood: landlord.neighborhood ?? '',
+        city: landlord.city ?? '',
+        state: landlord.state ?? '',
+        zip_code: landlord.zip_code ?? '',
+        country: landlord.country ?? 'Brasil',
         is_active: landlord.is_active ?? true,
       });
     }
@@ -107,8 +107,8 @@ export default function SettingsPage() {
       </div>
 
       {isNewLandlord && (
-        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-md">
-          <p className="text-blue-700">
+        <div className="mb-6 p-4 bg-primary/5 border border-primary/20 rounded-md">
+          <p className="text-primary">
             Nenhum locador configurado. Preencha os dados abaixo para criar o
             primeiro registro.
           </p>

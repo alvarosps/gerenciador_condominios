@@ -41,13 +41,13 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { DataTable, Column } from '@/components/tables/data-table';
+import { DataTable, type Column } from '@/components/tables/data-table';
 import { TenantFormWizard } from './_components/tenant-form-wizard';
 import {
   useTenants,
   useDeleteTenant,
 } from '@/lib/api/hooks/use-tenants';
-import { Tenant } from '@/lib/schemas/tenant.schema';
+import { type Tenant } from '@/lib/schemas/tenant.schema';
 import { formatCPFOrCNPJ, formatBrazilianPhone } from '@/lib/utils/formatters';
 import { tenantExportColumns } from '@/lib/hooks/use-export';
 import { useCrudPage } from '@/lib/hooks/use-crud-page';
@@ -94,7 +94,7 @@ export default function TenantsPage() {
       render: (value, record: Tenant) => (
         <div>
           <div className="font-medium">{value as string}</div>
-          <div className="text-xs text-gray-500">
+          <div className="text-xs text-muted-foreground">
             {record.is_company ? 'Empresa' : 'Pessoa Física'}
           </div>
         </div>
@@ -135,13 +135,13 @@ export default function TenantsPage() {
       width: 120,
       render: (value) => {
         const statusVariants: Record<string, string> = {
-          'Solteiro': 'bg-blue-100 text-blue-800 hover:bg-blue-200',
-          'Casado': 'bg-green-100 text-green-800 hover:bg-green-200',
-          'Divorciado': 'bg-orange-100 text-orange-800 hover:bg-orange-200',
-          'Viúvo': 'bg-gray-100 text-gray-800 hover:bg-gray-200',
+          'Solteiro': 'bg-info/10 text-info hover:bg-info/20',
+          'Casado': 'bg-success/10 text-success hover:bg-success/20',
+          'Divorciado': 'bg-warning/10 text-warning hover:bg-warning/20',
+          'Viúvo': 'bg-muted text-muted-foreground hover:bg-muted/80',
         };
         return (
-          <Badge className={cn(statusVariants[value as string] || 'bg-gray-100 text-gray-800')}>
+          <Badge className={cn(statusVariants[value as string] ?? 'bg-muted text-muted-foreground')}>
             {value as string}
           </Badge>
         );
@@ -153,20 +153,20 @@ export default function TenantsPage() {
       width: 120,
       align: 'center',
       render: (_, record: Tenant) => {
-        const count = record.dependents?.length || 0;
+        const count = record.dependents?.length ?? 0;
         return (
           <div className="flex items-center gap-2 justify-center">
             <Users className="h-5 w-5 text-muted-foreground" />
             <Badge
               variant={count > 0 ? 'default' : 'secondary'}
-              className={cn(count > 0 ? 'bg-blue-500 hover:bg-blue-600' : '')}
+              className={cn(count > 0 ? 'bg-info text-info-foreground hover:bg-info/90' : '')}
             >
               {count}
             </Badge>
           </div>
         );
       },
-      sorter: (a: Tenant, b: Tenant) => (a.dependents?.length || 0) - (b.dependents?.length || 0),
+      sorter: (a: Tenant, b: Tenant) => (a.dependents?.length ?? 0) - (b.dependents?.length ?? 0),
     },
     {
       title: 'Móveis',
@@ -174,13 +174,13 @@ export default function TenantsPage() {
       width: 100,
       align: 'center',
       render: (_, record: Tenant) => {
-        const count = record.furnitures?.length || 0;
+        const count = record.furnitures?.length ?? 0;
         return (
           <div className="flex items-center gap-2 justify-center">
             <User className="h-5 w-5 text-muted-foreground" />
             <Badge
               variant={count > 0 ? 'default' : 'secondary'}
-              className={cn(count > 0 ? 'bg-green-500 hover:bg-green-600' : '')}
+              className={cn(count > 0 ? 'bg-success text-success-foreground hover:bg-success/90' : '')}
             >
               {count}
             </Badge>
@@ -208,7 +208,7 @@ export default function TenantsPage() {
             size="sm"
             onClick={() => {
               crud.setItemToDelete(record);
-              crud.handleDeleteClick(record.id!);
+              if (record.id !== undefined) crud.handleDeleteClick(record.id);
             }}
             disabled={crud.isDeleting}
           >
@@ -235,7 +235,7 @@ export default function TenantsPage() {
       <div className="mb-4 flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold">Inquilinos</h1>
-          <p className="text-gray-600 mt-1">
+          <p className="text-muted-foreground mt-1">
             Gerencie os inquilinos dos apartamentos
           </p>
         </div>
@@ -251,11 +251,11 @@ export default function TenantsPage() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
-              <DropdownMenuItem onClick={() => crud.handleExport('excel', tenants || [])}>
+              <DropdownMenuItem onClick={() => crud.handleExport('excel', tenants ?? [])}>
                 <FileSpreadsheet className="h-4 w-4 mr-2" />
                 Exportar para Excel
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => crud.handleExport('csv', tenants || [])}>
+              <DropdownMenuItem onClick={() => crud.handleExport('csv', tenants ?? [])}>
                 <FileText className="h-4 w-4 mr-2" />
                 Exportar para CSV
               </DropdownMenuItem>
@@ -269,8 +269,8 @@ export default function TenantsPage() {
       </div>
 
       {crud.bulkOps.hasSelection && (
-        <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded flex justify-between items-center">
-          <span className="text-blue-700 font-medium">
+        <div className="mb-4 p-4 bg-primary/5 border border-primary/20 rounded flex justify-between items-center">
+          <span className="text-primary font-medium">
             {crud.bulkOps.selectionCount} {crud.bulkOps.selectionCount === 1 ? 'inquilino selecionado' : 'inquilinos selecionados'}
           </span>
           <div className="flex gap-2">
@@ -292,8 +292,8 @@ export default function TenantsPage() {
       {/* Filters */}
       <Card className="mb-4">
         <CardContent className="pt-6">
-          <div className="flex gap-4 flex-wrap items-end">
-            <div className="flex-1 min-w-[250px]">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div>
               <label className="block text-sm font-medium mb-2">
                 Buscar por Nome ou CPF/CNPJ
               </label>
@@ -308,7 +308,7 @@ export default function TenantsPage() {
               </div>
             </div>
 
-            <div className="flex-1 min-w-[150px]">
+            <div>
               <label className="block text-sm font-medium mb-2">Tipo</label>
               <Select
                 value={filters.is_company === undefined ? 'all' : String(filters.is_company)}
@@ -330,7 +330,7 @@ export default function TenantsPage() {
               </Select>
             </div>
 
-            <div className="flex-1 min-w-[150px]">
+            <div>
               <label className="block text-sm font-medium mb-2">Dependentes</label>
               <Select
                 value={filters.has_dependents === undefined ? 'all' : String(filters.has_dependents)}
@@ -352,7 +352,7 @@ export default function TenantsPage() {
               </Select>
             </div>
 
-            <div className="flex-1 min-w-[150px]">
+            <div>
               <label className="block text-sm font-medium mb-2">Móveis</label>
               <Select
                 value={filters.has_furniture === undefined ? 'all' : String(filters.has_furniture)}
@@ -375,9 +375,11 @@ export default function TenantsPage() {
             </div>
 
             {hasActiveFilters && (
-              <Button variant="outline" onClick={clearFilters}>
-                Limpar Filtros
-              </Button>
+              <div className="flex items-end">
+                <Button variant="outline" onClick={clearFilters} className="w-full">
+                  Limpar Filtros
+                </Button>
+              </div>
             )}
           </div>
         </CardContent>

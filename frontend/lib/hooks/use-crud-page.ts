@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { UseMutationResult } from '@tanstack/react-query';
+import { type UseMutationResult } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useExport } from './use-export';
 import { useBulkOperations } from './use-bulk-operations';
@@ -94,7 +94,7 @@ interface UseCrudPageReturn<T> {
 
   // Export state and handlers
   isExporting: boolean;
-  handleExport: (format: 'excel' | 'csv', data: T[]) => Promise<void>;
+  handleExport: (format: 'excel' | 'csv', data: T[]) => void;
 }
 
 /**
@@ -216,7 +216,7 @@ export function useCrudPage<T extends { id?: number }>({
       setItemToDelete(null);
       onDeleteSuccess?.();
     } catch (error) {
-      const message = deleteErrorMessage || `Erro ao excluir ${entityName}. Verifique se não há dependências vinculadas.`;
+      const message = deleteErrorMessage ?? `Erro ao excluir ${entityName}. Verifique se não há dependências vinculadas.`;
       toast.error(message);
       onDeleteError?.(error as Error);
       console.error('Delete error:', error);
@@ -241,26 +241,26 @@ export function useCrudPage<T extends { id?: number }>({
 
   // Export handler
   const handleExport = useCallback(
-    async (format: 'excel' | 'csv', data: T[]) => {
+    (format: 'excel' | 'csv', data: T[]) => {
       if (!exportColumns || !exportFilename) {
         toast.warning('Exportação não configurada');
         return;
       }
 
-      if (!data || data.length === 0) {
+      if (data?.length === 0) {
         toast.warning('Não há dados para exportar');
         return;
       }
 
       try {
         if (format === 'excel') {
-          await exportToExcel(data, exportColumns, {
+          exportToExcel(data, exportColumns, {
             filename: exportFilename,
-            sheetName: exportSheetName || entityNamePlural,
+            sheetName: exportSheetName ?? entityNamePlural,
           });
           toast.success('Arquivo Excel exportado com sucesso!');
         } else {
-          await exportToCSV(data, exportColumns, {
+          exportToCSV(data, exportColumns, {
             filename: exportFilename,
           });
           toast.success('Arquivo CSV exportado com sucesso!');

@@ -3,7 +3,7 @@
 import { Node, mergeAttributes } from '@tiptap/core';
 import {
   NodeViewWrapper,
-  NodeViewProps,
+  type NodeViewProps,
   ReactNodeViewRenderer,
 } from '@tiptap/react';
 import React from 'react';
@@ -31,8 +31,8 @@ const TemplateBlockView: React.FC<NodeViewProps> = ({ node }) => {
         'inline-flex items-center px-1.5 py-0.5 mx-0.5',
         'rounded text-sm font-mono border select-none cursor-default',
         isForBlock
-          ? 'bg-purple-100 text-purple-800 border-purple-200'
-          : 'bg-amber-100 text-amber-800 border-amber-200',
+          ? 'bg-primary/10 text-primary border-primary/20'
+          : 'bg-warning/10 text-warning border-warning/20',
         isEndBlock && 'opacity-75'
       )}
       contentEditable={false}

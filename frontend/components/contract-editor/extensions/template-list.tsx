@@ -3,7 +3,7 @@
 import { Node, mergeAttributes } from '@tiptap/core';
 import {
   NodeViewWrapper,
-  NodeViewProps,
+  type NodeViewProps,
   ReactNodeViewRenderer,
 } from '@tiptap/react';
 import React from 'react';
@@ -48,7 +48,7 @@ const TemplateListView: React.FC<NodeViewProps> = ({ node }) => {
       {/* Content is from user's own contract template, not untrusted input */}
       <div
         className="template-list-content prose prose-sm max-w-none"
-        dangerouslySetInnerHTML={{ __html: node.attrs.content || '' }}
+        dangerouslySetInnerHTML={{ __html: (node.attrs.content as string) ?? '' }}
       />
     </NodeViewWrapper>
   );
@@ -88,7 +88,7 @@ export const TemplateList = Node.create({
         renderHTML: (attributes) => {
           if (!attributes.content) return {};
           return {
-            'data-list-content': encodeURIComponent(attributes.content),
+            'data-list-content': encodeURIComponent(String(attributes.content)),
           };
         },
       },

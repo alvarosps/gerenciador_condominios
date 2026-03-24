@@ -16,8 +16,8 @@ import {
   FilePlus,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Column } from '@/components/tables/data-table';
-import { Lease } from '@/lib/schemas/lease.schema';
+import { type Column } from '@/components/tables/data-table';
+import { type Lease } from '@/lib/schemas/lease.schema';
 import { formatCurrency } from '@/lib/utils/formatters';
 import { format, isPast, isFuture, differenceInDays, differenceInMonths, parseISO } from 'date-fns';
 
@@ -93,11 +93,11 @@ export function getMinimumPeriodStatus(lease: Lease) {
 
 export function createLeaseColumns(handlers: LeaseActionHandlers): Column<Lease>[] {
   const badgeVariants: Record<string, string> = {
-    blue: 'bg-blue-100 text-blue-800 hover:bg-blue-200',
-    red: 'bg-red-100 text-red-800 hover:bg-red-200',
-    orange: 'bg-orange-100 text-orange-800 hover:bg-orange-200',
-    green: 'bg-green-100 text-green-800 hover:bg-green-200',
-    yellow: 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200',
+    blue: 'bg-info/10 text-info hover:bg-info/20',
+    red: 'bg-destructive/10 text-destructive hover:bg-destructive/20',
+    orange: 'bg-warning/10 text-warning hover:bg-warning/20',
+    green: 'bg-success/10 text-success hover:bg-success/20',
+    yellow: 'bg-warning/10 text-warning hover:bg-warning/20',
   };
 
   return [
@@ -108,7 +108,7 @@ export function createLeaseColumns(handlers: LeaseActionHandlers): Column<Lease>
       render: (_, record: Lease) => (
         <div>
           <div className="font-medium">{record.apartment?.building?.name}</div>
-          <div className="text-xs text-gray-500">
+          <div className="text-xs text-muted-foreground">
             Apto {record.apartment?.number}
           </div>
         </div>
@@ -122,7 +122,7 @@ export function createLeaseColumns(handlers: LeaseActionHandlers): Column<Lease>
         <div>
           <div className="font-medium">{record.responsible_tenant?.name}</div>
           {record.tenants && record.tenants.length > 1 && (
-            <div className="text-xs text-gray-500">
+            <div className="text-xs text-muted-foreground">
               +{record.tenants.length - 1} inquilino(s)
             </div>
           )}
@@ -136,10 +136,10 @@ export function createLeaseColumns(handlers: LeaseActionHandlers): Column<Lease>
       render: (_, record: Lease) => (
         <div className="text-sm">
           <div>{format(parseISO(record.start_date), 'dd/MM/yyyy')}</div>
-          <div className="text-gray-500">
+          <div className="text-muted-foreground">
             até {record.final_date ? format(parseISO(record.final_date), 'dd/MM/yyyy') : 'N/A'}
           </div>
-          <div className="text-xs text-gray-400">
+          <div className="text-xs text-muted-foreground">
             {record.validity_months} meses
           </div>
         </div>
@@ -153,7 +153,7 @@ export function createLeaseColumns(handlers: LeaseActionHandlers): Column<Lease>
       render: (_, record: Lease) => {
         const { status, color } = getLeaseStatus(record);
         return (
-          <Badge className={cn(badgeVariants[color] || 'bg-gray-100 text-gray-800')}>
+          <Badge className={cn(badgeVariants[color] ?? 'bg-muted text-muted-foreground')}>
             {status}
           </Badge>
         );
@@ -169,7 +169,7 @@ export function createLeaseColumns(handlers: LeaseActionHandlers): Column<Lease>
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Badge className={cn(badgeVariants[color] || 'bg-gray-100 text-gray-800', 'cursor-help')}>
+                <Badge className={cn(badgeVariants[color] ?? 'bg-muted text-muted-foreground', 'cursor-help')}>
                   {label}
                 </Badge>
               </TooltipTrigger>
@@ -186,19 +186,17 @@ export function createLeaseColumns(handlers: LeaseActionHandlers): Column<Lease>
     },
     {
       title: 'Valor',
-      dataIndex: 'rental_value',
       key: 'rental_value',
       width: 120,
-      render: (value) => formatCurrency(value as number),
-      sorter: (a: Lease, b: Lease) => a.rental_value - b.rental_value,
+      render: (_, record: Lease) => formatCurrency(record.apartment?.rental_value ?? 0),
+      sorter: (a: Lease, b: Lease) => (a.apartment?.rental_value ?? 0) - (b.apartment?.rental_value ?? 0),
     },
     {
       title: 'Vencimento',
-      dataIndex: 'due_day',
       key: 'due_day',
       width: 100,
-      render: (value) => `Dia ${value}`,
-      sorter: (a: Lease, b: Lease) => a.due_day - b.due_day,
+      render: (_, record: Lease) => `Dia ${String(record.responsible_tenant?.due_day ?? '-')}`,
+      sorter: (a: Lease, b: Lease) => (a.responsible_tenant?.due_day ?? 0) - (b.responsible_tenant?.due_day ?? 0),
     },
     {
       title: 'Contrato',
@@ -208,10 +206,10 @@ export function createLeaseColumns(handlers: LeaseActionHandlers): Column<Lease>
       render: (_, record: Lease) => (
         <div className="flex flex-col items-center gap-1">
           {record.contract_generated && (
-            <Badge className="bg-green-100 text-green-800">Gerado</Badge>
+            <Badge className="bg-success/10 text-success">Gerado</Badge>
           )}
           {record.contract_signed && (
-            <Badge className="bg-blue-100 text-blue-800">Assinado</Badge>
+            <Badge className="bg-info/10 text-info">Assinado</Badge>
           )}
           {!record.contract_generated && !record.contract_signed && (
             <Badge variant="secondary">Pendente</Badge>

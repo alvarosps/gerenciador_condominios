@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
-import { Furniture, furnitureSchema } from '@/lib/schemas/furniture.schema';
-import { PaginatedResponse, extractResults } from '@/lib/types/api';
+import { type Furniture, furnitureSchema } from '@/lib/schemas/furniture.schema';
+import { type PaginatedResponse, extractResults } from '@/lib/types/api';
 
 /**
  * Hook to fetch all furniture items
@@ -32,7 +32,7 @@ export function useFurnitureItem(id: number | null) {
       const { data } = await apiClient.get<Furniture>(`/furnitures/${id}/`);
       return furnitureSchema.parse(data);
     },
-    enabled: !!id,
+    enabled: Boolean(id),
   });
 }
 
@@ -50,8 +50,10 @@ export function useCreateFurniture() {
       return response.data;
     },
     onSuccess: () => {
-      // Invalidate furniture list to trigger refetch
-      queryClient.invalidateQueries({ queryKey: ['furniture'] });
+      void queryClient.invalidateQueries({ queryKey: ['furniture'] });
+      void queryClient.invalidateQueries({ queryKey: ['apartments'] });
+      void queryClient.invalidateQueries({ queryKey: ['tenants'] });
+      void queryClient.invalidateQueries({ queryKey: ['leases'] });
     },
   });
 }
@@ -74,9 +76,11 @@ export function useUpdateFurniture() {
       return response.data;
     },
     onSuccess: (data) => {
-      // Invalidate both list and specific furniture item cache
-      queryClient.invalidateQueries({ queryKey: ['furniture'] });
-      queryClient.invalidateQueries({ queryKey: ['furniture', data.id] });
+      void queryClient.invalidateQueries({ queryKey: ['furniture'] });
+      void queryClient.invalidateQueries({ queryKey: ['furniture', data.id] });
+      void queryClient.invalidateQueries({ queryKey: ['apartments'] });
+      void queryClient.invalidateQueries({ queryKey: ['tenants'] });
+      void queryClient.invalidateQueries({ queryKey: ['leases'] });
     },
   });
 }
@@ -92,8 +96,10 @@ export function useDeleteFurniture() {
       await apiClient.delete(`/furnitures/${id}/`);
     },
     onSuccess: () => {
-      // Invalidate furniture list to trigger refetch
-      queryClient.invalidateQueries({ queryKey: ['furniture'] });
+      void queryClient.invalidateQueries({ queryKey: ['furniture'] });
+      void queryClient.invalidateQueries({ queryKey: ['apartments'] });
+      void queryClient.invalidateQueries({ queryKey: ['tenants'] });
+      void queryClient.invalidateQueries({ queryKey: ['leases'] });
     },
   });
 }

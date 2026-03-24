@@ -12,18 +12,18 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
-import { useLogin, useRegister, useRefreshToken, useCurrentUser } from '../use-auth';
+import { useLogin, useRegister, useRefreshToken, useCurrentUser, useLogout, useGoogleLogin } from '../use-auth';
 import { createWrapper } from '@/tests/test-utils';
 
-// Mock the auth store with proper function implementations
-const mockSetAuth = vi.fn();
-const mockSetTokens = vi.fn();
-const mockSetToken = vi.fn();
-const mockClearAuth = vi.fn();
+// Use vi.hoisted so mock variables are available inside vi.mock factory
+const { authStoreMock } = vi.hoisted(() => {
+  const mockSetAuth = vi.fn();
+  const mockSetTokens = vi.fn();
+  const mockSetToken = vi.fn();
+  const mockClearAuth = vi.fn();
 
-vi.mock('@/store/auth-store', () => ({
-  useAuthStore: vi.fn((selector) => {
-    const mockState = {
+  const authStoreMock = (selector: (state: Record<string, unknown>) => unknown): unknown => {
+    const mockState: Record<string, unknown> = {
       user: { id: 1, email: 'test@example.com', first_name: 'Test', last_name: 'User' },
       accessToken: 'mock-access-token',
       refreshToken: 'mock-refresh-token-67890',
@@ -33,7 +33,13 @@ vi.mock('@/store/auth-store', () => ({
       clearAuth: mockClearAuth,
     };
     return selector(mockState);
-  }),
+  };
+
+  return { mockSetAuth, mockSetTokens, mockSetToken, mockClearAuth, authStoreMock };
+});
+
+vi.mock('@/store/auth-store', () => ({
+  useAuthStore: vi.fn(authStoreMock),
 }));
 
 // Store original window.location
@@ -105,7 +111,7 @@ describe('useAuth hooks', () => {
   });
 
   describe('useCurrentUser', () => {
-    it('should return current user when authenticated', async () => {
+    it('should return current user when authenticated', () => {
       const { result } = renderHook(() => useCurrentUser(), {
         wrapper: createWrapper(),
       });
@@ -117,6 +123,43 @@ describe('useAuth hooks', () => {
         first_name: 'Test',
         last_name: 'User',
       });
+    });
+  });
+
+  describe('useLogout', () => {
+    it('should clear localStorage tokens on logout', async () => {
+      const removeItemSpy = vi.spyOn(localStorage, 'removeItem');
+
+      const { result } = renderHook(() => useLogout(), {
+        wrapper: createWrapper(),
+      });
+
+      result.current.mutate();
+
+      // Wait for mutation to settle (success or error — both paths clear auth state)
+      await waitFor(() => {
+        expect(result.current.isPending).toBe(false);
+      }, { timeout: 5000 });
+
+      // Verify localStorage was cleared (logout clears tokens regardless of success/error)
+      expect(removeItemSpy).toHaveBeenCalledWith('access_token');
+      expect(removeItemSpy).toHaveBeenCalledWith('refresh_token');
+    });
+  });
+
+  describe('useGoogleLogin', () => {
+    it('should return a function that redirects to Google OAuth URL', () => {
+      const { result } = renderHook(() => useGoogleLogin(), {
+        wrapper: createWrapper(),
+      });
+
+      // Should return a function
+      expect(typeof result.current).toBe('function');
+
+      // Call it and verify redirect
+      result.current();
+
+      expect(window.location.href).toContain('/auth/google/');
     });
   });
 });

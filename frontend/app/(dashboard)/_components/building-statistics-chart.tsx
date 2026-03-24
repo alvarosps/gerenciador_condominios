@@ -91,11 +91,13 @@ export function BuildingStatisticsChart() {
     label,
   }: {
     active?: boolean;
-    payload?: Array<{ payload: ChartDataItem }>;
+    payload?: { payload: ChartDataItem }[];
     label?: string;
   }) => {
-    if (active && payload && payload.length) {
-      const dataItem = payload[0].payload;
+    if (active && payload?.length) {
+      const first = payload[0];
+      if (!first) return null;
+      const dataItem = first.payload;
       return (
         <div className="bg-card border rounded-lg shadow-lg p-4">
           <p className="font-bold mb-2">{label}</p>
@@ -107,13 +109,13 @@ export function BuildingStatisticsChart() {
           </p>
           <p className="text-sm">
             <span className="text-muted-foreground">Ocupação: </span>
-            <span className="font-medium text-blue-500">
+            <span className="font-medium text-info">
               {dataItem['Ocupação (%)']}%
             </span>
           </p>
           <p className="text-sm">
             <span className="text-muted-foreground">Receita: </span>
-            <span className="font-medium text-green-500">
+            <span className="font-medium text-success">
               {formatCurrency(dataItem['Receita (R$ mil)'] * 1000)}
             </span>
           </p>
@@ -169,25 +171,25 @@ export function BuildingStatisticsChart() {
         </ResponsiveContainer>
 
         <div className="mt-6 pt-4 border-t">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 text-center">
             <div>
-              <div className="text-2xl font-bold text-blue-500">{data.length}</div>
+              <div className="text-2xl font-bold text-info">{data.length}</div>
               <div className="text-xs text-muted-foreground">Prédios</div>
             </div>
             <div>
-              <div className="text-2xl font-bold text-green-500">
+              <div className="text-2xl font-bold text-success">
                 {data.reduce((sum, b) => sum + b.total_apartments, 0)}
               </div>
               <div className="text-xs text-muted-foreground">Total Aptos</div>
             </div>
             <div>
-              <div className="text-2xl font-bold text-orange-500">
+              <div className="text-2xl font-bold text-warning">
                 {data.reduce((sum, b) => sum + b.rented_apartments, 0)}
               </div>
               <div className="text-xs text-muted-foreground">Aptos Alugados</div>
             </div>
             <div>
-              <div className="text-2xl font-bold text-purple-500">
+              <div className="text-2xl font-bold text-primary">
                 {formatCurrency(
                   data.reduce((sum, b) => {
                     const revenue = typeof b.total_revenue === 'string'

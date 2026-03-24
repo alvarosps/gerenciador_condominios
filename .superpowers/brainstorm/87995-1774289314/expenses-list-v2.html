@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Proposta: Despesas</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: system-ui, -apple-system, sans-serif; background: #111; color: #e5e7eb; padding: 24px; line-height: 1.5; }
+  h2 { font-size: 22px; margin-bottom: 4px; color: #fff; }
+  h3 { font-size: 17px; margin: 24px 0 12px; color: #fff; }
+  .subtitle { color: #9ca3af; font-size: 14px; margin-bottom: 20px; }
+
+  .mockup { background: #1a1a2e; border: 1px solid #2d2d44; border-radius: 12px; overflow: hidden; margin-bottom: 24px; }
+  .mockup-header { background: #16162a; padding: 10px 16px; font-size: 12px; color: #6b7280; border-bottom: 1px solid #2d2d44; }
+  .mockup-body { padding: 16px; }
+
+  .month-nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+  .month-nav .nav-btns { display: flex; gap: 8px; align-items: center; }
+  .month-nav button { background: #2d2d44; border: 1px solid #3d3d5c; color: #e5e7eb; padding: 5px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; }
+  .month-nav .month-label { font-weight: 600; font-size: 16px; color: #fff; }
+  .month-nav .total { font-size: 13px; color: #9ca3af; }
+  .month-nav .total strong { color: #ef4444; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead tr { border-bottom: 2px solid #2d2d44; }
+  th { padding: 10px 8px; color: #6b7280; text-align: left; font-weight: 500; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+  th.right { text-align: right; }
+  th.center { text-align: center; }
+  td { padding: 12px 8px; border-bottom: 1px solid #1f1f35; }
+  tr:nth-child(even) { background: #16162a; }
+  tr:hover { background: #1f1f3a; }
+
+  .name { font-weight: 600; color: #fff; }
+  .detail { font-size: 11px; color: #6b7280; margin-top: 2px; }
+  .icon { margin-right: 6px; }
+
+  .badge { padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: 500; display: inline-block; }
+  .badge-person { background: #1e3a5f; color: #60a5fa; }
+  .badge-condo { background: #2e1065; color: #a78bfa; }
+  .badge-utility { background: #422006; color: #fbbf24; }
+  .badge-fixed { background: #052e16; color: #4ade80; }
+  .badge-salary { background: #4a0420; color: #f472b6; }
+
+  .amount { text-align: right; font-weight: 600; }
+  .amount-red { color: #ef4444; }
+  .amount-green { color: #22c55e; }
+
+  .progress-cell { min-width: 200px; }
+  .progress-bar { display: flex; align-items: center; gap: 8px; }
+  .progress-track { flex: 1; background: #2d2d44; border-radius: 4px; height: 8px; }
+  .progress-fill { border-radius: 4px; height: 8px; transition: width 0.3s; }
+  .progress-fill-amber { background: #f59e0b; }
+  .progress-fill-blue { background: #3b82f6; }
+  .progress-fill-green { background: #22c55e; }
+  .progress-label { font-size: 11px; color: #6b7280; white-space: nowrap; }
+  .progress-label-green { color: #22c55e; font-weight: 600; }
+  .no-progress { color: #4b5563; font-size: 12px; }
+
+  .action-link { color: #60a5fa; text-decoration: none; font-size: 12px; }
+  .action-link:hover { text-decoration: underline; }
+
+  .options { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 12px; }
+  .option { background: #1a1a2e; border: 2px solid #2d2d44; border-radius: 10px; padding: 16px; cursor: pointer; transition: all 0.15s; }
+  .option:hover { border-color: #4f46e5; background: #1f1f3a; }
+  .option.selected { border-color: #4f46e5; background: #1e1b4b; }
+  .option .letter { display: inline-block; background: #2d2d44; color: #a5b4fc; width: 28px; height: 28px; border-radius: 50%; text-align: center; line-height: 28px; font-weight: 700; font-size: 13px; margin-bottom: 8px; }
+  .option h4 { color: #fff; font-size: 14px; margin-bottom: 4px; }
+  .option p { color: #9ca3af; font-size: 12px; margin: 2px 0; }
+  .option code { background: #2d2d44; padding: 2px 6px; border-radius: 4px; font-size: 11px; color: #a5b4fc; }
+</style>
+</head>
+<body>
+
+<h2>Proposta: Pagina de Despesas</h2>
+<p class="subtitle">Lista mensal de despesas com acesso a detalhes de cada categoria</p>
+
+<div class="mockup">
+  <div class="mockup-header">Despesas > Lista Mensal</div>
+  <div class="mockup-body">
+    <div class="month-nav">
+      <div class="nav-btns">
+        <button>&larr; Fev</button>
+        <span class="month-label">Marco de 2026</span>
+        <button>Abr &rarr;</button>
+      </div>
+      <div class="total">Total: <strong>R$ 38.851,64</strong></div>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Despesa</th>
+          <th>Tipo</th>
+          <th class="right">Valor</th>
+          <th>Progresso Pgto</th>
+          <th class="center">Acoes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="icon">&#128100;</span><span class="name">Alvaro</span></td>
+          <td><span class="badge badge-person">Pessoa</span></td>
+          <td class="amount amount-red">R$ 11.634,52</td>
+          <td class="progress-cell">
+            <div class="progress-bar">
+              <div class="progress-track"><div class="progress-fill progress-fill-amber" style="width: 0%"></div></div>
+              <span class="progress-label">R$ 0 / R$ 11.634</span>
+            </div>
+          </td>
+          <td style="text-align:center"><a href="#" class="action-link">Ver detalhes &rarr;</a></td>
+        </tr>
+        <tr>
+          <td><span class="icon">&#128100;</span><span class="name">Camila</span><div class="detail">Salario administracao condominio</div></td>
+          <td><span class="badge badge-condo">Condominio</span></td>
+          <td class="amount amount-red">R$ 3.829,36</td>
+          <td class="no-progress">&mdash;</td>
+          <td style="text-align:center"><a href="#" class="action-link">Ver detalhes &rarr;</a></td>
+        </tr>
+        <tr>
+          <td><span class="icon">&#128100;</span><span class="name">Junior</span></td>
+          <td><span class="badge badge-person">Pessoa</span></td>
+          <td class="amount amount-red">R$ 2.370,00</td>
+          <td class="progress-cell">
+            <div class="progress-bar">
+              <div class="progress-track"><div class="progress-fill progress-fill-blue" style="width: 32%"></div></div>
+              <span class="progress-label">R$ 767 / R$ 2.370</span>
+            </div>
+          </td>
+          <td style="text-align:center"><a href="#" class="action-link">Ver detalhes &rarr;</a></td>
+        </tr>
+        <tr>
+          <td><span class="icon">&#128100;</span><span class="name">Rodrigo</span></td>
+          <td><span class="badge badge-person">Pessoa</span></td>
+          <td class="amount amount-red">R$ 12.155,15</td>
+          <td class="progress-cell">
+            <div class="progress-bar">
+              <div class="progress-track"><div class="progress-fill progress-fill-amber" style="width: 41%"></div></div>
+              <span class="progress-label">R$ 5.000 / R$ 12.155</span>
+            </div>
+          </td>
+          <td style="text-align:center"><a href="#" class="action-link">Ver detalhes &rarr;</a></td>
+        </tr>
+        <tr>
+          <td><span class="icon">&#128100;</span><span class="name">Tiago</span></td>
+          <td><span class="badge badge-person">Pessoa</span></td>
+          <td class="amount amount-green">R$ 1.327,40</td>
+          <td class="progress-cell">
+            <div class="progress-bar">
+              <div class="progress-track"><div class="progress-fill progress-fill-green" style="width: 100%"></div></div>
+              <span class="progress-label progress-label-green">Quitado</span>
+            </div>
+          </td>
+          <td style="text-align:center"><a href="#" class="action-link">Ver detalhes &rarr;</a></td>
+        </tr>
+        <tr>
+          <td><span class="icon">&#9889;</span><span class="name">Contas de Luz</span><div class="detail">3 predios</div></td>
+          <td><span class="badge badge-utility">Utilidade</span></td>
+          <td class="amount amount-red">R$ 1.843,73</td>
+          <td class="no-progress">&mdash;</td>
+          <td style="text-align:center"><a href="#" class="action-link">Ver detalhes &rarr;</a></td>
+        </tr>
+        <tr>
+          <td><span class="icon">&#128167;</span><span class="name">Contas de Agua</span><div class="detail">1 predio</div></td>
+          <td><span class="badge badge-utility">Utilidade</span></td>
+          <td class="amount amount-red">R$ 696,04</td>
+          <td class="no-progress">&mdash;</td>
+          <td style="text-align:center"><a href="#" class="action-link">Ver detalhes &rarr;</a></td>
+        </tr>
+        <tr>
+          <td><span class="icon">&#127970;</span><span class="name">IPTU</span><div class="detail">2 predios</div></td>
+          <td><span class="badge badge-utility">Utilidade</span></td>
+          <td class="amount amount-red">R$ 2.242,55</td>
+          <td class="no-progress">&mdash;</td>
+          <td style="text-align:center"><a href="#" class="action-link">Ver detalhes &rarr;</a></td>
+        </tr>
+        <tr>
+          <td><span class="icon">&#128246;</span><span class="name">Internet</span><div class="detail">3 itens</div></td>
+          <td><span class="badge badge-fixed">Fixo</span></td>
+          <td class="amount amount-red">R$ 459,80</td>
+          <td class="no-progress">&mdash;</td>
+          <td style="text-align:center"><a href="#" class="action-link">Ver detalhes &rarr;</a></td>
+        </tr>
+        <tr>
+          <td><span class="icon">&#128222;</span><span class="name">Celular / Claro</span></td>
+          <td><span class="badge badge-fixed">Fixo</span></td>
+          <td class="amount amount-red">R$ 443,09</td>
+          <td class="no-progress">&mdash;</td>
+          <td style="text-align:center"><a href="#" class="action-link">Ver detalhes &rarr;</a></td>
+        </tr>
+        <tr>
+          <td><span class="icon">&#127793;</span><span class="name">Sitio</span><div class="detail">2 itens</div></td>
+          <td><span class="badge badge-fixed">Fixo</span></td>
+          <td class="amount amount-red">R$ 900,00</td>
+          <td class="no-progress">&mdash;</td>
+          <td style="text-align:center"><a href="#" class="action-link">Ver detalhes &rarr;</a></td>
+        </tr>
+        <tr>
+          <td><span class="icon">&#128188;</span><span class="name">Funcionarios</span><div class="detail">1 funcionario</div></td>
+          <td><span class="badge badge-salary">Salario</span></td>
+          <td class="amount amount-red">R$ 800,00</td>
+          <td class="no-progress">&mdash;</td>
+          <td style="text-align:center"><a href="#" class="action-link">Ver detalhes &rarr;</a></td>
+        </tr>
+        <tr>
+          <td><span class="icon">&bull;&bull;&bull;</span> <span class="name">Outros</span><div class="detail">1 item</div></td>
+          <td><span class="badge badge-fixed">Fixo</span></td>
+          <td class="amount amount-red">R$ 150,00</td>
+          <td class="no-progress">&mdash;</td>
+          <td style="text-align:center"><a href="#" class="action-link">Ver detalhes &rarr;</a></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<h3>Decisao: Edicao de itens dentro da pagina de detalhes</h3>
+<p class="subtitle">Confirmado: edicao via modal/drawer (mais espaco para campos complexos como categoria/subcategoria)</p>
+
+<h3>Proximo: Estrutura da pagina de detalhes</h3>
+<p class="subtitle">Ex: ao clicar "Ver detalhes" do Rodrigo, o que aparece?</p>
+
+<div class="mockup">
+  <div class="mockup-header">Despesas > Rodrigo > Marco de 2026</div>
+  <div class="mockup-body">
+    <!-- Header -->
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid #2d2d44;">
+      <div>
+        <h2 style="font-size: 20px; margin-bottom: 4px;">&#128100; Despesas Rodrigo</h2>
+        <p style="color: #9ca3af; font-size: 13px;">Marco de 2026</p>
+      </div>
+      <div style="text-align: right;">
+        <div style="font-size: 24px; font-weight: 700; color: #ef4444;">R$ 12.155,15</div>
+        <div style="margin: 8px 0;">
+          <div style="display: flex; align-items: center; gap: 8px; justify-content: flex-end;">
+            <div style="width: 200px; background: #2d2d44; border-radius: 4px; height: 10px;">
+              <div style="width: 41%; background: #f59e0b; border-radius: 4px; height: 10px;"></div>
+            </div>
+          </div>
+          <div style="font-size: 12px; color: #9ca3af; margin-top: 4px;">Pago: R$ 5.000,00 &middot; Restante: R$ 7.155,15</div>
+        </div>
+        <button style="background: #2563eb; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 13px;">Registrar Pagamento</button>
+      </div>
+    </div>
+
+    <!-- Accordion: Cartoes -->
+    <div style="border: 1px solid #2d2d44; border-radius: 8px; margin-bottom: 8px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; cursor: pointer; background: #16162a; border-radius: 8px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="color: #6b7280;">&#9660;</span>
+          <span style="font-weight: 600; color: #f97316;">Cartoes</span>
+          <span style="font-size: 11px; color: #6b7280;">(74 itens)</span>
+        </div>
+        <span style="font-weight: 700; color: #f97316;">R$ 7.073,52</span>
+      </div>
+      <div style="padding: 0 16px 12px;">
+        <table style="width: 100%; font-size: 12px; margin-top: 8px;">
+          <thead>
+            <tr style="border-bottom: 1px solid #2d2d44;">
+              <th style="padding: 6px 4px; color: #6b7280; text-align: left; font-size: 11px;">Descricao</th>
+              <th style="padding: 6px 4px; color: #6b7280; text-align: left; font-size: 11px;">Cartao</th>
+              <th style="padding: 6px 4px; color: #6b7280; text-align: center; font-size: 11px;">Parcela</th>
+              <th style="padding: 6px 4px; color: #6b7280; text-align: left; font-size: 11px;">Categoria</th>
+              <th style="padding: 6px 4px; color: #6b7280; text-align: right; font-size: 11px;">Valor</th>
+              <th style="padding: 6px 4px; color: #6b7280; text-align: center; font-size: 11px;">Acoes</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="border-bottom: 1px solid #1f1f35;">
+              <td style="padding: 8px 4px; color: #e5e7eb;">Panvel Filial Porto Alegre</td>
+              <td style="padding: 8px 4px; color: #9ca3af;">Itau Azul</td>
+              <td style="padding: 8px 4px; text-align: center; color: #9ca3af;">2/3</td>
+              <td style="padding: 8px 4px;"><span style="background: #422006; color: #fbbf24; padding: 1px 6px; border-radius: 8px; font-size: 10px;">Pessoal</span></td>
+              <td style="padding: 8px 4px; text-align: right; font-weight: 500; color: #ef4444;">R$ 52,18</td>
+              <td style="padding: 8px 4px; text-align: center;">
+                <span style="cursor: pointer; margin: 0 4px;" title="Editar">&#9998;</span>
+                <span style="cursor: pointer; margin: 0 4px; color: #ef4444;" title="Deletar">&#128465;</span>
+              </td>
+            </tr>
+            <tr style="border-bottom: 1px solid #1f1f35; background: #16162a;">
+              <td style="padding: 8px 4px; color: #e5e7eb;">Mega Brick Porto Alegre</td>
+              <td style="padding: 8px 4px; color: #9ca3af;">Itau Azul</td>
+              <td style="padding: 8px 4px; text-align: center; color: #9ca3af;">2/10</td>
+              <td style="padding: 8px 4px;"><span style="background: #1e3a5f; color: #60a5fa; padding: 1px 6px; border-radius: 8px; font-size: 10px;">Kitnets</span></td>
+              <td style="padding: 8px 4px; text-align: right; font-weight: 500; color: #ef4444;">R$ 100,00</td>
+              <td style="padding: 8px 4px; text-align: center;">
+                <span style="cursor: pointer; margin: 0 4px;" title="Editar">&#9998;</span>
+                <span style="cursor: pointer; margin: 0 4px; color: #ef4444;" title="Deletar">&#128465;</span>
+              </td>
+            </tr>
+            <tr style="border-bottom: 1px solid #1f1f35;">
+              <td style="padding: 8px 4px; color: #e5e7eb;">Bistek Supermercados</td>
+              <td style="padding: 8px 4px; color: #9ca3af;">Caixa</td>
+              <td style="padding: 8px 4px; text-align: center; color: #9ca3af;">&mdash;</td>
+              <td style="padding: 8px 4px;"><span style="background: #422006; color: #fbbf24; padding: 1px 6px; border-radius: 8px; font-size: 10px;">Pessoal</span></td>
+              <td style="padding: 8px 4px; text-align: right; font-weight: 500; color: #ef4444;">R$ 351,60</td>
+              <td style="padding: 8px 4px; text-align: center;">
+                <span style="cursor: pointer; margin: 0 4px;" title="Editar">&#9998;</span>
+                <span style="cursor: pointer; margin: 0 4px; color: #ef4444;" title="Deletar">&#128465;</span>
+              </td>
+            </tr>
+            <tr>
+              <td colspan="6" style="padding: 8px 4px; text-align: center; color: #6b7280; font-size: 11px;">... e mais 71 itens (mostrando 10 primeiros, expandir para ver todos)</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Accordion: Emprestimos (collapsed) -->
+    <div style="border: 1px solid #2d2d44; border-radius: 8px; margin-bottom: 8px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; cursor: pointer; background: #16162a; border-radius: 8px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="color: #6b7280;">&#9654;</span>
+          <span style="font-weight: 600; color: #ef4444;">Emprestimos</span>
+          <span style="font-size: 11px; color: #6b7280;">(8 itens)</span>
+        </div>
+        <span style="font-weight: 700; color: #ef4444;">R$ 2.881,63</span>
+      </div>
+    </div>
+
+    <!-- Accordion: Estipendios (collapsed) -->
+    <div style="border: 1px solid #2d2d44; border-radius: 8px; margin-bottom: 8px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; cursor: pointer; background: #16162a; border-radius: 8px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="color: #6b7280;">&#9654;</span>
+          <span style="font-weight: 600; color: #a855f7;">Estipendios</span>
+          <span style="font-size: 11px; color: #6b7280;">(1 item)</span>
+        </div>
+        <span style="font-weight: 700; color: #a855f7;">R$ 1.100,00</span>
+      </div>
+    </div>
+
+    <!-- Accordion: Descontos (collapsed) -->
+    <div style="border: 1px solid #2d2d44; border-radius: 8px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; cursor: pointer; background: #16162a; border-radius: 8px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="color: #6b7280;">&#9654;</span>
+          <span style="font-weight: 600; color: #22c55e;">Descontos</span>
+          <span style="font-size: 11px; color: #6b7280;">(4 itens)</span>
+        </div>
+        <span style="font-weight: 700; color: #22c55e;">- R$ 1.100,00</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

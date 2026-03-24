@@ -20,19 +20,28 @@ Usage:
     CacheManager.invalidate_model('Lease', lease_id)
 """
 
-from __future__ import annotations
-
 import hashlib
 import logging
+from collections.abc import Callable
 from functools import wraps
-from typing import Any, Callable, Optional, TypeVar
+from typing import Any, TypeVar, cast
 
+from django.conf import settings
 from django.core.cache import cache
 from django.db.models import Model
+
+try:
+    from django_redis import get_redis_connection
+
+    HAS_DJANGO_REDIS = True
+except ImportError:
+    HAS_DJANGO_REDIS = False
 
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
+
+_CACHE_KEY_MAX_LENGTH = 200
 
 
 def get_cache_key(*args: Any, prefix: str = "", **kwargs: Any) -> str:
@@ -48,9 +57,9 @@ def get_cache_key(*args: Any, prefix: str = "", **kwargs: Any) -> str:
         Cache key string
 
     Examples:
-        >>> get_cache_key('lease', 1, prefix='detail')
+        >>> get_cache_key("lease", 1, prefix="detail")
         'detail:lease:1'
-        >>> get_cache_key(building_id=5, apartment=10, prefix='apt')
+        >>> get_cache_key(building_id=5, apartment=10, prefix="apt")
         'apt:building_id=5:apartment=10'
     """
     # Convert args and kwargs to a stable string representation
@@ -75,13 +84,13 @@ def get_cache_key(*args: Any, prefix: str = "", **kwargs: Any) -> str:
     cache_key = ":".join(key_parts)
 
     # If key is too long, hash it
-    if len(cache_key) > 200:
-        cache_key = f"{prefix}:hash:{hashlib.md5(cache_key.encode()).hexdigest()}"
+    if len(cache_key) > _CACHE_KEY_MAX_LENGTH:
+        cache_key = f"{prefix}:hash:{hashlib.sha256(cache_key.encode()).hexdigest()}"
 
     return cache_key
 
 
-def get_model_cache_key(model_name: str, pk: Optional[int] = None, action: str = "") -> str:
+def get_model_cache_key(model_name: str, pk: int | None = None, action: str = "") -> str:
     """
     Generate cache key for model instances or lists.
 
@@ -94,9 +103,9 @@ def get_model_cache_key(model_name: str, pk: Optional[int] = None, action: str =
         Cache key string
 
     Examples:
-        >>> get_model_cache_key('Lease', pk=1, action='detail')
+        >>> get_model_cache_key("Lease", pk=1, action="detail")
         'model:Lease:1:detail'
-        >>> get_model_cache_key('Apartment', action='list')
+        >>> get_model_cache_key("Apartment", action="list")
         'model:Apartment:list'
     """
     parts = ["model", model_name]
@@ -140,7 +149,7 @@ def cache_result(timeout: int = 300, key_prefix: str = "") -> Callable:
             cached_value = cache.get(cache_key)
             if cached_value is not None:
                 logger.debug(f"Cache HIT: {cache_key}")
-                return cached_value
+                return cast(T, cached_value)
 
             # Cache miss - execute function
             logger.debug(f"Cache MISS: {cache_key}")
@@ -151,11 +160,6 @@ def cache_result(timeout: int = 300, key_prefix: str = "") -> Callable:
             logger.debug(f"Cache SET: {cache_key} (timeout={timeout}s)")
 
             return result
-
-        # Attach cache key generator to function for manual invalidation
-        wrapper.get_cache_key = lambda *args, **kwargs: get_cache_key(
-            *args, prefix=key_prefix or func.__name__, **kwargs
-        )
 
         return wrapper
 
@@ -183,7 +187,7 @@ class CacheManager:
     """
 
     @staticmethod
-    def invalidate_model(model_name: str, pk: Optional[int] = None) -> int:
+    def invalidate_model(model_name: str, pk: int | None = None) -> int:
         """
         Invalidate all cache keys for a model or specific instance.
 
@@ -195,18 +199,12 @@ class CacheManager:
             Number of keys invalidated
 
         Examples:
-            >>> CacheManager.invalidate_model('Lease', pk=1)
+            >>> CacheManager.invalidate_model("Lease", pk=1)
             3
-            >>> CacheManager.invalidate_model('Apartment')
+            >>> CacheManager.invalidate_model("Apartment")
             15
         """
-        if pk is not None:
-            # Invalidate specific instance caches
-            pattern = f"*{model_name}:{pk}*"
-        else:
-            # Invalidate all model caches
-            pattern = f"*{model_name}*"
-
+        pattern = f"*{model_name}:{pk}*" if pk is not None else f"*{model_name}*"
         return CacheManager.invalidate_pattern(pattern)
 
     @staticmethod
@@ -221,37 +219,28 @@ class CacheManager:
             Number of keys invalidated
 
         Examples:
-            >>> CacheManager.invalidate_pattern('lease:*')
+            >>> CacheManager.invalidate_pattern("lease:*")
             10
-            >>> CacheManager.invalidate_pattern('*building*')
+            >>> CacheManager.invalidate_pattern("*building*")
             5
         """
+        if not HAS_DJANGO_REDIS:
+            return 0
+
         try:
-            # Get Redis client from django-redis
-            from django_redis import get_redis_connection
-
             redis_client = get_redis_connection("default")
-
-            # Find all keys matching pattern
-            # Add key prefix from settings
-            from django.conf import settings
-
             key_prefix = settings.CACHES["default"].get("KEY_PREFIX", "condominios")
             full_pattern = f"{key_prefix}:1:{pattern}"
-
             keys = redis_client.keys(full_pattern)
-
+        except Exception:
+            logger.exception(f"Error invalidating cache pattern {pattern}")
+            return 0
+        else:
             if keys:
-                # Delete all matching keys
-                count = redis_client.delete(*keys)
+                count: int = cast(int, redis_client.delete(*keys))
                 logger.info(f"Invalidated {count} cache keys matching pattern: {pattern}")
                 return count
-            else:
-                logger.debug(f"No cache keys found matching pattern: {pattern}")
-                return 0
-
-        except Exception as e:
-            logger.error(f"Error invalidating cache pattern {pattern}: {e}")
+            logger.debug(f"No cache keys found matching pattern: {pattern}")
             return 0
 
     @staticmethod
@@ -269,10 +258,11 @@ class CacheManager:
         try:
             cache.clear()
             logger.warning("Cleared ALL cache keys")
-            return True
-        except Exception as e:
-            logger.error(f"Error clearing all caches: {e}")
+        except Exception:
+            logger.exception("Error clearing all caches")
             return False
+        else:
+            return True
 
     @staticmethod
     def get_cache_stats() -> dict:
@@ -287,13 +277,17 @@ class CacheManager:
             >>> print(f"Cache keys: {stats['keys']}")
         """
         try:
-            from django_redis import get_redis_connection
+            if not HAS_DJANGO_REDIS:
+                return {
+                    "total_keys": 0,
+                    "keyspace_hits": 0,
+                    "keyspace_misses": 0,
+                    "hit_rate": 0.0,
+                }
 
             redis_client = get_redis_connection("default")
 
             info = redis_client.info("stats")
-            from django.conf import settings
-
             key_prefix = settings.CACHES["default"].get("KEY_PREFIX", "condominios")
 
             # Count keys with our prefix
@@ -305,11 +299,13 @@ class CacheManager:
                 "keyspace_hits": info.get("keyspace_hits", 0),
                 "keyspace_misses": info.get("keyspace_misses", 0),
                 "hit_rate": (
-                    info.get("keyspace_hits", 0) / (info.get("keyspace_hits", 0) + info.get("keyspace_misses", 1)) * 100
+                    info.get("keyspace_hits", 0)
+                    / (info.get("keyspace_hits", 0) + info.get("keyspace_misses", 1))
+                    * 100
                 ),
             }
-        except Exception as e:
-            logger.error(f"Error getting cache stats: {e}")
+        except Exception:
+            logger.exception("Error getting cache stats")
             return {
                 "total_keys": 0,
                 "keyspace_hits": 0,

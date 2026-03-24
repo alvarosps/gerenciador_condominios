@@ -68,13 +68,14 @@ db.sqlite3-journal
 # Template backups
 core/templates/backups/
 
-# Documentation
-docs/
+# Documentation (allow docs/ but ignore generated docs)
+docs/_build/
 
 # IDE
 .vscode/
 .idea/
-.claude/
+.claude/settings.local.json
+CLAUDE.local.md
 *.swp
 *.swo
 *~

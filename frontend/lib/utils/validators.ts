@@ -95,7 +95,7 @@ export function validateBrazilianPhone(phone: string): boolean {
   if (digits.length !== 10 && digits.length !== 11) return false;
 
   // First digit must be 1-9 (area code can't start with 0)
-  if (digits[0] === '0') return false;
+  if (digits.startsWith('0')) return false;
 
   // For mobile (11 digits), the third digit must be 9
   if (digits.length === 11 && digits[2] !== '9') return false;

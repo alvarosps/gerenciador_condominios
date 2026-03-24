@@ -23,6 +23,7 @@ interface LeaseMetrics {
   contracts_pending: number;
   expiring_soon: number;
   expired_leases: number;
+  avg_validity_months: number;
 }
 
 interface BuildingStatistic {
@@ -62,8 +63,11 @@ interface TenantStatistics {
   total_tenants: number;
   individual_tenants: number;
   company_tenants: number;
+  person_tenants: number;
   tenants_with_dependents: number;
+  tenants_with_furniture: number;
   total_dependents: number;
+  avg_dependents: number;
   marital_status_distribution: MaritalStatusDistribution[];
 }
 
@@ -121,7 +125,7 @@ export function useDashboardBuildingStatistics() {
 
 /**
  * Hook to fetch late payment summary
- * Returns summary and list of late payments
+ * Returns list of late payment records
  */
 export function useDashboardLatePayments() {
   return useQuery({
