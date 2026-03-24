@@ -21,9 +21,11 @@ import {
   useTemplateBackups,
   useRestoreTemplateBackup,
 } from '../use-contract-template';
-// Create mock functions before vi.mock so they can be referenced inside the factory
-const mockGet = vi.fn();
-const mockPost = vi.fn();
+// Use vi.hoisted so mock variables are available inside vi.mock factory
+const { mockGet, mockPost } = vi.hoisted(() => ({
+  mockGet: vi.fn(),
+  mockPost: vi.fn(),
+}));
 
 // Mock the apiClient
 vi.mock('@/lib/api/client', () => ({

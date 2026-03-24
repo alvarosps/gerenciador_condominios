@@ -40,6 +40,29 @@ vi.mock('@monaco-editor/react', () => ({
   ),
 }));
 
+// Mock WysiwygEditor — page defaults to wysiwyg mode, so this is what the tests interact with
+vi.mock('@/components/contract-editor', () => ({
+  WysiwygEditor: ({
+    value,
+    onChange,
+  }: {
+    value: string;
+    onChange: (v: string) => void;
+    className?: string;
+  }) => (
+    <textarea
+      data-testid="monaco-editor"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+    />
+  ),
+}));
+
+// Mock RulesEditor — rendered in the "rules" tab
+vi.mock('@/components/contract-editor/rules-editor', () => ({
+  RulesEditor: () => <div data-testid="rules-editor" />,
+}));
+
 // Mock sonner toast
 vi.mock('sonner', () => ({
   toast: {

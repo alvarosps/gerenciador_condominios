@@ -518,16 +518,20 @@ const dashboardHandlers = [
   // Late payment summary
   http.get(`${API_BASE}/dashboard/late_payment_summary/`, async () => {
     await delay(50);
-    return HttpResponse.json([
-      {
-        lease_id: 1,
-        tenant_name: 'João Silva',
-        building: 'Building A',
-        apartment_number: 101,
-        days_late: 5,
-        late_fee: 75.0,
-      },
-    ]);
+    return HttpResponse.json({
+      total_late_leases: 1,
+      total_late_fees: 75.0,
+      late_leases: [
+        {
+          lease_id: 1,
+          tenant_name: 'João Silva',
+          building: 'Building A',
+          apartment_number: 101,
+          late_days: 5,
+          late_fee: 75.0,
+        },
+      ],
+    });
   }),
 
   // Tenant statistics
