@@ -165,15 +165,15 @@ export function GlobalSearch() {
     const iconClass = 'h-5 w-5';
     switch (type) {
       case 'building':
-        return <Building2 className={cn(iconClass, 'text-blue-500')} />;
+        return <Building2 className={cn(iconClass, 'text-info')} />;
       case 'apartment':
-        return <DoorOpen className={cn(iconClass, 'text-green-500')} />;
+        return <DoorOpen className={cn(iconClass, 'text-success')} />;
       case 'tenant':
-        return <Users className={cn(iconClass, 'text-orange-500')} />;
+        return <Users className={cn(iconClass, 'text-warning')} />;
       case 'lease':
-        return <FileText className={cn(iconClass, 'text-purple-500')} />;
+        return <FileText className={cn(iconClass, 'text-primary')} />;
       case 'furniture':
-        return <Package className={cn(iconClass, 'text-pink-500')} />;
+        return <Package className={cn(iconClass, 'text-destructive')} />;
     }
   };
 
