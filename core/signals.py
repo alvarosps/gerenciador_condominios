@@ -16,8 +16,6 @@ Models and their cache invalidation relationships:
 - Dependent: Invalidates Dependent, Tenant caches
 """
 
-from __future__ import annotations
-
 import logging
 
 from django.db.models.signals import m2m_changed, post_delete, post_save

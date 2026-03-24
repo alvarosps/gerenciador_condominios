@@ -10,8 +10,6 @@ This module defines the core domain models for property management:
 - Lease: Rental contracts
 """
 
-from __future__ import annotations
-
 import re
 from decimal import Decimal
 
@@ -405,6 +403,9 @@ class Tenant(AuditMixin, SoftDeleteMixin, models.Model):
         default=False, help_text="Indica se o caução das tags já foi pago"
     )
     rent_due_day = models.PositiveIntegerField(help_text="Dia do vencimento do aluguel", default=1)
+    warning_count = models.PositiveIntegerField(
+        default=0, help_text="Quantidade de avisos do inquilino"
+    )
 
     # Relação com móveis próprios do inquilino
     furnitures = models.ManyToManyField(
@@ -543,6 +544,17 @@ class Lease(AuditMixin, SoftDeleteMixin, models.Model):
     )
     tag_fee = models.DecimalField(
         max_digits=10, decimal_places=2, help_text="Valor da caução da tag", default=0
+    )
+
+    # Campos do contrato (caução/pagamentos)
+    deposit_amount = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True, help_text="Valor da caução"
+    )
+    cleaning_fee_paid = models.BooleanField(
+        default=False, help_text="Taxa de limpeza paga"
+    )
+    tag_deposit_paid = models.BooleanField(
+        default=False, help_text="Caução de tags paga"
     )
 
     contract_generated = models.BooleanField(
@@ -709,7 +721,7 @@ class Landlord(AuditMixin, SoftDeleteMixin, models.Model):
         return ", ".join(parts)
 
     @classmethod
-    def get_active(cls) -> Landlord | None:
+    def get_active(cls) -> "Landlord | None":
         """Get the currently active landlord."""
         return cls.objects.filter(is_active=True).first()
 
