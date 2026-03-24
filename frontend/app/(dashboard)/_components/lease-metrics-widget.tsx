@@ -80,12 +80,6 @@ export function LeaseMetricsWidget() {
     ? (data.active_leases / data.total_leases) * 100
     : 0;
 
-  // const getProgressColor = (percentage: number): string => {
-  //   if (percentage >= 80) return 'bg-green-600';
-  //   if (percentage >= 50) return 'bg-blue-500';
-  //   return 'bg-red-500';
-  // };
-
   return (
     <Card className="hover:shadow-md transition-shadow">
       <CardHeader>
@@ -99,7 +93,7 @@ export function LeaseMetricsWidget() {
               value={data.active_leases}
               suffix={`/ ${data.total_leases}`}
               icon={<FileText />}
-              valueColor="text-green-600"
+              valueColor="text-success"
             />
             <div className="space-y-2">
               <Progress
@@ -116,7 +110,7 @@ export function LeaseMetricsWidget() {
             title="Expirando em Breve"
             value={data.expiring_soon}
             icon={<Clock />}
-            valueColor={data.expiring_soon > 0 ? 'text-orange-500' : 'text-green-500'}
+            valueColor={data.expiring_soon > 0 ? 'text-warning' : 'text-success'}
             description="Locações que expiram em até 30 dias"
           />
 
@@ -124,7 +118,7 @@ export function LeaseMetricsWidget() {
             title="Locações Expiradas"
             value={data.expired_leases}
             icon={<XCircle />}
-            valueColor="text-red-600"
+            valueColor="text-destructive"
             description="Contratos que já venceram"
           />
 
@@ -132,7 +126,7 @@ export function LeaseMetricsWidget() {
             title="Contratos Pendentes"
             value={data.contracts_pending}
             icon={<CheckCircle />}
-            valueColor={data.contracts_pending > 0 ? 'text-orange-500' : 'text-green-500'}
+            valueColor={data.contracts_pending > 0 ? 'text-warning' : 'text-success'}
             description="Locações sem contrato gerado"
           />
         </div>
