@@ -1,13 +1,15 @@
 # core/views.py
 import logging
 from datetime import date, timedelta
+from typing import Any
 
 from dateutil.relativedelta import relativedelta
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import DatabaseError, IntegrityError
-from django.db.models import Count, Q
+from django.db.models import Count, Q, QuerySet
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
+from rest_framework.request import Request
 from rest_framework.response import Response
 
 from .models import Apartment, Building, Furniture, Lease, Tenant
@@ -45,7 +47,7 @@ class BuildingViewSet(viewsets.ModelViewSet):
     serializer_class = BuildingSerializer
     permission_classes = [ReadOnlyForNonAdmin]
 
-    def get_queryset(self):
+    def get_queryset(self) -> QuerySet[Building]:
         """
         Optimize queryset with prefetch_related for apartments.
 
@@ -97,7 +99,7 @@ class ApartmentViewSet(viewsets.ModelViewSet):
     serializer_class = ApartmentSerializer
     permission_classes = [ReadOnlyForNonAdmin]
 
-    def get_queryset(self):
+    def get_queryset(self) -> QuerySet[Apartment]:
         """
         Optimize queryset with select_related and prefetch_related.
         Also applies filters based on query parameters.
@@ -163,7 +165,7 @@ class TenantViewSet(viewsets.ModelViewSet):
     serializer_class = TenantSerializer
     permission_classes = [ReadOnlyForNonAdmin]
 
-    def get_queryset(self):
+    def get_queryset(self) -> QuerySet[Tenant]:
         """
         Optimize queryset with prefetch_related.
         Also applies filters based on query parameters.
@@ -244,7 +246,9 @@ class LeaseViewSet(viewsets.ModelViewSet):
     serializer_class = LeaseSerializer
     permission_classes = [CanModifyLease]
 
-    def _apply_lease_status_filters(self, queryset, params):
+    def _apply_lease_status_filters(
+        self, queryset: QuerySet[Lease], params: Any
+    ) -> QuerySet[Lease]:
         """Apply computed date-based filters to a lease queryset."""
         today = date.today()
 
@@ -280,7 +284,7 @@ class LeaseViewSet(viewsets.ModelViewSet):
 
         return queryset
 
-    def get_queryset(self):
+    def get_queryset(self) -> QuerySet[Lease]:
         """
         Optimize queryset with select_related and prefetch_related to eliminate N+1 queries.
         Also applies filters based on query parameters.
@@ -326,7 +330,7 @@ class LeaseViewSet(viewsets.ModelViewSet):
 
     # Endpoint para gerar contrato em PDF
     @action(detail=True, methods=["post"], permission_classes=[CanGenerateContract])
-    def generate_contract(self, request, pk=None):
+    def generate_contract(self, request: Request, pk: int | None = None) -> Response:
         """
         Generate PDF contract for a lease.
 
@@ -373,7 +377,7 @@ class LeaseViewSet(viewsets.ModelViewSet):
 
     # Endpoint para cálculo de multa de atraso
     @action(detail=True, methods=["get"], permission_classes=[IsTenantOrAdmin])
-    def calculate_late_fee(self, request, pk=None):
+    def calculate_late_fee(self, request: Request, pk: int | None = None) -> Response:
         """
         Calculate late payment fee for a lease.
 
@@ -400,7 +404,7 @@ class LeaseViewSet(viewsets.ModelViewSet):
 
     # Endpoint para alteração do dia de vencimento com cálculo da taxa
     @action(detail=True, methods=["post"], permission_classes=[IsAdminUser])
-    def change_due_date(self, request, pk=None):
+    def change_due_date(self, request: Request, pk: int | None = None) -> Response:
         """
         Change the due date for rent payments.
 
@@ -479,7 +483,7 @@ class DashboardViewSet(viewsets.ViewSet):
     permission_classes = [IsAdminUser]  # Only admins can access dashboard
 
     @action(detail=False, methods=["get"])
-    def financial_summary(self, request):
+    def financial_summary(self, request: Request) -> Response:
         """
         Get financial summary across all properties.
 
@@ -502,7 +506,7 @@ class DashboardViewSet(viewsets.ViewSet):
         return Response(summary, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=["get"])
-    def lease_metrics(self, request):
+    def lease_metrics(self, request: Request) -> Response:
         """
         Get lease statistics and metrics.
 
@@ -523,7 +527,7 @@ class DashboardViewSet(viewsets.ViewSet):
         return Response(metrics, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=["get"])
-    def building_statistics(self, request):
+    def building_statistics(self, request: Request) -> Response:
         """
         Get per-building statistics and occupancy.
 
@@ -547,7 +551,7 @@ class DashboardViewSet(viewsets.ViewSet):
         return Response(statistics, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=["get"])
-    def late_payment_summary(self, request):
+    def late_payment_summary(self, request: Request) -> Response:
         """
         Get late payment statistics.
 
@@ -577,7 +581,7 @@ class DashboardViewSet(viewsets.ViewSet):
         return Response(summary, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=["get"])
-    def tenant_statistics(self, request):
+    def tenant_statistics(self, request: Request) -> Response:
         """
         Get tenant statistics and demographics.
 

@@ -1,5 +1,6 @@
 from datetime import date
 from decimal import Decimal
+from typing import Any
 
 from django.contrib.auth import get_user_model
 from django.db.models import Sum
@@ -128,7 +129,7 @@ class ApartmentSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["is_rented"]
 
-    def create(self, validated_data):
+    def create(self, validated_data: dict[str, Any]) -> Apartment:
         """Create apartment with furniture relationships."""
         furniture_ids = validated_data.pop("furniture_ids", [])
         apartment = Apartment.objects.create(**validated_data)
@@ -136,7 +137,7 @@ class ApartmentSerializer(serializers.ModelSerializer):
             apartment.furnitures.set(furniture_ids)
         return apartment
 
-    def update(self, instance, validated_data):
+    def update(self, instance: Apartment, validated_data: dict[str, Any]) -> Apartment:
         """Update apartment with furniture relationships."""
         furniture_ids = validated_data.pop("furniture_ids", None)
 
@@ -159,7 +160,7 @@ class DependentSerializer(serializers.ModelSerializer):
         fields = ["id", "tenant", "name", "phone"]
         read_only_fields = ["tenant"]  # tenant is set by parent in nested creation
 
-    def validate_phone(self, value):
+    def validate_phone(self, value: str) -> str:
         """Validate Brazilian phone number format."""
         if value:
             BrazilianPhoneValidator()(value)
@@ -191,13 +192,13 @@ class TenantSerializer(serializers.ModelSerializer):
             "furniture_ids",
         ]
 
-    def validate_phone(self, value):
+    def validate_phone(self, value: str) -> str:
         """Validate Brazilian phone number format."""
         if value:
             BrazilianPhoneValidator()(value)
         return value
 
-    def validate(self, attrs):
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         """Cross-field validation for CPF/CNPJ based on is_company flag."""
         attrs = super().validate(attrs)
 
@@ -219,7 +220,7 @@ class TenantSerializer(serializers.ModelSerializer):
 
         return attrs
 
-    def create(self, validated_data):
+    def create(self, validated_data: dict[str, Any]) -> Tenant:
         dependents_data = validated_data.pop("dependents", [])
         furniture_ids = validated_data.pop("furniture_ids", [])
         tenant = Tenant.objects.create(**validated_data)
@@ -229,7 +230,7 @@ class TenantSerializer(serializers.ModelSerializer):
             Dependent.objects.create(tenant=tenant, **dep_data)
         return tenant
 
-    def update(self, instance, validated_data):
+    def update(self, instance: Tenant, validated_data: dict[str, Any]) -> Tenant:
         dependents_data = validated_data.pop("dependents", None)
         furniture_ids = validated_data.pop("furniture_ids", None)
         for attr, value in validated_data.items():
@@ -300,7 +301,7 @@ class LeaseSerializer(serializers.ModelSerializer):
             "is_salary_offset",
         ]
 
-    def create(self, validated_data):
+    def create(self, validated_data: dict[str, Any]) -> Lease:
         """Create lease with tenant relationships."""
         tenants = validated_data.pop("tenants", [])
         lease = Lease.objects.create(**validated_data)
@@ -308,7 +309,7 @@ class LeaseSerializer(serializers.ModelSerializer):
             lease.tenants.set(tenants)
         return lease
 
-    def update(self, instance, validated_data):
+    def update(self, instance: Lease, validated_data: dict[str, Any]) -> Lease:
         """Update lease with tenant relationships."""
         tenants = validated_data.pop("tenants", None)
 
@@ -358,7 +359,7 @@ class LandlordSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["id", "created_at", "updated_at", "full_address"]
 
-    def validate_cpf_cnpj(self, value):
+    def validate_cpf_cnpj(self, value: str) -> str:
         """Validate CPF or CNPJ format."""
         if value:
             # Try CPF first, then CNPJ
@@ -372,7 +373,7 @@ class LandlordSerializer(serializers.ModelSerializer):
                     raise serializers.ValidationError(msg) from exc
         return value
 
-    def validate_phone(self, value):
+    def validate_phone(self, value: str) -> str:
         """Validate Brazilian phone number format."""
         if value:
             BrazilianPhoneValidator()(value)
@@ -443,7 +444,7 @@ class PersonSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["id", "user", "created_at", "updated_at"]
 
-    def get_credit_cards(self, obj):
+    def get_credit_cards(self, obj: Person) -> list[Any]:
         return CreditCardSerializer(obj.credit_cards.all(), many=True).data
 
 
@@ -519,7 +520,7 @@ class ExpenseInstallmentSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["id"]
 
-    def get_is_overdue(self, obj) -> bool:
+    def get_is_overdue(self, obj: ExpenseInstallment) -> bool:
         return not obj.is_paid and obj.due_date < date.today()
 
 
@@ -599,18 +600,18 @@ class ExpenseSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
 
-    def get_remaining_installments(self, obj) -> int:
+    def get_remaining_installments(self, obj: Expense) -> int:
         return obj.installments.filter(is_paid=False).count()
 
-    def get_total_paid(self, obj) -> str:
+    def get_total_paid(self, obj: Expense) -> str:
         result = obj.installments.filter(is_paid=True).aggregate(total=Sum("amount"))
         return str(result["total"] or Decimal(0))
 
-    def get_total_remaining(self, obj) -> str:
+    def get_total_remaining(self, obj: Expense) -> str:
         result = obj.installments.filter(is_paid=False).aggregate(total=Sum("amount"))
         return str(result["total"] or Decimal(0))
 
-    def validate(self, attrs):
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         attrs = super().validate(attrs)
         expense_type = attrs.get("expense_type", "")
 
@@ -679,7 +680,7 @@ class PersonIncomeSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
 
-    def get_current_value(self, obj) -> str:
+    def get_current_value(self, obj: PersonIncome) -> str:
         if obj.income_type == "apartment_rent" and obj.apartment:
             return str(obj.apartment.rental_value)
         if obj.income_type == "fixed_stipend" and obj.fixed_amount:
@@ -758,7 +759,7 @@ class RentPaymentSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
 
-    def validate_reference_month(self, value):
+    def validate_reference_month(self, value: date) -> date:
         if value.day != 1:
             msg = "O mês de referência deve ser o primeiro dia do mês."
             raise serializers.ValidationError(msg)
@@ -792,7 +793,7 @@ class EmployeePaymentSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["id", "total_paid", "created_at", "updated_at"]
 
-    def validate_reference_month(self, value):
+    def validate_reference_month(self, value: date) -> date:
         if value.day != 1:
             msg = "O mês de referência deve ser o primeiro dia do mês."
             raise serializers.ValidationError(msg)
@@ -822,7 +823,7 @@ class PersonPaymentSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
 
-    def validate_reference_month(self, value):
+    def validate_reference_month(self, value: date) -> date:
         if value.day != 1:
             msg = "O mês de referência deve ser o primeiro dia do mês."
             raise serializers.ValidationError(msg)

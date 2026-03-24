@@ -6,6 +6,7 @@ Provides OAuth callback handler that issues JWT tokens after successful Google O
 """
 
 import logging
+from typing import Any
 from urllib.parse import urlencode
 
 from allauth.socialaccount.models import SocialAccount
@@ -28,6 +29,8 @@ User = get_user_model()
 def current_user(request: Request) -> Response:
     """Return the authenticated user's profile."""
     user = request.user
+    if not user.is_authenticated:
+        return Response({"error": "Authentication required"}, status=401)
     return Response({
         "id": user.pk,
         "email": user.email,
@@ -38,7 +41,7 @@ def current_user(request: Request) -> Response:
     })
 
 
-def get_tokens_for_user(user):
+def get_tokens_for_user(user: Any) -> dict[str, str]:
     """
     Generate JWT tokens (access and refresh) for a given user.
 
@@ -77,7 +80,7 @@ class GoogleOAuthCallbackView:
     """
 
     @staticmethod
-    def handle_callback(request):
+    def handle_callback(request: Request) -> Any:
         """
         Handle the OAuth callback and issue JWT tokens.
 
@@ -142,7 +145,7 @@ class GoogleOAuthCallbackView:
 
 @api_view(["GET"])
 @permission_classes([AllowAny])
-def google_oauth_callback(request):
+def google_oauth_callback(request: Request) -> Any:
     """
     Endpoint for Google OAuth callback.
 
@@ -160,7 +163,7 @@ def google_oauth_callback(request):
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
-def link_oauth_account(request):
+def link_oauth_account(request: Request) -> JsonResponse:
     """
     Manually link a Google account to an existing Django user by email.
 
@@ -208,7 +211,7 @@ def link_oauth_account(request):
 
 @api_view(["GET"])
 @permission_classes([AllowAny])
-def oauth_status(request):
+def oauth_status(request: Request) -> JsonResponse:
     """
     Check OAuth configuration status.
 
