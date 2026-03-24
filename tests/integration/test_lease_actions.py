@@ -73,9 +73,7 @@ def lease(apartment, tenant, admin_user):
 class TestChangeDueDate:
     url_template = "/api/leases/{pk}/change_due_date/"
 
-    def test_change_due_date_writes_to_tenant(
-        self, authenticated_api_client, lease, tenant
-    ):
+    def test_change_due_date_writes_to_tenant(self, authenticated_api_client, lease, tenant):
         """change_due_date must update Tenant.due_day, not any Lease field."""
         url = self.url_template.format(pk=lease.pk)
         response = authenticated_api_client.post(url, {"new_due_day": 15}, format="json")
@@ -88,9 +86,10 @@ class TestChangeDueDate:
         assert tenant.due_day == 15
 
         # Lease should have no due_day field (it was removed in the refactor)
-        assert not hasattr(lease, "due_day") or not hasattr(
-            Lease._meta.get_field, "due_day"
-        )
+        from django.core.exceptions import FieldDoesNotExist
+
+        with pytest.raises(FieldDoesNotExist):
+            Lease._meta.get_field("due_day")
 
     def test_change_due_date_uses_apartment_rental_value(
         self, authenticated_api_client, lease, apartment
@@ -105,26 +104,20 @@ class TestChangeDueDate:
         # Fee should be a non-negative decimal
         assert Decimal(str(response.data["fee"])) >= Decimal("0.00")
 
-    def test_change_due_date_missing_param_returns_400(
-        self, authenticated_api_client, lease
-    ):
+    def test_change_due_date_missing_param_returns_400(self, authenticated_api_client, lease):
         url = self.url_template.format(pk=lease.pk)
         response = authenticated_api_client.post(url, {}, format="json")
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "error" in response.data
 
-    def test_change_due_date_invalid_value_returns_400(
-        self, authenticated_api_client, lease
-    ):
+    def test_change_due_date_invalid_value_returns_400(self, authenticated_api_client, lease):
         url = self.url_template.format(pk=lease.pk)
         response = authenticated_api_client.post(
             url, {"new_due_day": "not_a_number"}, format="json"
         )
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
-    def test_change_due_date_out_of_range_returns_400(
-        self, authenticated_api_client, lease
-    ):
+    def test_change_due_date_out_of_range_returns_400(self, authenticated_api_client, lease):
         """Due day must be between 1 and 31."""
         url = self.url_template.format(pk=lease.pk)
         response = authenticated_api_client.post(url, {"new_due_day": 32}, format="json")
@@ -153,9 +146,7 @@ class TestCalculateLateFee:
         assert Decimal(str(response.data["late_fee"])) == Decimal("12.50")
 
     @freeze_time("2026-03-05")
-    def test_not_late_returns_message(
-        self, authenticated_api_client, lease, apartment, tenant
-    ):
+    def test_not_late_returns_message(self, authenticated_api_client, lease, apartment, tenant):
         """When today < due_day, fee should be zero or return a not-late message."""
         # Tenant.due_day=10, today=2026-03-05 → not late yet
         url = self.url_template.format(pk=lease.pk)
@@ -163,7 +154,9 @@ class TestCalculateLateFee:
 
         assert response.status_code == status.HTTP_200_OK
         # Either a message or zero fee
-        assert "message" in response.data or Decimal(str(response.data.get("late_fee", 0))) == Decimal("0.00")
+        assert "message" in response.data or Decimal(
+            str(response.data.get("late_fee", 0))
+        ) == Decimal("0.00")
 
 
 @pytest.mark.integration
@@ -194,9 +187,7 @@ class TestGenerateContract:
         lease.refresh_from_db()
         assert lease.contract_generated is True
 
-    def test_generate_contract_unauthenticated_returns_401(
-        self, api_client, lease
-    ):
+    def test_generate_contract_unauthenticated_returns_401(self, api_client, lease):
         url = self.url_template.format(pk=lease.pk)
         response = api_client.post(url)
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
@@ -207,9 +198,7 @@ class TestGenerateContract:
 class TestLeaseSignalIsRented:
     """Tests for the signal that syncs apartment.is_rented from Lease lifecycle."""
 
-    def test_creating_lease_sets_apartment_is_rented_true(
-        self, apartment, tenant, admin_user
-    ):
+    def test_creating_lease_sets_apartment_is_rented_true(self, apartment, tenant, admin_user):
         """When a Lease is created, apartment.is_rented must become True."""
         assert not apartment.is_rented
 
@@ -226,9 +215,7 @@ class TestLeaseSignalIsRented:
         apartment.refresh_from_db()
         assert apartment.is_rented is True
 
-    def test_soft_deleting_lease_sets_apartment_is_rented_false(
-        self, lease, apartment, admin_user
-    ):
+    def test_soft_deleting_lease_sets_apartment_is_rented_false(self, lease, apartment, admin_user):
         """When a Lease is soft-deleted, apartment.is_rented must become False."""
         apartment.refresh_from_db()
         assert apartment.is_rented is True
