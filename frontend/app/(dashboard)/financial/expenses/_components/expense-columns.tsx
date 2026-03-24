@@ -25,14 +25,14 @@ export interface ExpenseActionHandlers {
 }
 
 const EXPENSE_TYPE_LABELS: Record<string, { label: string; color: string }> = {
-  card_purchase: { label: 'Cartão', color: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300' },
+  card_purchase: { label: 'Cartão', color: 'bg-primary/10 text-primary' },
   bank_loan: { label: 'Emp. Bancário', color: 'bg-destructive/10 text-destructive' },
   personal_loan: { label: 'Emp. Pessoal', color: 'bg-warning/10 text-warning' },
   water_bill: { label: 'Água', color: 'bg-info/10 text-info' },
-  electricity_bill: { label: 'Luz', color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300' },
-  property_tax: { label: 'IPTU', color: 'bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300' },
+  electricity_bill: { label: 'Luz', color: 'bg-warning/10 text-warning' },
+  property_tax: { label: 'IPTU', color: 'bg-success/10 text-success' },
   fixed_expense: { label: 'Fixo', color: 'bg-muted text-muted-foreground' },
-  one_time_expense: { label: 'Único', color: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300' },
+  one_time_expense: { label: 'Único', color: 'bg-info/10 text-info' },
   employee_salary: { label: 'Salário', color: 'bg-success/10 text-success' },
 };
 

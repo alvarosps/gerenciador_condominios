@@ -393,7 +393,7 @@ export function ExpenseEditModal({ mode, item, personId, onClose, onSaved }: Pro
                         type="checkbox"
                         checked={field.value}
                         onChange={field.onChange}
-                        className="h-4 w-4 rounded border-gray-300"
+                        className="h-4 w-4 rounded border-border"
                       />
                     </FormControl>
                     <FormLabel className="font-normal">
@@ -416,7 +416,7 @@ export function ExpenseEditModal({ mode, item, personId, onClose, onSaved }: Pro
                             type="checkbox"
                             checked={field.value}
                             onChange={field.onChange}
-                            className="h-4 w-4 rounded border-gray-300"
+                            className="h-4 w-4 rounded border-border"
                           />
                         </FormControl>
                         <FormLabel className="font-normal">Parcelado</FormLabel>

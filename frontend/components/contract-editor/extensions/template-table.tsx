@@ -23,14 +23,14 @@ const TemplateTableView: React.FC<NodeViewProps> = ({ node }) => {
       as="div"
       className={cn(
         'template-table-wrapper',
-        'my-4 p-2 border-2 border-dashed border-purple-300 rounded-lg',
-        'bg-purple-50 dark:bg-purple-950/20',
+        'my-4 p-2 border-2 border-dashed border-primary/30 rounded-lg',
+        'bg-primary/5',
         'select-none'
       )}
       contentEditable={false}
       data-type="templateTable"
     >
-      <div className="text-xs text-purple-600 dark:text-purple-400 mb-2 font-medium uppercase tracking-wide flex items-center gap-1">
+      <div className="text-xs text-primary mb-2 font-medium uppercase tracking-wide flex items-center gap-1">
         <svg
           xmlns="http://www.w3.org/2000/svg"
           viewBox="0 0 20 20"

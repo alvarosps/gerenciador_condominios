@@ -24,10 +24,10 @@ type BadgeVariant = 'person' | 'condominio' | 'utility' | 'fixed' | 'salary';
 
 const BADGE_CLASSES: Record<BadgeVariant, string> = {
   person: 'bg-info/10 text-info',
-  condominio: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
+  condominio: 'bg-primary/10 text-primary',
   utility: 'bg-warning/10 text-warning',
   fixed: 'bg-success/10 text-success',
-  salary: 'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-300',
+  salary: 'bg-destructive/10 text-destructive',
 };
 
 const BADGE_LABELS: Record<BadgeVariant, string> = {
