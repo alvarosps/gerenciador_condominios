@@ -53,7 +53,7 @@ export function useCreateApartment() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: Omit<Apartment, 'id' | 'building' | 'furnitures'>) => {
+    mutationFn: async (data: Omit<Apartment, 'id' | 'building' | 'furnitures' | 'is_rented' | 'owner' | 'owner_id' | 'lease'>) => {
       // Validate data before sending
       const validated = apartmentSchema.omit({ id: true, building: true, furnitures: true }).parse(data);
       const response = await apiClient.post<Apartment>('/apartments/', validated);

@@ -41,11 +41,7 @@ import {
 import { toast } from 'sonner';
 import { DataTable, type Column } from '@/components/tables/data-table';
 import { ApartmentFormModal } from './_components/apartment-form-modal';
-import {
-  useApartments,
-  useDeleteApartment,
-  useUpdateApartment,
-} from '@/lib/api/hooks/use-apartments';
+import { useApartments, useDeleteApartment } from '@/lib/api/hooks/use-apartments';
 import { useBuildings } from '@/lib/api/hooks/use-buildings';
 import { type Apartment } from '@/lib/schemas/apartment.schema';
 import { formatCurrency } from '@/lib/utils/formatters';
@@ -64,7 +60,6 @@ export default function ApartmentsPage() {
   const { data: apartments, isLoading, error } = useApartments(filters);
   const { data: buildings } = useBuildings();
   const deleteMutation = useDeleteApartment();
-  const updateMutation = useUpdateApartment();
 
   // Use the consolidated CRUD hook for all state management
   const crud = useCrudPage<Apartment>({
@@ -95,18 +90,6 @@ export default function ApartmentsPage() {
       min_price: undefined,
       max_price: undefined,
     });
-  };
-
-  const handleBulkStatusChange = (isRented: boolean) => {
-    if (!apartments) return;
-    void crud.bulkOps.handleBulkStatusChange(
-      apartments,
-      async (data) => {
-        await updateMutation.mutateAsync(data);
-      },
-      'is_rented',
-      isRented
-    );
   };
 
   const columns: Column<Apartment>[] = [
@@ -262,20 +245,6 @@ export default function ApartmentsPage() {
           <div className="flex gap-2">
             <Button variant="outline" onClick={crud.bulkOps.clearSelection}>
               Cancelar Seleção
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => handleBulkStatusChange(false)}
-              disabled={updateMutation.isPending}
-            >
-              Marcar como Disponível
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => handleBulkStatusChange(true)}
-              disabled={updateMutation.isPending}
-            >
-              Marcar como Alugado
             </Button>
             <Button
               variant="destructive"

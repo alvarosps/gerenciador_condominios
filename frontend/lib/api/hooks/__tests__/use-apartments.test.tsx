@@ -117,10 +117,6 @@ describe('useApartments', () => {
         rental_value: 1500,
         cleaning_fee: 150,
         max_tenants: 2,
-        interfone_configured: false,
-        contract_generated: false,
-        contract_signed: false,
-        is_rented: false,
         furniture_ids: [],
       });
 
