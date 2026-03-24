@@ -77,10 +77,7 @@ export function TenantFormWizard({ open, tenant, onClose }: Props) {
       marital_status: '',
       dependents: [],
       furniture_ids: [],
-      deposit_amount: null,
-      cleaning_fee_paid: false,
-      tag_deposit_paid: false,
-      rent_due_day: 1,
+      due_day: 1,
     },
     mode: 'onChange',
   });
@@ -101,10 +98,7 @@ export function TenantFormWizard({ open, tenant, onClose }: Props) {
           tenant.furnitures
             ?.map((f) => f.id)
             .filter((id): id is number => id !== undefined) ?? [],
-        deposit_amount: tenant.deposit_amount,
-        cleaning_fee_paid: tenant.cleaning_fee_paid,
-        tag_deposit_paid: tenant.tag_deposit_paid,
-        rent_due_day: tenant.rent_due_day ?? 1,
+        due_day: tenant.due_day ?? 1,
       });
     } else if (!tenant && open) {
       formMethods.reset();
@@ -151,10 +145,7 @@ export function TenantFormWizard({ open, tenant, onClose }: Props) {
           values.dependents?.filter(
             (d: { name: string; phone: string }) => d.name && d.phone
           ) ?? [],
-        deposit_amount: values.deposit_amount ?? null,
-        cleaning_fee_paid: values.cleaning_fee_paid ?? false,
-        tag_deposit_paid: values.tag_deposit_paid ?? false,
-        rent_due_day: values.rent_due_day ?? 1,
+        due_day: values.due_day ?? 1,
       };
 
       if (tenant?.id) {

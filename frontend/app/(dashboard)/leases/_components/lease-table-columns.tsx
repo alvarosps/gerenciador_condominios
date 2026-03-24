@@ -186,19 +186,17 @@ export function createLeaseColumns(handlers: LeaseActionHandlers): Column<Lease>
     },
     {
       title: 'Valor',
-      dataIndex: 'rental_value',
       key: 'rental_value',
       width: 120,
-      render: (value) => formatCurrency(value as number),
-      sorter: (a: Lease, b: Lease) => a.rental_value - b.rental_value,
+      render: (_, record: Lease) => formatCurrency(record.apartment?.rental_value ?? 0),
+      sorter: (a: Lease, b: Lease) => (a.apartment?.rental_value ?? 0) - (b.apartment?.rental_value ?? 0),
     },
     {
       title: 'Vencimento',
-      dataIndex: 'due_day',
       key: 'due_day',
       width: 100,
-      render: (value) => `Dia ${String(value)}`,
-      sorter: (a: Lease, b: Lease) => a.due_day - b.due_day,
+      render: (_, record: Lease) => `Dia ${String(record.responsible_tenant?.due_day ?? '-')}`,
+      sorter: (a: Lease, b: Lease) => (a.responsible_tenant?.due_day ?? 0) - (b.responsible_tenant?.due_day ?? 0),
     },
     {
       title: 'Contrato',

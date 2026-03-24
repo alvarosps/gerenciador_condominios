@@ -74,17 +74,17 @@ describe('useLeases', () => {
         tenant_ids: [2],
         start_date: '2024-12-01',
         validity_months: 12,
-        due_day: 5,
-        rental_value: 2500,
-        cleaning_fee: 300,
         tag_fee: 50,
+        deposit_amount: null,
+        cleaning_fee_paid: false,
+        tag_deposit_paid: false,
       };
 
       result.current.mutate(newLease);
 
       await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
-      expect(result.current.data?.rental_value).toBe(2500);
+      expect(result.current.data?.tag_fee).toBe(50);
     });
 
     it('should invalidate leases query after creation', async () => {
@@ -101,10 +101,10 @@ describe('useLeases', () => {
         tenant_ids: [2],
         start_date: '2024-12-01',
         validity_months: 12,
-        due_day: 5,
-        rental_value: 2500,
-        cleaning_fee: 300,
         tag_fee: 50,
+        deposit_amount: null,
+        cleaning_fee_paid: false,
+        tag_deposit_paid: false,
       });
 
       await waitFor(() => expect(result.current.isSuccess).toBe(true));
@@ -122,14 +122,14 @@ describe('useLeases', () => {
       const updatedLease = {
         ...mockLeases[0],
         id: mockLeases[0]?.id ?? 1,
-        rental_value: 1800,
+        tag_fee: 80,
       };
 
       result.current.mutate(updatedLease);
 
       await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
-      expect(result.current.data?.rental_value).toBe(1800);
+      expect(result.current.data?.tag_fee).toBe(80);
     });
   });
 

@@ -91,7 +91,6 @@ describe('useTenants', () => {
         email: 'joao.novo@email.com',
         marital_status: 'Solteiro',
         profession: 'Desenvolvedor',
-        deposit_amount: null,
         furnitures: [],
         dependents: [],
       };
@@ -116,7 +115,6 @@ describe('useTenants', () => {
         email: 'familia.silva@email.com',
         marital_status: 'Casado',
         profession: 'Contador',
-        deposit_amount: null,
         furnitures: [],
         dependents: [
           { name: 'Filho 1', phone: '(11) 91111-2222' },

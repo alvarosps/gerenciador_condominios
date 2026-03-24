@@ -58,10 +58,7 @@ export const tenantFormSchema = z.object({
   furniture_ids: z.array(z.number()).optional(),
 
   // Additional fields
-  deposit_amount: z.number().nullable().optional(),
-  cleaning_fee_paid: z.boolean().optional(),
-  tag_deposit_paid: z.boolean().optional(),
-  rent_due_day: z.number().optional(),
+  due_day: z.number().optional(),
 });
 
 export type TenantFormValues = z.infer<typeof tenantFormSchema>;

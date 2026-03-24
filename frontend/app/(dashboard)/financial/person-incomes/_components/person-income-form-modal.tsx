@@ -257,7 +257,7 @@ export function PersonIncomeFormModal({ open, personIncome, onClose }: Props) {
                 {activeLeaseForApartment && (
                   <div className="rounded-md bg-muted p-3 text-sm">
                     <span className="font-medium">Valor atual do lease:</span>{' '}
-                    {formatCurrency(activeLeaseForApartment.rental_value)}
+                    {formatCurrency(activeLeaseForApartment.apartment?.rental_value ?? 0)}
                   </div>
                 )}
                 {watchedApartmentId && !activeLeaseForApartment && (
