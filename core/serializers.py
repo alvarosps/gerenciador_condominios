@@ -445,7 +445,7 @@ class PersonSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "user", "created_at", "updated_at"]
 
     def get_credit_cards(self, obj: Person) -> list[Any]:
-        return CreditCardSerializer(obj.credit_cards.all(), many=True).data
+        return list(CreditCardSerializer(obj.credit_cards.all(), many=True).data)
 
 
 class CreditCardSerializer(serializers.ModelSerializer):
@@ -496,9 +496,9 @@ class ExpenseCategorySerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["id", "parent", "subcategories", "created_at", "updated_at"]
 
-    def get_subcategories(self, obj: ExpenseCategory) -> list:
+    def get_subcategories(self, obj: ExpenseCategory) -> list[Any]:
         children = obj.subcategories.all()
-        return ExpenseCategorySerializer(children, many=True).data
+        return list(ExpenseCategorySerializer(children, many=True).data)
 
 
 class ExpenseInstallmentSerializer(serializers.ModelSerializer):
