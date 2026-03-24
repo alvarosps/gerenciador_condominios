@@ -3,9 +3,12 @@
 import logging
 from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
+from typing import cast
 
 from dateutil.relativedelta import relativedelta
+from django.contrib.auth.models import User
 from django.db.models import QuerySet
+from django.http import QueryDict
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.request import Request
@@ -131,57 +134,55 @@ class ExpenseViewSet(viewsets.ModelViewSet):
         queryset = Expense.objects.select_related(
             "person", "credit_card", "building", "category"
         ).prefetch_related("installments")
-
         params = self.request.query_params
-
-        person_id = params.get("person_id")
-        if person_id is not None:
-            queryset = queryset.filter(person_id=person_id)
-
-        credit_card_id = params.get("credit_card_id")
-        if credit_card_id is not None:
-            queryset = queryset.filter(credit_card_id=credit_card_id)
-
-        expense_type = params.get("expense_type")
-        if expense_type is not None:
-            queryset = queryset.filter(expense_type=expense_type)
-
-        category_id = params.get("category_id")
-        if category_id is not None:
-            queryset = queryset.filter(category_id=category_id)
-
-        building_id = params.get("building_id")
-        if building_id is not None:
-            queryset = queryset.filter(building_id=building_id)
-
-        is_paid = params.get("is_paid")
-        if is_paid is not None:
-            queryset = queryset.filter(is_paid=is_paid.lower() == "true")
-
-        is_installment = params.get("is_installment")
-        if is_installment is not None:
-            queryset = queryset.filter(is_installment=is_installment.lower() == "true")
-
-        is_recurring = params.get("is_recurring")
-        if is_recurring is not None:
-            queryset = queryset.filter(is_recurring=is_recurring.lower() == "true")
-
-        is_debt_installment = params.get("is_debt_installment")
-        if is_debt_installment is not None:
-            queryset = queryset.filter(is_debt_installment=is_debt_installment.lower() == "true")
-
-        is_offset = params.get("is_offset")
-        if is_offset is not None:
-            queryset = queryset.filter(is_offset=is_offset.lower() == "true")
-
+        queryset = self._apply_expense_id_filters(queryset, params)
+        queryset = self._apply_expense_bool_filters(queryset, params)
         date_from = params.get("date_from")
         if date_from is not None:
             queryset = queryset.filter(expense_date__gte=date_from)
-
         date_to = params.get("date_to")
         if date_to is not None:
             queryset = queryset.filter(expense_date__lte=date_to)
+        return queryset
 
+    def _apply_expense_id_filters(
+        self, queryset: QuerySet[Expense], params: QueryDict
+    ) -> QuerySet[Expense]:
+        person_id = params.get("person_id")
+        if person_id is not None:
+            queryset = queryset.filter(person_id=int(person_id))
+        credit_card_id = params.get("credit_card_id")
+        if credit_card_id is not None:
+            queryset = queryset.filter(credit_card_id=int(credit_card_id))
+        expense_type = params.get("expense_type")
+        if expense_type is not None:
+            queryset = queryset.filter(expense_type=expense_type)
+        category_id = params.get("category_id")
+        if category_id is not None:
+            queryset = queryset.filter(category_id=int(category_id))
+        building_id = params.get("building_id")
+        if building_id is not None:
+            queryset = queryset.filter(building_id=int(building_id))
+        return queryset
+
+    def _apply_expense_bool_filters(
+        self, queryset: QuerySet[Expense], params: QueryDict
+    ) -> QuerySet[Expense]:
+        is_paid = params.get("is_paid")
+        if is_paid is not None:
+            queryset = queryset.filter(is_paid=is_paid.lower() == "true")
+        is_installment = params.get("is_installment")
+        if is_installment is not None:
+            queryset = queryset.filter(is_installment=is_installment.lower() == "true")
+        is_recurring = params.get("is_recurring")
+        if is_recurring is not None:
+            queryset = queryset.filter(is_recurring=is_recurring.lower() == "true")
+        is_debt_installment = params.get("is_debt_installment")
+        if is_debt_installment is not None:
+            queryset = queryset.filter(is_debt_installment=is_debt_installment.lower() == "true")
+        is_offset = params.get("is_offset")
+        if is_offset is not None:
+            queryset = queryset.filter(is_offset=is_offset.lower() == "true")
         return queryset
 
     @action(detail=True, methods=["post"])
@@ -218,6 +219,7 @@ class ExpenseViewSet(viewsets.ModelViewSet):
         )
 
         has_credit_card = expense.credit_card_id is not None
+        user = cast(User, request.user)
 
         installments = []
         for i in range(1, expense.total_installments + 1):
@@ -235,8 +237,8 @@ class ExpenseViewSet(viewsets.ModelViewSet):
                     total_installments=expense.total_installments,
                     amount=installment_amount,
                     due_date=due_date,
-                    created_by=request.user,
-                    updated_by=request.user,
+                    created_by=user,
+                    updated_by=user,
                 )
             )
 
@@ -272,6 +274,7 @@ class ExpenseViewSet(viewsets.ModelViewSet):
 
         # Create new installments from provided list
         new_installments = request.data.get("installments", [])
+        rebuild_user = cast(User, request.user)
         to_create = [
             ExpenseInstallment(
                 expense=expense,
@@ -281,8 +284,8 @@ class ExpenseViewSet(viewsets.ModelViewSet):
                 due_date=inst_data["due_date"],
                 is_paid=inst_data.get("is_paid", False),
                 paid_date=inst_data.get("paid_date"),
-                created_by=request.user,
-                updated_by=request.user,
+                created_by=rebuild_user,
+                updated_by=rebuild_user,
             )
             for inst_data in new_installments
         ]
@@ -327,11 +330,11 @@ class ExpenseInstallmentViewSet(viewsets.ModelViewSet):
 
         person_id = params.get("person_id")
         if person_id is not None:
-            queryset = queryset.filter(expense__person_id=person_id)
+            queryset = queryset.filter(expense__person_id=int(person_id))
 
         credit_card_id = params.get("credit_card_id")
         if credit_card_id is not None:
-            queryset = queryset.filter(expense__credit_card_id=credit_card_id)
+            queryset = queryset.filter(expense__credit_card_id=int(credit_card_id))
 
         return queryset
 
@@ -395,15 +398,15 @@ class IncomeViewSet(viewsets.ModelViewSet):
 
         person_id = params.get("person_id")
         if person_id is not None:
-            queryset = queryset.filter(person_id=person_id)
+            queryset = queryset.filter(person_id=int(person_id))
 
         building_id = params.get("building_id")
         if building_id is not None:
-            queryset = queryset.filter(building_id=building_id)
+            queryset = queryset.filter(building_id=int(building_id))
 
         category_id = params.get("category_id")
         if category_id is not None:
-            queryset = queryset.filter(category_id=category_id)
+            queryset = queryset.filter(category_id=int(category_id))
 
         is_recurring = params.get("is_recurring")
         if is_recurring is not None:

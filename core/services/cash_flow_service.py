@@ -5,7 +5,6 @@ Provides monthly income/expense calculations, cash flow projection,
 and per-person financial summaries.
 """
 
-
 from datetime import date
 from decimal import Decimal
 from typing import Any
@@ -169,9 +168,10 @@ class CashFlowService:
         details = []
         for lease in owner_leases:
             owner_repayments += lease.apartment.rental_value
+            owner = lease.apartment.owner
             details.append(
                 {
-                    "person_name": lease.apartment.owner.name,
+                    "person_name": owner.name if owner is not None else "",
                     "apartment_number": str(lease.apartment.number),
                     "building_name": lease.apartment.building.street_number,
                     "amount": lease.apartment.rental_value,
@@ -422,7 +422,9 @@ class CashFlowService:
         owner_repayments, owner_repayments_details = CashFlowService._collect_owner_repayments(
             month_start, next_month
         )
-        person_stipends, person_stipends_details = CashFlowService._collect_person_stipends(month_start)
+        person_stipends, person_stipends_details = CashFlowService._collect_person_stipends(
+            month_start
+        )
         card_installments, card_installments_details = CashFlowService._collect_card_installments(
             month_start, next_month
         )
@@ -575,7 +577,7 @@ class CashFlowService:
             rent_income += lease.apartment.rental_value
 
         # Recurring extra income
-        recurring_income = Income.objects.filter(
+        recurring_income: Decimal = Income.objects.filter(
             is_recurring=True,
             expected_monthly_amount__isnull=False,
         ).aggregate(total=Coalesce(Sum("expected_monthly_amount"), Decimal("0.00")))["total"]
@@ -601,7 +603,7 @@ class CashFlowService:
         total += owner_total
 
         # Person stipends
-        stipend_total = PersonIncome.objects.filter(
+        stipend_total: Decimal = PersonIncome.objects.filter(
             income_type=PersonIncomeType.FIXED_STIPEND,
             is_active=True,
             fixed_amount__isnull=False,
@@ -609,7 +611,7 @@ class CashFlowService:
         total += stipend_total
 
         # Known installments (card, loan, debt, property_tax) with due_date in month
-        installment_total = ExpenseInstallment.objects.filter(
+        installment_total: Decimal = ExpenseInstallment.objects.filter(
             due_date__gte=month_start,
             due_date__lt=next_month,
             expense__is_offset=False,
@@ -620,7 +622,7 @@ class CashFlowService:
         total += CashFlowService._get_projected_utility_average()
 
         # Fixed expenses (respect end_date and exclude offsets)
-        fixed_total = (
+        fixed_total: Decimal = (
             Expense.objects.filter(
                 expense_type=ExpenseType.FIXED_EXPENSE,
                 is_recurring=True,
@@ -641,7 +643,8 @@ class CashFlowService:
             .values_list("max_pk", flat=True)
         )
         latest_payments = EmployeePayment.objects.filter(pk__in=latest_pk_per_person)
-        total += sum(ep.total_paid for ep in latest_payments)
+        for ep in latest_payments:
+            total += ep.total_paid
 
         return total
 
@@ -677,7 +680,7 @@ class CashFlowService:
             m_end = _next_month_start(y, m)
             month_filters |= Q(expense_date__gte=m_start, expense_date__lt=m_end)
 
-        monthly_totals = (
+        monthly_totals: Decimal = (
             Expense.objects.filter(
                 expense_type__in=[ExpenseType.WATER_BILL, ExpenseType.ELECTRICITY_BILL],
                 is_debt_installment=False,

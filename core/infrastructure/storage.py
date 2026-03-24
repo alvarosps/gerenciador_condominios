@@ -15,11 +15,10 @@ Usage:
     pdf_bytes = storage.retrieve("document.pdf")
 """
 
-from __future__ import annotations
-
 import logging
 from abc import ABC, abstractmethod
 from pathlib import Path
+from typing import cast
 
 # Try to import boto3 for S3 support (optional dependency)
 try:
@@ -370,7 +369,7 @@ class S3DocumentStorage(IDocumentStorage):
         """
         try:
             response = self.s3_client.get_object(Bucket=self.bucket_name, Key=file_path)
-            content = response["Body"].read()
+            content = cast(bytes, response["Body"].read())
         except OSError as e:
             # Check if it's a NoSuchKey error
             error_code = getattr(e, "response", {}).get("Error", {}).get("Code", "")
@@ -443,10 +442,13 @@ class S3DocumentStorage(IDocumentStorage):
                 return f"https://{self.bucket_name}.s3.{self.region}.amazonaws.com/{file_path}"
 
             # Generate presigned URL with expiry
-            return self.s3_client.generate_presigned_url(
-                "get_object",
-                Params={"Bucket": self.bucket_name, "Key": file_path},
-                ExpiresIn=expiry,
+            return cast(
+                str,
+                self.s3_client.generate_presigned_url(
+                    "get_object",
+                    Params={"Bucket": self.bucket_name, "Key": file_path},
+                    ExpiresIn=expiry,
+                ),
             )
 
         except Exception as e:

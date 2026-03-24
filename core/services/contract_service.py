@@ -126,7 +126,7 @@ class ContractService:
         apt_furniture = set(lease.apartment.furnitures.all())
 
         # Collect furniture from ALL tenants, not just responsible tenant
-        all_tenant_furniture = set()
+        all_tenant_furniture: set[Furniture] = set()
         for tenant in lease.tenants.all():
             all_tenant_furniture.update(tenant.furnitures.all())
 

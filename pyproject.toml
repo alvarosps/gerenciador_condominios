@@ -147,6 +147,9 @@ max-complexity = 12
 "core/infrastructure/storage.py" = ["BLE001"]
 # logging_config overrides RotatingFileHandler.doRollover which uses camelCase (stdlib convention)
 "condominios_manager/logging_config.py" = ["N802"]
+# base.py uses _default_manager as the only mypy-compatible way to access the manager
+# on a generic TypeVar-bound Model class without triggering attr-defined errors
+"core/services/base.py" = ["SLF001"]
 
 [tool.ruff.lint.pylint]
 max-args = 8
@@ -164,7 +167,7 @@ docstring-code-format = true
 # =============================================================================
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.12"
 plugins = [
     "mypy_django_plugin.main",
     "mypy_drf_plugin.main",
@@ -215,6 +218,7 @@ ignore_errors = true
 
 [[tool.mypy.overrides]]
 module = [
+    "allauth.*",
     "num2words.*",
     "playwright.*",
     "jinja2.*",
@@ -226,6 +230,9 @@ module = [
     "model_bakery.*",
     "responses.*",
     "freezegun.*",
+    "boto3.*",
+    "botocore.*",
+    "django_redis.*",
 ]
 ignore_missing_imports = true
 

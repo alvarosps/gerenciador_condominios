@@ -39,7 +39,7 @@ class RequestResponseLoggingMiddleware(MiddlewareMixin):
         Args:
             request: Incoming HTTP request
         """
-        request.start_time = time.time()
+        request.__dict__["start_time"] = time.time()
 
         # Log access
         access_logger.info(
@@ -67,8 +67,8 @@ class RequestResponseLoggingMiddleware(MiddlewareMixin):
         Returns:
             The unmodified HTTP response
         """
-        if hasattr(request, "start_time"):
-            duration = time.time() - request.start_time
+        if "start_time" in request.__dict__:
+            duration = time.time() - request.__dict__["start_time"]
 
             # Log access response
             access_logger.info(
@@ -112,7 +112,7 @@ class RequestResponseLoggingMiddleware(MiddlewareMixin):
         """
         x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
         if x_forwarded_for:
-            ip = x_forwarded_for.split(",")[0]
+            ip: str = str(x_forwarded_for).split(",")[0]
         else:
-            ip = request.META.get("REMOTE_ADDR", "")
+            ip = str(request.META.get("REMOTE_ADDR", ""))
         return ip

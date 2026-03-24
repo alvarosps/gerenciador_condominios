@@ -20,19 +20,15 @@ Usage:
     CacheManager.invalidate_model('Lease', lease_id)
 """
 
-from __future__ import annotations
-
 import hashlib
 import logging
+from collections.abc import Callable
 from functools import wraps
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import Any, TypeVar, cast
 
 from django.conf import settings
 from django.core.cache import cache
 from django.db.models import Model
-
-if TYPE_CHECKING:
-    from collections.abc import Callable
 
 try:
     from django_redis import get_redis_connection
@@ -153,7 +149,7 @@ def cache_result(timeout: int = 300, key_prefix: str = "") -> Callable:
             cached_value = cache.get(cache_key)
             if cached_value is not None:
                 logger.debug(f"Cache HIT: {cache_key}")
-                return cached_value
+                return cast(T, cached_value)
 
             # Cache miss - execute function
             logger.debug(f"Cache MISS: {cache_key}")
@@ -164,11 +160,6 @@ def cache_result(timeout: int = 300, key_prefix: str = "") -> Callable:
             logger.debug(f"Cache SET: {cache_key} (timeout={timeout}s)")
 
             return result
-
-        # Attach cache key generator to function for manual invalidation
-        wrapper.get_cache_key = lambda *args, **kwargs: get_cache_key(
-            *args, prefix=key_prefix or func.__name__, **kwargs
-        )
 
         return wrapper
 
@@ -246,7 +237,7 @@ class CacheManager:
             return 0
         else:
             if keys:
-                count = redis_client.delete(*keys)
+                count: int = cast(int, redis_client.delete(*keys))
                 logger.info(f"Invalidated {count} cache keys matching pattern: {pattern}")
                 return count
             logger.debug(f"No cache keys found matching pattern: {pattern}")

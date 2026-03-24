@@ -271,7 +271,7 @@ def _collect_entries_by_day(
             "type": "income",
             "id": inc.id,
             "description": inc.description,
-            "amount": float(inc.expected_monthly_amount),
+            "amount": float(inc.expected_monthly_amount or 0),
             "expected": True,
             "paid": inc.is_received or received_this_month,
         }
@@ -368,7 +368,7 @@ def _collect_fixed_expense_exits(
             "type": "expense",
             "id": exp.id,
             "description": exp.description,
-            "amount": float(exp.expected_monthly_amount),
+            "amount": float(exp.expected_monthly_amount or 0),
             "due": True,
             "paid": exp.is_paid,
         }
