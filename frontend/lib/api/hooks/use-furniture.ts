@@ -50,8 +50,10 @@ export function useCreateFurniture() {
       return response.data;
     },
     onSuccess: () => {
-      // Invalidate furniture list to trigger refetch
       void queryClient.invalidateQueries({ queryKey: ['furniture'] });
+      void queryClient.invalidateQueries({ queryKey: ['apartments'] });
+      void queryClient.invalidateQueries({ queryKey: ['tenants'] });
+      void queryClient.invalidateQueries({ queryKey: ['leases'] });
     },
   });
 }
@@ -74,9 +76,11 @@ export function useUpdateFurniture() {
       return response.data;
     },
     onSuccess: (data) => {
-      // Invalidate both list and specific furniture item cache
       void queryClient.invalidateQueries({ queryKey: ['furniture'] });
       void queryClient.invalidateQueries({ queryKey: ['furniture', data.id] });
+      void queryClient.invalidateQueries({ queryKey: ['apartments'] });
+      void queryClient.invalidateQueries({ queryKey: ['tenants'] });
+      void queryClient.invalidateQueries({ queryKey: ['leases'] });
     },
   });
 }
@@ -92,8 +96,10 @@ export function useDeleteFurniture() {
       await apiClient.delete(`/furnitures/${id}/`);
     },
     onSuccess: () => {
-      // Invalidate furniture list to trigger refetch
       void queryClient.invalidateQueries({ queryKey: ['furniture'] });
+      void queryClient.invalidateQueries({ queryKey: ['apartments'] });
+      void queryClient.invalidateQueries({ queryKey: ['tenants'] });
+      void queryClient.invalidateQueries({ queryKey: ['leases'] });
     },
   });
 }

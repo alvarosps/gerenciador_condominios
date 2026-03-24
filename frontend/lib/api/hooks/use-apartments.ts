@@ -60,8 +60,9 @@ export function useCreateApartment() {
       return response.data;
     },
     onSuccess: () => {
-      // Invalidate apartments list to trigger refetch
       void queryClient.invalidateQueries({ queryKey: ['apartments'] });
+      void queryClient.invalidateQueries({ queryKey: ['leases'] });
+      void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
   });
 }
@@ -77,7 +78,7 @@ export function useUpdateApartment() {
       if (!data.id) throw new Error('Apartment ID is required for update');
 
       // Remove nested objects for API call
-      const { building: _building, furnitures: _furnitures, ...updateData } = data;
+      const { building: _building, furnitures: _furnitures, lease: _lease, owner: _owner, ...updateData } = data;
 
       const response = await apiClient.put<Apartment>(
         `/apartments/${data.id}/`,
@@ -86,9 +87,10 @@ export function useUpdateApartment() {
       return response.data;
     },
     onSuccess: (data) => {
-      // Invalidate both list and specific apartment cache
       void queryClient.invalidateQueries({ queryKey: ['apartments'] });
       void queryClient.invalidateQueries({ queryKey: ['apartments', data.id] });
+      void queryClient.invalidateQueries({ queryKey: ['leases'] });
+      void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
   });
 }
@@ -104,8 +106,9 @@ export function useDeleteApartment() {
       await apiClient.delete(`/apartments/${id}/`);
     },
     onSuccess: () => {
-      // Invalidate apartments list to trigger refetch
       void queryClient.invalidateQueries({ queryKey: ['apartments'] });
+      void queryClient.invalidateQueries({ queryKey: ['leases'] });
+      void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
   });
 }
