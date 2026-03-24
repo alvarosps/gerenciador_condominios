@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Table,
   TableBody,
@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { PAGINATION } from '@/lib/utils/constants';
 
 export interface Column<T> {
@@ -65,14 +66,26 @@ export function DataTable<T extends Record<string, unknown>>({
       ? pagination.pageSize
       : PAGINATION.DEFAULT_PAGE_SIZE
   );
+  const [sortKey, setSortKey] = useState<string | null>(null);
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc' | null>(null);
 
   const showPagination = pagination !== false;
   const paginationConfig = typeof pagination === 'object' ? pagination : {};
-  const total = paginationConfig.total ?? dataSource.length;
+
+  const sortedData = useMemo(() => {
+    if (!sortKey || !sortDirection) return dataSource;
+    const sorter = columns.find((c) => c.key === sortKey)?.sorter;
+    if (!sorter) return dataSource;
+    return [...dataSource].sort((a, b) =>
+      sortDirection === 'desc' ? -sorter(a, b) : sorter(a, b)
+    );
+  }, [dataSource, columns, sortKey, sortDirection]);
+
+  const total = paginationConfig.total ?? sortedData.length;
   const totalPages = Math.ceil(total / pageSize);
   const start = (currentPage - 1) * pageSize;
   const end = start + pageSize;
-  const paginatedData = dataSource.slice(start, end);
+  const paginatedData = sortedData.slice(start, end);
 
   // Define getRowKey before it's used
   const getRowKey = (record: T, index: number): string => {
@@ -98,6 +111,17 @@ export function DataTable<T extends Record<string, unknown>>({
   const handlePageChange = (page: number): void => {
     setCurrentPage(page);
     paginationConfig.onChange?.(page, pageSize);
+  };
+
+  const handleSort = (key: string, direction: 'asc' | 'desc'): void => {
+    if (sortKey === key && sortDirection === direction) {
+      setSortKey(null);
+      setSortDirection(null);
+    } else {
+      setSortKey(key);
+      setSortDirection(direction);
+    }
+    setCurrentPage(1);
   };
 
   const handlePageSizeChange = (newSize: string): void => {
@@ -207,7 +231,41 @@ export function DataTable<T extends Record<string, unknown>>({
               )}
               {columns.map((column) => (
                 <TableHead key={column.key} style={{ width: column.width }}>
-                  {column.title}
+                  {column.sorter ? (
+                    <div className="flex items-center gap-1">
+                      <span>{column.title}</span>
+                      <div className="flex flex-col -space-y-1 ml-1">
+                        <button
+                          type="button"
+                          onClick={() => handleSort(column.key, 'asc')}
+                          className={cn(
+                            'text-[10px] leading-none cursor-pointer hover:text-primary transition-colors',
+                            sortKey === column.key && sortDirection === 'asc'
+                              ? 'text-primary'
+                              : 'text-muted-foreground/30'
+                          )}
+                          aria-label={`Sort ${column.title} ascending`}
+                        >
+                          ▲
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleSort(column.key, 'desc')}
+                          className={cn(
+                            'text-[10px] leading-none cursor-pointer hover:text-primary transition-colors',
+                            sortKey === column.key && sortDirection === 'desc'
+                              ? 'text-primary'
+                              : 'text-muted-foreground/30'
+                          )}
+                          aria-label={`Sort ${column.title} descending`}
+                        >
+                          ▼
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    column.title
+                  )}
                 </TableHead>
               ))}
             </TableRow>
