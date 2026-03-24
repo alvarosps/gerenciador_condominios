@@ -189,9 +189,9 @@ export function useChangeDueDate() {
       return data;
     },
     onSuccess: (_, params) => {
-      // Invalidate lease to refresh due_day
       void queryClient.invalidateQueries({ queryKey: ['leases', params.leaseId] });
       void queryClient.invalidateQueries({ queryKey: ['leases'] });
+      void queryClient.invalidateQueries({ queryKey: ['tenants'] });
     },
   });
 }

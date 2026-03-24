@@ -59,8 +59,8 @@ export function useCreateTenant() {
       return response.data;
     },
     onSuccess: () => {
-      // Invalidate tenants list to trigger refetch
       void queryClient.invalidateQueries({ queryKey: ['tenants'] });
+      void queryClient.invalidateQueries({ queryKey: ['leases'] });
     },
   });
 }
@@ -85,9 +85,9 @@ export function useUpdateTenant() {
       return response.data;
     },
     onSuccess: (data) => {
-      // Invalidate both list and specific tenant cache
       void queryClient.invalidateQueries({ queryKey: ['tenants'] });
       void queryClient.invalidateQueries({ queryKey: ['tenants', data.id] });
+      void queryClient.invalidateQueries({ queryKey: ['leases'] });
     },
   });
 }
@@ -103,8 +103,8 @@ export function useDeleteTenant() {
       await apiClient.delete(`/tenants/${id}/`);
     },
     onSuccess: () => {
-      // Invalidate tenants list to trigger refetch
       void queryClient.invalidateQueries({ queryKey: ['tenants'] });
+      void queryClient.invalidateQueries({ queryKey: ['leases'] });
     },
   });
 }
