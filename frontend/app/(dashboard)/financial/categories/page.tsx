@@ -175,7 +175,7 @@ export default function CategoriesPage() {
       <div className="mb-4 flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold">Categorias de Despesas</h1>
-          <p className="text-gray-600 mt-1">Gerencie as categorias e subcategorias de despesas</p>
+          <p className="text-muted-foreground mt-1">Gerencie as categorias e subcategorias de despesas</p>
         </div>
         {isAdmin && (
           <Button onClick={crud.openCreateModal}>

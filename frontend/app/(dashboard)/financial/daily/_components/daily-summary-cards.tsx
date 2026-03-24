@@ -66,7 +66,7 @@ export function DailySummaryCards({ year, month }: Props) {
           <DollarSign className="h-5 w-5 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className={cn('text-3xl font-bold', currentBalance >= 0 ? 'text-green-600' : 'text-red-600')}>
+          <div className={cn('text-3xl font-bold', currentBalance >= 0 ? 'text-success' : 'text-destructive')}>
             {formatCurrency(currentBalance)}
           </div>
           <p className="text-xs text-muted-foreground mt-2">Saldo acumulado do mês</p>
@@ -79,7 +79,7 @@ export function DailySummaryCards({ year, month }: Props) {
           <TrendingUp className="h-5 w-5 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="text-3xl font-bold text-blue-600">
+          <div className="text-3xl font-bold text-info">
             {formatCurrency(data.total_received_income)}
           </div>
           <p className="text-xs text-muted-foreground mt-2">
@@ -94,7 +94,7 @@ export function DailySummaryCards({ year, month }: Props) {
           <TrendingDown className="h-5 w-5 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="text-3xl font-bold text-orange-500">
+          <div className="text-3xl font-bold text-warning">
             {formatCurrency(data.total_paid_expenses)}
           </div>
           <p className="text-xs text-muted-foreground mt-2">
@@ -103,14 +103,14 @@ export function DailySummaryCards({ year, month }: Props) {
         </CardContent>
       </Card>
 
-      <Card className={cn('hover:shadow-md transition-shadow', data.overdue_count > 0 && 'border-red-200')}>
+      <Card className={cn('hover:shadow-md transition-shadow', data.overdue_count > 0 && 'border-destructive/20')}>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Vencidas</CardTitle>
-          <AlertTriangle className={cn('h-5 w-5', data.overdue_count > 0 ? 'text-red-500' : 'text-muted-foreground')} />
+          <AlertTriangle className={cn('h-5 w-5', data.overdue_count > 0 ? 'text-destructive' : 'text-muted-foreground')} />
         </CardHeader>
         <CardContent>
           <div className="flex items-center gap-2">
-            <div className={cn('text-3xl font-bold', data.overdue_count > 0 ? 'text-red-600' : 'text-muted-foreground')}>
+            <div className={cn('text-3xl font-bold', data.overdue_count > 0 ? 'text-destructive' : 'text-muted-foreground')}>
               {formatCurrency(data.overdue_total)}
             </div>
             {data.overdue_count > 0 && (

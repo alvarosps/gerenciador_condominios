@@ -219,7 +219,7 @@ export default function PersonIncomesPage() {
       <div className="mb-4 flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold">Rendimentos por Pessoa</h1>
-          <p className="text-gray-600 mt-1">
+          <p className="text-muted-foreground mt-1">
             Gerencie o que cada pessoa tem direito a receber mensalmente
           </p>
         </div>

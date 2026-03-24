@@ -54,15 +54,15 @@ export function DetailHeader({
           <p className="text-muted-foreground text-sm">{monthLabel}</p>
         </div>
         <div className="text-right space-y-2">
-          <div className="text-2xl font-bold text-red-600">{formatCurrency(total)}</div>
+          <div className="text-2xl font-bold text-destructive">{formatCurrency(total)}</div>
 
           {isPayable && totalPaid !== null && totalPaid !== undefined && pending !== null && pending !== undefined && (
             <>
-              <div className="w-48 bg-gray-200 rounded-full h-2.5">
+              <div className="w-48 bg-muted rounded-full h-2.5">
                 <div
                   className={cn(
                     'h-2.5 rounded-full transition-all',
-                    isPaid ? 'bg-green-500' : progress > 50 ? 'bg-blue-500' : 'bg-amber-500',
+                    isPaid ? 'bg-success' : progress > 50 ? 'bg-info' : 'bg-warning',
                   )}
                   style={{ width: `${progress}%` }}
                 />

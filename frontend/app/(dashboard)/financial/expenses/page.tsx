@@ -18,7 +18,7 @@ export default function ExpensesPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold">Despesas</h1>
-        <p className="text-gray-600 mt-1">Gerencie despesas mensais</p>
+        <p className="text-muted-foreground mt-1">Gerencie despesas mensais</p>
       </div>
 
       <Card>
@@ -32,7 +32,7 @@ export default function ExpensesPage() {
             {data && (
               <div className="text-sm text-muted-foreground">
                 Total:{' '}
-                <span className="font-bold text-red-600">
+                <span className="font-bold text-destructive">
                   {formatCurrency(data.expense_summary.total)}
                 </span>
               </div>

@@ -25,15 +25,15 @@ export interface ExpenseActionHandlers {
 }
 
 const EXPENSE_TYPE_LABELS: Record<string, { label: string; color: string }> = {
-  card_purchase: { label: 'Cartão', color: 'bg-purple-100 text-purple-800' },
-  bank_loan: { label: 'Emp. Bancário', color: 'bg-red-100 text-red-800' },
-  personal_loan: { label: 'Emp. Pessoal', color: 'bg-orange-100 text-orange-800' },
-  water_bill: { label: 'Água', color: 'bg-blue-100 text-blue-800' },
-  electricity_bill: { label: 'Luz', color: 'bg-yellow-100 text-yellow-800' },
-  property_tax: { label: 'IPTU', color: 'bg-teal-100 text-teal-800' },
-  fixed_expense: { label: 'Fixo', color: 'bg-gray-100 text-gray-800' },
-  one_time_expense: { label: 'Único', color: 'bg-indigo-100 text-indigo-800' },
-  employee_salary: { label: 'Salário', color: 'bg-green-100 text-green-800' },
+  card_purchase: { label: 'Cartão', color: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300' },
+  bank_loan: { label: 'Emp. Bancário', color: 'bg-destructive/10 text-destructive' },
+  personal_loan: { label: 'Emp. Pessoal', color: 'bg-warning/10 text-warning' },
+  water_bill: { label: 'Água', color: 'bg-info/10 text-info' },
+  electricity_bill: { label: 'Luz', color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300' },
+  property_tax: { label: 'IPTU', color: 'bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300' },
+  fixed_expense: { label: 'Fixo', color: 'bg-muted text-muted-foreground' },
+  one_time_expense: { label: 'Único', color: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300' },
+  employee_salary: { label: 'Salário', color: 'bg-success/10 text-success' },
 };
 
 function getInstallmentLabel(expense: Expense): string | null {
@@ -57,7 +57,7 @@ export function createExpenseColumns(handlers: ExpenseActionHandlers): Column<Ex
       render: (_, record) => {
         const typeInfo = EXPENSE_TYPE_LABELS[record.expense_type];
         return (
-          <Badge className={cn(typeInfo?.color ?? 'bg-gray-100 text-gray-800')}>
+          <Badge className={cn(typeInfo?.color ?? 'bg-muted text-muted-foreground')}>
             {typeInfo?.label ?? record.expense_type}
           </Badge>
         );
@@ -117,7 +117,7 @@ export function createExpenseColumns(handlers: ExpenseActionHandlers): Column<Ex
       width: 100,
       align: 'center',
       render: (_, record) => (
-        <Badge className={cn(record.is_paid ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800')}>
+        <Badge className={cn(record.is_paid ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning')}>
           {record.is_paid ? 'Pago' : 'Pendente'}
         </Badge>
       ),

@@ -82,7 +82,7 @@ export function ComparisonTable({ months }: ComparisonTableProps) {
                     {formatCurrency(m.simulated_cumulative)}
                   </TableCell>
                   <TableCell
-                    className={`text-right font-medium ${delta >= 0 ? 'text-green-600' : 'text-red-600'}`}
+                    className={`text-right font-medium ${delta >= 0 ? 'text-success' : 'text-destructive'}`}
                   >
                     {delta >= 0 ? '+' : ''}
                     {formatCurrency(delta)}
@@ -103,7 +103,7 @@ export function ComparisonTable({ months }: ComparisonTableProps) {
               </TableCell>
               <TableCell />
               <TableCell
-                className={`text-right font-bold ${totalDelta >= 0 ? 'text-green-600' : 'text-red-600'}`}
+                className={`text-right font-bold ${totalDelta >= 0 ? 'text-success' : 'text-destructive'}`}
               >
                 {totalDelta >= 0 ? '+' : ''}
                 {formatCurrency(totalDelta)}

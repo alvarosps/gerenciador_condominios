@@ -23,11 +23,11 @@ interface ExpenseListTableProps {
 type BadgeVariant = 'person' | 'condominio' | 'utility' | 'fixed' | 'salary';
 
 const BADGE_CLASSES: Record<BadgeVariant, string> = {
-  person: 'bg-blue-100 text-blue-700',
-  condominio: 'bg-purple-100 text-purple-700',
-  utility: 'bg-amber-100 text-amber-700',
-  fixed: 'bg-green-100 text-green-700',
-  salary: 'bg-pink-100 text-pink-700',
+  person: 'bg-info/10 text-info',
+  condominio: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
+  utility: 'bg-warning/10 text-warning',
+  fixed: 'bg-success/10 text-success',
+  salary: 'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-300',
 };
 
 const BADGE_LABELS: Record<BadgeVariant, string> = {
@@ -57,11 +57,11 @@ function PersonProgressBar({ person }: { person: PersonExpenseSummary }) {
 
   return (
     <div className="w-full min-w-[120px]">
-      <div className="w-full bg-gray-200 rounded-full h-2 mb-1">
+      <div className="w-full bg-muted rounded-full h-2 mb-1">
         <div
           className={cn(
             'h-2 rounded-full transition-all',
-            isPaid ? 'bg-green-500' : progress > 50 ? 'bg-blue-500' : 'bg-amber-500',
+            isPaid ? 'bg-success' : progress > 50 ? 'bg-info' : 'bg-warning',
           )}
           style={{ width: `${progress}%` }}
         />
@@ -222,7 +222,7 @@ export function ExpenseListTable({ data, year, month }: ExpenseListTableProps) {
                 <span
                   className={cn(
                     'font-semibold',
-                    row.total > 0 ? 'text-red-600' : 'text-muted-foreground',
+                    row.total > 0 ? 'text-destructive' : 'text-muted-foreground',
                   )}
                 >
                   {formatCurrency(row.total)}
@@ -238,7 +238,7 @@ export function ExpenseListTable({ data, year, month }: ExpenseListTableProps) {
               <td className="py-3 text-right">
                 <Link
                   href={row.href}
-                  className="text-blue-600 hover:underline text-sm font-medium"
+                  className="text-info hover:underline text-sm font-medium"
                 >
                   Ver detalhes →
                 </Link>

@@ -47,7 +47,7 @@ function getItemStatus(item: DailyEntry | DailyExit, dateStr: string, isExit: bo
 
 function StatusBadge({ status }: { status: 'paid' | 'overdue' | 'pending' }) {
   if (status === 'paid') {
-    return <Badge className="bg-green-100 text-green-800 hover:bg-green-100 text-xs">Pago</Badge>;
+    return <Badge className="bg-success/10 text-success hover:bg-success/10 text-xs">Pago</Badge>;
   }
   if (status === 'overdue') {
     return <Badge variant="destructive" className="text-xs">Vencida</Badge>;
@@ -77,7 +77,7 @@ function MarkPaidButton({
       disabled={isPending}
       onClick={() => onMarkPaid({ item_type: itemType, item_id: itemId, payment_date: dateStr })}
     >
-      <CheckCircle2 className="h-4 w-4 text-green-600" />
+      <CheckCircle2 className="h-4 w-4 text-success" />
     </Button>
   );
 }
@@ -95,7 +95,7 @@ function EntryRow({ entry, dateStr, isAdmin, isPending, onMarkPaid }: EntryRowPr
 
   return (
     <div className="flex items-center gap-3 py-2 px-3 rounded-lg hover:bg-muted/50 transition-colors">
-      <ArrowDownCircle className="h-5 w-5 text-green-500 shrink-0" />
+      <ArrowDownCircle className="h-5 w-5 text-success shrink-0" />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm font-medium truncate">{entry.description}</span>
@@ -104,7 +104,7 @@ function EntryRow({ entry, dateStr, isAdmin, isPending, onMarkPaid }: EntryRowPr
       </div>
       <div className="flex items-center gap-2 shrink-0">
         <StatusBadge status={status} />
-        <span className="text-sm font-bold text-green-600">{formatCurrency(entry.amount)}</span>
+        <span className="text-sm font-bold text-success">{formatCurrency(entry.amount)}</span>
         {isAdmin && status !== 'paid' && entry.id !== undefined && (
           <MarkPaidButton
             itemType="income"
@@ -134,10 +134,10 @@ function ExitRow({ exit, dateStr, isAdmin, isPending, onMarkPaid }: ExitRowProps
     <div
       className={cn(
         'flex items-center gap-3 py-2 px-3 rounded-lg hover:bg-muted/50 transition-colors',
-        status === 'overdue' && 'bg-red-50',
+        status === 'overdue' && 'bg-destructive/10',
       )}
     >
-      <ArrowUpCircle className="h-5 w-5 text-red-500 shrink-0" />
+      <ArrowUpCircle className="h-5 w-5 text-destructive shrink-0" />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm font-medium truncate">{exit.description}</span>
@@ -153,7 +153,7 @@ function ExitRow({ exit, dateStr, isAdmin, isPending, onMarkPaid }: ExitRowProps
       </div>
       <div className="flex items-center gap-2 shrink-0">
         <StatusBadge status={status} />
-        <span className="text-sm font-bold text-red-600">{formatCurrency(exit.amount)}</span>
+        <span className="text-sm font-bold text-destructive">{formatCurrency(exit.amount)}</span>
         {isAdmin && status !== 'paid' && (
           <MarkPaidButton
             itemType="installment"
@@ -300,12 +300,12 @@ export function DailyTimeline({ data, isLoading, filters, isAdmin, onDayClick }:
                 {hasItems && (
                   <>
                     {entries.length > 0 && (
-                      <span className="text-xs text-green-600 font-medium">
+                      <span className="text-xs text-success font-medium">
                         +{formatCurrency(entries.reduce((s, e) => s + e.amount, 0))}
                       </span>
                     )}
                     {exits.length > 0 && (
-                      <span className="text-xs text-red-600 font-medium">
+                      <span className="text-xs text-destructive font-medium">
                         -{formatCurrency(exits.reduce((s, e) => s + e.amount, 0))}
                       </span>
                     )}
@@ -314,7 +314,7 @@ export function DailyTimeline({ data, isLoading, filters, isAdmin, onDayClick }:
                 <span
                   className={cn(
                     'text-sm font-bold',
-                    cumulativeBalance >= 0 ? 'text-green-600' : 'text-red-600',
+                    cumulativeBalance >= 0 ? 'text-success' : 'text-destructive',
                   )}
                 >
                   {formatCurrency(cumulativeBalance)}

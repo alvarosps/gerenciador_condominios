@@ -76,15 +76,15 @@ function CustomTooltip({
       <p className="font-bold mb-2">Dia {label}{item.isFuture ? ' (futuro)' : ''}</p>
       <p className="text-sm">
         <span className="text-muted-foreground">Entradas: </span>
-        <span className="font-medium text-green-600">{formatCurrency(item.entries)}</span>
+        <span className="font-medium text-success">{formatCurrency(item.entries)}</span>
       </p>
       <p className="text-sm">
         <span className="text-muted-foreground">Saídas: </span>
-        <span className="font-medium text-red-600">{formatCurrency(item.exits)}</span>
+        <span className="font-medium text-destructive">{formatCurrency(item.exits)}</span>
       </p>
       <p className="text-sm border-t mt-1 pt-1">
         <span className="text-muted-foreground">Saldo Acumulado: </span>
-        <span className="font-medium text-blue-600">{formatCurrency(item.cumulative)}</span>
+        <span className="font-medium text-info">{formatCurrency(item.cumulative)}</span>
       </p>
     </div>
   );
@@ -161,7 +161,7 @@ export function DailyBalanceChart({ data, isLoading }: Props) {
               yAxisId="left"
               dataKey="entries"
               name="Entradas"
-              fill="#22c55e"
+              fill="var(--success)"
               radius={[4, 4, 0, 0]}
               opacity={0.85}
             />
@@ -169,7 +169,7 @@ export function DailyBalanceChart({ data, isLoading }: Props) {
               yAxisId="left"
               dataKey="exits"
               name="Saídas"
-              fill="#ef4444"
+              fill="var(--destructive)"
               radius={[4, 4, 0, 0]}
               opacity={0.85}
             />
@@ -178,7 +178,7 @@ export function DailyBalanceChart({ data, isLoading }: Props) {
               type="monotone"
               dataKey="cumulative"
               name="Saldo Acumulado"
-              stroke="#3b82f6"
+              stroke="var(--info)"
               strokeWidth={2}
               dot={{ r: 3 }}
             />

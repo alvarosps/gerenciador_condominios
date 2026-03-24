@@ -97,7 +97,7 @@ function createEmployeePaymentColumns(
       key: 'rent_offset',
       width: 160,
       render: (value) => (
-        <span className="text-gray-400">{formatCurrency(value as number)}</span>
+        <span className="text-muted-foreground">{formatCurrency(value as number)}</span>
       ),
     },
     {
@@ -128,8 +128,8 @@ function createEmployeePaymentColumns(
         <Badge
           className={cn(
             record.is_paid
-              ? 'bg-green-100 text-green-800'
-              : 'bg-yellow-100 text-yellow-800',
+              ? 'bg-success/10 text-success'
+              : 'bg-warning/10 text-warning',
           )}
         >
           {record.is_paid ? 'Pago' : 'Pendente'}
@@ -258,7 +258,7 @@ export default function EmployeesPage() {
       <div className="mb-4 flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold">Funcionários</h1>
-          <p className="text-gray-600 mt-1">Gerencie pagamentos de funcionários</p>
+          <p className="text-muted-foreground mt-1">Gerencie pagamentos de funcionários</p>
         </div>
         {isAdmin && (
           <Button onClick={crud.openCreateModal}>

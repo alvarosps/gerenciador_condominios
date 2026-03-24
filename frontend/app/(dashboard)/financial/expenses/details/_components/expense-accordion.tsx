@@ -38,7 +38,7 @@ function SubAccordion({
           <span className="font-medium">{title}</span>
           <span className="text-xs text-muted-foreground">({items.length} itens)</span>
         </div>
-        <span className="font-semibold text-red-600">{formatCurrency(total)}</span>
+        <span className="font-semibold text-destructive">{formatCurrency(total)}</span>
       </button>
 
       {isOpen && (

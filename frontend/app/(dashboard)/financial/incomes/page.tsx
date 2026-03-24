@@ -119,7 +119,7 @@ function createIncomeColumns(handlers: IncomeActionHandlers): Column<Income>[] {
       width: 110,
       align: 'center',
       render: (_, record) => (
-        <Badge className={cn(record.is_recurring ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800')}>
+        <Badge className={cn(record.is_recurring ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground')}>
           {record.is_recurring ? 'Sim' : 'Não'}
         </Badge>
       ),
@@ -130,7 +130,7 @@ function createIncomeColumns(handlers: IncomeActionHandlers): Column<Income>[] {
       width: 110,
       align: 'center',
       render: (_, record) => (
-        <Badge className={cn(record.is_received ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800')}>
+        <Badge className={cn(record.is_received ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning')}>
           {record.is_received ? 'Recebido' : 'Pendente'}
         </Badge>
       ),
@@ -259,7 +259,7 @@ export default function IncomesPage() {
       <div className="mb-4 flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold">Receitas</h1>
-          <p className="text-gray-600 mt-1">
+          <p className="text-muted-foreground mt-1">
             Gerencie receitas e recebimentos
           </p>
         </div>

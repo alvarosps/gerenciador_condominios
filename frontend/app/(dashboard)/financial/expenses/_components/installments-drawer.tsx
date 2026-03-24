@@ -33,12 +33,12 @@ function getInstallmentStatus(installment: ExpenseInstallment): {
   className: string;
 } {
   if (installment.is_paid) {
-    return { label: 'Pago', className: 'bg-green-100 text-green-800' };
+    return { label: 'Pago', className: 'bg-success/10 text-success' };
   }
   if (installment.is_overdue) {
-    return { label: 'Vencido', className: 'bg-red-100 text-red-800' };
+    return { label: 'Vencido', className: 'bg-destructive/10 text-destructive' };
   }
-  return { label: 'Pendente', className: 'bg-yellow-100 text-yellow-800' };
+  return { label: 'Pendente', className: 'bg-warning/10 text-warning' };
 }
 
 export function InstallmentsDrawer({ open, expense, onClose }: Props) {

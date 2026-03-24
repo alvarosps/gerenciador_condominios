@@ -74,7 +74,7 @@ export default function FinancialSettingsPage() {
     return (
       <div>
         <h1 className="text-2xl font-bold">Configurações Financeiras</h1>
-        <p className="text-gray-600 mt-1">Carregando...</p>
+        <p className="text-muted-foreground mt-1">Carregando...</p>
       </div>
     );
   }
@@ -83,7 +83,7 @@ export default function FinancialSettingsPage() {
     <div>
       <div className="mb-6">
         <h1 className="text-2xl font-bold">Configurações Financeiras</h1>
-        <p className="text-gray-600 mt-1">Configure o saldo inicial e parâmetros do módulo financeiro</p>
+        <p className="text-muted-foreground mt-1">Configure o saldo inicial e parâmetros do módulo financeiro</p>
       </div>
 
       <div className="max-w-lg">

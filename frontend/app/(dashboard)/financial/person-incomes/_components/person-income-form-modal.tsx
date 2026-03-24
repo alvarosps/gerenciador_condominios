@@ -261,7 +261,7 @@ export function PersonIncomeFormModal({ open, personIncome, onClose }: Props) {
                   </div>
                 )}
                 {watchedApartmentId && !activeLeaseForApartment && (
-                  <div className="rounded-md bg-yellow-50 p-3 text-sm text-yellow-800">
+                  <div className="rounded-md bg-warning/10 p-3 text-sm text-warning">
                     Nenhum lease ativo encontrado para este apartamento
                   </div>
                 )}

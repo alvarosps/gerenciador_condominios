@@ -24,12 +24,12 @@ const SCENARIO_ICONS: Record<SimulationScenarioType, typeof CreditCard> = {
 };
 
 const SCENARIO_COLORS: Record<SimulationScenarioType, string> = {
-  pay_off_early: 'text-green-600',
-  change_rent: 'text-blue-600',
-  new_loan: 'text-red-600',
-  remove_tenant: 'text-orange-600',
-  add_fixed_expense: 'text-red-600',
-  remove_fixed_expense: 'text-green-600',
+  pay_off_early: 'text-success',
+  change_rent: 'text-info',
+  new_loan: 'text-destructive',
+  remove_tenant: 'text-warning',
+  add_fixed_expense: 'text-destructive',
+  remove_fixed_expense: 'text-success',
 };
 
 interface ScenarioCardProps {
@@ -53,7 +53,7 @@ export function ScenarioCard({ scenario, onRemove }: ScenarioCardProps) {
             <p className="text-xs text-muted-foreground truncate">{scenario.description}</p>
             {scenario.impact !== undefined && (
               <p
-                className={`text-xs font-medium mt-1 ${scenario.impact >= 0 ? 'text-green-600' : 'text-red-600'}`}
+                className={`text-xs font-medium mt-1 ${scenario.impact >= 0 ? 'text-success' : 'text-destructive'}`}
               >
                 {scenario.impact >= 0 ? '+' : ''}
                 {formatCurrency(scenario.impact)}

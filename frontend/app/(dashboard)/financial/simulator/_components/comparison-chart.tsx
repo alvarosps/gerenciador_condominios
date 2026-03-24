@@ -81,20 +81,20 @@ function CustomTooltip({
       <p className="font-bold mb-2">{label}</p>
       <p className="text-sm">
         <span className="text-muted-foreground">Cenário Atual: </span>
-        <span className="font-medium text-blue-600">{formatCurrency(item.baseCumulative)}</span>
+        <span className="font-medium text-info">{formatCurrency(item.baseCumulative)}</span>
       </p>
       {item.simulatedCumulative !== undefined && (
         <>
           <p className="text-sm">
             <span className="text-muted-foreground">Cenário Simulado: </span>
-            <span className="font-medium text-green-600">
+            <span className="font-medium text-success">
               {formatCurrency(item.simulatedCumulative)}
             </span>
           </p>
           <p className="text-sm border-t mt-1 pt-1">
             <span className="text-muted-foreground">Delta: </span>
             <span
-              className={`font-medium ${(item.delta ?? 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}
+              className={`font-medium ${(item.delta ?? 0) >= 0 ? 'text-success' : 'text-destructive'}`}
             >
               {(item.delta ?? 0) >= 0 ? '+' : ''}
               {formatCurrency(item.delta ?? 0)}
@@ -137,7 +137,7 @@ export function ComparisonChart({ base, simulated }: ComparisonChartProps) {
                 type="monotone"
                 dataKey="delta"
                 name="Delta"
-                fill="#22c55e"
+                fill="var(--success)"
                 fillOpacity={0.15}
                 stroke="none"
               />
@@ -147,7 +147,7 @@ export function ComparisonChart({ base, simulated }: ComparisonChartProps) {
               type="monotone"
               dataKey="baseCumulative"
               name="Cenário Atual"
-              stroke="#3b82f6"
+              stroke="var(--info)"
               strokeWidth={2}
               dot={{ r: 4 }}
             />
@@ -157,7 +157,7 @@ export function ComparisonChart({ base, simulated }: ComparisonChartProps) {
                 type="monotone"
                 dataKey="simulatedCumulative"
                 name="Cenário Simulado"
-                stroke="#22c55e"
+                stroke="var(--success)"
                 strokeWidth={2}
                 dot={{ r: 4 }}
                 strokeDasharray="5 5"

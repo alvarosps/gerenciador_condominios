@@ -210,7 +210,7 @@ export default function RentPaymentsPage() {
       <div className="mb-4 flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold">Pagamentos de Aluguel</h1>
-          <p className="text-gray-600 mt-1">
+          <p className="text-muted-foreground mt-1">
             Gerencie os pagamentos de aluguel recebidos
           </p>
         </div>
