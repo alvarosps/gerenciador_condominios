@@ -4,16 +4,11 @@ Model-level validators for business logic validation.
 Provides validators for model fields and cross-field validation.
 """
 
-from __future__ import annotations
-
 from datetime import date
-from typing import TYPE_CHECKING
+from typing import Any
 
 from dateutil.relativedelta import relativedelta
 from django.core.exceptions import ValidationError
-
-if TYPE_CHECKING:
-    from core.models import Lease
 
 # Validation constants
 _DUE_DAY_MIN = 1
@@ -40,10 +35,6 @@ def validate_due_day(value: int) -> None:
         >>> validate_due_day(0)  # Raises ValidationError
         >>> validate_due_day(32)  # Raises ValidationError
     """
-    if not isinstance(value, int):
-        msg = "Due day must be an integer."
-        raise ValidationError(msg)
-
     if value < _DUE_DAY_MIN or value > _DUE_DAY_MAX:
         msg = f"Due day must be between 1 and 31. Got: {value}"
         raise ValidationError(msg, code="invalid_due_day")
@@ -74,7 +65,7 @@ def validate_date_range(start_date: date, end_date: date, field_name: str = "end
         )
 
 
-def validate_lease_dates(lease: Lease) -> None:
+def validate_lease_dates(lease: Any) -> None:
     """
     Validate lease date consistency.
 
@@ -114,7 +105,7 @@ def validate_lease_dates(lease: Lease) -> None:
         raise ValidationError(errors)
 
 
-def validate_tenant_count(lease: Lease) -> None:
+def validate_tenant_count(lease: Any) -> None:
     """
     Validate that number_of_tenants is at least the actual tenant count.
 
