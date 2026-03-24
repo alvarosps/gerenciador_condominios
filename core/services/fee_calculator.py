@@ -8,15 +8,10 @@ This service handles all fee-related business logic:
 - Total value calculations
 """
 
-from __future__ import annotations
-
+from datetime import date
 from decimal import Decimal
-from typing import TYPE_CHECKING
 
 from django.conf import settings
-
-if TYPE_CHECKING:
-    from datetime import date
 
 
 class FeeCalculatorService:

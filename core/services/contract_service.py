@@ -11,8 +11,6 @@ Handles all business logic related to contract generation including:
 - File storage via IDocumentStorage (supports filesystem and cloud)
 """
 
-from __future__ import annotations
-
 import logging
 import tempfile
 import warnings
@@ -178,7 +176,9 @@ class ContractService:
         num_tenants = len(lease.tenants.all())
         valor_tags = FeeCalculatorService.calculate_tag_fee(num_tenants)
         valor_total = FeeCalculatorService.calculate_total_value(
-            rental_value=lease.rental_value, cleaning_fee=lease.cleaning_fee, tag_fee=valor_tags
+            rental_value=lease.apartment.rental_value,
+            cleaning_fee=lease.apartment.cleaning_fee,
+            tag_fee=valor_tags,
         )
 
         # Calculate lease furniture
@@ -200,10 +200,10 @@ class ContractService:
             "validity": validity,
             "start_date": formatted_dates["start_date_formatted"],
             "final_date": final_date,
-            "rental_value": lease.rental_value,
+            "rental_value": lease.apartment.rental_value,
             "next_month_date": next_month_date,
             "tag_fee": lease.tag_fee,
-            "cleaning_fee": lease.cleaning_fee,
+            "cleaning_fee": lease.apartment.cleaning_fee,
             "valor_total": valor_total,
             "rules": rules,
             "lease": lease,

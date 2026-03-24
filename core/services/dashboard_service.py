@@ -10,8 +10,6 @@ Provides:
 - Tenant analytics
 """
 
-from __future__ import annotations
-
 import logging
 from datetime import date, timedelta
 from decimal import Decimal
@@ -86,8 +84,8 @@ class DashboardService:
 
         # Calculate revenue totals
         revenue_aggregates = active_leases.aggregate(
-            total_revenue=Coalesce(Sum("rental_value"), Decimal("0.00")),
-            total_cleaning_fees=Coalesce(Sum("cleaning_fee"), Decimal("0.00")),
+            total_revenue=Coalesce(Sum("apartment__rental_value"), Decimal("0.00")),
+            total_cleaning_fees=Coalesce(Sum("apartment__cleaning_fee"), Decimal("0.00")),
             total_tag_fees=Coalesce(Sum("tag_fee"), Decimal("0.00")),
         )
 
@@ -308,7 +306,9 @@ class DashboardService:
         for lease in active_leases:
             # Calculate if payment is late
             result = FeeCalculatorService.calculate_late_fee(
-                rental_value=lease.rental_value, due_day=lease.due_day, current_date=today
+                rental_value=lease.apartment.rental_value,
+                due_day=lease.responsible_tenant.due_day,
+                current_date=today,
             )
 
             if result["is_late"]:
@@ -323,8 +323,8 @@ class DashboardService:
                         "apartment_number": lease.apartment.number,
                         "building_number": lease.apartment.building.street_number,
                         "tenant_name": lease.responsible_tenant.name,
-                        "rental_value": lease.rental_value,
-                        "due_day": lease.due_day,
+                        "rental_value": lease.apartment.rental_value,
+                        "due_day": lease.responsible_tenant.due_day,
                         "late_days": late_days,
                         "late_fee": late_fee,
                     }

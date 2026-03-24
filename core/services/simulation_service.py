@@ -235,7 +235,7 @@ def _db_change_rent(projection: list[dict[str, Any]], scenario: dict[str, Any]) 
     new_value = Decimal(str(scenario["new_value"]))
     try:
         apartment = Apartment.objects.select_related("lease").get(pk=apartment_id)
-        current_value = apartment.lease.rental_value
+        current_value = apartment.rental_value
     except ObjectDoesNotExist:
         return
     delta = new_value - current_value
@@ -261,7 +261,7 @@ def _db_remove_tenant(projection: list[dict[str, Any]], scenario: dict[str, Any]
     apartment_id = int(scenario["apartment_id"])
     try:
         apartment = Apartment.objects.select_related("lease").get(pk=apartment_id)
-        rental_value = apartment.lease.rental_value
+        rental_value = apartment.rental_value
     except ObjectDoesNotExist:
         return
     for entry in projection:

@@ -240,12 +240,12 @@ def _collect_entries_by_day(
     _, days_in_month = calendar.monthrange(year, month)
 
     for lease in leases:
-        due = min(lease.due_day, days_in_month)
+        due = min(lease.responsible_tenant.due_day, days_in_month)
         payment = rent_payments.get(lease.id)
         entry = {
             "type": "rent",
             "description": f"Aluguel Apto {lease.apartment.number}/{lease.apartment.building.street_number}",
-            "amount": float(lease.rental_value),
+            "amount": float(lease.apartment.rental_value),
             "expected": True,
             "paid": payment is not None,
         }
@@ -436,7 +436,7 @@ def _get_expected_rent_total(year: int, month: int, month_start: date) -> Decima
     )
     total = Decimal("0.00")
     for lease in leases:
-        total += lease.rental_value
+        total += lease.apartment.rental_value
     return total
 
 
