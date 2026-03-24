@@ -116,6 +116,24 @@ export function useDeleteLease() {
 }
 
 /**
+ * Hook to partially update a lease (PATCH)
+ */
+export function usePatchLease() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, ...fields }: { id: number } & Record<string, unknown>) => {
+      const response = await apiClient.patch<Lease>(`/leases/${String(id)}/`, fields);
+      return leaseSchema.parse(response.data);
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['leases'] });
+      void queryClient.invalidateQueries({ queryKey: ['apartments'] });
+    },
+  });
+}
+
+/**
  * Hook to generate a contract PDF for a lease
  * This calls the backend to generate the PDF using pyppeteer
  */
