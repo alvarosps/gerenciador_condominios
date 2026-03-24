@@ -18,7 +18,7 @@ export const creditCardSchema = z.object({
   person: personSimpleSchema.optional(),
   person_id: z.number().optional(),
   nickname: z.string().min(1, 'Apelido é obrigatório'),
-  last_four_digits: z.string().min(4).max(4),
+  last_four_digits: z.string().max(4).default(''),
   closing_day: z.number().min(1).max(31),
   due_day: z.number().min(1).max(31),
   is_active: z.boolean().default(true),

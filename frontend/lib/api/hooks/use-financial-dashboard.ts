@@ -95,6 +95,7 @@ export interface ExtraIncome {
   description: string;
   amount: number;
   is_recurring: boolean;
+  person_name: string | null;
 }
 
 export interface UtilityBuildingEntry {

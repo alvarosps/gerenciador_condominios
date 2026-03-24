@@ -743,17 +743,30 @@ class FinancialDashboardService:
         extra_incomes: list[dict[str, Any]] = []
         extra_income_total = Decimal("0.00")
 
-        for inc in Income.objects.filter(is_recurring=True, expected_monthly_amount__isnull=False):
+        for inc in Income.objects.filter(
+            is_recurring=True, expected_monthly_amount__isnull=False
+        ).select_related("person"):
             amount = inc.expected_monthly_amount or Decimal("0.00")
             extra_income_total += amount
-            extra_incomes.append({"description": inc.description, "amount": amount, "is_recurring": True})
+            extra_incomes.append({
+                "description": inc.description,
+                "amount": amount,
+                "is_recurring": True,
+                "person_name": inc.person.name if inc.person else None,
+            })
 
         for inc in Income.objects.filter(
-            income_date__gte=month_start, income_date__lt=next_month,
-            is_received=True, is_recurring=False,
-        ):
+            income_date__gte=month_start,
+            income_date__lt=next_month,
+            is_recurring=False,
+        ).select_related("person"):
             extra_income_total += inc.amount
-            extra_incomes.append({"description": inc.description, "amount": inc.amount, "is_recurring": False})
+            extra_incomes.append({
+                "description": inc.description,
+                "amount": inc.amount,
+                "is_recurring": False,
+                "person_name": inc.person.name if inc.person else None,
+            })
 
         return extra_income_total, extra_incomes
 

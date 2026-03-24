@@ -34,7 +34,6 @@ import { usePersons } from '@/lib/api/hooks/use-persons';
 import { type Income } from '@/lib/schemas/income.schema';
 import { useCrudPage } from '@/lib/hooks/use-crud-page';
 import { useExport, incomeExportColumns } from '@/lib/hooks/use-export';
-import { useAuthStore } from '@/store/auth-store';
 import { formatCurrency, formatDate } from '@/lib/utils/formatters';
 
 interface ExtendedIncomeFilters extends IncomeFilters {
@@ -61,7 +60,6 @@ interface IncomeActionHandlers {
   onMarkReceived: (income: Income) => void | Promise<void>;
   isDeleting: boolean;
   isMarkingReceived: boolean;
-  isAdmin: boolean;
 }
 
 function createIncomeColumns(handlers: IncomeActionHandlers): Column<Income>[] {
@@ -145,8 +143,6 @@ function createIncomeColumns(handlers: IncomeActionHandlers): Column<Income>[] {
       render: (_, record) => (
         <TooltipProvider>
           <div className="flex items-center gap-1">
-            {handlers.isAdmin && (
-              <>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button variant="ghost" size="icon" onClick={() => handlers.onEdit(record)}>
@@ -169,10 +165,8 @@ function createIncomeColumns(handlers: IncomeActionHandlers): Column<Income>[] {
                   </TooltipTrigger>
                   <TooltipContent>Excluir</TooltipContent>
                 </Tooltip>
-              </>
-            )}
 
-            {handlers.isAdmin && !record.is_received && (
+            {!record.is_received && (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
@@ -195,8 +189,6 @@ function createIncomeColumns(handlers: IncomeActionHandlers): Column<Income>[] {
 }
 
 export default function IncomesPage() {
-  const { user } = useAuthStore();
-  const isAdmin = user?.is_staff ?? false;
   const [filters, setFilters] = useState<ExtendedIncomeFilters>({});
 
   const { data: incomes, isLoading, error } = useIncomes(filters);
@@ -241,9 +233,8 @@ export default function IncomesPage() {
         onMarkReceived: handleMarkReceived,
         isDeleting: crud.isDeleting,
         isMarkingReceived: markReceivedMutation.isPending,
-        isAdmin,
       }),
-    [crud.openEditModal, crud.isDeleting, handleDelete, handleMarkReceived, markReceivedMutation.isPending, isAdmin],
+    [crud.openEditModal, crud.isDeleting, handleDelete, handleMarkReceived, markReceivedMutation.isPending],
   );
 
   const hasActiveFilters = Object.entries(filters).some(([, v]) => v !== undefined && v !== '');
@@ -281,12 +272,10 @@ export default function IncomesPage() {
             <Download className="h-4 w-4 mr-2" />
             Exportar
           </Button>
-          {isAdmin && (
-            <Button onClick={crud.openCreateModal}>
-              <Plus className="h-4 w-4 mr-2" />
-              Nova Receita
-            </Button>
-          )}
+          <Button onClick={crud.openCreateModal}>
+            <Plus className="h-4 w-4 mr-2" />
+            Nova Receita
+          </Button>
         </div>
       </div>
 

@@ -116,7 +116,7 @@ export function IncomeFormModal({ open, income, onClose }: Props) {
         await updateMutation.mutateAsync({ ...values, id: income.id });
         toast.success('Receita atualizada com sucesso');
       } else {
-        await createMutation.mutateAsync({ ...values, is_received: false });
+        await createMutation.mutateAsync({ ...values, is_received: !values.is_recurring });
         toast.success('Receita criada com sucesso');
       }
 

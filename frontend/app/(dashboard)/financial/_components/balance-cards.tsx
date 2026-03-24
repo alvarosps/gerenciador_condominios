@@ -42,10 +42,6 @@ export function BalanceCards({ data, monthLabel }: { data: DashboardSummary; mon
     ? parseFloat(data.current_month_income)
     : data.current_month_income;
 
-  const extraTotal = typeof data.income_summary.extra_income_total === 'string'
-    ? parseFloat(data.income_summary.extra_income_total)
-    : data.income_summary.extra_income_total;
-
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
       <Card className="hover:shadow-md transition-shadow">
@@ -57,10 +53,17 @@ export function BalanceCards({ data, monthLabel }: { data: DashboardSummary; mon
           <div className="text-3xl font-bold text-blue-600">
             {formatCurrency(totalIncome)}
           </div>
-          <p className="text-xs text-muted-foreground mt-2">
-            {data.income_summary.condominium_kitnet_count} kitnets
-            {extraTotal > 0 ? ` + outras entradas` : ''}
-          </p>
+          <div className="mt-2 space-y-0.5">
+            <p className="text-xs text-muted-foreground">
+              {data.income_summary.all_apartments.length} kitnets: {formatCurrency(data.income_summary.total_monthly_income)}
+            </p>
+            {data.income_summary.extra_incomes.map((inc) => (
+              <p key={inc.description} className="text-xs text-muted-foreground">
+                {inc.person_name ? `${inc.person_name} - ` : ''}
+                {inc.description}: {formatCurrency(inc.amount)}
+              </p>
+            ))}
+          </div>
         </CardContent>
       </Card>
 
