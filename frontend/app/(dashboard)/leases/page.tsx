@@ -3,6 +3,30 @@
 import { useState, useMemo, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,15 +43,15 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { DataTable } from '@/components/tables/data-table';
-import { LeaseFiltersCard, type LeaseFilters } from './_components/lease-filters';
-import { createLeaseColumns } from './_components/lease-table-columns';
+import { SearchableSelect, type SearchableSelectOption } from '@/components/ui/searchable-select';
+import { createLeaseColumns, getLeaseStatus } from './_components/lease-table-columns';
 import { LeaseDeleteDialog, LeaseBulkDeleteDialog } from './_components/lease-dialogs';
 import {
   useLeases,
   useDeleteLease,
+  useTerminateLease,
 } from '@/lib/api/hooks/use-leases';
-import { useApartments } from '@/lib/api/hooks/use-apartments';
-import { useTenants } from '@/lib/api/hooks/use-tenants';
+import { useBuildings } from '@/lib/api/hooks/use-buildings';
 import { type Lease } from '@/lib/schemas/lease.schema';
 import { leaseExportColumns } from '@/lib/hooks/use-export';
 import { useCrudPage } from '@/lib/hooks/use-crud-page';
@@ -62,28 +86,29 @@ const DueDateModal = dynamic(
   { loading: () => <ModalLoader />, ssr: false }
 );
 
+type StatusFilter = 'all' | 'active' | 'expired' | 'expiring';
+
+interface BuildingLeaseFilters {
+  responsible_tenant_id: number | undefined;
+  status: StatusFilter;
+}
+
 export default function LeasesPage() {
   // Page-specific modals (not handled by useCrudPage)
   const [isContractModalOpen, setIsContractModalOpen] = useState(false);
   const [isLateFeeModalOpen, setIsLateFeeModalOpen] = useState(false);
   const [isDueDateModalOpen, setIsDueDateModalOpen] = useState(false);
+  const [isTerminateModalOpen, setIsTerminateModalOpen] = useState(false);
   const [actionLease, setActionLease] = useState<Lease | null>(null);
 
-  // Page-specific filters
-  const [filters, setFilters] = useState<LeaseFilters>({
-    apartment_id: undefined,
-    responsible_tenant_id: undefined,
-    is_active: undefined,
-    is_expired: undefined,
-    expiring_soon: undefined,
-  });
+  // Per-building filter state
+  const [filtersByBuilding, setFiltersByBuilding] = useState<Record<number, BuildingLeaseFilters>>({});
 
-  const { data: leases, isLoading, error } = useLeases(filters);
-  const { data: apartments } = useApartments();
-  const { data: tenants } = useTenants();
+  const { data: leases, isLoading, error } = useLeases();
+  const { data: buildings } = useBuildings();
   const deleteMutation = useDeleteLease();
+  const terminateMutation = useTerminateLease();
 
-  // Use the consolidated CRUD hook for standard CRUD operations
   const crud = useCrudPage<Lease>({
     entityName: 'locação',
     entityNamePlural: 'locações',
@@ -92,6 +117,54 @@ export default function LeasesPage() {
     exportFilename: 'locacoes',
     exportSheetName: 'Locações',
   });
+
+  // Group leases by building id
+  const groupedLeases = useMemo(() => {
+    const map = new Map<number, Lease[]>();
+    leases?.forEach((lease) => {
+      const buildingId = lease.apartment?.building?.id;
+      if (buildingId === undefined) return;
+      const existing = map.get(buildingId) ?? [];
+      existing.push(lease);
+      map.set(buildingId, existing);
+    });
+    return map;
+  }, [leases]);
+
+  const getFilters = (buildingId: number): BuildingLeaseFilters =>
+    filtersByBuilding[buildingId] ?? { responsible_tenant_id: undefined, status: 'all' };
+
+  const updateFilter = (buildingId: number, updates: Partial<BuildingLeaseFilters>): void => {
+    setFiltersByBuilding((prev) => ({
+      ...prev,
+      [buildingId]: { ...getFilters(buildingId), ...updates },
+    }));
+  };
+
+  const clearFilters = (buildingId: number): void => {
+    setFiltersByBuilding((prev) =>
+      Object.fromEntries(Object.entries(prev).filter(([key]) => Number(key) !== buildingId)),
+    );
+  };
+
+  const getFilteredLeases = (buildingId: number, leasesForBuilding: Lease[]): Lease[] => {
+    const filters = getFilters(buildingId);
+    return leasesForBuilding.filter((lease) => {
+      if (
+        filters.responsible_tenant_id !== undefined &&
+        lease.responsible_tenant?.id !== filters.responsible_tenant_id
+      ) {
+        return false;
+      }
+      if (filters.status !== 'all') {
+        const { color } = getLeaseStatus(lease);
+        if (filters.status === 'active' && color !== 'green') return false;
+        if (filters.status === 'expired' && color !== 'red') return false;
+        if (filters.status === 'expiring' && color !== 'orange') return false;
+      }
+      return true;
+    });
+  };
 
   // Page-specific action handlers
   const handleGenerateContract = useCallback((lease: Lease) => {
@@ -109,12 +182,29 @@ export default function LeasesPage() {
     setIsDueDateModalOpen(true);
   }, []);
 
+  const handleTerminate = useCallback((lease: Lease) => {
+    setActionLease(lease);
+    setIsTerminateModalOpen(true);
+  }, []);
+
   const handleActionModalClose = useCallback(() => {
     setIsContractModalOpen(false);
     setIsLateFeeModalOpen(false);
     setIsDueDateModalOpen(false);
     setActionLease(null);
   }, []);
+
+  const handleConfirmTerminate = useCallback(async () => {
+    if (!actionLease?.id) return;
+    try {
+      await terminateMutation.mutateAsync(actionLease.id);
+      toast.success('Contrato encerrado com sucesso');
+      setIsTerminateModalOpen(false);
+      setActionLease(null);
+    } catch {
+      toast.error('Erro ao encerrar contrato');
+    }
+  }, [actionLease, terminateMutation]);
 
   const handleDelete = useCallback((lease: Lease) => {
     crud.setItemToDelete(lease);
@@ -130,9 +220,18 @@ export default function LeasesPage() {
         onGenerateContract: handleGenerateContract,
         onCalculateLateFee: handleCalculateLateFee,
         onChangeDueDate: handleChangeDueDate,
+        onTerminate: handleTerminate,
         isDeleting: crud.isDeleting,
       }),
-    [crud.openEditModal, crud.isDeleting, handleDelete, handleGenerateContract, handleCalculateLateFee, handleChangeDueDate]
+    [
+      crud.openEditModal,
+      crud.isDeleting,
+      handleDelete,
+      handleGenerateContract,
+      handleCalculateLateFee,
+      handleChangeDueDate,
+      handleTerminate,
+    ]
   );
 
   if (error) {
@@ -182,7 +281,8 @@ export default function LeasesPage() {
       {crud.bulkOps.hasSelection && (
         <div className="mb-4 p-4 bg-info/10 border border-info/20 rounded flex justify-between items-center">
           <span className="text-info font-medium">
-            {crud.bulkOps.selectionCount} {crud.bulkOps.selectionCount === 1 ? 'locação selecionada' : 'locações selecionadas'}
+            {crud.bulkOps.selectionCount}{' '}
+            {crud.bulkOps.selectionCount === 1 ? 'locação selecionada' : 'locações selecionadas'}
           </span>
           <div className="flex gap-2">
             <Button variant="outline" onClick={crud.bulkOps.clearSelection}>
@@ -200,22 +300,106 @@ export default function LeasesPage() {
         </div>
       )}
 
-      {/* Filters */}
-      <LeaseFiltersCard
-        filters={filters}
-        onFiltersChange={setFilters}
-        apartments={apartments}
-        tenants={tenants}
-      />
+      {/* Accordions per building */}
+      <Accordion type="multiple" className="space-y-4">
+        {buildings?.map((building) => {
+          const buildingId = building.id;
+          if (buildingId === undefined) return null;
+          const buildingLeases = groupedLeases.get(buildingId) ?? [];
+          const filteredLeases = getFilteredLeases(buildingId, buildingLeases);
+          const filters = getFilters(buildingId);
+          const hasActiveFilters =
+            filters.responsible_tenant_id !== undefined || filters.status !== 'all';
 
-      {/* Data Table */}
-      <DataTable<Lease>
-        columns={columns}
-        dataSource={leases}
-        loading={isLoading}
-        rowKey="id"
-        rowSelection={crud.bulkOps.rowSelection}
-      />
+          // Build tenant options from leases in this building
+          const tenantOptions: SearchableSelectOption[] = [
+            { value: 'all', label: 'Todos os inquilinos' },
+          ];
+          const seenTenantIds = new Set<number>();
+          buildingLeases.forEach((lease) => {
+            const tenant = lease.responsible_tenant;
+            if (tenant?.id !== undefined && !seenTenantIds.has(tenant.id)) {
+              seenTenantIds.add(tenant.id);
+              tenantOptions.push({ value: String(tenant.id), label: tenant.name });
+            }
+          });
+
+          return (
+            <AccordionItem key={buildingId} value={String(buildingId)}>
+              <AccordionTrigger className="px-4">
+                <div className="flex items-center gap-2">
+                  <span>
+                    {building.name} — Nº {building.street_number}
+                  </span>
+                  <Badge variant="secondary">{buildingLeases.length} locações</Badge>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="px-4 pb-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Inquilino Responsável</label>
+                    <SearchableSelect
+                      value={
+                        filters.responsible_tenant_id
+                          ? String(filters.responsible_tenant_id)
+                          : 'all'
+                      }
+                      onValueChange={(value) =>
+                        updateFilter(buildingId, {
+                          responsible_tenant_id: value === 'all' ? undefined : Number(value),
+                        })
+                      }
+                      options={tenantOptions}
+                      placeholder="Todos os inquilinos"
+                      searchPlaceholder="Buscar inquilino..."
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Status</label>
+                    <Select
+                      value={filters.status}
+                      onValueChange={(value) =>
+                        updateFilter(buildingId, { status: value as StatusFilter })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Todos" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        <SelectItem value="active">Ativo</SelectItem>
+                        <SelectItem value="expired">Expirado</SelectItem>
+                        <SelectItem value="expiring">Expirando em breve</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {hasActiveFilters && (
+                    <div className="flex items-end">
+                      <Button
+                        variant="outline"
+                        onClick={() => clearFilters(buildingId)}
+                        className="w-full"
+                      >
+                        Limpar Filtros
+                      </Button>
+                    </div>
+                  )}
+                </div>
+
+                <DataTable<Lease>
+                  columns={columns}
+                  dataSource={filteredLeases}
+                  loading={isLoading}
+                  rowKey="id"
+                  rowSelection={crud.bulkOps.rowSelection}
+                />
+              </AccordionContent>
+            </AccordionItem>
+          );
+        })}
+      </Accordion>
 
       {/* Modals */}
       <LeaseFormModal
@@ -242,7 +426,31 @@ export default function LeasesPage() {
         onClose={handleActionModalClose}
       />
 
-      {/* Dialogs */}
+      {/* Terminate Contract Dialog */}
+      <AlertDialog open={isTerminateModalOpen} onOpenChange={setIsTerminateModalOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Encerrar Contrato</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja encerrar o contrato do Apto{' '}
+              {actionLease?.apartment?.number} — {actionLease?.apartment?.building?.name}? O
+              apartamento será marcado como disponível.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => void handleConfirmTerminate()}
+              disabled={terminateMutation.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {terminateMutation.isPending ? 'Encerrando...' : 'Encerrar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Dialogs */}
       <LeaseDeleteDialog
         open={crud.deleteDialogOpen}
         onOpenChange={crud.setDeleteDialogOpen}

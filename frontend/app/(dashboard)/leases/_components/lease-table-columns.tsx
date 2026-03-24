@@ -14,6 +14,7 @@ import {
   Calculator,
   Calendar,
   FilePlus,
+  XCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { type Column } from '@/components/tables/data-table';
@@ -27,6 +28,7 @@ export interface LeaseActionHandlers {
   onGenerateContract: (lease: Lease) => void;
   onCalculateLateFee: (lease: Lease) => void;
   onChangeDueDate: (lease: Lease) => void;
+  onTerminate: (lease: Lease) => void;
   isDeleting: boolean;
 }
 
@@ -102,16 +104,11 @@ export function createLeaseColumns(handlers: LeaseActionHandlers): Column<Lease>
 
   return [
     {
-      title: 'Prédio / Apto',
+      title: 'Apto',
       key: 'apartment',
-      width: 180,
+      width: 80,
       render: (_, record: Lease) => (
-        <div>
-          <div className="font-medium">{record.apartment?.building?.name}</div>
-          <div className="text-xs text-muted-foreground">
-            Apto {record.apartment?.number}
-          </div>
-        </div>
+        <div className="font-medium">Apto {record.apartment?.number}</div>
       ),
     },
     {
@@ -243,7 +240,7 @@ export function createLeaseColumns(handlers: LeaseActionHandlers): Column<Lease>
     {
       title: 'Ações',
       key: 'actions',
-      width: 200,
+      width: 240,
       fixed: 'right',
       render: (_, record: Lease) => (
         <TooltipProvider>
@@ -312,6 +309,19 @@ export function createLeaseColumns(handlers: LeaseActionHandlers): Column<Lease>
                 </Button>
               </TooltipTrigger>
               <TooltipContent>Excluir</TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => handlers.onTerminate(record)}
+                >
+                  <XCircle className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Encerrar Contrato</TooltipContent>
             </Tooltip>
           </div>
         </TooltipProvider>

@@ -230,3 +230,21 @@ export function useApartmentLeases(apartmentId: number | null) {
 export function useTenantLeases(tenantId: number | null) {
   return useLeases(tenantId ? { responsible_tenant_id: tenantId } : undefined);
 }
+
+/**
+ * Hook to terminate a lease contract
+ * Calls POST /leases/{id}/terminate/ which marks the apartment as available
+ */
+export function useTerminateLease() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (leaseId: number) => {
+      const response = await apiClient.post<{ detail: string }>(`/leases/${String(leaseId)}/terminate/`);
+      return response.data;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['leases'] });
+      void queryClient.invalidateQueries({ queryKey: ['apartments'] });
+    },
+  });
+}
