@@ -49,6 +49,7 @@ def tenant() -> Tenant:
         phone="11999999999",
         marital_status="Solteiro(a)",
         profession="Engenheiro",
+        due_day=7,
     )
 
 
@@ -59,9 +60,6 @@ def lease(apartment: Apartment, tenant: Tenant) -> Lease:
         responsible_tenant=tenant,
         start_date=date(2025, 1, 1),
         validity_months=12,
-        due_day=7,
-        rental_value=Decimal("1200.00"),
-        cleaning_fee=Decimal("100.00"),
         tag_fee=Decimal("50.00"),
     )
 
@@ -83,9 +81,9 @@ class TestDailyBreakdown:
         assert len(result_feb) == 28
 
     def test_rent_entries_on_due_day(self, lease: Lease) -> None:
-        """Rent should appear on the lease's due_day."""
+        """Rent should appear on the responsible_tenant's due_day."""
         result = DailyControlService.get_daily_breakdown(2026, 3)
-        # Lease due_day=7, so day 7 (index 6) should have rent entry
+        # Tenant due_day=7, so day 7 (index 6) should have rent entry
         day_7 = result[6]
         assert day_7["date"] == "2026-03-07"
 

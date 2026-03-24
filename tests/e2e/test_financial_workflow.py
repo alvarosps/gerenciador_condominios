@@ -124,15 +124,13 @@ class TestFinancialWorkflowE2E:
             phone="(11) 98765-4321",
             marital_status="Solteiro(a)",
             profession="Engenheiro",
+            due_day=10,
         )
         lease = Lease.objects.create(
             apartment=apt,
             responsible_tenant=tenant,
             start_date=date(2025, 1, 1),
             validity_months=12,
-            due_day=10,
-            rental_value=Decimal("1500.00"),
-            cleaning_fee=Decimal("200.00"),
             tag_fee=Decimal("50.00"),
         )
 
@@ -226,15 +224,13 @@ class TestFinancialWorkflowE2E:
             phone="(11) 91234-5678",
             marital_status="Casado(a)",
             profession="Comerciante",
+            due_day=10,
         )
         lease = Lease.objects.create(
             apartment=apt,
             responsible_tenant=tenant,
             start_date=date(2025, 1, 1),
             validity_months=12,
-            due_day=10,
-            rental_value=Decimal("2000.00"),
-            cleaning_fee=Decimal("200.00"),
             tag_fee=Decimal("50.00"),
         )
 
@@ -273,15 +269,13 @@ class TestFinancialWorkflowE2E:
             phone="(11) 93456-7890",
             marital_status="Solteiro(a)",
             profession="Professora",
+            due_day=10,
         )
         Lease.objects.create(
             apartment=apt,
             responsible_tenant=tenant,
             start_date=date(2025, 1, 1),
             validity_months=24,
-            due_day=10,
-            rental_value=Decimal("1300.00"),
-            cleaning_fee=Decimal("200.00"),
             tag_fee=Decimal("50.00"),
             prepaid_until=date(2026, 9, 29),
         )
@@ -309,15 +303,13 @@ class TestFinancialWorkflowE2E:
             phone="(11) 94567-8901",
             marital_status="Solteiro(a)",
             profession="Diarista",
+            due_day=10,
         )
         Lease.objects.create(
             apartment=apt,
             responsible_tenant=tenant,
             start_date=date(2025, 1, 1),
             validity_months=12,
-            due_day=10,
-            rental_value=Decimal("800.00"),
-            cleaning_fee=Decimal("0.00"),
             tag_fee=Decimal("0.00"),
             is_salary_offset=True,
         )
@@ -730,15 +722,13 @@ class TestFinancialWorkflowE2E:
             phone="(11) 95555-1234",
             marital_status="Solteiro(a)",
             profession="Analista",
+            due_day=10,
         )
         Lease.objects.create(
             apartment=apt,
             responsible_tenant=tenant,
             start_date=date(2025, 1, 1),
             validity_months=24,
-            due_day=10,
-            rental_value=Decimal("1200.00"),
-            cleaning_fee=Decimal("150.00"),
             tag_fee=Decimal("50.00"),
         )
 

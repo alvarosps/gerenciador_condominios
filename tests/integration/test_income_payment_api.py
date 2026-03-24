@@ -79,6 +79,7 @@ def tenant_income_test(admin_user):
         phone="11977770505",
         marital_status="Solteiro(a)",
         profession="Engenheiro",
+        due_day=10,
         created_by=admin_user,
         updated_by=admin_user,
     )
@@ -89,11 +90,8 @@ def lease_income_test(apartment_income_test, tenant_income_test, admin_user):
     return Lease.objects.create(
         apartment=apartment_income_test,
         responsible_tenant=tenant_income_test,
-        rental_value=Decimal("1300.00"),
-        due_day=10,
         start_date=date(2026, 1, 1),
         validity_months=12,
-        cleaning_fee=Decimal("200.00"),
         tag_fee=Decimal("50.00"),
         created_by=admin_user,
         updated_by=admin_user,
@@ -521,12 +519,14 @@ class TestPersonIncomeAPI:
         assert response.data["current_value"] == "1300.00"
 
     def test_current_value_apartment_no_lease(
-        self, authenticated_api_client, person_income_apartment_obj
+        self, authenticated_api_client, person_income_apartment_obj, apartment_income_test
     ):
+        """Without a lease, current_value returns apartment.rental_value directly."""
         url = f"{self.url}{person_income_apartment_obj.pk}/"
         response = authenticated_api_client.get(url)
         assert response.status_code == status.HTTP_200_OK
-        assert response.data["current_value"] == "0"
+        # rental_value lives on Apartment, so it's always available even without a lease
+        assert response.data["current_value"] == str(apartment_income_test.rental_value)
 
     def test_current_value_fixed_stipend(self, authenticated_api_client, person_income_stipend_obj):
         url = f"{self.url}{person_income_stipend_obj.pk}/"
