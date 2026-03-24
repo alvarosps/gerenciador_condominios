@@ -1,4 +1,4 @@
-# Listing Pages: Sort, Accordion por Prédio, Colunas de Inquilinos
+# Listing Pages: Sort, Accordion, Colunas, Ações de Contrato
 
 **Data:** 2026-03-24
 **Status:** Aprovado
@@ -9,6 +9,9 @@ Melhorar as páginas de listagem (Apartamentos, Inquilinos, Locações) com:
 1. Ordenação clicável por coluna com setas duplas ▲▼
 2. Agrupamento por prédio via accordions (Apartamentos e Locações)
 3. Reestruturação das colunas da página de Inquilinos
+4. Ação "Encerrar contrato" na página de Locações
+5. Ações "Trocar de kitnet" e "Criar contrato" na página de Inquilinos
+6. Mudança de modelo: `Lease.apartment` de `OneToOneField` para `ForeignKey`
 
 ## Decisões de Design
 
@@ -19,6 +22,9 @@ Melhorar as páginas de listagem (Apartamentos, Inquilinos, Locações) com:
 | Estado padrão dos accordions | Fechados |
 | Botão "Ver contrato" (inquilinos) | Navega para `/leases` |
 | Filtros removidos (inquilinos) | Dependentes, Móveis |
+| Encerrar contrato | Soft delete do lease + reset campos + `is_rented = false` |
+| Lease.apartment | `ForeignKey` + unique constraint condicional (permite histórico soft-deleted) |
+| Trocar kitnet — campos do novo lease | `contract_generated`, `contract_signed`, `interfone_configured` começam `false` |
 
 ---
 
@@ -195,7 +201,7 @@ Na prática, todas as leases têm apartment com building. Como guarda defensiva:
 
 ### Obtenção dos dados de lease
 
-A página chama `useActiveLeases()` (hook já existente em `use-leases.ts` que wrapa `useLeases({ is_active: true })`). Com `useMemo`, cria `Map<number, Lease>`:
+A página chama `useLeases()` (sem filtros — retorna todos os leases não-deletados, incluindo expirados). Com `useMemo`, cria `Map<number, Lease>`:
 
 **Loading state:** As colunas de lease mostram um skeleton/shimmer enquanto `activeLeases` está carregando (`isLoading` do hook). Não bloquear a renderização dos dados de tenant — mostrar a tabela com as colunas de tenant preenchidas e as colunas de lease com loading indicator até o segundo fetch resolver.
 
@@ -220,6 +226,13 @@ const leaseByTenantId = useMemo(() => {
 
 As colunas de lease acessam o dado via `leaseByTenantId.get(record.id)`. Nota: `record.id` é `number | undefined` no schema Zod — adicionar null guard no call site: `const lease = record.id !== undefined ? leaseByTenantId.get(record.id) : undefined`.
 
+### Definição de "contrato ativo" para esta página
+A coluna "Contrato Ativo" usa leases **não-deletados** (não `is_active` baseado em data). Usa `useLeases()` sem filtro de `is_active`, filtrando apenas por `is_deleted = false` (que o `SoftDeleteManager` faz automaticamente). Isso significa:
+- Tenant com lease não-deletado mas expirado → "Contrato Ativo: Sim" (o contrato existe, só está vencido — precisa ser encerrado explicitamente)
+- Tenant sem lease ou só com leases deletados → "Contrato Ativo: Não"
+
+Essa semântica é intencional: um lease expirado ainda é um contrato "existente" que precisa de ação (encerrar ou renovar), não deve ser tratado como inexistente.
+
 ### Navegação "Ver contrato"
 - `router.push('/leases')` usando `useRouter` do Next.js
 - Navega para a página de locações (onde o usuário pode encontrar a locação no accordion do prédio correspondente)
@@ -230,19 +243,264 @@ As colunas de lease acessam o dado via `leaseByTenantId.get(record.id)`. Nota: `
 
 ---
 
+## 4. Mudança de Modelo: Lease.apartment OneToOneField → ForeignKey
+
+### Problema
+`Lease.apartment` é `OneToOneField(Apartment)`. Isso impede soft delete funcional — ao encerrar um contrato (soft delete), o constraint do banco impede criar um novo lease para o mesmo apartment, mesmo que o antigo esteja marcado como `is_deleted = True`.
+
+### Solução
+
+**Mudança no model:**
+```python
+# core/models.py — Lease
+# ANTES:
+apartment = models.OneToOneField(Apartment, on_delete=models.CASCADE, related_name="lease")
+
+# DEPOIS:
+apartment = models.ForeignKey(Apartment, on_delete=models.CASCADE, related_name="leases")
+
+class Meta:
+    constraints = [
+        models.UniqueConstraint(
+            fields=["apartment"],
+            condition=models.Q(is_deleted=False),
+            name="unique_active_lease_per_apartment",
+        )
+    ]
+```
+
+**O que isso permite:**
+- Múltiplos leases por apartment no banco (histórico de contratos anteriores)
+- Apenas **um lease ativo** (não-deletado) por apartment, enforced no banco
+- Soft delete funciona: ao encerrar, `is_deleted = True` libera o apartment para novo lease
+- Reversibilidade: restaurar lease encerrado por engano (desde que não haja outro ativo no mesmo apartment)
+
+### Impacto — `related_name` muda de `lease` para `leases`
+
+Todos os acessos a `apartment.lease` (singular, OneToOne) precisam mudar para `apartment.leases.filter(is_deleted=False).first()` ou equivalente. Locais afetados:
+
+**Backend:**
+- `core/models.py` — qualquer referência a `apartment.lease`
+- `core/serializers.py` — `ApartmentSerializer` se usar nested lease
+- `core/views.py` — qualquer queryset que acesse `apartment.lease`
+- `core/services/contract_service.py` — geração de PDF usa dados do lease
+- `core/services/fee_calculator.py` — cálculos de multa acessam lease do apartment
+- `core/signals.py` — invalidação de cache
+- Testes que usem `apartment.lease`
+
+**Frontend:**
+- `lib/schemas/apartment.schema.ts` — se tiver campo `lease`, mudar para `leases` (array)
+- Qualquer componente que acesse `apartment.lease`
+
+### Atualização do signal `sync_apartment_is_rented`
+
+O signal atual usa `is_rented = not instance.is_deleted` — funciona para OneToOne mas é **incorreto** para ForeignKey. Após a mudança, um apartment pode ter múltiplos leases (históricos soft-deleted). Se qualquer lease histórico for re-saved (ex: audit update), o signal setaria `is_rented = False` incorretamente.
+
+**Nova lógica do signal:**
+```python
+# ANTES (OneToOne):
+is_rented = not instance.is_deleted
+Apartment.objects.filter(pk=instance.apartment_id).update(is_rented=is_rented)
+
+# DEPOIS (ForeignKey):
+has_active_lease = Lease.objects.filter(apartment_id=instance.apartment_id).exists()
+Apartment.objects.filter(pk=instance.apartment_id).update(is_rented=has_active_lease)
+```
+
+`Lease.objects` já exclui soft-deleted via `SoftDeleteManager`, então `.exists()` retorna `True` apenas se há lease ativo.
+
+**Também atualizar `sync_apartment_is_rented_on_delete` (hard delete):**
+```python
+# ANTES:
+@receiver(post_delete, sender=Lease)
+def sync_apartment_is_rented_on_delete(sender, instance, **kwargs):
+    Apartment.objects.filter(pk=instance.apartment_id).update(is_rented=False)
+
+# DEPOIS:
+@receiver(post_delete, sender=Lease)
+def sync_apartment_is_rented_on_delete(sender, instance, **kwargs):
+    has_active_lease = Lease.objects.filter(apartment_id=instance.apartment_id).exists()
+    Apartment.objects.filter(pk=instance.apartment_id).update(is_rented=has_active_lease)
+```
+
+Ambos os signals devem usar a mesma lógica query-based após a mudança para ForeignKey.
+
+**Consequência para terminate/transfer:** Os services **não devem** setar `apartment.is_rented` manualmente. O signal cuida disso automaticamente após o soft delete e a criação do novo lease. Isso evita duplicação e race conditions.
+
+### Migration
+- Nova migration: `AlterField` de `OneToOneField` para `ForeignKey` + `AddConstraint` para unique condicional
+- **Sem perda de dados** — a migration apenas relaxa o constraint
+
+### Arquivos afetados
+- `core/models.py` — mudar field + adicionar constraint
+- `core/serializers.py` — atualizar related_name
+- `core/views.py` — atualizar querysets
+- `core/services/contract_service.py` — atualizar acesso a lease
+- `core/services/fee_calculator.py` — atualizar acesso a lease
+- `core/signals.py` — **atualizar lógica** do signal `sync_apartment_is_rented` (ver abaixo)
+- `tests/` — atualizar testes que usam `apartment.lease`
+- Nova migration em `core/migrations/`
+
+---
+
+## 5. Ação "Encerrar Contrato" (Página de Locações)
+
+### Conceito
+Botão "Encerrar" na coluna de ações de cada lease. Abre modal de confirmação. Ao confirmar, encerra o contrato.
+
+### Backend — novo endpoint
+
+**Endpoint:** `POST /api/leases/{id}/terminate/`
+
+**Lógica (em service, não na view) — DEVE usar `@transaction.atomic`:**
+1. Resetar campos do lease: `contract_generated = False`, `contract_signed = False`, `interfone_configured = False`
+2. Soft delete do lease (`lease.delete()` — usa SoftDeleteMixin)
+3. O signal `sync_apartment_is_rented` atualiza automaticamente `apartment.is_rented` (ver seção 4)
+4. Invalidar caches relevantes (lease, apartment)
+
+**M2M tenants:** Preservar as associações M2M no lease soft-deleted (histórico). Não limpar `lease.tenants`.
+
+**Resposta:** `200 OK` com mensagem de sucesso
+
+**Permissões:** Apenas `is_staff` (admin) pode encerrar contratos
+
+### Frontend
+
+**Botão na tabela:**
+- Novo ícone na coluna de ações (ex: `XCircle` ou `Ban` do lucide-react)
+- Tooltip: "Encerrar Contrato"
+- Só habilitado se o lease está ativo (não expirado, não futuro)
+
+**Modal de confirmação:**
+- Título: "Encerrar Contrato"
+- Descrição: "Tem certeza que deseja encerrar o contrato do Apto {number} — {building.name}? O apartamento será marcado como disponível."
+- Botões: "Cancelar" / "Encerrar" (destructive)
+- Loading state no botão durante request
+
+**Após sucesso:**
+- `toast.success('Contrato encerrado com sucesso')`
+- Invalidar queries: leases, apartments (ambos mudam)
+
+### Arquivos afetados
+- `core/services/` — novo service function `terminate_lease(lease_id, user)`
+- `core/views.py` — nova action `terminate` no `LeaseViewSet`
+- `lib/api/hooks/use-leases.ts` — novo mutation `useTerminateLease()`
+- `app/(dashboard)/leases/_components/lease-table-columns.tsx` — adicionar botão "Encerrar"
+- `app/(dashboard)/leases/page.tsx` — adicionar modal de confirmação + handler
+
+---
+
+## 6. Ações "Trocar de Kitnet" e "Criar Contrato" (Página de Inquilinos)
+
+### Conceito
+Na página de Inquilinos, duas ações contextuais por inquilino:
+- **"Trocar de kitnet"** — visível quando o inquilino tem contrato ativo
+- **"Criar contrato"** — visível quando o inquilino **não** tem contrato ativo
+
+Ambas abrem um modal com formulário de lease.
+
+### 6a. "Trocar de Kitnet"
+
+**Modal:**
+- Título: "Trocar de Kitnet — {tenant.name}"
+- Campos do lease form completo (mesmos do `LeaseFormModal`), **pre-preenchidos** com dados do contrato atual:
+  - `apartment_id` → **vazio** (deve selecionar novo kitnet, lista mostra apenas apartamentos disponíveis)
+  - `responsible_tenant_id` → pre-preenchido com o tenant atual (read-only)
+  - `tenant_ids` → pre-preenchido com os tenants do contrato atual
+  - `start_date` → pre-preenchido com a data de início do contrato atual (editável)
+  - `validity_months` → pre-preenchido do contrato atual
+  - `tag_fee` → pre-preenchido do contrato atual
+  - `deposit_amount` → pre-preenchido do contrato atual
+  - `cleaning_fee_paid` → `false` (novo kitnet)
+  - `tag_deposit_paid` → `false` (novo kitnet)
+- Todos os campos são editáveis (exceto `responsible_tenant_id`)
+- Resumo do apartment selecionado (igual ao `LeaseFormModal`)
+
+**Backend — novo endpoint:** `POST /api/leases/{id}/transfer/`
+
+**Payload:** Campos padrão de um lease novo (usa `apartment_id` como destino, consistente com o serializer existente). O lease antigo é identificado pelo `{id}` na URL.
+
+**Lógica (em service) — DEVE usar `@transaction.atomic`:**
+1. Validar que o apartment destino (`apartment_id` do payload) não está alugado
+2. Resetar campos do lease antigo: `contract_generated = False`, `contract_signed = False`, `interfone_configured = False`
+3. Soft delete do lease antigo — signal atualiza `apartment_antigo.is_rented = False`
+4. Criar novo lease com os dados do payload + `contract_generated = False`, `contract_signed = False`, `interfone_configured = False` — signal atualiza `apartment_novo.is_rented = True`
+5. Invalidar caches
+
+**M2M tenants do lease antigo:** Preservar (histórico). O novo lease recebe `tenant_ids` do payload.
+
+**Resposta:** `201 Created` com o novo lease
+
+### 6b. "Criar Contrato"
+
+**Modal:**
+- Título: "Criar Contrato — {tenant.name}"
+- Campos do lease form completo (mesmos do `LeaseFormModal`):
+  - `apartment_id` → **vazio** (selecionar kitnet disponível)
+  - `responsible_tenant_id` → pre-preenchido com o tenant atual (read-only)
+  - `tenant_ids` → pre-preenchido com `[tenant.id]`
+  - `start_date` → pre-preenchido com **data de hoje** (editável)
+  - `validity_months` → `12` (default)
+  - `tag_fee` → `50` (default)
+  - `deposit_amount` → `null`
+  - `cleaning_fee_paid` → `false`
+  - `tag_deposit_paid` → `false`
+- Todos os campos editáveis (exceto `responsible_tenant_id`)
+
+**Backend:** Usa o endpoint existente `POST /api/leases/` (create normal). O backend já seta `is_rented = True` no apartment ao criar lease.
+
+### Componente compartilhado
+
+Ambos os modais usam **o mesmo componente de formulário** — um `TenantLeaseModal` que recebe:
+- `mode: 'create' | 'transfer'`
+- `tenant: Tenant` (obrigatório)
+- `currentLease?: Lease` (obrigatório quando `mode = 'transfer'`)
+
+O componente reutiliza a mesma estrutura do `LeaseFormModal` existente, mas com `responsible_tenant_id` fixo e pre-preenchimento condicional.
+
+**Campo `responsible_tenant_id` read-only:** Renderizar como texto estático (nome + CPF/CNPJ) em vez de `<Select>` — não é um select desabilitado, é um campo informativo. O valor é enviado no payload via hidden value, não via input do usuário.
+
+### Arquivos afetados
+- `core/services/` — novo service function `transfer_lease(lease_id, new_apartment_id, payload, user)`
+- `core/views.py` — nova action `transfer` no `LeaseViewSet`
+- `lib/api/hooks/use-leases.ts` — novo mutation `useTransferLease()`
+- `app/(dashboard)/tenants/page.tsx` — adicionar botões contextuais + estado do modal
+- `app/(dashboard)/tenants/_components/tenant-lease-modal.tsx` — **novo componente** (modal create/transfer)
+
+---
+
 ## Resumo de arquivos afetados
+
+### Frontend
 
 | Arquivo | Tipo de mudança |
 |---|---|
 | `components/tables/data-table.tsx` | Adicionar lógica de sort + setas ▲▼ |
 | `app/(dashboard)/apartments/page.tsx` | Refatorar para accordions por prédio |
-| `app/(dashboard)/tenants/page.tsx` | Remover/adicionar colunas e filtros |
-| `app/(dashboard)/leases/page.tsx` | Refatorar para accordions por prédio |
+| `app/(dashboard)/tenants/page.tsx` | Remover/adicionar colunas e filtros + botões Trocar/Criar |
+| `app/(dashboard)/tenants/_components/tenant-lease-modal.tsx` | **Novo** — modal create/transfer lease |
+| `app/(dashboard)/leases/page.tsx` | Refatorar para accordions + modal encerrar contrato |
 | `app/(dashboard)/leases/_components/lease-filters.tsx` | **Deletar** — filtros passam a ser inline nos accordions |
-| `app/(dashboard)/leases/_components/lease-table-columns.tsx` | Adicionar sorters + coluna "Prédio / Apto" → "Apto" |
+| `app/(dashboard)/leases/_components/lease-table-columns.tsx` | Adicionar sorters + coluna "Apto" + botão "Encerrar" |
+| `lib/api/hooks/use-leases.ts` | Novos mutations: `useTerminateLease()`, `useTransferLease()` |
 | `lib/hooks/use-export.ts` | Remover colunas deletadas de `tenantExportColumns` |
 
+### Backend
+
+| Arquivo | Tipo de mudança |
+|---|---|
+| `core/models.py` | `Lease.apartment`: `OneToOneField` → `ForeignKey` + unique constraint condicional |
+| `core/migrations/` | Nova migration para a mudança de field + constraint |
+| `core/serializers.py` | Atualizar `related_name` de `lease` → `leases` |
+| `core/views.py` | Atualizar querysets + novas actions `terminate`, `transfer` |
+| `core/services/contract_service.py` | Atualizar acesso `apartment.lease` → `apartment.leases` |
+| `core/services/fee_calculator.py` | Atualizar acesso `apartment.lease` → `apartment.leases` |
+| `core/services/` | Novo: `terminate_lease()`, `transfer_lease()` |
+| `core/signals.py` | **Atualizar lógica** `sync_apartment_is_rented` + referências related_name |
+| `tests/` | Atualizar testes que usam `apartment.lease` |
+
 ## Fora de escopo
-- Mudanças no backend (sorting é 100% client-side — dados já vêm completos com `page_size=10000`)
+- Sorting server-side (sorting é 100% client-side — dados já vêm completos com `page_size=10000`)
 - Página de Móveis (não mencionada nos requisitos)
 - Multi-column sort (sort por apenas uma coluna de cada vez)
+- Restauração de lease encerrado por engano (possível via admin ou futura feature, constraint permite)
