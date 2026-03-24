@@ -55,14 +55,14 @@ export function OverdueAlerts() {
       <Card className="hover:shadow-md transition-shadow">
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <div className="flex items-center gap-2">
-            <CheckCircle2 className="h-5 w-5 text-green-600" />
+            <CheckCircle2 className="h-5 w-5 text-success" />
             <CardTitle className="text-base">Parcelas Vencidas</CardTitle>
           </div>
         </CardHeader>
         <CardContent>
-          <Alert className="border-green-200 bg-green-50">
-            <CheckCircle2 className="h-4 w-4 text-green-600" />
-            <AlertDescription className="text-green-800">
+          <Alert className="border-success/20 bg-success/10">
+            <CheckCircle2 className="h-4 w-4 text-success" />
+            <AlertDescription className="text-success">
               Nenhuma parcela vencida. Tudo em dia!
             </AlertDescription>
           </Alert>
@@ -74,10 +74,10 @@ export function OverdueAlerts() {
   const sorted = [...data].sort((a, b) => (b.days_overdue ?? 0) - (a.days_overdue ?? 0));
 
   return (
-    <Card className="hover:shadow-md transition-shadow border-red-200">
+    <Card className="hover:shadow-md transition-shadow border-destructive/20">
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
         <div className="flex items-center gap-2">
-          <AlertTriangle className="h-5 w-5 text-red-500" />
+          <AlertTriangle className="h-5 w-5 text-destructive" />
           <CardTitle className="text-base">Parcelas Vencidas</CardTitle>
         </div>
         <Badge variant="destructive">{data.length}</Badge>
@@ -87,7 +87,7 @@ export function OverdueAlerts() {
           {sorted.map((item) => (
             <div
               key={item.id}
-              className="flex items-center justify-between p-3 rounded-lg border border-red-200 bg-red-50 transition-colors"
+              className="flex items-center justify-between p-3 rounded-lg border border-destructive/20 bg-destructive/10 transition-colors"
             >
               <div className="flex-1 space-y-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
@@ -101,7 +101,7 @@ export function OverdueAlerts() {
                   {item.credit_card_nickname && <span>· {item.credit_card_nickname}</span>}
                 </div>
               </div>
-              <span className="font-bold text-sm text-red-600 shrink-0 ml-2">
+              <span className="font-bold text-sm text-destructive shrink-0 ml-2">
                 {formatCurrency(item.amount)}
               </span>
             </div>

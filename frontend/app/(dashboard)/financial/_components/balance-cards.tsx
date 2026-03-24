@@ -50,7 +50,7 @@ export function BalanceCards({ data, monthLabel }: { data: DashboardSummary; mon
           <TrendingUp className="h-5 w-5 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="text-3xl font-bold text-blue-600">
+          <div className="text-3xl font-bold text-info">
             {formatCurrency(totalIncome)}
           </div>
           <div className="mt-2 space-y-0.5">
@@ -75,7 +75,7 @@ export function BalanceCards({ data, monthLabel }: { data: DashboardSummary; mon
         <CardContent>
           <div className={cn(
             'text-3xl font-bold',
-            data.income_summary.vacant_count > 0 ? 'text-amber-500' : 'text-green-600',
+            data.income_summary.vacant_count > 0 ? 'text-warning' : 'text-success',
           )}>
             {formatCurrency(data.income_summary.vacant_lost_rent)}
           </div>
@@ -99,7 +99,7 @@ export function BalanceCards({ data, monthLabel }: { data: DashboardSummary; mon
           <TrendingDown className="h-5 w-5 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="text-3xl font-bold text-orange-500">
+          <div className="text-3xl font-bold text-warning">
             {formatCurrency(data.current_month_expenses)}
           </div>
           <p className="text-xs text-muted-foreground mt-2">
@@ -115,7 +115,7 @@ export function BalanceCards({ data, monthLabel }: { data: DashboardSummary; mon
           <DollarSign className="h-5 w-5 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className={cn('text-3xl font-bold', balance >= 0 ? 'text-green-600' : 'text-red-600')}>
+          <div className={cn('text-3xl font-bold', balance >= 0 ? 'text-success' : 'text-destructive')}>
             {formatCurrency(balance)}
           </div>
           <p className="text-xs text-muted-foreground mt-2">Receitas - Despesas</p>

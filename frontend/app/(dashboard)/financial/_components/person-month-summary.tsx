@@ -66,7 +66,7 @@ function SummarySection({
     <div className="space-y-1">
       <div className="flex justify-between text-sm font-medium">
         <span className="text-muted-foreground">{label}:</span>
-        <span className={cn(isNegative && 'text-green-600')}>
+        <span className={cn(isNegative && 'text-success')}>
           {isNegative ? '-' : ''}
           {formatCurrency(Math.abs(total))}
         </span>
@@ -162,15 +162,15 @@ function SummaryContent({
         </div>
         <div className="flex justify-between text-sm">
           <span className="text-muted-foreground">Pago:</span>
-          <span className="text-green-600">{formatCurrency(data.total_paid)}</span>
+          <span className="text-success">{formatCurrency(data.total_paid)}</span>
         </div>
         <div className="flex justify-between text-sm font-semibold">
           <span>Pendente:</span>
           <span
             className={cn(
-              data.pending_balance === 0 && 'text-green-600',
-              data.pending_balance > 0 && 'text-red-600',
-              data.pending_balance < 0 && 'text-yellow-600',
+              data.pending_balance === 0 && 'text-success',
+              data.pending_balance > 0 && 'text-destructive',
+              data.pending_balance < 0 && 'text-warning',
             )}
           >
             {formatCurrency(data.pending_balance)}

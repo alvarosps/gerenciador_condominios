@@ -78,8 +78,8 @@ export function UpcomingInstallments() {
                   key={item.id}
                   className={cn(
                     'flex items-center justify-between p-3 rounded-lg border transition-colors',
-                    isOverdue && 'border-red-200 bg-red-50',
-                    isUrgent && !isOverdue && 'border-yellow-200 bg-yellow-50',
+                    isOverdue && 'border-destructive/20 bg-destructive/10',
+                    isUrgent && !isOverdue && 'border-warning/20 bg-warning/10',
                   )}
                 >
                   <div className="flex-1 space-y-1 min-w-0">
@@ -105,7 +105,7 @@ export function UpcomingInstallments() {
                       onClick={() => markPaid.mutate(item.id)}
                       disabled={markPaid.isPending}
                     >
-                      <CheckCircle2 className="h-4 w-4 text-green-600" />
+                      <CheckCircle2 className="h-4 w-4 text-success" />
                     </Button>
                   </div>
                 </div>

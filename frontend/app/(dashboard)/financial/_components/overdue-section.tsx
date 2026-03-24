@@ -45,13 +45,13 @@ function OverdueCard({ group }: { group: GroupedOverdue }) {
   const iptuItems = group.items.filter((i) => i.type === 'iptu');
 
   return (
-    <Card className="border-amber-200 bg-amber-50/50">
+    <Card className="border-warning/20 bg-warning/5">
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-sm font-semibold text-amber-800">
+          <CardTitle className="text-sm font-semibold text-warning">
             {group.label}
           </CardTitle>
-          <span className="text-sm font-bold text-red-600">
+          <span className="text-sm font-bold text-destructive">
             {formatCurrency(group.total)}
           </span>
         </div>
@@ -66,14 +66,14 @@ function OverdueCard({ group }: { group: GroupedOverdue }) {
               <User className="h-3.5 w-3.5" />
               {item.person_name}
               {item.total_paid !== null && item.total_paid !== undefined && item.total_paid > 0 && (
-                <span className="text-xs text-green-600">
+                <span className="text-xs text-success">
                   (pago {formatCurrency(item.total_paid)})
                 </span>
               )}
             </span>
             <span className={cn(
               'font-medium',
-              (item.net_amount ?? 0) > 0 ? 'text-blue-600' : 'text-red-600',
+              (item.net_amount ?? 0) > 0 ? 'text-info' : 'text-destructive',
             )}>
               {formatCurrency(item.amount)}
             </span>
@@ -94,7 +94,7 @@ function OverdueCard({ group }: { group: GroupedOverdue }) {
                     {item.installment ? ` (${item.installment})` : ''}
                   </span>
                 </span>
-                <span className="font-medium text-red-600 whitespace-nowrap shrink-0 ml-2">
+                <span className="font-medium text-destructive whitespace-nowrap shrink-0 ml-2">
                   {formatCurrency(item.amount)}
                 </span>
               </div>
@@ -116,10 +116,10 @@ export function OverdueSection({ items }: { items: OverdueItem[] }) {
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <h2 className="text-base font-semibold flex items-center gap-2">
-          <AlertTriangle className="h-5 w-5 text-amber-500" />
+          <AlertTriangle className="h-5 w-5 text-warning" />
           Valores em Atraso
         </h2>
-        <span className="text-sm font-bold text-red-600">
+        <span className="text-sm font-bold text-destructive">
           Total: {formatCurrency(totalOverdue)}
         </span>
       </div>

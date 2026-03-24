@@ -69,7 +69,7 @@ function ExpenseItem({
           {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
         </div>
       </div>
-      <span className={cn('text-sm font-semibold', total > 0 ? 'text-red-600' : 'text-muted-foreground')}>
+      <span className={cn('text-sm font-semibold', total > 0 ? 'text-destructive' : 'text-muted-foreground')}>
         {formatCurrency(total)}
       </span>
     </button>
@@ -100,17 +100,17 @@ function PersonExpenseItem({
           <User className="h-4 w-4 text-muted-foreground" />
           <span className="text-sm font-medium">{person.person_name}</span>
         </div>
-        <span className={cn('text-sm font-semibold', isPaid ? 'text-green-600' : 'text-red-600')}>
+        <span className={cn('text-sm font-semibold', isPaid ? 'text-success' : 'text-destructive')}>
           {formatCurrency(person.total)}
         </span>
       </div>
 
       {/* Progress bar */}
-      <div className="w-full bg-gray-200 rounded-full h-2 mb-1.5">
+      <div className="w-full bg-muted rounded-full h-2 mb-1.5">
         <div
           className={cn(
             'h-2 rounded-full transition-all',
-            isPaid ? 'bg-green-500' : progress > 50 ? 'bg-blue-500' : 'bg-amber-500',
+            isPaid ? 'bg-success' : progress > 50 ? 'bg-info' : 'bg-warning',
           )}
           style={{ width: `${progress}%` }}
         />
@@ -205,7 +205,7 @@ function PersonDetailModal({
       {person.card_total > 0 && (
         <CollapsibleSection
           title="Cartões"
-          color="text-orange-600"
+          color="text-warning"
           details={person.card_details}
           total={person.card_total}
           totalLabel="Total cartões"
@@ -216,7 +216,7 @@ function PersonDetailModal({
       {person.loan_total > 0 && (
         <CollapsibleSection
           title="Empréstimos"
-          color="text-red-600"
+          color="text-destructive"
           details={person.loan_details}
           total={person.loan_total}
           totalLabel="Total empréstimos"
@@ -227,7 +227,7 @@ function PersonDetailModal({
       {person.fixed_total > 0 && (
         <CollapsibleSection
           title="Despesas Fixas"
-          color="text-gray-600"
+          color="text-muted-foreground"
           details={person.fixed_details}
           total={person.fixed_total}
           totalLabel="Total fixos"
@@ -238,7 +238,7 @@ function PersonDetailModal({
       {person.one_time_total > 0 && (
         <CollapsibleSection
           title="Gastos Únicos"
-          color="text-blue-600"
+          color="text-info"
           details={person.one_time_details}
           total={person.one_time_total}
           totalLabel="Total gastos únicos"
@@ -249,7 +249,7 @@ function PersonDetailModal({
       {person.offset_total > 0 && (
         <CollapsibleSection
           title="Descontos"
-          color="text-green-600"
+          color="text-success"
           details={person.offset_details}
           total={person.offset_total}
           totalLabel="Total descontos"
@@ -260,7 +260,7 @@ function PersonDetailModal({
       {person.stipend_total > 0 && (
         <CollapsibleSection
           title="Estipêndios"
-          color="text-purple-600"
+          color="text-primary"
           details={person.stipend_details}
           total={person.stipend_total}
           totalLabel="Total estipêndios"
@@ -272,26 +272,26 @@ function PersonDetailModal({
       <div className="border-t-2 pt-3 mt-3 space-y-2">
         <div className="flex justify-between text-sm font-bold">
           <span>Total</span>
-          <span className="text-red-600">{formatCurrency(person.total)}</span>
+          <span className="text-destructive">{formatCurrency(person.total)}</span>
         </div>
         {person.is_payable && (
           <>
             {person.total_paid > 0 && (
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Pago</span>
-                <span className="text-green-600 font-medium">{formatCurrency(person.total_paid)}</span>
+                <span className="text-success font-medium">{formatCurrency(person.total_paid)}</span>
               </div>
             )}
             <div className="flex justify-between text-sm font-semibold">
               <span>Pendente</span>
-              <span className={person.pending <= 0 ? 'text-green-600' : 'text-red-600'}>
+              <span className={person.pending <= 0 ? 'text-success' : 'text-destructive'}>
                 {person.pending <= 0 ? 'Quitado' : formatCurrency(person.pending)}
               </span>
             </div>
             <button
               type="button"
               onClick={() => setPaymentOpen(true)}
-              className="block w-full text-center text-sm text-blue-600 hover:underline pt-1"
+              className="block w-full text-center text-sm text-info hover:underline pt-1"
             >
               Registrar pagamento
             </button>
@@ -308,7 +308,7 @@ function PersonDetailModal({
       </div>
       <a
         href={`/financial/expenses/details?type=person&id=${person.person_id}&year=${year}&month=${month}`}
-        className="block text-center text-sm text-blue-600 hover:underline pt-2 border-t mt-2"
+        className="block text-center text-sm text-info hover:underline pt-2 border-t mt-2"
       >
         Ver detalhes completos →
       </a>
@@ -333,7 +333,7 @@ function UtilityDetailModal({
         <div key={building.building_name} className="border rounded-lg p-3 space-y-2">
           <div className="flex justify-between items-center">
             <h4 className="text-sm font-semibold">Prédio {building.building_name}</h4>
-            <span className="text-sm font-bold text-red-600">
+            <span className="text-sm font-bold text-destructive">
               {formatCurrency(building.total)}
             </span>
           </div>
@@ -398,7 +398,7 @@ function UtilityDetailModal({
 
           {/* Notes */}
           {building.notes.map((note, j) => (
-            <p key={j} className="text-xs text-amber-600 italic pl-2">
+            <p key={j} className="text-xs text-warning italic pl-2">
               {note}
             </p>
           ))}
@@ -414,11 +414,11 @@ function UtilityDetailModal({
       {/* Grand total */}
       <div className="border-t-2 pt-3 mt-3 flex justify-between text-sm font-bold">
         <span>Total</span>
-        <span className="text-red-600">{formatCurrency(data.total)}</span>
+        <span className="text-destructive">{formatCurrency(data.total)}</span>
       </div>
       <a
         href={`/financial/expenses/details?type=${utilityType}&year=${year}&month=${month}`}
-        className="block text-center text-sm text-blue-600 hover:underline pt-2 border-t mt-2"
+        className="block text-center text-sm text-info hover:underline pt-2 border-t mt-2"
       >
         Ver detalhes completos →
       </a>
@@ -454,11 +454,11 @@ function SimpleDetailModal({
       )}
       <div className="border-t-2 pt-3 mt-3 flex justify-between text-sm font-bold">
         <span>Total</span>
-        <span className="text-red-600">{formatCurrency(data.total)}</span>
+        <span className="text-destructive">{formatCurrency(data.total)}</span>
       </div>
       <a
         href={`/financial/expenses/details?type=${simpleType}&year=${year}&month=${month}`}
-        className="block text-center text-sm text-blue-600 hover:underline pt-2 border-t mt-2"
+        className="block text-center text-sm text-info hover:underline pt-2 border-t mt-2"
       >
         Ver detalhes completos →
       </a>
@@ -479,7 +479,7 @@ export function ExpenseSummaryCard({ data, monthLabel }: { data: DashboardSummar
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base font-semibold flex items-center gap-2">
-            <CreditCard className="h-5 w-5 text-orange-500" />
+            <CreditCard className="h-5 w-5 text-warning" />
             Resumo de Despesas — {monthLabel}
           </CardTitle>
         </CardHeader>

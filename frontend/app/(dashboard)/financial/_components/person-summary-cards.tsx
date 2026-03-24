@@ -44,7 +44,7 @@ function PersonSummaryCard({ personId, personName }: { personId: number; personN
       <CardContent className="space-y-3">
         <div className="flex items-center justify-between text-sm">
           <span className="flex items-center gap-1.5 text-muted-foreground">
-            <ArrowDown className="h-3.5 w-3.5 text-blue-500" />
+            <ArrowDown className="h-3.5 w-3.5 text-info" />
             Recebe
           </span>
           <span className="font-medium">{formatCurrency(data.receives)}</span>
@@ -79,10 +79,10 @@ function PersonSummaryCard({ personId, personName }: { personId: number; personN
         {data.offset_total > 0 && (
           <div className="flex items-center justify-between text-sm">
             <span className="flex items-center gap-1.5 text-muted-foreground">
-              <ArrowUp className="h-3.5 w-3.5 text-green-500" />
+              <ArrowUp className="h-3.5 w-3.5 text-success" />
               Descontos
             </span>
-            <span className="font-medium text-green-600">-{formatCurrency(data.offset_total)}</span>
+            <span className="font-medium text-success">-{formatCurrency(data.offset_total)}</span>
           </div>
         )}
 
@@ -96,7 +96,7 @@ function PersonSummaryCard({ personId, personName }: { personId: number; personN
           <span
             className={cn(
               'font-bold',
-              data.net_amount > 0 ? 'text-red-600' : 'text-green-600',
+              data.net_amount > 0 ? 'text-destructive' : 'text-success',
             )}
           >
             {formatCurrency(data.net_amount)}
@@ -107,7 +107,7 @@ function PersonSummaryCard({ personId, personName }: { personId: number; personN
           <div className="border-t pt-2 space-y-1">
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">Pago</span>
-              <span className="text-green-600">{formatCurrency(data.total_paid)}</span>
+              <span className="text-success">{formatCurrency(data.total_paid)}</span>
             </div>
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">Pendente</span>
