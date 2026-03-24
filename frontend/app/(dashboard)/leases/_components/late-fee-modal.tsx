@@ -104,13 +104,13 @@ export function LateFeeModal({ open, lease, onClose }: Props) {
                 <div className="flex justify-between py-2 border-b">
                   <dt className="font-medium text-sm text-gray-600">Valor do Aluguel</dt>
                   <dd className="text-sm text-gray-900">
-                    {formatCurrency(lease.rental_value)}
+                    {formatCurrency(lease.apartment?.rental_value ?? 0)}
                   </dd>
                 </div>
                 <div className="flex justify-between py-2">
                   <dt className="font-medium text-sm text-gray-600">Dia de Vencimento</dt>
                   <dd className="text-sm text-gray-900">
-                    Dia {lease.due_day}
+                    Dia {lease.responsible_tenant?.due_day ?? '-'}
                   </dd>
                 </div>
               </dl>

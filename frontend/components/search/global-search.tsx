@@ -116,7 +116,7 @@ export function GlobalSearch() {
             id: item.id,
             title: `Locação - ${item.responsible_tenant?.name ?? 'Sem inquilino'}`,
             subtitle: `${item.apartment?.building?.name ?? ''} Apto ${item.apartment?.number ?? ''}`,
-            metadata: `${formatCurrency(item.rental_value)} - Venc. dia ${item.due_day}`,
+            metadata: `${formatCurrency(item.apartment?.rental_value ?? 0)} - Venc. dia ${item.responsible_tenant?.due_day ?? '-'}`,
             url: '/dashboard/leases',
           });
         }

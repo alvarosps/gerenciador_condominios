@@ -28,10 +28,7 @@ interface TenantFormValues {
     phone: string;
   }[];
   furniture_ids?: number[];
-  deposit_amount?: number | null;
-  cleaning_fee_paid?: boolean;
-  tag_deposit_paid?: boolean;
-  rent_due_day?: number;
+  due_day?: number;
 }
 
 interface Props {

@@ -357,7 +357,7 @@ const leaseHandlers = [
       return new HttpResponse(null, { status: 404 });
     }
     // Mock late fee calculation
-    const dailyRate = lease.rental_value / 30;
+    const dailyRate = (lease.apartment?.rental_value ?? 0) / 30;
     const lateFeePerDay = dailyRate * 0.05;
     return HttpResponse.json({
       daily_rate: dailyRate,
@@ -380,8 +380,10 @@ const leaseHandlers = [
     if (!existingLease) {
       return new HttpResponse(null, { status: 404 });
     }
-    const oldDueDay = existingLease.due_day;
-    existingLease.due_day = data.new_due_day;
+    const oldDueDay = existingLease.responsible_tenant?.due_day ?? 0;
+    if (existingLease.responsible_tenant) {
+      existingLease.responsible_tenant.due_day = data.new_due_day;
+    }
     return HttpResponse.json({
       message: 'Due date changed successfully',
       old_due_day: oldDueDay,
@@ -476,11 +478,11 @@ const dashboardHandlers = [
   // Financial summary
   http.get(`${API_BASE}/dashboard/financial_summary/`, async () => {
     await delay(50);
-    const totalRevenue = leases.reduce((sum, l) => sum + l.rental_value, 0);
+    const totalRevenue = leases.reduce((sum, l) => sum + (l.apartment?.rental_value ?? 0), 0);
     return HttpResponse.json({
       total_revenue: totalRevenue,
       avg_rental_value: leases.length > 0 ? totalRevenue / leases.length : 0,
-      total_cleaning_fees: leases.reduce((sum, l) => sum + (l.cleaning_fee || 0), 0),
+      total_cleaning_fees: leases.reduce((sum, l) => sum + (l.apartment?.cleaning_fee ?? 0), 0),
       total_late_fees: 250.0,
       occupancy_rate: apartments.length > 0 ? (leases.length / apartments.length) * 100 : 0,
     });
