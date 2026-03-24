@@ -25,8 +25,8 @@ const TemplateVariableView: React.FC<NodeViewProps> = ({ node }) => {
       as="span"
       className={cn(
         'inline-flex items-center px-1.5 py-0.5 mx-0.5',
-        'bg-blue-100 text-blue-800 rounded text-sm font-mono',
-        'border border-blue-200 select-none cursor-default'
+        'bg-info/10 text-info rounded text-sm font-mono',
+        'border border-info/20 select-none cursor-default'
       )}
       contentEditable={false}
       data-template-variable={variable}
