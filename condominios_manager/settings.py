@@ -125,23 +125,35 @@ DATABASES = {
 
 # Cache Configuration (Phase 4: Redis Caching)
 # https://docs.djangoproject.com/en/5.0/topics/cache/
-CACHES = {
-    "default": {
-        "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": config("REDIS_URL", default="redis://127.0.0.1:6379/0"),
-        "OPTIONS": {
-            "CLIENT_CLASS": "django_redis.client.DefaultClient",
-            "CONNECTION_POOL_KWARGS": {
-                "max_connections": 50,
-                "retry_on_timeout": True,
+# Set REDIS_URL="" in .env to disable Redis and use in-memory cache
+_redis_url = config("REDIS_URL", default="redis://127.0.0.1:6379/0")
+
+if _redis_url:
+    CACHES = {
+        "default": {
+            "BACKEND": "django_redis.cache.RedisCache",
+            "LOCATION": _redis_url,
+            "OPTIONS": {
+                "CLIENT_CLASS": "django_redis.client.DefaultClient",
+                "CONNECTION_POOL_KWARGS": {
+                    "max_connections": 50,
+                    "retry_on_timeout": True,
+                },
+                "SOCKET_CONNECT_TIMEOUT": 5,  # seconds
+                "SOCKET_TIMEOUT": 5,  # seconds
             },
-            "SOCKET_CONNECT_TIMEOUT": 5,  # seconds
-            "SOCKET_TIMEOUT": 5,  # seconds
-        },
-        "KEY_PREFIX": "condominios",
-        "TIMEOUT": config("CACHE_TIMEOUT", default=300, cast=int),  # 5 minutes default
+            "KEY_PREFIX": "condominios",
+            "TIMEOUT": config("CACHE_TIMEOUT", default=300, cast=int),  # 5 minutes default
+        }
     }
-}
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "condominios-cache",
+            "TIMEOUT": config("CACHE_TIMEOUT", default=300, cast=int),
+        }
+    }
 
 # Cache key versioning for invalidation
 CACHE_MIDDLEWARE_ALIAS = "default"

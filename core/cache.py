@@ -37,6 +37,15 @@ try:
 except ImportError:
     HAS_DJANGO_REDIS = False
 
+
+def _is_redis_backend() -> bool:
+    """Check if the default cache backend is Redis (not LocMemCache or other)."""
+    if not HAS_DJANGO_REDIS:
+        return False
+    backend = settings.CACHES.get("default", {}).get("BACKEND", "")
+    return "redis" in backend.lower()
+
+
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
@@ -224,7 +233,7 @@ class CacheManager:
             >>> CacheManager.invalidate_pattern("*building*")
             5
         """
-        if not HAS_DJANGO_REDIS:
+        if not _is_redis_backend():
             return 0
 
         try:
@@ -277,7 +286,7 @@ class CacheManager:
             >>> print(f"Cache keys: {stats['keys']}")
         """
         try:
-            if not HAS_DJANGO_REDIS:
+            if not _is_redis_backend():
                 return {
                     "total_keys": 0,
                     "keyspace_hits": 0,
