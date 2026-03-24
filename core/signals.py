@@ -152,15 +152,16 @@ def invalidate_tenant_furniture_cache(
 
 @receiver(post_save, sender=Lease)
 def sync_apartment_is_rented(sender: type[Lease], instance: Lease, **kwargs: Any) -> None:
-    """Sync apartment.is_rented when lease is created, updated, or soft-deleted."""
-    is_rented = not instance.is_deleted
-    Apartment.objects.filter(pk=instance.apartment_id).update(is_rented=is_rented)
+    """Sync apartment.is_rented based on whether any active lease exists."""
+    has_active_lease = Lease.objects.filter(apartment_id=instance.apartment_id).exists()
+    Apartment.objects.filter(pk=instance.apartment_id).update(is_rented=has_active_lease)
 
 
 @receiver(post_delete, sender=Lease)
 def sync_apartment_is_rented_on_delete(sender: type[Lease], instance: Lease, **kwargs: Any) -> None:
     """Sync apartment.is_rented when lease is hard-deleted."""
-    Apartment.objects.filter(pk=instance.apartment_id).update(is_rented=False)
+    has_active_lease = Lease.objects.filter(apartment_id=instance.apartment_id).exists()
+    Apartment.objects.filter(pk=instance.apartment_id).update(is_rented=has_active_lease)
 
 
 @receiver(post_save, sender=Lease)

@@ -84,6 +84,66 @@ class TestSyncApartmentIsRented:
         apartment.refresh_from_db()
         assert apartment.is_rented is False
 
+    def test_resaving_soft_deleted_lease_does_not_mark_apartment_unavailable_when_active_lease_exists(
+        self, lease: Lease, apartment: Apartment
+    ) -> None:
+        """Historical soft-deleted lease re-save must not override active lease state."""
+        second_tenant = Tenant.objects.create(
+            name="Second Tenant",
+            cpf_cnpj="46959416000",
+            phone="11999998888",
+            marital_status="Solteiro(a)",
+            profession="Engenheiro",
+        )
+        # Soft-delete the first lease so the unique constraint allows a new active lease
+        lease.delete()
+        apartment.refresh_from_db()
+        assert apartment.is_rented is False
+
+        # Create a second active lease for the same apartment
+        second_lease = Lease.objects.create(
+            apartment=apartment,
+            responsible_tenant=second_tenant,
+            start_date=date(2025, 7, 1),
+            validity_months=12,
+        )
+        apartment.refresh_from_db()
+        assert apartment.is_rented is True
+
+        # Re-save the soft-deleted (historical) lease — simulates any update to it
+        lease_from_db = Lease.all_objects.get(pk=lease.pk)
+        lease_from_db.save()
+
+        # Apartment must still be rented (second_lease is still active)
+        apartment.refresh_from_db()
+        assert apartment.is_rented is True
+
+        second_lease.delete(hard_delete=True)
+
+    def test_apartment_becomes_rented_when_new_lease_created_after_soft_delete(
+        self, lease: Lease, apartment: Apartment
+    ) -> None:
+        """After soft-deleting the only lease, creating a new one marks apartment as rented."""
+        lease.delete()
+        apartment.refresh_from_db()
+        assert apartment.is_rented is False
+
+        second_tenant = Tenant.objects.create(
+            name="New Tenant",
+            cpf_cnpj="29765710070",
+            phone="11977776666",
+            marital_status="Casado(a)",
+            profession="Professor",
+        )
+        Lease.objects.create(
+            apartment=apartment,
+            responsible_tenant=second_tenant,
+            start_date=date(2025, 8, 1),
+            validity_months=12,
+        )
+        apartment.refresh_from_db()
+        assert apartment.is_rented is True
+
 
 # =============================================================================
 # Cache invalidation — Building signals
