@@ -301,6 +301,14 @@ export default function LeasesPage() {
       )}
 
       {/* Accordions per building */}
+      {isLoading ? (
+        <div className="flex items-center justify-center p-12 border rounded-md">
+          <div className="flex flex-col items-center gap-2">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="text-sm text-muted-foreground">Carregando locações...</p>
+          </div>
+        </div>
+      ) : (
       <Accordion type="multiple" className="space-y-4">
         {buildings?.map((building) => {
           const buildingId = building.id;
@@ -402,6 +410,7 @@ export default function LeasesPage() {
           );
         })}
       </Accordion>
+      )}
 
       {/* Modals */}
       <LeaseFormModal
