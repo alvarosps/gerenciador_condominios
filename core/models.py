@@ -12,11 +12,13 @@ This module defines the core domain models for property management:
 
 import re
 from decimal import Decimal
+from typing import Any
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
+from django.db.models import QuerySet
 from django.utils import timezone
 
 # Import validators (note: we don't enforce these on existing data)
@@ -41,15 +43,15 @@ class SoftDeleteManager(models.Manager):
     Provides additional methods to access deleted and all objects.
     """
 
-    def get_queryset(self):
+    def get_queryset(self) -> QuerySet[Any]:
         """Return queryset excluding soft-deleted objects."""
         return super().get_queryset().filter(is_deleted=False)
 
-    def with_deleted(self):
+    def with_deleted(self) -> QuerySet[Any]:
         """Return queryset including soft-deleted objects."""
         return super().get_queryset()
 
-    def deleted_only(self):
+    def deleted_only(self) -> QuerySet[Any]:
         """Return queryset with only soft-deleted objects."""
         return super().get_queryset().filter(is_deleted=True)
 
@@ -97,7 +99,7 @@ class AuditMixin(models.Model):
     class Meta:
         abstract = True
 
-    def save(self, *args, **kwargs):
+    def save(self, *args: Any, **kwargs: Any) -> None:
         """Override save to automatically update updated_at timestamp."""
         if self.pk:  # If updating existing record
             self.updated_at = timezone.now()
@@ -142,7 +144,13 @@ class SoftDeleteMixin(models.Model):
     class Meta:
         abstract = True
 
-    def delete(self, using=None, keep_parents=False, hard_delete=False, deleted_by=None):
+    def delete(
+        self,
+        using: str | None = None,
+        keep_parents: bool = False,
+        hard_delete: bool = False,
+        deleted_by: Any = None,
+    ) -> tuple[int, dict[str, int]]:
         """
         Soft delete the record or perform hard delete if explicitly requested.
 
@@ -153,15 +161,15 @@ class SoftDeleteMixin(models.Model):
             deleted_by: User performing the deletion (for audit)
         """
         if hard_delete:
-            super().delete(using=using, keep_parents=keep_parents)
-        else:
-            self.is_deleted = True
-            self.deleted_at = timezone.now()
-            if deleted_by:
-                self.deleted_by = deleted_by
-            self.save(update_fields=["is_deleted", "deleted_at", "deleted_by"])
+            return super().delete(using=using, keep_parents=keep_parents)
+        self.is_deleted = True
+        self.deleted_at = timezone.now()
+        if deleted_by:
+            self.deleted_by = deleted_by
+        self.save(update_fields=["is_deleted", "deleted_at", "deleted_by"])
+        return 0, {}
 
-    def restore(self, restored_by=None):
+    def restore(self, restored_by: Any = None) -> None:
         """
         Restore a soft-deleted record.
 
@@ -408,7 +416,7 @@ class Tenant(AuditMixin, SoftDeleteMixin, models.Model):
         """Return string representation of tenant."""
         return self.name
 
-    def save(self, *args, **kwargs):
+    def save(self, *args: Any, **kwargs: Any) -> None:
         """Override save to enforce validation before persisting."""
         self.full_clean()
         super().save(*args, **kwargs)
@@ -560,7 +568,7 @@ class Lease(AuditMixin, SoftDeleteMixin, models.Model):
         """Return string representation of lease."""
         return f"Locação do Apto {self.apartment.number} - {self.apartment.building.street_number}"
 
-    def save(self, *args, **kwargs):
+    def save(self, *args: Any, **kwargs: Any) -> None:
         """Override save to enforce validation before persisting."""
         self.full_clean()
         super().save(*args, **kwargs)
@@ -663,7 +671,7 @@ class Landlord(AuditMixin, SoftDeleteMixin, models.Model):
         """Return string representation of landlord."""
         return self.name
 
-    def save(self, *args, **kwargs):
+    def save(self, *args: Any, **kwargs: Any) -> None:
         """Ensure only one active landlord exists."""
         if self.is_active:
             # Deactivate other landlords
@@ -1054,7 +1062,7 @@ class FinancialSettings(models.Model):
     def __str__(self) -> str:
         return f"Saldo inicial: R${self.initial_balance}"
 
-    def save(self, *args, **kwargs):
+    def save(self, *args: Any, **kwargs: Any) -> None:
         self.pk = 1
         if FinancialSettings.objects.filter(pk=1).exists():
             kwargs.pop("force_insert", None)
