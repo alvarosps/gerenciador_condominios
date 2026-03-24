@@ -212,23 +212,10 @@ export const tenantExportColumns = [
     label: 'Telefone',
     format: (value: unknown) => formatBrazilianPhone(toStr(value)),
   },
-  { key: 'email' as const, label: 'Email' },
   {
     key: 'is_company' as const,
     label: 'Tipo',
     format: (value: unknown) => (value ? 'Empresa' : 'Pessoa Física'),
-  },
-  { key: 'profession' as const, label: 'Profissão' },
-  { key: 'marital_status' as const, label: 'Estado Civil' },
-  {
-    key: 'dependents' as const,
-    label: 'Dependentes',
-    format: (value: unknown) => (Array.isArray(value) ? value.length : 0),
-  },
-  {
-    key: 'furnitures' as const,
-    label: 'Móveis',
-    format: (value: unknown) => (Array.isArray(value) ? value.length : 0),
   },
 ];
 

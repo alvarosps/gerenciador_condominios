@@ -232,6 +232,24 @@ export function useTenantLeases(tenantId: number | null) {
 }
 
 /**
+ * Hook to transfer a tenant to a different apartment (creates a new lease)
+ * Calls POST /leases/{id}/transfer/ which terminates the old lease and creates a new one
+ */
+export function useTransferLease() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ leaseId, ...payload }: { leaseId: number } & Record<string, unknown>) => {
+      const response = await apiClient.post<Lease>(`/leases/${String(leaseId)}/transfer/`, payload);
+      return leaseSchema.parse(response.data);
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['leases'] });
+      void queryClient.invalidateQueries({ queryKey: ['apartments'] });
+    },
+  });
+}
+
+/**
  * Hook to terminate a lease contract
  * Calls POST /leases/{id}/terminate/ which marks the apartment as available
  */
