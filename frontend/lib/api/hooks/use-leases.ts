@@ -197,9 +197,12 @@ export function useChangeDueDate() {
       const { data } = await apiClient.post<{
         old_due_day: number;
         new_due_day: number;
+        old_due_date: string;
+        new_due_date: string;
         change_fee: number;
         days_difference: number;
         daily_rate: number;
+        total_due: number;
         message: string;
       }>(`/leases/${params.leaseId}/change_due_date/`, {
         new_due_day: params.new_due_day,

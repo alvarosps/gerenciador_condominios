@@ -422,8 +422,27 @@ class FinancialDashboardService:
         months.reverse()  # oldest first
         months.append((current_year, current_month))
 
+        # Prepend initial_balance as the first month if the person has one
+        # and it falls before the lookback window
+        initial_balance_entry: dict[str, Any] | None = None
+        if (
+            person.initial_balance > Decimal("0.00")
+            and person.initial_balance_date
+            and (person.initial_balance_date.year, person.initial_balance_date.month)
+            not in months
+        ):
+            ib_y, ib_m = person.initial_balance_date.year, person.initial_balance_date.month
+            if date(ib_y, ib_m, 1) < date(current_year, current_month, 1):
+                initial_balance_entry = {
+                    "year": ib_y,
+                    "month": ib_m,
+                    "expense_total": person.initial_balance,
+                }
+
         # Get expense total per month
         month_data: list[dict[str, Any]] = []
+        if initial_balance_entry:
+            month_data.append(initial_balance_entry)
         for y, m in months:
             month_start = date(y, m, 1)
             next_m = _next_month_start(y, m)
@@ -681,7 +700,7 @@ class FinancialDashboardService:
         # Vacant apartments (not rented) — grouped by building with last known rent
         vacant_apartments = (
             Apartment.objects.filter(is_rented=False)
-            .select_related("building")
+            .select_related("building", "owner")
             .order_by("building__street_number", "number")
         )
         vacant_lost_rent = Decimal("0.00")
@@ -699,6 +718,7 @@ class FinancialDashboardService:
                     "apartment_number": str(apt.number),
                     "building_name": building_name,
                     "rental_value": rental_value,
+                    "owner_name": apt.owner.name if apt.owner else None,
                 }
             )
 

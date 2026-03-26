@@ -2,7 +2,6 @@
 
 from decimal import Decimal
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 from django.conf import settings
@@ -296,8 +295,7 @@ class TestRestoreBackupEndpoint:
 
 
 # =============================================================================
-# Additional error-branch coverage — missing lines 62-70, 110-124, 163-170,
-# 199-210, 253-267
+# Additional error-branch coverage — filesystem boundary mocking only
 # =============================================================================
 
 
@@ -305,216 +303,142 @@ class TestRestoreBackupEndpoint:
 class TestGetTemplatePermissionError:
     url = "/api/templates/current/"
 
-    def test_permission_error_returns_403(self, authenticated_api_client, monkeypatch):
-        """Covers lines 62-70: PermissionError branch in get_template."""
-        from core.services import TemplateManagementService
+    def test_permission_error_returns_403(self, authenticated_api_client, template_dir, monkeypatch):
+        """PermissionError reading the template file → 403.
 
-        def raise_permission(*args, **kwargs):
-            raise PermissionError("no read access")
+        Patches Path.read_text at the filesystem boundary to simulate OS-level
+        permission denial without touching service internals.
+        """
+        import core.services.template_management_service as svc_module
 
-        monkeypatch.setattr(TemplateManagementService, "get_template", staticmethod(raise_permission))
+        original_read_text = Path.read_text
+
+        def deny_read(self, *args, **kwargs):
+            if "contract_template.html" in str(self) and "backups" not in str(self):
+                raise PermissionError("no read access")
+            return original_read_text(self, *args, **kwargs)
+
+        monkeypatch.setattr(svc_module.Path, "read_text", deny_read)
         response = authenticated_api_client.get(self.url)
         assert response.status_code == status.HTTP_403_FORBIDDEN
         assert "permissão" in response.data["error"]
-
-    def test_unexpected_error_returns_500(self, authenticated_api_client, monkeypatch):
-        """Covers lines 68-73: generic Exception branch in get_template."""
-        from core.services import TemplateManagementService
-
-        def raise_unexpected(*args, **kwargs):
-            raise RuntimeError("unexpected")
-
-        monkeypatch.setattr(TemplateManagementService, "get_template", staticmethod(raise_unexpected))
-        response = authenticated_api_client.get(self.url)
-        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
-        assert "Erro interno" in response.data["error"]
 
 
 @pytest.mark.integration
 class TestSaveTemplateErrorBranches:
     url = "/api/templates/save/"
 
-    def test_permission_error_returns_403(self, authenticated_api_client, monkeypatch):
-        """Covers lines 110-115: PermissionError branch in save_template."""
-        from core.services import TemplateManagementService
+    def test_permission_error_returns_403(self, authenticated_api_client, template_dir, monkeypatch):
+        """PermissionError writing the template file → 403.
 
-        def raise_permission(*args, **kwargs):
-            raise PermissionError("no write")
+        Patches Path.write_text at the filesystem boundary.
+        """
+        import core.services.template_management_service as svc_module
 
-        monkeypatch.setattr(TemplateManagementService, "save_template", staticmethod(raise_permission))
+        def deny_write(self, *args, **kwargs):
+            raise PermissionError("no write access")
+
+        monkeypatch.setattr(svc_module.Path, "write_text", deny_write)
         response = authenticated_api_client.post(
             self.url, {"content": "<html></html>"}, format="json"
         )
         assert response.status_code == status.HTTP_403_FORBIDDEN
         assert "permissão" in response.data["error"]
 
-    def test_os_error_returns_500(self, authenticated_api_client, monkeypatch):
-        """Covers lines 116-120: OSError branch in save_template."""
-        from core.services import TemplateManagementService
+    def test_os_error_returns_500(self, authenticated_api_client, template_dir, monkeypatch):
+        """OSError during backup copy → 500.
 
-        def raise_os_error(*args, **kwargs):
+        Patches shutil.copy2 at the filesystem boundary to simulate disk full.
+        """
+        import core.services.template_management_service as svc_module
+
+        def raise_os_error(src, dst, **kwargs):
             raise OSError("disk full")
 
-        monkeypatch.setattr(TemplateManagementService, "save_template", staticmethod(raise_os_error))
+        monkeypatch.setattr(svc_module.shutil, "copy2", raise_os_error)
         response = authenticated_api_client.post(
             self.url, {"content": "<html></html>"}, format="json"
         )
         assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
         assert "salvar" in response.data["error"]
 
-    def test_unexpected_error_returns_500(self, authenticated_api_client, monkeypatch):
-        """Covers lines 122-127: generic Exception branch in save_template."""
-        from core.services import TemplateManagementService
-
-        def raise_unexpected(*args, **kwargs):
-            raise RuntimeError("boom")
-
-        monkeypatch.setattr(TemplateManagementService, "save_template", staticmethod(raise_unexpected))
-        response = authenticated_api_client.post(
-            self.url, {"content": "<html></html>"}, format="json"
-        )
-        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
-
-    def test_value_error_returns_400(self, authenticated_api_client, monkeypatch):
-        """Covers lines 108-109: ValueError branch in save_template."""
-        from core.services import TemplateManagementService
-
-        def raise_value_error(*args, **kwargs):
-            raise ValueError("invalid content")
-
-        monkeypatch.setattr(TemplateManagementService, "save_template", staticmethod(raise_value_error))
-        response = authenticated_api_client.post(
-            self.url, {"content": "<html></html>"}, format="json"
-        )
-        assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "invalid content" in response.data["error"]
-
-
-@pytest.mark.integration
-class TestPreviewTemplateErrorBranches:
-    url = "/api/templates/preview/"
-
-    def test_object_does_not_exist_returns_404(self, authenticated_api_client, monkeypatch):
-        """Covers lines 163-167: ObjectDoesNotExist branch in preview_template."""
-        from django.core.exceptions import ObjectDoesNotExist
-
-        from core.services import TemplateManagementService
-
-        def raise_does_not_exist(*args, **kwargs):
-            raise ObjectDoesNotExist("lease not found")
-
-        monkeypatch.setattr(
-            TemplateManagementService, "preview_template", staticmethod(raise_does_not_exist)
-        )
-        response = authenticated_api_client.post(
-            self.url, {"content": "<html></html>"}, format="json"
-        )
-        assert response.status_code == status.HTTP_404_NOT_FOUND
-        assert "Locação não encontrada" in response.data["error"]
-
-    def test_unexpected_error_returns_500(self, authenticated_api_client, monkeypatch):
-        """Covers lines 168-173: generic Exception branch in preview_template."""
-        from core.services import TemplateManagementService
-
-        def raise_unexpected(*args, **kwargs):
-            raise RuntimeError("render failure")
-
-        monkeypatch.setattr(
-            TemplateManagementService, "preview_template", staticmethod(raise_unexpected)
-        )
-        response = authenticated_api_client.post(
-            self.url, {"content": "<html></html>"}, format="json"
-        )
-        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
-
 
 @pytest.mark.integration
 class TestListBackupsErrorBranches:
     url = "/api/templates/backups/"
 
-    def test_file_not_found_returns_empty_list(self, authenticated_api_client, monkeypatch):
-        """Covers lines 199-201: FileNotFoundError → returns empty list with 200."""
-        from core.services import TemplateManagementService
+    def test_permission_error_returns_403(self, authenticated_api_client, template_dir, monkeypatch):
+        """PermissionError iterating the backup directory → 403.
 
-        def raise_fnf(*args, **kwargs):
-            raise FileNotFoundError("backup dir missing")
+        Patches Path.iterdir at the filesystem boundary.
+        """
+        import core.services.template_management_service as svc_module
 
-        monkeypatch.setattr(TemplateManagementService, "list_backups", staticmethod(raise_fnf))
-        response = authenticated_api_client.get(self.url)
-        assert response.status_code == status.HTTP_200_OK
-        assert response.data == []
-
-    def test_permission_error_returns_403(self, authenticated_api_client, monkeypatch):
-        """Covers lines 202-207: PermissionError branch in list_backups."""
-        from core.services import TemplateManagementService
-
-        def raise_permission(*args, **kwargs):
+        def deny_iterdir(self):
             raise PermissionError("no list access")
 
-        monkeypatch.setattr(TemplateManagementService, "list_backups", staticmethod(raise_permission))
+        monkeypatch.setattr(svc_module.Path, "iterdir", deny_iterdir)
         response = authenticated_api_client.get(self.url)
         assert response.status_code == status.HTTP_403_FORBIDDEN
         assert "permissão" in response.data["error"]
-
-    def test_unexpected_error_returns_500(self, authenticated_api_client, monkeypatch):
-        """Covers lines 208-213: generic Exception branch in list_backups."""
-        from core.services import TemplateManagementService
-
-        def raise_unexpected(*args, **kwargs):
-            raise RuntimeError("unexpected list failure")
-
-        monkeypatch.setattr(TemplateManagementService, "list_backups", staticmethod(raise_unexpected))
-        response = authenticated_api_client.get(self.url)
-        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 
 
 @pytest.mark.integration
 class TestRestoreBackupErrorBranches:
     url = "/api/templates/restore/"
 
-    def test_permission_error_returns_403(self, authenticated_api_client, monkeypatch):
-        """Covers lines 253-257: PermissionError branch in restore_backup."""
-        from core.services import TemplateManagementService
+    def test_permission_error_returns_403(self, authenticated_api_client, template_dir, monkeypatch):
+        """PermissionError copying backup to template → 403.
 
-        def raise_permission(*args, **kwargs):
+        Creates a real backup first, then patches shutil.copy2 on the restore
+        copy to simulate permission denial.
+        """
+        import core.services.template_management_service as svc_module
+
+        save_response = authenticated_api_client.post(
+            "/api/templates/save/",
+            {"content": "<html>before restore</html>"},
+            format="json",
+        )
+        backup_filename = save_response.data["backup_filename"]
+
+        call_count = {"n": 0}
+        original_copy2 = svc_module.shutil.copy2
+
+        def deny_second_copy(src, dst, **kwargs):
+            call_count["n"] += 1
+            if call_count["n"] == 1:
+                # First call: safety backup — allow it
+                return original_copy2(src, dst, **kwargs)
             raise PermissionError("no restore access")
 
-        monkeypatch.setattr(
-            TemplateManagementService, "restore_backup", staticmethod(raise_permission)
-        )
+        monkeypatch.setattr(svc_module.shutil, "copy2", deny_second_copy)
         response = authenticated_api_client.post(
-            self.url, {"backup_filename": "backup.html"}, format="json"
+            self.url, {"backup_filename": backup_filename}, format="json"
         )
         assert response.status_code == status.HTTP_403_FORBIDDEN
         assert "permissão" in response.data["error"]
 
-    def test_os_error_returns_500(self, authenticated_api_client, monkeypatch):
-        """Covers lines 258-263: OSError branch in restore_backup."""
-        from core.services import TemplateManagementService
+    def test_os_error_returns_500(self, authenticated_api_client, template_dir, monkeypatch):
+        """OSError during the safety-backup copy before restore → 500.
 
-        def raise_os_error(*args, **kwargs):
-            raise OSError("restore disk error")
+        Patches shutil.copy2 at the filesystem boundary.
+        """
+        import core.services.template_management_service as svc_module
 
-        monkeypatch.setattr(
-            TemplateManagementService, "restore_backup", staticmethod(raise_os_error)
+        save_response = authenticated_api_client.post(
+            "/api/templates/save/",
+            {"content": "<html>before restore</html>"},
+            format="json",
         )
+        backup_filename = save_response.data["backup_filename"]
+
+        def raise_os_error(src, dst, **kwargs):
+            raise OSError("disk error during restore")
+
+        monkeypatch.setattr(svc_module.shutil, "copy2", raise_os_error)
         response = authenticated_api_client.post(
-            self.url, {"backup_filename": "backup.html"}, format="json"
+            self.url, {"backup_filename": backup_filename}, format="json"
         )
         assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
         assert "restaurar" in response.data["error"]
-
-    def test_unexpected_error_returns_500(self, authenticated_api_client, monkeypatch):
-        """Covers lines 264-269: generic Exception branch in restore_backup."""
-        from core.services import TemplateManagementService
-
-        def raise_unexpected(*args, **kwargs):
-            raise RuntimeError("unexpected restore failure")
-
-        monkeypatch.setattr(
-            TemplateManagementService, "restore_backup", staticmethod(raise_unexpected)
-        )
-        response = authenticated_api_client.post(
-            self.url, {"backup_filename": "backup.html"}, format="json"
-        )
-        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR

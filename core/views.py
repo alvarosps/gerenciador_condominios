@@ -431,12 +431,23 @@ class LeaseViewSet(viewsets.ModelViewSet):
             )
 
             # Update the due date on the tenant (source of truth)
+            old_due_day = lease.responsible_tenant.due_day
             tenant = lease.responsible_tenant
             tenant.due_day = new_due_day
             tenant.save(update_fields=["due_day"])
 
             return Response(
-                {"message": "Dia de vencimento alterado.", "fee": fee_result["fee"]},
+                {
+                    "message": "Dia de vencimento alterado.",
+                    "old_due_day": old_due_day,
+                    "new_due_day": new_due_day,
+                    "old_due_date": fee_result["old_due_date"],
+                    "new_due_date": fee_result["new_due_date"],
+                    "change_fee": fee_result["fee"],
+                    "days_difference": fee_result["days_difference"],
+                    "daily_rate": fee_result["daily_rate"],
+                    "total_due": fee_result["total_due"],
+                },
                 status=status.HTTP_200_OK,
             )
         except ValueError as e:

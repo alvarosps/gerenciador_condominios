@@ -16,7 +16,7 @@ import { Calendar, AlertTriangle, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { useChangeDueDate } from '@/lib/api/hooks/use-leases';
 import { type Lease } from '@/lib/schemas/lease.schema';
-import { formatCurrency } from '@/lib/utils/formatters';
+import { formatCurrency, formatDate } from '@/lib/utils/formatters';
 
 interface Props {
   open: boolean;
@@ -27,9 +27,12 @@ interface Props {
 interface ChangeDueDateResult {
   old_due_day: number;
   new_due_day: number;
+  old_due_date: string;
+  new_due_date: string;
   change_fee: number;
   days_difference: number;
   daily_rate: number;
+  total_due: number;
   message: string;
 }
 
@@ -145,13 +148,13 @@ export function DueDateModal({ open, lease, onClose }: Props) {
                   <div className="flex justify-between items-center">
                     <span className="text-muted-foreground">Vencimento Anterior:</span>
                     <span className="text-lg font-medium">
-                      Dia {result.old_due_day}
+                      Dia {result.old_due_day} ({formatDate(result.old_due_date)})
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-muted-foreground">Novo Vencimento:</span>
                     <span className="text-lg font-bold text-info">
-                      Dia {result.new_due_day}
+                      Dia {result.new_due_day} ({formatDate(result.new_due_date)})
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
@@ -166,10 +169,16 @@ export function DueDateModal({ open, lease, onClose }: Props) {
                       {formatCurrency(result.daily_rate)}
                     </span>
                   </div>
-                  <div className="flex justify-between items-center pt-3 border-t-2 border-info/30">
-                    <span className="text-foreground font-medium">Taxa de Alteração:</span>
-                    <span className="text-2xl font-bold text-info">
+                  <div className="flex justify-between items-center pt-3 border-t">
+                    <span className="text-muted-foreground">Taxa de Alteração:</span>
+                    <span className="text-lg font-medium">
                       {formatCurrency(result.change_fee)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center pt-3 border-t-2 border-info/30">
+                    <span className="text-foreground font-medium">Total a Pagar:</span>
+                    <span className="text-2xl font-bold text-info">
+                      {formatCurrency(result.total_due)}
                     </span>
                   </div>
                   {result.message && (

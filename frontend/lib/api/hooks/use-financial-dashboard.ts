@@ -54,6 +54,7 @@ export interface ApartmentInfo {
   apartment_number: string;
   building_name: string;
   rental_value?: number;
+  owner_name?: string | null;
 }
 
 export interface OwnerIncome {
