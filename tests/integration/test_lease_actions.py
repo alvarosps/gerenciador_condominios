@@ -73,13 +73,15 @@ def lease(apartment, tenant, admin_user):
 class TestChangeDueDate:
     url_template = "/api/leases/{pk}/change_due_date/"
 
+    @freeze_time("2026-03-15")
     def test_change_due_date_writes_to_tenant(self, authenticated_api_client, lease, tenant):
         """change_due_date must update Tenant.due_day, not any Lease field."""
         url = self.url_template.format(pk=lease.pk)
         response = authenticated_api_client.post(url, {"new_due_day": 15}, format="json")
 
         assert response.status_code == status.HTTP_200_OK
-        assert "fee" in response.data
+        assert response.data["old_due_day"] == 10
+        assert response.data["new_due_day"] == 15
 
         # Tenant.due_day should be updated
         tenant.refresh_from_db()
@@ -91,18 +93,86 @@ class TestChangeDueDate:
         with pytest.raises(FieldDoesNotExist):
             Lease._meta.get_field("due_day")
 
-    def test_change_due_date_uses_apartment_rental_value(
-        self, authenticated_api_client, lease, apartment
+    @freeze_time("2026-03-15")
+    def test_change_due_date_returns_complete_response(
+        self, authenticated_api_client, lease, apartment, tenant
     ):
-        """The fee calculation must read rental_value from Apartment, not Lease."""
+        """Response must include all fee details, dates, and total_due."""
+        # tenant.due_day=10, rental_value=1500.00, new_due_day=20
+        # reference=2026-03-15, old_date=2026-03-10, new_date=2026-03-20
+        # inclusive days = (20-10)+1 = 11, daily_rate=50.00
+        # fee=round(50*11)=550, total_due=1500+550=2050
         url = self.url_template.format(pk=lease.pk)
         response = authenticated_api_client.post(url, {"new_due_day": 20}, format="json")
 
         assert response.status_code == status.HTTP_200_OK
-        # A fee is returned, meaning the service correctly read apartment.rental_value
-        assert "fee" in response.data
-        # Fee should be a non-negative decimal
-        assert Decimal(str(response.data["fee"])) >= Decimal("0.00")
+        assert response.data["old_due_day"] == 10
+        assert response.data["new_due_day"] == 20
+        assert response.data["old_due_date"] == date(2026, 3, 10)
+        assert response.data["new_due_date"] == date(2026, 3, 20)
+        assert response.data["days_difference"] == 11
+        assert Decimal(str(response.data["daily_rate"])) == Decimal("50.00")
+        assert response.data["change_fee"] == 550
+        assert Decimal(str(response.data["total_due"])) == Decimal("2050.00")
+
+    @freeze_time("2026-03-15")
+    def test_change_due_date_wraps_to_next_month(self, authenticated_api_client, admin_user):
+        """When new_due_day < current_due_day, the new date falls in the next month.
+
+        User's exact scenario: due_day=22 → 5, reference March 2026.
+        old_date=2026-03-22, new_date=2026-04-05
+        Inclusive days: 22,23,...,31,1,...,5 = 15 days
+        daily_rate=1250/30=41.67, fee=round(41.67*15)=round(625.05)=625
+        total_due=1250+625=1875
+        """
+        building = Building.objects.create(
+            street_number=9900,
+            name="Edifício Round Test",
+            address="Rua Round, 9900",
+            created_by=admin_user,
+            updated_by=admin_user,
+        )
+        apt = Apartment.objects.create(
+            building=building,
+            number=204,
+            rental_value=Decimal("1250.00"),
+            cleaning_fee=Decimal("100.00"),
+            max_tenants=2,
+            created_by=admin_user,
+            updated_by=admin_user,
+        )
+        tnt = Tenant.objects.create(
+            name="Tenant Round Test",
+            cpf_cnpj="52998224725",
+            phone="11999990099",
+            marital_status="Solteiro(a)",
+            profession="Tester",
+            due_day=22,
+            created_by=admin_user,
+            updated_by=admin_user,
+        )
+        lse = Lease.objects.create(
+            apartment=apt,
+            responsible_tenant=tnt,
+            start_date=date(2026, 2, 22),
+            validity_months=12,
+            tag_fee=Decimal("50.00"),
+            created_by=admin_user,
+            updated_by=admin_user,
+        )
+
+        url = self.url_template.format(pk=lse.pk)
+        response = authenticated_api_client.post(url, {"new_due_day": 5}, format="json")
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["old_due_date"] == date(2026, 3, 22)
+        assert response.data["new_due_date"] == date(2026, 4, 5)
+        assert response.data["days_difference"] == 15
+        assert Decimal(str(response.data["daily_rate"])) == Decimal("41.67")
+        # 41.67 * 15 = 625.05 → rounds to 625
+        assert response.data["change_fee"] == 625
+        # total_due = 1250 + 625 = 1875
+        assert Decimal(str(response.data["total_due"])) == Decimal("1875.00")
 
     def test_change_due_date_missing_param_returns_400(self, authenticated_api_client, lease):
         url = self.url_template.format(pk=lease.pk)

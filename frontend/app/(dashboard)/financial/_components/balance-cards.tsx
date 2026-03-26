@@ -1,10 +1,10 @@
 'use client';
 
-import { DollarSign, TrendingDown, TrendingUp, Home } from 'lucide-react';
+import { AlertTriangle, DollarSign, TrendingDown, TrendingUp } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { DashboardSummary } from '@/lib/api/hooks/use-financial-dashboard';
-import { formatCurrency } from '@/lib/utils/formatters';
+import { formatCurrency, formatMonthYear } from '@/lib/utils/formatters';
 import { cn } from '@/lib/utils';
 
 function BalanceCardSkeleton() {
@@ -38,58 +38,34 @@ export function BalanceCards({ data, monthLabel }: { data: DashboardSummary; mon
     ? parseFloat(data.current_month_balance)
     : data.current_month_balance;
 
-  const totalIncome = typeof data.current_month_income === 'string'
-    ? parseFloat(data.current_month_income)
-    : data.current_month_income;
+  const { income_summary } = data;
+  const totalEntradas = income_summary.total_monthly_income + income_summary.extra_income_total;
+  const prevMonth = data.month === 1 ? 12 : data.month - 1;
+  const prevYear = data.month === 1 ? data.year - 1 : data.year;
+  const previousMonthLabel = formatMonthYear(prevYear, prevMonth);
 
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
       <Card className="hover:shadow-md transition-shadow">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Entradas no Mês — {monthLabel}</CardTitle>
+          <CardTitle className="text-sm font-medium">Total Entradas no Mês — {monthLabel}</CardTitle>
           <TrendingUp className="h-5 w-5 text-muted-foreground" />
         </CardHeader>
         <CardContent>
           <div className="text-3xl font-bold text-info">
-            {formatCurrency(totalIncome)}
+            {formatCurrency(totalEntradas)}
           </div>
           <div className="mt-2 space-y-0.5">
             <p className="text-xs text-muted-foreground">
-              {data.income_summary.all_apartments.length} kitnets: {formatCurrency(data.income_summary.total_monthly_income)}
+              {income_summary.all_apartments.length} kitnets: {formatCurrency(income_summary.total_monthly_income)}
             </p>
-            {data.income_summary.extra_incomes.map((inc) => (
+            {income_summary.extra_incomes.map((inc) => (
               <p key={inc.description} className="text-xs text-muted-foreground">
                 {inc.person_name ? `${inc.person_name} - ` : ''}
                 {inc.description}: {formatCurrency(inc.amount)}
               </p>
             ))}
           </div>
-        </CardContent>
-      </Card>
-
-      <Card className="hover:shadow-md transition-shadow">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Kitnets Não Alugados</CardTitle>
-          <Home className="h-5 w-5 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className={cn(
-            'text-3xl font-bold',
-            data.income_summary.vacant_count > 0 ? 'text-warning' : 'text-success',
-          )}>
-            {formatCurrency(data.income_summary.vacant_lost_rent)}
-          </div>
-          <p className="text-xs text-muted-foreground mt-1">
-            Não alugados: {data.income_summary.vacant_count}
-          </p>
-          {data.income_summary.vacant_by_building.map((b) => (
-            <p key={b.building_name} className="text-xs text-muted-foreground">
-              Prédio {b.building_name}: {b.apartments.join(', ')}
-            </p>
-          ))}
-          {data.income_summary.vacant_count === 0 && (
-            <p className="text-xs text-muted-foreground">Todos alugados</p>
-          )}
         </CardContent>
       </Card>
 
@@ -119,6 +95,23 @@ export function BalanceCards({ data, monthLabel }: { data: DashboardSummary; mon
             {formatCurrency(balance)}
           </div>
           <p className="text-xs text-muted-foreground mt-2">Receitas - Despesas</p>
+        </CardContent>
+      </Card>
+
+      <Card className="hover:shadow-md transition-shadow">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Atrasados — {previousMonthLabel}</CardTitle>
+          <AlertTriangle className={cn('h-5 w-5', data.overdue_total > 0 ? 'text-destructive' : 'text-muted-foreground')} />
+        </CardHeader>
+        <CardContent>
+          <div className={cn('text-3xl font-bold', data.overdue_total > 0 ? 'text-destructive' : 'text-success')}>
+            {formatCurrency(data.overdue_total)}
+          </div>
+          <p className="text-xs text-muted-foreground mt-2">
+            {data.overdue_items.length > 0
+              ? `${data.overdue_items.length} item${data.overdue_items.length > 1 ? 's' : ''} em atraso`
+              : 'Nenhum atraso'}
+          </p>
         </CardContent>
       </Card>
     </div>

@@ -5,6 +5,7 @@ import { useDashboardSummary } from '@/lib/api/hooks/use-financial-dashboard';
 import { formatMonthYear } from '@/lib/utils/formatters';
 import { BalanceCards, BalanceCardsSkeleton } from './_components/balance-cards';
 import { IncomeSummaryCard } from './_components/income-summary-card';
+import { OtherIncomeCard } from './_components/other-income-card';
 import { ExpenseSummaryCard } from './_components/expense-summary-card';
 import { OverdueSection } from './_components/overdue-section';
 import { CashFlowChart } from './_components/cash-flow-chart';
@@ -38,6 +39,11 @@ export default function FinancialDashboardPage() {
         <>
           <BalanceCards data={data} monthLabel={monthLabel} />
           <IncomeSummaryCard data={data} monthLabel={monthLabel} />
+          <OtherIncomeCard
+            extraIncomes={data.income_summary.extra_incomes}
+            extraIncomeTotal={data.income_summary.extra_income_total}
+            monthLabel={monthLabel}
+          />
           <ExpenseSummaryCard data={data} monthLabel={monthLabel} />
           <OverdueSection items={data.overdue_items} />
         </>

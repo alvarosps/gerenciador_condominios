@@ -775,6 +775,12 @@ class Person(AuditMixin, SoftDeleteMixin, models.Model):
     email = models.EmailField(blank=True)
     is_owner = models.BooleanField(default=False)
     is_employee = models.BooleanField(default=False)
+    initial_balance = models.DecimalField(
+        max_digits=12, decimal_places=2, default=0, help_text="Saldo devedor anterior ao sistema"
+    )
+    initial_balance_date = models.DateField(
+        null=True, blank=True, help_text="Mês de referência do saldo devedor (dia 1 do mês)"
+    )
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
         null=True,

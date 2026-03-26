@@ -117,6 +117,19 @@ Financeiro: 0012 (financial module) → 0013 (category parent) → 0014 (is_offs
 - Frontend `.env.local`: `NEXT_PUBLIC_API_URL=http://localhost:8000/api`
 - CORS: `localhost:4000`, `localhost:6000`
 
+## Skills — Plugin vs Projeto
+
+**Quando um skill do plugin Superpowers for invocado, SEMPRE carregar também o skill equivalente do projeto (`.claude/skills/`).** Os skills do plugin são genéricos; os do projeto têm regras específicas deste sistema (Django+DRF, serializers dual pattern, soft delete, cache invalidation, mock policy). Ambos devem ser seguidos — as regras do projeto têm precedência em caso de conflito.
+
+| Plugin skill | Skill do projeto para também carregar |
+| --- | --- |
+| `superpowers:brainstorming` | `/brainstorming` (architecture gate com regras Django/DRF) |
+| `superpowers:writing-plans` | `/prompt-writing` (TDD, context engineering, exemplar index) |
+| `superpowers:executing-plans` | `/prompt-session` (TDD + audit + SESSION_STATE.md) |
+| `superpowers:systematic-debugging` | `/debug` (com regras de mock policy, soft delete, cache) |
+| `superpowers:verification-before-completion` | `/audit` (verifica completude contra plano) |
+| `superpowers:test-driven-development` | TDD integrado em `/prompt-session` e `/new-feature` |
+
 ## Documentação do Módulo Financeiro
 
 - **LEIA PRIMEIRO**: `docs/LESSONS_LEARNED.md` — contexto completo do negócio, todas as regras, armadilhas, e decisões arquiteturais

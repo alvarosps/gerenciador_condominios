@@ -443,6 +443,8 @@ class PersonSerializer(serializers.ModelSerializer):
             "email",
             "is_owner",
             "is_employee",
+            "initial_balance",
+            "initial_balance_date",
             "user",
             "user_id",
             "notes",
