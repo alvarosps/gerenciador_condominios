@@ -5,6 +5,7 @@ export const dependentSchema = z.object({
   id: z.number().optional(),
   name: z.string().min(1, 'Nome é obrigatório'),
   phone: z.string().min(1, 'Telefone é obrigatório'),
+  cpf_cnpj: z.string().optional().nullable(),
   relationship: z.string().optional().nullable(),
   tenant_id: z.number().optional(),
   created_at: z.string().optional(),

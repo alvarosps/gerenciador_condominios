@@ -100,7 +100,7 @@ export function ApartmentFormModal({ open, apartment, onClose }: Props) {
         });
         toast.success('Apartamento atualizado com sucesso');
       } else {
-        await createMutation.mutateAsync(values);
+        await createMutation.mutateAsync({ ...values, rental_value_double: null });
         toast.success('Apartamento criado com sucesso');
       }
 
