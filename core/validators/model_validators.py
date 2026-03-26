@@ -107,37 +107,39 @@ def validate_lease_dates(lease: Any) -> None:
 
 def validate_tenant_count(lease: Any) -> None:
     """
-    Validate that number_of_tenants is at least the actual tenant count.
-
-    Allows declaring more occupants than registered tenants (e.g., for tag fee calculation
-    when additional people will live there but aren't formally registered as tenants).
+    Validate that number_of_tenants is 1 or 2 and does not exceed apartment max_tenants.
 
     Args:
         lease: Lease instance to validate
 
     Raises:
-        ValidationError: If declared count is less than actual count
+        ValidationError: If number_of_tenants is not 1 or 2, or exceeds apartment.max_tenants
 
     Example:
         >>> lease.number_of_tenants = 1
-        >>> lease.tenants.count() = 2
-        >>> validate_tenant_count(lease)  # Raises ValidationError (can't have fewer declared)
+        >>> validate_tenant_count(lease)  # OK
+
+        >>> lease.number_of_tenants = 3
+        >>> validate_tenant_count(lease)  # Raises ValidationError (must be 1 or 2)
 
         >>> lease.number_of_tenants = 2
-        >>> lease.tenants.count() = 1
-        >>> validate_tenant_count(lease)  # OK (can declare more occupants)
+        >>> lease.apartment.max_tenants = 1
+        >>> validate_tenant_count(lease)  # Raises ValidationError (exceeds max_tenants)
     """
-    if lease.pk:  # Only validate if lease is saved (tenants relationship exists)
-        actual_count = lease.tenants.count()
-        if lease.number_of_tenants < actual_count:
-            raise ValidationError(
-                {
-                    "number_of_tenants": f"Number of tenants ({lease.number_of_tenants}) "
-                    f"cannot be less than actual registered tenant count ({actual_count}). "
-                    f"You can declare more occupants, but not fewer than registered tenants."
-                },
-                code="tenant_count_too_low",
-            )
+    if lease.number_of_tenants not in (1, 2):
+        raise ValidationError(
+            {"number_of_tenants": "Number of tenants must be 1 or 2."},
+            code="tenant_count_invalid",
+        )
+
+    if lease.apartment_id and lease.number_of_tenants > lease.apartment.max_tenants:
+        raise ValidationError(
+            {
+                "number_of_tenants": f"Number of tenants ({lease.number_of_tenants}) "
+                f"exceeds apartment maximum ({lease.apartment.max_tenants})."
+            },
+            code="tenant_count_exceeds_max",
+        )
 
 
 def validate_rental_value(value: float) -> None:

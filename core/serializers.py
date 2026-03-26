@@ -32,6 +32,8 @@ from .models import (
 
 User = get_user_model()
 
+_DOUBLE_OCCUPANCY = 2  # number_of_tenants tier that uses rental_value_double
+
 
 class BuildingSerializer(serializers.ModelSerializer):
     class Meta:
@@ -117,6 +119,7 @@ class ApartmentSerializer(serializers.ModelSerializer):
             "building_id",
             "number",
             "rental_value",
+            "rental_value_double",
             "cleaning_fee",
             "max_tenants",
             "is_rented",
@@ -165,7 +168,7 @@ class DependentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Dependent
-        fields = ["id", "tenant", "name", "phone"]
+        fields = ["id", "tenant", "name", "phone", "cpf_cnpj"]
         read_only_fields = ["tenant"]  # tenant is set by parent in nested creation
 
     def validate_phone(self, value: str) -> str:
@@ -284,6 +287,12 @@ class LeaseSerializer(serializers.ModelSerializer):
     tenant_ids = serializers.PrimaryKeyRelatedField(
         queryset=Tenant.objects.all(), many=True, source="tenants", write_only=True
     )
+    rental_value = serializers.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        required=False,
+        help_text="Valor do aluguel acordado. Se omitido, deriva do apartamento.",
+    )
 
     class Meta:
         model = Lease
@@ -296,9 +305,11 @@ class LeaseSerializer(serializers.ModelSerializer):
             "tenants",
             "tenant_ids",
             "number_of_tenants",
+            "resident_dependent_id",
             "start_date",
             "validity_months",
             "tag_fee",
+            "rental_value",
             "deposit_amount",
             "cleaning_fee_paid",
             "tag_deposit_paid",
@@ -310,8 +321,20 @@ class LeaseSerializer(serializers.ModelSerializer):
         ]
 
     def create(self, validated_data: dict[str, Any]) -> Lease:
-        """Create lease with tenant relationships."""
+        """Create lease with tenant relationships.
+
+        If rental_value is not provided, derives it from the apartment based on
+        number_of_tenants: uses apartment.rental_value_double for 2 tenants when
+        available, otherwise falls back to apartment.rental_value.
+        """
         tenants = validated_data.pop("tenants", [])
+        if "rental_value" not in validated_data:
+            apartment: Apartment = validated_data["apartment"]
+            number_of_tenants: int = validated_data.get("number_of_tenants", 1)
+            if number_of_tenants == _DOUBLE_OCCUPANCY and apartment.rental_value_double is not None:
+                validated_data["rental_value"] = apartment.rental_value_double
+            else:
+                validated_data["rental_value"] = apartment.rental_value
         lease = Lease.objects.create(**validated_data)
         if tenants:
             lease.tenants.set(tenants)

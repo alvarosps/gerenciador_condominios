@@ -63,6 +63,7 @@ def lease(apartment, tenant, admin_user):
         start_date=date(2026, 1, 1),
         validity_months=12,
         tag_fee=Decimal("50.00"),
+        rental_value=Decimal("1500.00"),
         created_by=admin_user,
         updated_by=admin_user,
     )
@@ -157,6 +158,7 @@ class TestChangeDueDate:
             start_date=date(2026, 2, 22),
             validity_months=12,
             tag_fee=Decimal("50.00"),
+            rental_value=Decimal("1250.00"),
             created_by=admin_user,
             updated_by=admin_user,
         )
@@ -278,6 +280,7 @@ class TestLeaseSignalIsRented:
             start_date=date(2026, 1, 1),
             validity_months=12,
             tag_fee=Decimal("0.00"),
+            rental_value=Decimal("1500.00"),
             created_by=admin_user,
             updated_by=admin_user,
         )

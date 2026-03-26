@@ -81,6 +81,7 @@ def lease(apartment: Apartment, tenant: Tenant) -> Lease:
         responsible_tenant=tenant,
         start_date=date(2025, 1, 1),
         validity_months=24,
+        rental_value=Decimal("1500.00"),
     )
 
 
@@ -129,7 +130,8 @@ class TestGetMonthlyIncome:
         )
         Lease.objects.create(
             apartment=owned_apt, responsible_tenant=t,
-            start_date=date(2025, 1, 1), validity_months=12
+            start_date=date(2025, 1, 1), validity_months=12,
+            rental_value=Decimal("2000.00"),
         )
         result = CashFlowService.get_monthly_income(2026, 3)
         apt_ids = [d["apartment_id"] for d in result["rent_details"]]
@@ -309,7 +311,8 @@ class TestGetMonthlyExpenses:
         )
         Lease.objects.create(
             apartment=apt, responsible_tenant=t,
-            start_date=date(2025, 1, 1), validity_months=12
+            start_date=date(2025, 1, 1), validity_months=12,
+            rental_value=Decimal("1800.00"),
         )
         result = CashFlowService.get_monthly_expenses(2026, 3)
         assert result["owner_repayments"] >= Decimal("1800.00")

@@ -274,6 +274,14 @@ class Apartment(AuditMixin, SoftDeleteMixin, models.Model):
         max_digits=10, decimal_places=2, default=Decimal("0.00"), help_text="Taxa de limpeza"
     )
     max_tenants = models.PositiveIntegerField(help_text="Número máximo de inquilinos permitidos")
+    rental_value_double = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(Decimal("0.00"))],
+        help_text="Valor do aluguel para 2 pessoas",
+    )
 
     is_rented = models.BooleanField(
         default=False, help_text="Atualizado automaticamente via signal de Lease"
@@ -463,6 +471,12 @@ class Dependent(AuditMixin, SoftDeleteMixin, models.Model):
         help_text="Telefone do dependente",
         validators=[validate_brazilian_phone],
     )
+    cpf_cnpj = models.CharField(
+        max_length=14,
+        blank=True,
+        default="",
+        help_text="CPF ou CNPJ do dependente",
+    )
 
     # Custom manager that excludes soft-deleted objects
     all_objects = models.Manager()  # Access all objects including deleted
@@ -509,9 +523,16 @@ class Lease(AuditMixin, SoftDeleteMixin, models.Model):
         Tenant, related_name="leases", help_text="Inquilinos que residem no apartamento"
     )
     number_of_tenants = models.PositiveIntegerField(
-        help_text="Número de ocupantes (para cálculo de taxa de tag). "
-        "Pode ser maior que o número de inquilinos registrados.",
+        help_text="Número de ocupantes (1 ou 2). Determina tier de preço. Deve ser <= apartment.max_tenants.",
         default=1,
+    )
+    resident_dependent = models.ForeignKey(
+        "Dependent",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="leases_as_resident",
+        help_text="Dependente que reside no apartamento neste contrato",
     )
 
     start_date = models.DateField(
@@ -522,6 +543,12 @@ class Lease(AuditMixin, SoftDeleteMixin, models.Model):
 
     tag_fee = models.DecimalField(
         max_digits=10, decimal_places=2, help_text="Valor da caução da tag", default=0
+    )
+    rental_value = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal("0.00"))],
+        help_text="Valor do aluguel acordado no contrato",
     )
 
     # Campos do contrato (caução/pagamentos)
@@ -585,22 +612,16 @@ class Lease(AuditMixin, SoftDeleteMixin, models.Model):
         Perform model-level validation.
 
         Validates:
-        - Due day is in valid range (1-31)
         - Lease date consistency
-        - Tenant count consistency (if saved)
-
-        Note: This is only called when full_clean() is explicitly invoked,
-        not automatically on save(). This maintains backward compatibility
-        with existing data.
+        - Tenant count (1 or 2, must not exceed apartment.max_tenants)
         """
         super().clean()
 
         # Validate lease dates
         validate_lease_dates(self)
 
-        # Validate tenant count (only if lease is saved)
-        if self.pk:
-            validate_tenant_count(self)
+        # Validate tenant count
+        validate_tenant_count(self)
 
 
 class Landlord(AuditMixin, SoftDeleteMixin, models.Model):

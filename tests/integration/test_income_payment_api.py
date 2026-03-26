@@ -93,6 +93,7 @@ def lease_income_test(apartment_income_test, tenant_income_test, admin_user):
         start_date=date(2026, 1, 1),
         validity_months=12,
         tag_fee=Decimal("50.00"),
+        rental_value=Decimal("1300.00"),
         created_by=admin_user,
         updated_by=admin_user,
     )

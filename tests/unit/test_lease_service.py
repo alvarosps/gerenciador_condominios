@@ -73,6 +73,7 @@ def active_lease(old_apt, tenant):
         start_date="2026-01-01",
         validity_months=12,
         tag_fee=50,
+        rental_value=1000,
         contract_generated=True,
         contract_signed=True,
         interfone_configured=True,
@@ -204,6 +205,7 @@ class TestTransferLease:
             start_date="2026-01-01",
             validity_months=12,
             tag_fee=50,
+            rental_value=1200,
         )
 
         with pytest.raises(ValueError, match="já está alugado"):

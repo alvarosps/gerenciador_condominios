@@ -61,6 +61,7 @@ def lease(apartment: Apartment, tenant: Tenant) -> Lease:
         start_date=date(2025, 1, 1),
         validity_months=12,
         tag_fee=Decimal("50.00"),
+        rental_value=Decimal("1200.00"),
     )
 
 

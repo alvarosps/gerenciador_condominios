@@ -108,6 +108,7 @@ def active_lease(apartment_rented, tenant_individual, admin_user):
         start_date=date(2026, 1, 1),
         validity_months=24,
         tag_fee=Decimal("80.00"),
+        rental_value=Decimal("1500.00"),
         created_by=admin_user,
         updated_by=admin_user,
     )
