@@ -140,6 +140,39 @@ class ApartmentSerializer(serializers.ModelSerializer):
             return None
         return LeaseNestedForApartmentSerializer(lease).data
 
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
+        """Cross-field validation for rental_value_double when max_tenants == 2."""
+        attrs = super().validate(attrs)
+
+        max_tenants = attrs.get(
+            "max_tenants",
+            getattr(self.instance, "max_tenants", None) if self.instance else None,
+        )
+        rental_value_double = attrs.get(
+            "rental_value_double",
+            getattr(self.instance, "rental_value_double", None) if self.instance else None,
+        )
+        rental_value = attrs.get(
+            "rental_value",
+            getattr(self.instance, "rental_value", None) if self.instance else None,
+        )
+
+        if max_tenants == _DOUBLE_OCCUPANCY and rental_value_double is None:
+            raise serializers.ValidationError(
+                {"rental_value_double": "Obrigatório quando max_tenants é 2."}
+            )
+
+        if (
+            rental_value_double is not None
+            and rental_value is not None
+            and rental_value_double < rental_value
+        ):
+            raise serializers.ValidationError(
+                {"rental_value_double": ("rental_value_double deve ser >= rental_value.")}
+            )
+
+        return attrs
+
     def create(self, validated_data: dict[str, Any]) -> Apartment:
         """Create apartment with furniture relationships."""
         furniture_ids = validated_data.pop("furniture_ids", [])
@@ -175,6 +208,15 @@ class DependentSerializer(serializers.ModelSerializer):
         """Validate Brazilian phone number format."""
         if value:
             BrazilianPhoneValidator()(value)
+        return value
+
+    def validate_cpf_cnpj(self, value: str) -> str:
+        """Validate CPF for dependent (individuals only)."""
+        if value:
+            try:
+                CPFValidator()(value)
+            except serializers.ValidationError as e:
+                raise serializers.ValidationError(str(e)) from e
         return value
 
 
@@ -287,6 +329,14 @@ class LeaseSerializer(serializers.ModelSerializer):
     tenant_ids = serializers.PrimaryKeyRelatedField(
         queryset=Tenant.objects.all(), many=True, source="tenants", write_only=True
     )
+    resident_dependent = DependentSerializer(read_only=True)
+    resident_dependent_id = serializers.PrimaryKeyRelatedField(
+        queryset=Dependent.objects.all(),
+        source="resident_dependent",
+        write_only=True,
+        required=False,
+        allow_null=True,
+    )
     rental_value = serializers.DecimalField(
         max_digits=10,
         decimal_places=2,
@@ -305,6 +355,7 @@ class LeaseSerializer(serializers.ModelSerializer):
             "tenants",
             "tenant_ids",
             "number_of_tenants",
+            "resident_dependent",
             "resident_dependent_id",
             "start_date",
             "validity_months",
@@ -319,6 +370,53 @@ class LeaseSerializer(serializers.ModelSerializer):
             "prepaid_until",
             "is_salary_offset",
         ]
+
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
+        """Cross-field validation for number_of_tenants and resident_dependent."""
+        attrs = super().validate(attrs)
+
+        number_of_tenants = attrs.get(
+            "number_of_tenants",
+            getattr(self.instance, "number_of_tenants", 1) if self.instance else 1,
+        )
+
+        if number_of_tenants not in (1, _DOUBLE_OCCUPANCY):
+            raise serializers.ValidationError({"number_of_tenants": "Deve ser 1 ou 2."})
+
+        if number_of_tenants == _DOUBLE_OCCUPANCY:
+            resident_dependent = attrs.get("resident_dependent")
+
+            # For update: if number_of_tenants is not changing, resident_dependent
+            # is already set on the instance — no need to re-supply it.
+            already_set = (
+                self.instance is not None
+                and self.instance.number_of_tenants == _DOUBLE_OCCUPANCY
+                and "number_of_tenants" not in attrs
+            )
+
+            if resident_dependent is None and not already_set:
+                raise serializers.ValidationError(
+                    {"resident_dependent_id": "Obrigatório quando number_of_tenants é 2."}
+                )
+
+            if resident_dependent is not None:
+                responsible_tenant = attrs.get(
+                    "responsible_tenant",
+                    getattr(self.instance, "responsible_tenant", None) if self.instance else None,
+                )
+                if (
+                    responsible_tenant is not None
+                    and resident_dependent.tenant_id != responsible_tenant.id
+                ):
+                    raise serializers.ValidationError(
+                        {
+                            "resident_dependent_id": (
+                                "O dependente deve pertencer ao inquilino responsável."
+                            )
+                        }
+                    )
+
+        return attrs
 
     def create(self, validated_data: dict[str, Any]) -> Lease:
         """Create lease with tenant relationships.
