@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -38,6 +38,8 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
 import { CalendarIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -46,8 +48,13 @@ import { toast } from 'sonner';
 import { useCreateLease, useTransferLease } from '@/lib/api/hooks/use-leases';
 import { useAvailableApartments } from '@/lib/api/hooks/use-apartments';
 import { type Tenant } from '@/lib/schemas/tenant.schema';
+import { type Dependent } from '@/lib/schemas/tenant.schema';
 import { type Lease } from '@/lib/schemas/lease.schema';
 import { formatCPFOrCNPJ, formatCurrency } from '@/lib/utils/formatters';
+import { apiClient } from '@/lib/api/client';
+
+const TAG_FEE_SINGLE = 50;
+const TAG_FEE_DOUBLE = 80;
 
 interface TenantLeaseModalProps {
   mode: 'create' | 'transfer';
@@ -59,7 +66,9 @@ interface TenantLeaseModalProps {
 
 const tenantLeaseFormSchema = z.object({
   apartment_id: z.number().min(1, 'Selecione um apartamento'),
-  tenant_ids: z.array(z.number()).min(1, 'Selecione pelo menos um inquilino'),
+  number_of_tenants: z.number().min(1).max(2),
+  rental_value: z.number().min(0),
+  resident_dependent_id: z.number().optional().nullable(),
   start_date: z.date(),
   validity_months: z
     .number()
@@ -72,6 +81,12 @@ const tenantLeaseFormSchema = z.object({
 });
 
 type TenantLeaseFormValues = z.infer<typeof tenantLeaseFormSchema>;
+
+interface NewDependentForm {
+  name: string;
+  cpf_cnpj: string;
+  phone: string;
+}
 
 export function TenantLeaseModal({
   mode,
@@ -86,14 +101,23 @@ export function TenantLeaseModal({
 
   const isPending = createMutation.isPending || transferMutation.isPending;
 
+  const [newDependentForm, setNewDependentForm] = useState<NewDependentForm>({
+    name: '',
+    cpf_cnpj: '',
+    phone: '',
+  });
+  const [showNewDependentForm, setShowNewDependentForm] = useState(false);
+
   const formMethods = useForm<TenantLeaseFormValues>({
     resolver: zodResolver(tenantLeaseFormSchema),
     defaultValues: {
       apartment_id: undefined,
-      tenant_ids: tenant.id !== undefined ? [tenant.id] : [],
+      number_of_tenants: 1,
+      rental_value: 0,
+      resident_dependent_id: null,
       start_date: undefined,
       validity_months: 12,
-      tag_fee: 50,
+      tag_fee: TAG_FEE_SINGLE,
       deposit_amount: null,
       cleaning_fee_paid: false,
       tag_deposit_paid: false,
@@ -106,7 +130,9 @@ export function TenantLeaseModal({
     if (mode === 'transfer' && currentLease) {
       formMethods.reset({
         apartment_id: undefined,
-        tenant_ids: tenant.id !== undefined ? [tenant.id] : [],
+        number_of_tenants: currentLease.number_of_tenants ?? 1,
+        rental_value: currentLease.rental_value ?? 0,
+        resident_dependent_id: currentLease.resident_dependent_id ?? null,
         start_date: new Date(currentLease.start_date),
         validity_months: currentLease.validity_months,
         tag_fee: currentLease.tag_fee,
@@ -117,19 +143,99 @@ export function TenantLeaseModal({
     } else {
       formMethods.reset({
         apartment_id: undefined,
-        tenant_ids: tenant.id !== undefined ? [tenant.id] : [],
+        number_of_tenants: 1,
+        rental_value: 0,
+        resident_dependent_id: null,
         start_date: new Date(),
         validity_months: 12,
-        tag_fee: 50,
+        tag_fee: TAG_FEE_SINGLE,
         deposit_amount: null,
         cleaning_fee_paid: false,
         tag_deposit_paid: false,
       });
     }
+    setShowNewDependentForm(false);
+    setNewDependentForm({ name: '', cpf_cnpj: '', phone: '' });
   }, [open, mode, currentLease, tenant, formMethods]);
 
   const selectedApartmentId = formMethods.watch('apartment_id');
   const selectedApartment = apartments?.find((apt) => apt.id === selectedApartmentId);
+  const numberOfTenants = formMethods.watch('number_of_tenants');
+
+  // Auto-derive rental_value and tag_fee when apartment changes
+  useEffect(() => {
+    if (!selectedApartment) return;
+    formMethods.setValue('number_of_tenants', 1);
+    formMethods.setValue('rental_value', selectedApartment.rental_value);
+    formMethods.setValue('tag_fee', TAG_FEE_SINGLE);
+    formMethods.setValue('resident_dependent_id', null);
+    setShowNewDependentForm(false);
+    setNewDependentForm({ name: '', cpf_cnpj: '', phone: '' });
+  }, [selectedApartmentId, formMethods, selectedApartment]);
+
+  const handleNumberOfTenantsChange = (value: number) => {
+    formMethods.setValue('number_of_tenants', value);
+    formMethods.setValue('resident_dependent_id', null);
+    setShowNewDependentForm(false);
+    setNewDependentForm({ name: '', cpf_cnpj: '', phone: '' });
+
+    if (selectedApartment) {
+      if (value === 2) {
+        formMethods.setValue(
+          'rental_value',
+          selectedApartment.rental_value_double ?? selectedApartment.rental_value
+        );
+        formMethods.setValue('tag_fee', TAG_FEE_DOUBLE);
+      } else {
+        formMethods.setValue('rental_value', selectedApartment.rental_value);
+        formMethods.setValue('tag_fee', TAG_FEE_SINGLE);
+      }
+    }
+  };
+
+  const handleDependentSelection = (value: string) => {
+    if (value === 'new') {
+      setShowNewDependentForm(true);
+      formMethods.setValue('resident_dependent_id', null);
+    } else {
+      setShowNewDependentForm(false);
+      formMethods.setValue('resident_dependent_id', Number(value));
+    }
+  };
+
+  const createDependentAndGetId = async (tenantId: number): Promise<number> => {
+    const existingDependents: Dependent[] = tenant.dependents ?? [];
+
+    const updatedDependents = [
+      ...existingDependents.map(d => ({
+        id: d.id,
+        name: d.name,
+        phone: d.phone,
+        cpf_cnpj: d.cpf_cnpj ?? '',
+      })),
+      {
+        name: newDependentForm.name,
+        phone: newDependentForm.phone,
+        cpf_cnpj: newDependentForm.cpf_cnpj,
+      },
+    ];
+
+    const response = await apiClient.patch<{ id: number; dependents: Dependent[] }>(
+      `/tenants/${String(tenantId)}/`,
+      { dependents: updatedDependents }
+    );
+
+    const createdDependents = response.data.dependents;
+    const newDependent = createdDependents.find(
+      d => d.name === newDependentForm.name && d.cpf_cnpj === newDependentForm.cpf_cnpj
+    );
+
+    if (!newDependent?.id) {
+      throw new Error('Falha ao criar dependente');
+    }
+
+    return newDependent.id;
+  };
 
   const handleSubmit = async (values: TenantLeaseFormValues) => {
     const tenantId = tenant.id;
@@ -139,10 +245,23 @@ export function TenantLeaseModal({
     }
 
     try {
+      let residentDependentId = values.resident_dependent_id ?? null;
+
+      if (values.number_of_tenants === 2 && showNewDependentForm) {
+        if (!newDependentForm.name || !newDependentForm.phone) {
+          toast.error('Preencha nome e telefone do dependente');
+          return;
+        }
+        residentDependentId = await createDependentAndGetId(tenantId);
+      }
+
       const payload = {
         apartment_id: values.apartment_id,
         responsible_tenant_id: tenantId,
-        tenant_ids: values.tenant_ids,
+        tenant_ids: [tenantId],
+        number_of_tenants: values.number_of_tenants,
+        rental_value: values.rental_value,
+        resident_dependent_id: values.number_of_tenants === 2 ? residentDependentId : null,
         start_date: format(values.start_date, 'yyyy-MM-dd'),
         validity_months: values.validity_months,
         tag_fee: values.tag_fee,
@@ -169,12 +288,16 @@ export function TenantLeaseModal({
   const handleClose = () => {
     onClose();
     formMethods.reset();
+    setShowNewDependentForm(false);
+    setNewDependentForm({ name: '', cpf_cnpj: '', phone: '' });
   };
 
   const dialogTitle =
     mode === 'transfer'
       ? `Trocar de Kitnet — ${tenant.name}`
       : `Criar Contrato — ${tenant.name}`;
+
+  const dependents = tenant.dependents ?? [];
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -230,6 +353,109 @@ export function TenantLeaseModal({
                 </FormItem>
               )}
             />
+
+            {/* Number of Tenants — only for apartments that support 2 */}
+            {selectedApartment?.max_tenants === 2 && (
+              <FormField
+                control={formMethods.control}
+                name="number_of_tenants"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Quantas pessoas?</FormLabel>
+                    <FormControl>
+                      <RadioGroup
+                        value={String(field.value)}
+                        onValueChange={(value) => handleNumberOfTenantsChange(Number(value))}
+                        className="flex gap-6"
+                      >
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="1" id="t-tenants-1" />
+                          <Label htmlFor="t-tenants-1">1 pessoa</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="2" id="t-tenants-2" />
+                          <Label htmlFor="t-tenants-2">2 pessoas</Label>
+                        </div>
+                      </RadioGroup>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+
+            {/* Dependent selection — only when 2 tenants selected */}
+            {numberOfTenants === 2 && selectedApartment?.max_tenants === 2 && (
+              <div className="space-y-3 rounded-md border p-4">
+                <div className="text-sm font-medium">Segundo morador</div>
+
+                {dependents.length > 0 && (
+                  <RadioGroup
+                    value={showNewDependentForm ? 'new' : String(formMethods.watch('resident_dependent_id') ?? '')}
+                    onValueChange={handleDependentSelection}
+                    className="space-y-2"
+                  >
+                    {dependents.map((dep) => (
+                      <div key={dep.id} className="flex items-center space-x-2">
+                        <RadioGroupItem value={String(dep.id)} id={`t-dep-${String(dep.id)}`} />
+                        <Label htmlFor={`t-dep-${String(dep.id)}`}>
+                          {dep.name}
+                          {dep.cpf_cnpj ? ` — ${dep.cpf_cnpj}` : ''}
+                          {dep.phone ? ` — ${dep.phone}` : ''}
+                        </Label>
+                      </div>
+                    ))}
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="new" id="t-dep-new" />
+                      <Label htmlFor="t-dep-new">Cadastrar novo dependente</Label>
+                    </div>
+                  </RadioGroup>
+                )}
+
+                {(dependents.length === 0 || showNewDependentForm) && (
+                  <div className="space-y-3 pt-2">
+                    {dependents.length > 0 && (
+                      <div className="text-sm text-muted-foreground">Novo dependente:</div>
+                    )}
+                    <div className="grid grid-cols-1 gap-3">
+                      <div>
+                        <Label htmlFor="t-dep-name-new">Nome</Label>
+                        <Input
+                          id="t-dep-name-new"
+                          placeholder="Nome completo"
+                          value={newDependentForm.name}
+                          onChange={(e) =>
+                            setNewDependentForm((prev) => ({ ...prev, name: e.target.value }))
+                          }
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="t-dep-cpf-new">CPF</Label>
+                        <Input
+                          id="t-dep-cpf-new"
+                          placeholder="000.000.000-00"
+                          value={newDependentForm.cpf_cnpj}
+                          onChange={(e) =>
+                            setNewDependentForm((prev) => ({ ...prev, cpf_cnpj: e.target.value }))
+                          }
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="t-dep-phone-new">Telefone</Label>
+                        <Input
+                          id="t-dep-phone-new"
+                          placeholder="(00) 00000-0000"
+                          value={newDependentForm.phone}
+                          onChange={(e) =>
+                            setNewDependentForm((prev) => ({ ...prev, phone: e.target.value }))
+                          }
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             <Separator />
             <div className="text-sm font-medium">Período e Valores</div>
@@ -318,7 +544,37 @@ export function TenantLeaseModal({
                       />
                     </div>
                   </FormControl>
-                  <FormDescription>R$ 50,00 para 1 inquilino, R$ 80,00 para 2+ inquilinos</FormDescription>
+                  <FormDescription>R$ 50,00 para 1 pessoa, R$ 80,00 para 2 pessoas</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={formMethods.control}
+              name="rental_value"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Valor do Aluguel</FormLabel>
+                  <FormControl>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-sm text-muted-foreground">
+                        R$
+                      </span>
+                      <Input
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        placeholder="0.00"
+                        className="pl-10"
+                        {...field}
+                        onChange={(e) => field.onChange(Number(e.target.value))}
+                      />
+                    </div>
+                  </FormControl>
+                  <FormDescription>
+                    Preenchido automaticamente com base no número de moradores. Pode ser editado manualmente.
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -400,7 +656,17 @@ export function TenantLeaseModal({
                     <div className="font-medium mb-2">Resumo do Apartamento Selecionado:</div>
                     <div>• Prédio: {selectedApartment.building?.name}</div>
                     <div>• Apartamento: {selectedApartment.number}</div>
-                    <div>• Aluguel: {formatCurrency(selectedApartment.rental_value)}</div>
+                    {selectedApartment.max_tenants === 2 ? (
+                      <>
+                        <div>• Aluguel (1 pessoa): {formatCurrency(selectedApartment.rental_value)}</div>
+                        <div>• Aluguel (2 pessoas): {formatCurrency(selectedApartment.rental_value_double ?? selectedApartment.rental_value)}</div>
+                        <div className="font-medium text-primary">
+                          • Valor selecionado: {formatCurrency(formMethods.watch('rental_value'))}
+                        </div>
+                      </>
+                    ) : (
+                      <div>• Aluguel: {formatCurrency(selectedApartment.rental_value)}</div>
+                    )}
                     <div>• Limpeza: {formatCurrency(selectedApartment.cleaning_fee)}</div>
                     <div>• Máx. Inquilinos: {selectedApartment.max_tenants}</div>
                   </div>
