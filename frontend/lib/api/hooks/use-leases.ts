@@ -54,7 +54,7 @@ export function useCreateLease() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: Omit<Lease, 'id' | 'apartment' | 'responsible_tenant' | 'tenants' | 'final_date'>) => {
+    mutationFn: async (data: Omit<Lease, 'id' | 'apartment' | 'responsible_tenant' | 'tenants' | 'final_date' | 'rental_value' | 'resident_dependent'>) => {
       const response = await apiClient.post<Lease>('/leases/', data);
       return response.data;
     },

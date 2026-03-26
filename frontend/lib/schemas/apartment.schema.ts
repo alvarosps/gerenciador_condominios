@@ -9,6 +9,12 @@ export const apartmentSchema = z.object({
   building: buildingSchema.optional(),
   number: z.number().positive('Número deve ser positivo'),
   rental_value: z.string().or(z.number()).transform((val) => Number(val)),
+  rental_value_double: z
+    .string()
+    .or(z.number())
+    .nullable()
+    .optional()
+    .transform((val) => (val !== null && val !== undefined ? Number(val) : null)),
   cleaning_fee: z
     .string()
     .or(z.number())
