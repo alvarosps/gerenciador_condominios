@@ -15,6 +15,8 @@ import {
   Calendar,
   FilePlus,
   XCircle,
+  TrendingUp,
+  History,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { type Column } from '@/components/tables/data-table';
@@ -29,6 +31,8 @@ export interface LeaseActionHandlers {
   onCalculateLateFee: (lease: Lease) => void;
   onChangeDueDate: (lease: Lease) => void;
   onTerminate: (lease: Lease) => void;
+  onAdjustRent: (lease: Lease) => void;
+  onViewAdjustmentHistory: (lease: Lease) => void;
   isDeleting: boolean;
 }
 
@@ -296,6 +300,32 @@ export function createLeaseColumns(handlers: LeaseActionHandlers): Column<Lease>
                 </Button>
               </TooltipTrigger>
               <TooltipContent>Mudar Vencimento</TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => handlers.onAdjustRent(record)}
+                >
+                  <TrendingUp className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Reajustar Aluguel</TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => handlers.onViewAdjustmentHistory(record)}
+                >
+                  <History className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Histórico de Reajustes</TooltipContent>
             </Tooltip>
 
             <Tooltip>
