@@ -4,6 +4,7 @@ import { FinancialSummaryWidget } from './_components/financial-summary-widget';
 import { LeaseMetricsWidget } from './_components/lease-metrics-widget';
 import { BuildingStatisticsChart } from './_components/building-statistics-chart';
 import { LatePaymentsAlert } from './_components/late-payments-alert';
+import { RentAdjustmentAlerts } from './_components/rent-adjustment-alerts';
 import { TenantStatisticsWidget } from './_components/tenant-statistics-widget';
 
 export default function DashboardPage() {
@@ -22,6 +23,9 @@ export default function DashboardPage() {
 
         {/* Late Payments Alert */}
         <LatePaymentsAlert />
+
+        {/* Rent Adjustment Alerts */}
+        <RentAdjustmentAlerts />
 
         {/* Metrics Row */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
