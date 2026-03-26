@@ -86,6 +86,16 @@ const DueDateModal = dynamic(
   { loading: () => <ModalLoader />, ssr: false }
 );
 
+const RentAdjustmentModal = dynamic(
+  () => import('./_components/rent-adjustment-modal').then((mod) => mod.RentAdjustmentModal),
+  { loading: () => <ModalLoader />, ssr: false }
+);
+
+const RentAdjustmentHistorySheet = dynamic(
+  () => import('./_components/rent-adjustment-history-sheet').then((mod) => mod.RentAdjustmentHistorySheet),
+  { loading: () => <ModalLoader />, ssr: false }
+);
+
 type StatusFilter = 'all' | 'active' | 'expired' | 'expiring';
 
 interface BuildingLeaseFilters {
@@ -100,6 +110,8 @@ export default function LeasesPage() {
   const [isDueDateModalOpen, setIsDueDateModalOpen] = useState(false);
   const [isTerminateModalOpen, setIsTerminateModalOpen] = useState(false);
   const [actionLease, setActionLease] = useState<Lease | null>(null);
+  const [adjustRentLease, setAdjustRentLease] = useState<Lease | null>(null);
+  const [historyLeaseId, setHistoryLeaseId] = useState<number | null>(null);
 
   // Per-building filter state
   const [filtersByBuilding, setFiltersByBuilding] = useState<Record<number, BuildingLeaseFilters>>({});
@@ -187,6 +199,14 @@ export default function LeasesPage() {
     setIsTerminateModalOpen(true);
   }, []);
 
+  const handleAdjustRent = useCallback((lease: Lease) => {
+    setAdjustRentLease(lease);
+  }, []);
+
+  const handleViewAdjustmentHistory = useCallback((lease: Lease) => {
+    setHistoryLeaseId(lease.id ?? null);
+  }, []);
+
   const handleActionModalClose = useCallback(() => {
     setIsContractModalOpen(false);
     setIsLateFeeModalOpen(false);
@@ -221,6 +241,8 @@ export default function LeasesPage() {
         onCalculateLateFee: handleCalculateLateFee,
         onChangeDueDate: handleChangeDueDate,
         onTerminate: handleTerminate,
+        onAdjustRent: handleAdjustRent,
+        onViewAdjustmentHistory: handleViewAdjustmentHistory,
         isDeleting: crud.isDeleting,
       }),
     [
@@ -231,6 +253,8 @@ export default function LeasesPage() {
       handleCalculateLateFee,
       handleChangeDueDate,
       handleTerminate,
+      handleAdjustRent,
+      handleViewAdjustmentHistory,
     ]
   );
 
@@ -475,6 +499,18 @@ export default function LeasesPage() {
         onConfirm={crud.handleBulkDelete}
         isDeleting={crud.isBulkDeleting}
         selectionCount={crud.bulkOps.selectionCount}
+      />
+
+      <RentAdjustmentModal
+        open={adjustRentLease !== null}
+        lease={adjustRentLease}
+        onClose={() => setAdjustRentLease(null)}
+      />
+
+      <RentAdjustmentHistorySheet
+        open={historyLeaseId !== null}
+        leaseId={historyLeaseId}
+        onClose={() => setHistoryLeaseId(null)}
       />
     </div>
   );
