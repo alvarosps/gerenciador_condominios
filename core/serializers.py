@@ -26,6 +26,7 @@ from .models import (
     Person,
     PersonIncome,
     PersonPayment,
+    RentAdjustment,
     RentPayment,
     Tenant,
 )
@@ -551,6 +552,35 @@ class ContractRuleReorderSerializer(serializers.Serializer):
     rule_ids = serializers.ListField(
         child=serializers.IntegerField(), help_text="Lista ordenada de IDs das regras"
     )
+
+
+class RentAdjustmentSerializer(serializers.ModelSerializer):
+    """Read-only serializer for rent adjustment history."""
+
+    lease_summary = serializers.SerializerMethodField()
+
+    class Meta:
+        model = RentAdjustment
+        fields = [
+            "id",
+            "lease",
+            "lease_summary",
+            "adjustment_date",
+            "percentage",
+            "previous_value",
+            "new_value",
+            "apartment_updated",
+            "created_at",
+            "created_by",
+        ]
+        read_only_fields = fields
+
+    def get_lease_summary(self, obj: RentAdjustment) -> dict[str, Any]:
+        return {
+            "apartment_number": obj.lease.apartment.number,
+            "building_name": obj.lease.apartment.building.name,
+            "tenant_name": obj.lease.responsible_tenant.name,
+        }
 
 
 # =============================================================================
