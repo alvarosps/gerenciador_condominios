@@ -428,8 +428,7 @@ class FinancialDashboardService:
         if (
             person.initial_balance > Decimal("0.00")
             and person.initial_balance_date
-            and (person.initial_balance_date.year, person.initial_balance_date.month)
-            not in months
+            and (person.initial_balance_date.year, person.initial_balance_date.month) not in months
         ):
             ib_y, ib_m = person.initial_balance_date.year, person.initial_balance_date.month
             if date(ib_y, ib_m, 1) < date(current_year, current_month, 1):
@@ -659,11 +658,11 @@ class FinancialDashboardService:
         salary_offset_apartments: list[dict[str, Any]] = []
 
         for apt in rented_apartments:
-            lease = apt.leases.first()
+            lease = apt.leases.filter(is_deleted=False).first()
             if lease is None:
                 continue
 
-            rental_value = apt.rental_value
+            rental_value = lease.rental_value
 
             # Salary offset apartments: rent is compensation, not real income
             if lease.is_salary_offset:
@@ -900,12 +899,12 @@ class FinancialDashboardService:
             is_salary_offset=True,
         ).select_related("apartment", "apartment__building", "responsible_tenant")
         for lease in salary_offset_leases:
-            employee_total += lease.apartment.rental_value
+            employee_total += lease.rental_value
             apt_label = f"{lease.apartment.number}/{lease.apartment.building.street_number}"
             employee_details.append(
                 {
                     "description": f"{lease.responsible_tenant.name} — Aluguel Apto {apt_label}",
-                    "amount": lease.apartment.rental_value,
+                    "amount": lease.rental_value,
                 }
             )
 
@@ -1790,14 +1789,14 @@ class FinancialDashboardService:
             apartment__is_rented=True,
             is_salary_offset=True,
         ).select_related("apartment", "apartment__building", "responsible_tenant"):
-            employee_total += lease.apartment.rental_value
+            employee_total += lease.rental_value
             apt_label = f"{lease.apartment.number}/{lease.apartment.building.street_number}"
             employee_details.append(
                 {
                     "expense_id": None,
                     "installment_id": None,
                     "description": f"{lease.responsible_tenant.name} — Aluguel Apto {apt_label}",
-                    "amount": lease.apartment.rental_value,
+                    "amount": lease.rental_value,
                     "notes": "Compensação salarial (aluguel não gera receita)",
                     "category_name": None,
                     "category_color": None,

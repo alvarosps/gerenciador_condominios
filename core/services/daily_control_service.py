@@ -245,7 +245,7 @@ def _collect_entries_by_day(
         entry = {
             "type": "rent",
             "description": f"Aluguel Apto {lease.apartment.number}/{lease.apartment.building.street_number}",
-            "amount": float(lease.apartment.rental_value),
+            "amount": float(lease.rental_value),
             "expected": True,
             "paid": payment is not None,
         }
@@ -436,7 +436,7 @@ def _get_expected_rent_total(year: int, month: int, month_start: date) -> Decima
     )
     total = Decimal("0.00")
     for lease in leases:
-        total += lease.apartment.rental_value
+        total += lease.rental_value
     return total
 
 
