@@ -1,6 +1,7 @@
 # core/views.py
 import logging
 from datetime import date, timedelta
+from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from dateutil.relativedelta import relativedelta
@@ -25,10 +26,12 @@ from .serializers import (
     BuildingSerializer,
     FurnitureSerializer,
     LeaseSerializer,
+    RentAdjustmentSerializer,
     TenantSerializer,
 )
 from .services import ContractService, DashboardService, FeeCalculatorService
 from .services.lease_service import terminate_lease, transfer_lease
+from .services.rent_adjustment_service import RentAdjustmentService
 
 logger = logging.getLogger(__name__)
 
@@ -312,6 +315,7 @@ class LeaseViewSet(viewsets.ModelViewSet):
                 "tenants__dependents",  # Reverse FK: Tenant -> Dependents
                 "tenants__furnitures",  # ManyToMany: Tenant -> Furnitures (tenant's own)
                 "apartment__furnitures",  # ManyToMany: Apartment -> Furnitures (apartment's)
+                "rent_adjustments",  # Reverse FK: Lease -> RentAdjustments
             )
 
         if self.action == "list":
@@ -499,6 +503,65 @@ class LeaseViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(new_lease)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
+    @action(detail=True, methods=["post"], permission_classes=[IsAdminUser])
+    def adjust_rent(self, request: Request, pk: int | None = None) -> Response:
+        """
+        Apply a rent adjustment to a lease.
+
+        POST /api/leases/{id}/adjust_rent/
+
+        Body:
+            percentage (required): Adjustment percentage (e.g. 5.23 or -0.64)
+            update_apartment_prices (optional, default False): Whether to also update
+                the apartment's rental_value and rental_value_double.
+
+        Returns the created RentAdjustment record plus an optional warning if a
+        prior adjustment was made within the last 10 months.
+        """
+        lease = self.get_object()
+        percentage = request.data.get("percentage")
+        update_apartment_prices = request.data.get("update_apartment_prices", False)
+
+        if percentage is None:
+            return Response(
+                {"error": "Campo percentage é obrigatório."}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            percentage = Decimal(str(percentage))
+        except (InvalidOperation, ValueError):
+            return Response({"error": "Percentual inválido."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            adjustment, warning = RentAdjustmentService.apply_adjustment(
+                lease=lease,
+                percentage=percentage,
+                update_apartment_prices=bool(update_apartment_prices),
+            )
+        except ValidationError as e:
+            error: Any = e.message_dict if hasattr(e, "message_dict") else str(e)
+            return Response({"error": error}, status=status.HTTP_400_BAD_REQUEST)
+
+        data = dict(RentAdjustmentSerializer(adjustment).data)
+        data["warning"] = warning
+        return Response(data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=["get"])
+    def rent_adjustments(self, request: Request, pk: int | None = None) -> Response:
+        """
+        List rent adjustment history for a lease.
+
+        GET /api/leases/{id}/rent_adjustments/
+        """
+        lease = self.get_object()
+        adjustments = lease.rent_adjustments.select_related(
+            "lease__apartment",
+            "lease__apartment__building",
+            "lease__responsible_tenant",
+        ).all()
+        serializer = RentAdjustmentSerializer(adjustments, many=True)
+        return Response(serializer.data)
+
 
 class DashboardViewSet(viewsets.ViewSet):
     """
@@ -643,3 +706,16 @@ class DashboardViewSet(viewsets.ViewSet):
         """
         statistics = DashboardService.get_tenant_statistics()
         return Response(statistics, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["get"])
+    def rent_adjustment_alerts(self, request: Request) -> Response:
+        """
+        Get leases that are eligible or nearly eligible for a rent adjustment.
+
+        GET /api/dashboard/rent_adjustment_alerts/
+
+        Returns leases whose 12-month adjustment window falls within the next
+        2 months or is already overdue.
+        """
+        alerts = RentAdjustmentService.get_eligible_leases()
+        return Response({"alerts": alerts}, status=status.HTTP_200_OK)
