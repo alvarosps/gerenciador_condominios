@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import {
@@ -48,8 +48,9 @@ const apartmentFormSchema = z.object({
   building_id: z.number().min(1, 'Selecione um prédio'),
   number: z.number().min(1, 'Número deve ser positivo'),
   rental_value: z.number().min(0, 'Valor não pode ser negativo'),
+  rental_value_double: z.number().min(0, 'Valor não pode ser negativo').optional().nullable(),
   cleaning_fee: z.number().min(0, 'Valor não pode ser negativo'),
-  max_tenants: z.number().min(1, 'Deve ter pelo menos 1 inquilino').max(10, 'Máximo 10 inquilinos'),
+  max_tenants: z.number().min(1, 'Deve ter pelo menos 1 inquilino').max(2, 'Máximo 2 inquilinos'),
   furniture_ids: z.array(z.number()).optional(),
   last_rent_increase_date: z.string().optional(),
 });
@@ -68,6 +69,7 @@ export function ApartmentFormModal({ open, apartment, onClose }: Props) {
       building_id: undefined,
       number: undefined,
       rental_value: undefined,
+      rental_value_double: null,
       cleaning_fee: undefined,
       max_tenants: undefined,
       furniture_ids: [],
@@ -75,12 +77,21 @@ export function ApartmentFormModal({ open, apartment, onClose }: Props) {
     },
   });
 
+  const maxTenants = useWatch({ control: formMethods.control, name: 'max_tenants' });
+
+  useEffect(() => {
+    if (maxTenants === 1) {
+      formMethods.setValue('rental_value_double', null);
+    }
+  }, [maxTenants, formMethods]);
+
   useEffect(() => {
     if (apartment) {
       formMethods.reset({
         building_id: apartment.building?.id,
         number: apartment.number,
         rental_value: apartment.rental_value,
+        rental_value_double: apartment.rental_value_double ?? null,
         cleaning_fee: apartment.cleaning_fee,
         max_tenants: apartment.max_tenants,
         furniture_ids: apartment.furnitures?.map((f) => f.id).filter((id): id is number => id !== undefined) ?? [],
@@ -100,7 +111,10 @@ export function ApartmentFormModal({ open, apartment, onClose }: Props) {
         });
         toast.success('Apartamento atualizado com sucesso');
       } else {
-        await createMutation.mutateAsync({ ...values, rental_value_double: null });
+        await createMutation.mutateAsync({
+          ...values,
+          rental_value_double: values.rental_value_double ?? null,
+        });
         toast.success('Apartamento criado com sucesso');
       }
 
@@ -207,6 +221,31 @@ export function ApartmentFormModal({ open, apartment, onClose }: Props) {
               )}
             />
 
+            {/* Rental Value Double */}
+            {maxTenants === 2 && (
+              <FormField
+                control={formMethods.control}
+                name="rental_value_double"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Valor do Aluguel (2 pessoas)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="0.00"
+                        {...field}
+                        value={field.value ?? ''}
+                        onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
+                      />
+                    </FormControl>
+                    <FormDescription>Valor para 2 pessoas. Obrigatório quando máximo de inquilinos é 2.</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+
             {/* Cleaning Fee */}
             <FormField
               control={formMethods.control}
@@ -236,15 +275,20 @@ export function ApartmentFormModal({ open, apartment, onClose }: Props) {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Máximo de Inquilinos *</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      placeholder="Ex: 2"
-                      {...field}
-                      value={field.value || ''}
-                      onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
-                    />
-                  </FormControl>
+                  <Select
+                    onValueChange={(value) => field.onChange(Number(value))}
+                    value={field.value ? String(field.value) : undefined}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="1">1</SelectItem>
+                      <SelectItem value="2">2</SelectItem>
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}
