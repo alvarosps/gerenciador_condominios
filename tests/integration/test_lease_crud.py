@@ -6,7 +6,7 @@ from decimal import Decimal
 import pytest
 from rest_framework import status
 
-from core.models import Apartment, Building, Lease, Tenant
+from core.models import Apartment, Building, Dependent, Lease, Tenant
 
 
 @pytest.fixture
@@ -39,8 +39,20 @@ def apartment2(building, admin_user):
         building=building,
         number=102,
         rental_value=Decimal("1800.00"),
+        rental_value_double=Decimal("1950.00"),
         cleaning_fee=Decimal("250.00"),
         max_tenants=2,
+        created_by=admin_user,
+        updated_by=admin_user,
+    )
+
+
+@pytest.fixture
+def dependent2(tenant2, admin_user):
+    return Dependent.objects.create(
+        tenant=tenant2,
+        name="Filho de Maria",
+        phone="11988887777",
         created_by=admin_user,
         updated_by=admin_user,
     )
@@ -90,6 +102,17 @@ def tenant3(admin_user):
 
 
 @pytest.fixture
+def dependent(tenant, admin_user):
+    return Dependent.objects.create(
+        tenant=tenant,
+        name="Filho de Carlos",
+        phone="11977776666",
+        created_by=admin_user,
+        updated_by=admin_user,
+    )
+
+
+@pytest.fixture
 def lease(apartment, tenant, admin_user):
     return Lease.objects.create(
         apartment=apartment,
@@ -107,9 +130,7 @@ def lease(apartment, tenant, admin_user):
 class TestLeaseCreate:
     url = "/api/leases/"
 
-    def test_create_lease_with_single_tenant(
-        self, authenticated_api_client, apartment2, tenant2
-    ):
+    def test_create_lease_with_single_tenant(self, authenticated_api_client, apartment2, tenant2):
         payload = {
             "apartment_id": apartment2.id,
             "responsible_tenant_id": tenant2.id,
@@ -125,12 +146,13 @@ class TestLeaseCreate:
         assert len(response.data["tenants"]) == 1
 
     def test_create_lease_with_multiple_tenants(
-        self, authenticated_api_client, apartment2, tenant2, tenant3
+        self, authenticated_api_client, apartment2, tenant2, tenant3, dependent2
     ):
         payload = {
             "apartment_id": apartment2.id,
             "responsible_tenant_id": tenant2.id,
             "tenant_ids": [tenant2.id, tenant3.id],
+            "resident_dependent_id": dependent2.id,
             "start_date": "2026-06-01",
             "validity_months": 12,
             "tag_fee": "80.00",
@@ -140,9 +162,7 @@ class TestLeaseCreate:
         assert response.status_code == status.HTTP_201_CREATED
         assert len(response.data["tenants"]) == 2
 
-    def test_create_lease_invalid_apartment_id(
-        self, authenticated_api_client, tenant
-    ):
+    def test_create_lease_invalid_apartment_id(self, authenticated_api_client, tenant):
         payload = {
             "apartment_id": 999999,
             "responsible_tenant_id": tenant.id,
@@ -154,9 +174,7 @@ class TestLeaseCreate:
         response = authenticated_api_client.post(self.url, payload, format="json")
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
-    def test_create_lease_invalid_tenant_id(
-        self, authenticated_api_client, apartment2
-    ):
+    def test_create_lease_invalid_tenant_id(self, authenticated_api_client, apartment2):
         payload = {
             "apartment_id": apartment2.id,
             "responsible_tenant_id": 999999,
@@ -176,20 +194,19 @@ class TestLeaseCreate:
 @pytest.mark.integration
 class TestLeaseUpdate:
     def test_full_update_lease(
-        self, authenticated_api_client, lease, apartment, tenant, tenant2
+        self, authenticated_api_client, lease, apartment, tenant, tenant2, dependent
     ):
         payload = {
             "apartment_id": apartment.id,
             "responsible_tenant_id": tenant.id,
             "tenant_ids": [tenant.id, tenant2.id],
+            "resident_dependent_id": dependent.id,
             "start_date": "2026-02-01",
             "validity_months": 24,
             "tag_fee": "80.00",
             "number_of_tenants": 2,
         }
-        response = authenticated_api_client.put(
-            f"/api/leases/{lease.id}/", payload, format="json"
-        )
+        response = authenticated_api_client.put(f"/api/leases/{lease.id}/", payload, format="json")
         assert response.status_code == status.HTTP_200_OK
         assert response.data["validity_months"] == 24
         assert len(response.data["tenants"]) == 2
@@ -218,9 +235,7 @@ class TestLeaseUpdate:
             "validity_months": lease.validity_months,
             "tag_fee": str(lease.tag_fee),
         }
-        response = authenticated_api_client.put(
-            f"/api/leases/{lease.id}/", payload, format="json"
-        )
+        response = authenticated_api_client.put(f"/api/leases/{lease.id}/", payload, format="json")
         assert response.status_code == status.HTTP_200_OK
         tenant_ids = [t["id"] for t in response.data["tenants"]]
         assert tenant.id in tenant_ids
@@ -241,18 +256,14 @@ class TestLeaseDelete:
         apartment.refresh_from_db()
         assert apartment.is_rented is False
 
-    def test_deleted_lease_excluded_from_list(
-        self, authenticated_api_client, lease
-    ):
+    def test_deleted_lease_excluded_from_list(self, authenticated_api_client, lease):
         authenticated_api_client.delete(f"/api/leases/{lease.id}/")
         response = authenticated_api_client.get("/api/leases/")
         assert response.status_code == status.HTTP_200_OK
         ids = [item["id"] for item in response.data["results"]]
         assert lease.id not in ids
 
-    def test_delete_lease_regular_user_forbidden(
-        self, regular_authenticated_api_client, lease
-    ):
+    def test_delete_lease_regular_user_forbidden(self, regular_authenticated_api_client, lease):
         response = regular_authenticated_api_client.delete(f"/api/leases/{lease.id}/")
         assert response.status_code == status.HTTP_403_FORBIDDEN
         # Lease should still exist

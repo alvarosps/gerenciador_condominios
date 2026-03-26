@@ -383,6 +383,20 @@ class LeaseSerializer(serializers.ModelSerializer):
         if number_of_tenants not in (1, _DOUBLE_OCCUPANCY):
             raise serializers.ValidationError({"number_of_tenants": "Deve ser 1 ou 2."})
 
+        apartment = attrs.get(
+            "apartment",
+            getattr(self.instance, "apartment", None) if self.instance else None,
+        )
+        if apartment is not None and number_of_tenants > apartment.max_tenants:
+            raise serializers.ValidationError(
+                {
+                    "number_of_tenants": (
+                        f"Número de ocupantes ({number_of_tenants}) excede o máximo "
+                        f"permitido pelo apartamento ({apartment.max_tenants})."
+                    )
+                }
+            )
+
         if number_of_tenants == _DOUBLE_OCCUPANCY:
             resident_dependent = attrs.get("resident_dependent")
 
