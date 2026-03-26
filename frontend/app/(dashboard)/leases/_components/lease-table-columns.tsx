@@ -201,8 +201,8 @@ export function createLeaseColumns(handlers: LeaseActionHandlers): Column<Lease>
       title: 'Valor',
       key: 'rental_value',
       width: 120,
-      render: (_, record: Lease) => formatCurrency(record.apartment?.rental_value ?? 0),
-      sorter: (a: Lease, b: Lease) => (a.apartment?.rental_value ?? 0) - (b.apartment?.rental_value ?? 0),
+      render: (_, record: Lease) => formatCurrency(record.rental_value ?? 0),
+      sorter: (a: Lease, b: Lease) => (a.rental_value ?? 0) - (b.rental_value ?? 0),
     },
     {
       title: 'Vencimento',
