@@ -54,6 +54,7 @@ def apartment(building: Building, admin_user) -> Apartment:
         building=building,
         number=101,
         rental_value=Decimal("1500.00"),
+        rental_value_double=Decimal("1800.00"),
         max_tenants=2,
         created_by=admin_user,
         updated_by=admin_user,
@@ -139,6 +140,7 @@ class TestApartmentSerializer:
             "building_id": building.pk,
             "number": 203,
             "rental_value": "1600.00",
+            "rental_value_double": "1800.00",
             "max_tenants": 2,
             "furniture_ids": [f1.pk],
         }

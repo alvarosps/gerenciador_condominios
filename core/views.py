@@ -303,6 +303,7 @@ class LeaseViewSet(viewsets.ModelViewSet):
             "apartment",  # ForeignKey: Lease -> Apartment
             "apartment__building",  # ForeignKey: Apartment -> Building
             "responsible_tenant",  # ForeignKey: Lease -> Tenant (responsible)
+            "resident_dependent",  # ForeignKey: Lease -> Dependent (second occupant)
         )
 
         if self.action in ["list", "retrieve"]:
@@ -389,7 +390,7 @@ class LeaseViewSet(viewsets.ModelViewSet):
 
         # Delegate to service layer
         result = FeeCalculatorService.calculate_late_fee(
-            rental_value=lease.apartment.rental_value,
+            rental_value=lease.rental_value,
             due_day=lease.responsible_tenant.due_day,
             current_date=date.today(),
         )
@@ -425,7 +426,7 @@ class LeaseViewSet(viewsets.ModelViewSet):
 
             # Delegate fee calculation to service layer
             fee_result = FeeCalculatorService.calculate_due_date_change_fee(
-                rental_value=lease.apartment.rental_value,
+                rental_value=lease.rental_value,
                 current_due_day=lease.responsible_tenant.due_day,
                 new_due_day=new_due_day,
             )
