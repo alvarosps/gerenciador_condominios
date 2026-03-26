@@ -623,6 +623,50 @@ class Lease(AuditMixin, SoftDeleteMixin, models.Model):
         validate_tenant_count(self)
 
 
+class RentAdjustment(AuditMixin, SoftDeleteMixin, models.Model):
+    """
+    Records a rent adjustment applied to a lease.
+
+    Attributes:
+        lease: The lease this adjustment belongs to
+        adjustment_date: Date the adjustment takes effect
+        percentage: Adjustment percentage (positive = increase, negative = decrease)
+        previous_value: Rental value before adjustment
+        new_value: Rental value after adjustment
+        apartment_updated: Whether the apartment's rental_value was updated
+
+    Inherits audit fields (created_at, updated_at, created_by, updated_by)
+    and soft delete capability (is_deleted, deleted_at, deleted_by).
+    """
+
+    lease = models.ForeignKey(
+        Lease,
+        on_delete=models.CASCADE,
+        related_name="rent_adjustments",
+        help_text="Locação a qual o reajuste pertence",
+    )
+    adjustment_date = models.DateField(help_text="Data de aplicação do reajuste")
+    percentage = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        help_text="Percentual aplicado (ex: 5.23 ou -0.64)",
+    )
+    previous_value = models.DecimalField(max_digits=10, decimal_places=2)
+    new_value = models.DecimalField(max_digits=10, decimal_places=2)
+    apartment_updated = models.BooleanField(default=False)
+
+    # Managers
+    all_objects = models.Manager()
+    objects = SoftDeleteManager()
+
+    class Meta:
+        ordering = ["-adjustment_date"]
+
+    def __str__(self) -> str:
+        """Return string representation of rent adjustment."""
+        return f"Reajuste {self.percentage}% - Locação Apto {self.lease.apartment.number}"
+
+
 class Landlord(AuditMixin, SoftDeleteMixin, models.Model):
     """
     Represents the property owner/landlord (LOCADOR).
