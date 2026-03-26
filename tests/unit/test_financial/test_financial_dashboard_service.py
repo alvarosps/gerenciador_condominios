@@ -919,6 +919,7 @@ class TestBuildIncomeSummary:
             responsible_tenant=tenant,
             start_date=date(2025, 1, 1),
             validity_months=12,
+            rental_value=Decimal("1000.00"),
         )
         lease.tenants.add(tenant)
 
@@ -944,6 +945,7 @@ class TestBuildIncomeSummary:
             responsible_tenant=tenant,
             start_date=date(2025, 1, 1),
             validity_months=12,
+            rental_value=Decimal("900.00"),
         )
         lease.tenants.add(tenant)
 
@@ -970,6 +972,7 @@ class TestBuildIncomeSummary:
             start_date=date(2025, 1, 1),
             validity_months=12,
             is_salary_offset=True,
+            rental_value=Decimal("700.00"),
         )
         lease.tenants.add(tenant)
 

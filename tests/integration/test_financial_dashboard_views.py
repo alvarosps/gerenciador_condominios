@@ -61,6 +61,7 @@ def lease(apartment: Apartment, tenant: Tenant) -> Lease:
         responsible_tenant=tenant,
         start_date=date(2025, 1, 1),
         validity_months=24,
+        rental_value=Decimal("1500.00"),
     )
 
 

@@ -1,6 +1,7 @@
 """Tests for Django signals — cache invalidation and apartment sync."""
 
 from datetime import date
+from decimal import Decimal
 
 import pytest
 
@@ -46,6 +47,7 @@ def lease(apartment: Apartment, tenant: Tenant) -> Lease:
         responsible_tenant=tenant,
         start_date=date(2025, 1, 1),
         validity_months=12,
+        rental_value=Decimal("1200.00"),
     )
 
 
@@ -64,6 +66,7 @@ class TestSyncApartmentIsRented:
             responsible_tenant=tenant,
             start_date=date(2025, 1, 1),
             validity_months=12,
+            rental_value=Decimal("1200.00"),
         )
         apartment.refresh_from_db()
         assert apartment.is_rented is True
@@ -106,6 +109,7 @@ class TestSyncApartmentIsRented:
             responsible_tenant=second_tenant,
             start_date=date(2025, 7, 1),
             validity_months=12,
+            rental_value=Decimal("1200.00"),
         )
         apartment.refresh_from_db()
         assert apartment.is_rented is True
@@ -140,6 +144,7 @@ class TestSyncApartmentIsRented:
             responsible_tenant=second_tenant,
             start_date=date(2025, 8, 1),
             validity_months=12,
+            rental_value=Decimal("1200.00"),
         )
         apartment.refresh_from_db()
         assert apartment.is_rented is True
@@ -382,6 +387,7 @@ class TestSignalConnectDisconnect:
             responsible_tenant=tenant,
             start_date=date(2025, 6, 1),
             validity_months=12,
+            rental_value=Decimal("1200.00"),
         )
         apartment.refresh_from_db()
         # Signal reconnected — but disconnect removed receivers; behavior may differ

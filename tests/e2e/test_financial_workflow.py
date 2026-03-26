@@ -132,6 +132,7 @@ class TestFinancialWorkflowE2E:
             start_date=date(2025, 1, 1),
             validity_months=12,
             tag_fee=Decimal("50.00"),
+            rental_value=Decimal("1500.00"),
         )
 
         rent_resp = client.post(
@@ -232,6 +233,7 @@ class TestFinancialWorkflowE2E:
             start_date=date(2025, 1, 1),
             validity_months=12,
             tag_fee=Decimal("50.00"),
+            rental_value=Decimal("2000.00"),
         )
 
         # Register rent payment
@@ -277,6 +279,7 @@ class TestFinancialWorkflowE2E:
             start_date=date(2025, 1, 1),
             validity_months=24,
             tag_fee=Decimal("50.00"),
+            rental_value=Decimal("1300.00"),
             prepaid_until=date(2026, 9, 29),
         )
 
@@ -311,6 +314,7 @@ class TestFinancialWorkflowE2E:
             start_date=date(2025, 1, 1),
             validity_months=12,
             tag_fee=Decimal("0.00"),
+            rental_value=Decimal("800.00"),
             is_salary_offset=True,
         )
 
@@ -730,6 +734,7 @@ class TestFinancialWorkflowE2E:
             start_date=date(2025, 1, 1),
             validity_months=24,
             tag_fee=Decimal("50.00"),
+            rental_value=Decimal("1200.00"),
         )
 
         # Create installment with due_date on day 15

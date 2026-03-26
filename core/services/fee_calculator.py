@@ -14,6 +14,8 @@ from decimal import Decimal
 
 from django.conf import settings
 
+_DECEMBER = 12  # Month number for December
+
 
 class FeeCalculatorService:
     """
@@ -92,7 +94,7 @@ class FeeCalculatorService:
     @staticmethod
     def _next_month(year: int, month: int) -> tuple[int, int]:
         """Return (year, month) for the month after the given one."""
-        if month == 12:
+        if month == _DECEMBER:
             return year + 1, 1
         return year, month + 1
 

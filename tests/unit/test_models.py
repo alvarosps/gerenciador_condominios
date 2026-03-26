@@ -1,6 +1,7 @@
 """Tests for core model __str__, properties, soft delete, and AuditMixin."""
 
 from datetime import date
+from decimal import Decimal
 
 import pytest
 from django.core.exceptions import ValidationError
@@ -213,6 +214,7 @@ class TestLeaseModel:
             responsible_tenant=tenant,
             start_date=date(2025, 1, 1),
             validity_months=12,
+            rental_value=Decimal("1500.00"),
         )
         assert str(lease) == "Locação do Apto 101 - 999"
 
@@ -224,6 +226,7 @@ class TestLeaseModel:
             responsible_tenant=tenant,
             start_date=date(2025, 1, 1),
             validity_months=12,
+            rental_value=Decimal("1500.00"),
         )
         apartment.refresh_from_db()
         assert apartment.is_rented is True

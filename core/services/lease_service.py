@@ -53,12 +53,18 @@ def transfer_lease(lease_id: int, payload: dict[str, Any], user: Any) -> Lease:
     raw_deposit = payload.get("deposit_amount")
     deposit_amount: Decimal | None = Decimal(str(raw_deposit)) if raw_deposit else None
 
+    raw_rental_value = payload.get("rental_value")
+    rental_value: Decimal = (
+        Decimal(str(raw_rental_value)) if raw_rental_value else old_lease.rental_value
+    )
+
     new_lease = Lease.objects.create(
         apartment_id=new_apartment_id,
         responsible_tenant_id=responsible_tenant_id,
         start_date=payload.get("start_date", date.today()),
         validity_months=payload.get("validity_months", 12),
         tag_fee=Decimal(str(payload.get("tag_fee", 0))),
+        rental_value=rental_value,
         deposit_amount=deposit_amount,
         cleaning_fee_paid=payload.get("cleaning_fee_paid", False),
         tag_deposit_paid=payload.get("tag_deposit_paid", False),

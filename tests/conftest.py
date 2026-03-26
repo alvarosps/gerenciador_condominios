@@ -266,6 +266,7 @@ def sample_lease_data() -> dict[str, Any]:
         "start_date": date.today(),
         "validity_months": 12,
         "tag_fee": Decimal("80.00"),
+        "rental_value": Decimal("1500.00"),
         "deposit_amount": None,
         "cleaning_fee_paid": False,
         "tag_deposit_paid": False,

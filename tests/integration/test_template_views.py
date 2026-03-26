@@ -69,6 +69,7 @@ def lease(apartment, tenant, admin_user):
         start_date="2026-02-01",
         validity_months=12,
         tag_fee=Decimal("50.00"),
+        rental_value=Decimal("1400.00"),
         created_by=admin_user,
         updated_by=admin_user,
     )

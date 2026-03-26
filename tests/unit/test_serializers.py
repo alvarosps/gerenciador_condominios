@@ -512,6 +512,7 @@ class TestRentPaymentSerializer:
             responsible_tenant=tenant,
             start_date=date(2025, 1, 1),
             validity_months=12,
+            rental_value=Decimal("1500.00"),
         )
         payload = {
             "lease_id": lease.pk,
@@ -533,6 +534,7 @@ class TestRentPaymentSerializer:
             responsible_tenant=tenant,
             start_date=date(2025, 1, 1),
             validity_months=12,
+            rental_value=Decimal("1500.00"),
         )
         payload = {
             "lease_id": lease.pk,

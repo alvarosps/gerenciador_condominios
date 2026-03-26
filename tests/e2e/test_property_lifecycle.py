@@ -529,6 +529,7 @@ class TestDashboardDataAccuracy:
             start_date=date(2024, 1, 1),
             validity_months=24,
             tag_fee=Decimal("50.00"),
+            rental_value=Decimal("1500.00"),
         )
         Lease.objects.create(
             apartment=apt_b,
@@ -536,6 +537,7 @@ class TestDashboardDataAccuracy:
             start_date=date(2024, 6, 1),
             validity_months=12,
             tag_fee=Decimal("80.00"),
+            rental_value=Decimal("1800.00"),
         )
 
         # GET /api/dashboard/financial_summary/
@@ -639,6 +641,7 @@ class TestSoftDeleteCascadeBehavior:
             start_date=date(2024, 1, 1),
             validity_months=12,
             tag_fee=Decimal("50.00"),
+            rental_value=Decimal("1000.00"),
         )
 
         # Soft delete the tenant via API
@@ -1040,6 +1043,7 @@ class TestSearchAndFilterChains:
             start_date=date(2025, 1, 1),
             validity_months=24,
             tag_fee=Decimal("50.00"),
+            rental_value=Decimal("1000.00"),
         )
 
         # Expired lease (started in the past, short validity)
@@ -1049,6 +1053,7 @@ class TestSearchAndFilterChains:
             start_date=date(2020, 1, 1),
             validity_months=12,
             tag_fee=Decimal("50.00"),
+            rental_value=Decimal("1200.00"),
         )
 
         # Filter by apartment_id

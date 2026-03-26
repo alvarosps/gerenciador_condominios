@@ -111,6 +111,7 @@ def _create_rented_lease(street_number: int, due_day: int = 10) -> tuple[Buildin
         start_date=date(2025, 1, 1),
         validity_months=24,
         tag_fee=Decimal("50.00"),
+        rental_value=Decimal("1500.00"),
     )
     return building, apt, tenant, lease
 
