@@ -498,9 +498,8 @@ class Lease(AuditMixin, SoftDeleteMixin, models.Model):
         apartment: Apartment being rented
         responsible_tenant: Primary tenant responsible for the lease
         tenants: All tenants living in the apartment
-        number_of_tenants: Declared number of occupants (used for tag fee calculation).
-                          Can be >= actual tenant count to account for additional occupants
-                          not formally registered as tenants.
+        number_of_tenants: Number of occupants (1 or 2). Determines pricing tier.
+                          Must be <= apartment.max_tenants.
         start_date: Lease start date
         validity_months: Duration of lease in months
         tag_fee: Tag/key deposit amount
