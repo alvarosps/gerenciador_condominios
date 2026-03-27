@@ -69,6 +69,7 @@ const leaseFormSchema = z.object({
   number_of_tenants: z.number().min(1).max(2),
   rental_value: z.number().min(0),
   resident_dependent_id: z.number().optional().nullable(),
+  due_day: z.number().min(1, 'Dia deve ser entre 1 e 31').max(31, 'Dia deve ser entre 1 e 31'),
   start_date: z.date(),
   validity_months: z.number()
     .min(1, 'Validade deve ser no mínimo 1 mês')
@@ -99,6 +100,7 @@ export function LeaseFormModal({ open, lease, onClose }: Props) {
     : availableApartments;
   const { data: tenants, isLoading: tenantsLoading } = useTenants();
 
+  const [originalDueDay, setOriginalDueDay] = useState<number | null>(null);
   const [newDependentForm, setNewDependentForm] = useState<NewDependentForm>({
     name: '',
     cpf_cnpj: '',
@@ -114,6 +116,7 @@ export function LeaseFormModal({ open, lease, onClose }: Props) {
       number_of_tenants: 1,
       rental_value: 0,
       resident_dependent_id: null,
+      due_day: 1,
       start_date: undefined,
       validity_months: 12,
       tag_fee: TAG_FEE_SINGLE,
@@ -139,6 +142,7 @@ export function LeaseFormModal({ open, lease, onClose }: Props) {
         number_of_tenants: lease.number_of_tenants ?? 1,
         rental_value: lease.rental_value ?? 0,
         resident_dependent_id: lease.resident_dependent_id ?? null,
+        due_day: lease.responsible_tenant?.due_day ?? new Date(lease.start_date).getDate(),
         start_date: new Date(lease.start_date),
         validity_months: lease.validity_months,
         tag_fee: lease.tag_fee,
@@ -146,6 +150,7 @@ export function LeaseFormModal({ open, lease, onClose }: Props) {
         cleaning_fee_paid: lease.cleaning_fee_paid ?? false,
         tag_deposit_paid: lease.tag_deposit_paid ?? false,
       });
+      setOriginalDueDay(lease.responsible_tenant?.due_day ?? null);
     } else {
       formMethods.reset({
         apartment_id: undefined,
@@ -153,6 +158,7 @@ export function LeaseFormModal({ open, lease, onClose }: Props) {
         number_of_tenants: 1,
         rental_value: 0,
         resident_dependent_id: null,
+        due_day: 1,
         start_date: undefined,
         validity_months: 12,
         tag_fee: TAG_FEE_SINGLE,
@@ -160,6 +166,7 @@ export function LeaseFormModal({ open, lease, onClose }: Props) {
         cleaning_fee_paid: false,
         tag_deposit_paid: false,
       });
+      setOriginalDueDay(null);
     }
     setShowNewDependentForm(false);
     setNewDependentForm({ name: '', cpf_cnpj: '', phone: '' });
@@ -182,6 +189,20 @@ export function LeaseFormModal({ open, lease, onClose }: Props) {
     setShowNewDependentForm(false);
     setNewDependentForm({ name: '', cpf_cnpj: '', phone: '' });
   }, [selectedResponsibleTenantId, formMethods]);
+
+  // Auto-derive due_day from start_date (create mode only)
+  const watchedStartDate = formMethods.watch('start_date');
+  useEffect(() => {
+    if (isEditMode || !watchedStartDate) return;
+    formMethods.setValue('due_day', watchedStartDate.getDate());
+  }, [watchedStartDate, isEditMode, formMethods]);
+
+  // Calculate due date change fee preview
+  const watchedDueDay = formMethods.watch('due_day');
+  const dueDayChanged = isEditMode && originalDueDay !== null && watchedDueDay !== originalDueDay;
+  const dueDayChangeFee = dueDayChanged && selectedApartment
+    ? Math.abs(watchedDueDay - (originalDueDay ?? 0)) * ((formMethods.watch('rental_value') ?? 0) / 30)
+    : 0;
 
   const handleNumberOfTenantsChange = (value: number) => {
     formMethods.setValue('number_of_tenants', value);
@@ -274,6 +295,13 @@ export function LeaseFormModal({ open, lease, onClose }: Props) {
         cleaning_fee_paid: values.cleaning_fee_paid,
         tag_deposit_paid: values.tag_deposit_paid,
       };
+
+      // Update tenant due_day if it changed or if creating
+      const tenantId = values.responsible_tenant_id;
+      const currentTenantDueDay = selectedResponsibleTenant?.due_day;
+      if (values.due_day !== currentTenantDueDay) {
+        await apiClient.patch(`/tenants/${String(tenantId)}/`, { due_day: values.due_day });
+      }
 
       if (lease?.id) {
         await updateMutation.mutateAsync({ ...payload, id: lease.id });
@@ -533,6 +561,41 @@ export function LeaseFormModal({ open, lease, onClose }: Props) {
                       />
                     </PopoverContent>
                   </Popover>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Due Day */}
+            <FormField
+              control={formMethods.control}
+              name="due_day"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Dia de Vencimento</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={31}
+                      placeholder="Ex: 7"
+                      {...field}
+                      onChange={(e) => field.onChange(Number(e.target.value))}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    Dia do mês para vencimento do aluguel. Derivado automaticamente da data de início.
+                  </FormDescription>
+                  {dueDayChanged && dueDayChangeFee > 0 && (
+                    <Alert className="mt-2">
+                      <Info className="h-4 w-4" />
+                      <AlertDescription>
+                        Alteração de vencimento: taxa proporcional de{' '}
+                        <strong>{formatCurrency(dueDayChangeFee)}</strong>{' '}
+                        ({Math.abs(watchedDueDay - (originalDueDay ?? 0))} dias de diferença)
+                      </AlertDescription>
+                    </Alert>
+                  )}
                   <FormMessage />
                 </FormItem>
               )}
