@@ -375,11 +375,17 @@ class LeaseSerializer(serializers.ModelSerializer):
         ]
 
     def get_last_adjustment_date(self, obj: Lease) -> str | None:
-        """Return the date of the most recent rent adjustment, if any."""
+        """Return the date of the most recent rent adjustment.
+
+        Falls back to apartment.last_rent_increase_date for leases
+        that predate the RentAdjustment feature.
+        """
         adjustment = obj.rent_adjustments.order_by("-adjustment_date").first()
-        if adjustment is None:
-            return None
-        return str(adjustment.adjustment_date)
+        if adjustment is not None:
+            return str(adjustment.adjustment_date)
+        if obj.apartment.last_rent_increase_date is not None:
+            return str(obj.apartment.last_rent_increase_date)
+        return None
 
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         """Cross-field validation for number_of_tenants and resident_dependent."""
