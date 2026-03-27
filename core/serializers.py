@@ -466,6 +466,12 @@ class LeaseSerializer(serializers.ModelSerializer):
         lease = Lease.objects.create(**validated_data)
         if tenants:
             lease.tenants.set(tenants)
+
+        # Set last_rent_increase_date on apartment to the lease start date
+        apartment = lease.apartment
+        apartment.last_rent_increase_date = validated_data["start_date"]
+        apartment.save(update_fields=["last_rent_increase_date"])
+
         return lease
 
     def update(self, instance: Lease, validated_data: dict[str, Any]) -> Lease:
