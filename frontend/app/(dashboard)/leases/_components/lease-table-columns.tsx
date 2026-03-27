@@ -216,6 +216,21 @@ export function createLeaseColumns(handlers: LeaseActionHandlers): Column<Lease>
       sorter: (a: Lease, b: Lease) => (a.responsible_tenant?.due_day ?? 0) - (b.responsible_tenant?.due_day ?? 0),
     },
     {
+      title: 'Último Reajuste',
+      key: 'last_adjustment',
+      width: 130,
+      render: (_, record: Lease) => {
+        const dateStr = record.last_adjustment_date;
+        if (!dateStr) return <span className="text-muted-foreground">Nunca</span>;
+        return format(parseISO(dateStr), 'dd/MM/yyyy');
+      },
+      sorter: (a: Lease, b: Lease) => {
+        const aDate = a.last_adjustment_date ?? '';
+        const bDate = b.last_adjustment_date ?? '';
+        return aDate.localeCompare(bDate);
+      },
+    },
+    {
       title: 'Contrato',
       key: 'contract_status',
       width: 120,
