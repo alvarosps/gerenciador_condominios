@@ -70,6 +70,7 @@ const leaseFormSchema = z.object({
   rental_value: z.number().min(0),
   resident_dependent_id: z.number().optional().nullable(),
   due_day: z.number().min(1, 'Dia deve ser entre 1 e 31').max(31, 'Dia deve ser entre 1 e 31'),
+  last_rent_increase_date: z.string().optional().nullable(),
   start_date: z.date(),
   validity_months: z.number()
     .min(1, 'Validade deve ser no mínimo 1 mês')
@@ -143,6 +144,7 @@ export function LeaseFormModal({ open, lease, onClose }: Props) {
         rental_value: lease.rental_value ?? 0,
         resident_dependent_id: lease.resident_dependent_id ?? null,
         due_day: lease.responsible_tenant?.due_day ?? new Date(lease.start_date).getDate(),
+        last_rent_increase_date: lease.last_adjustment_date ?? lease.apartment?.last_rent_increase_date ?? null,
         start_date: new Date(lease.start_date),
         validity_months: lease.validity_months,
         tag_fee: lease.tag_fee,
@@ -159,6 +161,7 @@ export function LeaseFormModal({ open, lease, onClose }: Props) {
         rental_value: 0,
         resident_dependent_id: null,
         due_day: 1,
+        last_rent_increase_date: null,
         start_date: undefined,
         validity_months: 12,
         tag_fee: TAG_FEE_SINGLE,
@@ -304,6 +307,15 @@ export function LeaseFormModal({ open, lease, onClose }: Props) {
       }
 
       if (lease?.id) {
+        // Update apartment.last_rent_increase_date if changed
+        if (values.last_rent_increase_date && lease.apartment?.id) {
+          const currentDate = lease.last_adjustment_date ?? lease.apartment.last_rent_increase_date;
+          if (values.last_rent_increase_date !== currentDate) {
+            await apiClient.patch(`/apartments/${String(lease.apartment.id)}/`, {
+              last_rent_increase_date: values.last_rent_increase_date,
+            });
+          }
+        }
         await updateMutation.mutateAsync({ ...payload, id: lease.id });
         toast.success('Locação atualizada com sucesso');
       } else {
@@ -687,6 +699,31 @@ export function LeaseFormModal({ open, lease, onClose }: Props) {
                 </FormItem>
               )}
             />
+
+            {/* Last Rent Increase Date — edit mode only */}
+            {isEditMode && (
+              <FormField
+                control={formMethods.control}
+                name="last_rent_increase_date"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Data do Último Reajuste</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="date"
+                        {...field}
+                        value={field.value ?? ''}
+                        onChange={(e) => field.onChange(e.target.value || null)}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      Data de referência para o próximo reajuste anual
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
             {/* Deposit Amount */}
             <FormField
