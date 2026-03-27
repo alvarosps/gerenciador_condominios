@@ -57,6 +57,12 @@ import { apiClient } from '@/lib/api/client';
 const TAG_FEE_SINGLE = 50;
 const TAG_FEE_DOUBLE = 80;
 
+/** Parse yyyy-MM-dd as local date (avoids UTC timezone shift) */
+function parseLocalDate(dateStr: string): Date {
+  const [year, month, day] = dateStr.split('-').map(Number);
+  return new Date(year ?? 0, (month ?? 1) - 1, day ?? 1);
+}
+
 interface Props {
   open: boolean;
   lease?: Lease | null;
@@ -143,9 +149,9 @@ export function LeaseFormModal({ open, lease, onClose }: Props) {
         number_of_tenants: lease.number_of_tenants ?? 1,
         rental_value: lease.rental_value ?? 0,
         resident_dependent_id: lease.resident_dependent_id ?? null,
-        due_day: lease.responsible_tenant?.due_day ?? new Date(lease.start_date).getDate(),
+        due_day: lease.responsible_tenant?.due_day ?? parseLocalDate(lease.start_date).getDate(),
         last_rent_increase_date: lease.last_adjustment_date ?? lease.apartment?.last_rent_increase_date ?? null,
-        start_date: new Date(lease.start_date),
+        start_date: parseLocalDate(lease.start_date),
         validity_months: lease.validity_months,
         tag_fee: lease.tag_fee,
         deposit_amount: lease.deposit_amount ?? null,
