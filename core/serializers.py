@@ -344,6 +344,7 @@ class LeaseSerializer(serializers.ModelSerializer):
         required=False,
         help_text="Valor do aluguel acordado. Se omitido, deriva do apartamento.",
     )
+    last_adjustment_date = serializers.SerializerMethodField()
 
     class Meta:
         model = Lease
@@ -362,6 +363,7 @@ class LeaseSerializer(serializers.ModelSerializer):
             "validity_months",
             "tag_fee",
             "rental_value",
+            "last_adjustment_date",
             "deposit_amount",
             "cleaning_fee_paid",
             "tag_deposit_paid",
@@ -371,6 +373,13 @@ class LeaseSerializer(serializers.ModelSerializer):
             "prepaid_until",
             "is_salary_offset",
         ]
+
+    def get_last_adjustment_date(self, obj: Lease) -> str | None:
+        """Return the date of the most recent rent adjustment, if any."""
+        adjustment = obj.rent_adjustments.order_by("-adjustment_date").first()
+        if adjustment is None:
+            return None
+        return str(adjustment.adjustment_date)
 
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         """Cross-field validation for number_of_tenants and resident_dependent."""
