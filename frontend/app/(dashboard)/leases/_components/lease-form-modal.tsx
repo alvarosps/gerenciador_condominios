@@ -90,7 +90,13 @@ interface NewDependentForm {
 export function LeaseFormModal({ open, lease, onClose }: Props) {
   const createMutation = useCreateLease();
   const updateMutation = useUpdateLease();
-  const { data: apartments, isLoading: apartmentsLoading } = useAvailableApartments();
+  const isEditMode = Boolean(lease);
+  const { data: availableApartments, isLoading: apartmentsLoading } = useAvailableApartments();
+
+  // When editing, show only the lease's apartment; when creating, show available ones
+  const apartments = isEditMode && lease?.apartment
+    ? [lease.apartment]
+    : availableApartments;
   const { data: tenants, isLoading: tenantsLoading } = useTenants();
 
   const [newDependentForm, setNewDependentForm] = useState<NewDependentForm>({
@@ -124,8 +130,6 @@ export function LeaseFormModal({ open, lease, onClose }: Props) {
   const selectedResponsibleTenant = tenants?.find(t => t.id === selectedResponsibleTenantId);
 
   const numberOfTenants = formMethods.watch('number_of_tenants');
-
-  const isEditMode = Boolean(lease);
 
   useEffect(() => {
     if (lease) {
@@ -334,7 +338,7 @@ export function LeaseFormModal({ open, lease, onClose }: Props) {
                   <Select
                     value={field.value ? String(field.value) : ''}
                     onValueChange={(value) => field.onChange(Number(value))}
-                    disabled={apartmentsLoading}
+                    disabled={apartmentsLoading || isEditMode}
                   >
                     <FormControl>
                       <SelectTrigger>
