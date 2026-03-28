@@ -10,3 +10,5 @@ export * from './leases';
 export * from './persons';
 export * from './expenses';
 export * from './person-payments';
+export * from './person-payment-schedules';
+export * from './expense-month-skips';

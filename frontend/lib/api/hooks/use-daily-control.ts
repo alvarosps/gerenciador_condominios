@@ -19,9 +19,13 @@ export interface DailyExit {
   due: boolean;
   paid: boolean;
   person?: string;
+  person_id?: number;
   card?: string;
   building?: string;
   payment_date?: string;
+  installment_ids?: number[];
+  reference_month?: string;
+  total_paid_month?: number;
 }
 
 export interface DailyBreakdownDay {
@@ -49,9 +53,13 @@ export interface DailySummary {
 }
 
 export interface MarkPaidRequest {
-  item_type: 'installment' | 'expense' | 'income';
+  item_type: 'installment' | 'expense' | 'income' | 'credit_card' | 'person_schedule';
   item_id: number;
   payment_date: string;
+  person_id?: number;
+  amount?: number;
+  year?: number;
+  month?: number;
 }
 
 const STALE_TIME = 1000 * 60 * 5;
