@@ -51,6 +51,7 @@ import { ROUTES } from '@/lib/utils/constants';
 interface Props {
   open: boolean;
   expense?: Expense | null;
+  defaultExpenseDate?: string;
   onClose: () => void;
 }
 
@@ -132,7 +133,7 @@ const INSTALLMENT_TYPES = ['card_purchase', 'bank_loan', 'personal_loan'];
 // Types that show debt_installment toggle (utility bills)
 const DEBT_INSTALLMENT_TYPES = ['water_bill', 'electricity_bill', 'property_tax'];
 
-export function ExpenseFormModal({ open, expense, onClose }: Props) {
+export function ExpenseFormModal({ open, expense, defaultExpenseDate, onClose }: Props) {
   const createMutation = useCreateExpense();
   const updateMutation = useUpdateExpense();
   const generateInstallmentsMutation = useGenerateInstallments();
@@ -148,7 +149,7 @@ export function ExpenseFormModal({ open, expense, onClose }: Props) {
       description: '',
       expense_type: '',
       total_amount: 0,
-      expense_date: '',
+      expense_date: defaultExpenseDate ?? '',
       person_id: null,
       credit_card_id: null,
       building_id: null,
@@ -222,7 +223,7 @@ export function ExpenseFormModal({ open, expense, onClose }: Props) {
         description: '',
         expense_type: '',
         total_amount: 0,
-        expense_date: '',
+        expense_date: defaultExpenseDate ?? '',
         person_id: null,
         credit_card_id: null,
         building_id: null,
@@ -240,7 +241,7 @@ export function ExpenseFormModal({ open, expense, onClose }: Props) {
         notes: '',
       });
     }
-  }, [expense, form]);
+  }, [expense, form, defaultExpenseDate]);
 
   const showPersonField = PERSON_REQUIRED_TYPES.includes(watchedType) || PERSON_OPTIONAL_TYPES.includes(watchedType);
   const showCreditCardField = watchedType === 'card_purchase';

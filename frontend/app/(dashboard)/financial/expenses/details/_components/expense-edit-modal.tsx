@@ -78,6 +78,7 @@ interface EditProps {
   mode: 'edit';
   item: ExpenseDetailItem;
   personId?: number | null;
+  defaultExpenseDate?: string;
   onClose: () => void;
   onSaved: () => void;
 }
@@ -86,13 +87,14 @@ interface CreateProps {
   mode: 'create';
   item?: undefined;
   personId?: number | null;
+  defaultExpenseDate?: string;
   onClose: () => void;
   onSaved: () => void;
 }
 
 type Props = EditProps | CreateProps;
 
-export function ExpenseEditModal({ mode, item, personId, onClose, onSaved }: Props) {
+export function ExpenseEditModal({ mode, item, personId, defaultExpenseDate, onClose, onSaved }: Props) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [pendingValues, setPendingValues] = useState<FormValues | null>(null);
@@ -110,7 +112,7 @@ export function ExpenseEditModal({ mode, item, personId, onClose, onSaved }: Pro
       subcategory_id: null,
       notes: '',
       expense_type: '',
-      expense_date: new Date().toISOString().split('T')[0] ?? '',
+      expense_date: defaultExpenseDate ?? new Date().toISOString().split('T')[0] ?? '',
       is_installment: false,
       total_installments: null,
       current_installment: null,
@@ -157,14 +159,14 @@ export function ExpenseEditModal({ mode, item, personId, onClose, onSaved }: Pro
         subcategory_id: null,
         notes: '',
         expense_type: '',
-        expense_date: new Date().toISOString().split('T')[0] ?? '',
+        expense_date: defaultExpenseDate ?? new Date().toISOString().split('T')[0] ?? '',
         is_installment: false,
         total_installments: null,
         current_installment: null,
         is_offset: false,
       });
     }
-  }, [item, isCreate, form, hasInstallment]);
+  }, [item, isCreate, form, hasInstallment, defaultExpenseDate]);
 
   useEffect(() => {
     form.setValue('subcategory_id', null);
