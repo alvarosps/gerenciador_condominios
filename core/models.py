@@ -574,6 +574,23 @@ class Lease(AuditMixin, SoftDeleteMixin, models.Model):
     is_salary_offset = models.BooleanField(
         default=False, help_text="Aluguel compensado como salário."
     )
+    last_rent_increase_date = models.DateField(
+        null=True,
+        blank=True,
+        help_text="Data do último reajuste. Referência para o próximo reajuste anual.",
+    )
+    pending_rental_value = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Novo valor de aluguel pendente (reajuste com data futura).",
+    )
+    pending_rental_value_date = models.DateField(
+        null=True,
+        blank=True,
+        help_text="Data a partir da qual o pending_rental_value entra em vigor.",
+    )
 
     # Managers
     all_objects = models.Manager()  # Access all objects including deleted
@@ -724,6 +741,14 @@ class Landlord(AuditMixin, SoftDeleteMixin, models.Model):
     state = models.CharField(max_length=50, help_text="Estado")
     zip_code = models.CharField(max_length=10, help_text="CEP")
     country = models.CharField(max_length=100, default="Brasil", help_text="País")
+
+    # Settings
+    rent_adjustment_percentage = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal("0.00"),
+        help_text="Percentual padrão de reajuste anual do aluguel (ex: 5.23)",
+    )
 
     # Status
     is_active = models.BooleanField(
@@ -1126,6 +1151,65 @@ class PersonPayment(AuditMixin, SoftDeleteMixin, models.Model):
         return f"Pagamento R${self.amount} a {self.person.name} - {self.reference_month.strftime('%m/%Y')}"
 
 
+class PersonPaymentSchedule(AuditMixin, SoftDeleteMixin, models.Model):
+    """Configurable payment schedule entry for a person in a specific month."""
+
+    person = models.ForeignKey(
+        Person,
+        on_delete=models.CASCADE,
+        related_name="payment_schedules",
+    )
+    reference_month = models.DateField(
+        help_text="First day of the month (e.g., 2026-03-01)",
+    )
+    due_day = models.PositiveSmallIntegerField(
+        help_text="Day of month for this payment (1-31, capped to last day)",
+    )
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+
+    all_objects = models.Manager()
+    objects = SoftDeleteManager()
+
+    class Meta:
+        ordering = ["reference_month", "due_day"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["person", "reference_month", "due_day"],
+                condition=models.Q(is_deleted=False),
+                name="unique_person_schedule_per_day",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return (
+            f"{self.person.name} - {self.reference_month:%m/%Y} day {self.due_day}: R${self.amount}"
+        )
+
+
+class ExpenseMonthSkip(AuditMixin, models.Model):
+    """Marks an expense as not charged in a specific month."""
+
+    expense = models.ForeignKey(
+        Expense,
+        on_delete=models.CASCADE,
+        related_name="month_skips",
+    )
+    reference_month = models.DateField(
+        help_text="First day of the month (e.g., 2026-03-01)",
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["expense", "reference_month"],
+                name="unique_expense_skip_per_month",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"Skip: {self.expense.description} - {self.reference_month:%m/%Y}"
+
+
 class FinancialSettings(models.Model):
     initial_balance = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     initial_balance_date = models.DateField()
@@ -1145,3 +1229,30 @@ class FinancialSettings(models.Model):
             kwargs.pop("force_insert", None)
             kwargs["force_update"] = True
         super().save(*args, **kwargs)
+
+
+class IPCAIndex(models.Model):
+    """IPCA monthly index values from IBGE SIDRA API (table 1737, variable 2266).
+
+    Base: December 1993 = 100. Used to calculate rent adjustment factors.
+    """
+
+    reference_month = models.DateField(
+        unique=True,
+        help_text="Primeiro dia do mês de referência (ex: 2026-03-01)",
+    )
+    value = models.DecimalField(
+        max_digits=20,
+        decimal_places=13,
+        help_text="Número-índice IPCA (base dez/1993 = 100)",
+    )
+    fetched_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-reference_month"]
+        indexes = [
+            models.Index(fields=["reference_month"], name="ipca_index_month_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return f"IPCA {self.reference_month.strftime('%m/%Y')}: {self.value}"
