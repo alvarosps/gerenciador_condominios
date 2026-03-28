@@ -89,3 +89,15 @@ export function formatDateISO(date: Date | null | undefined): string {
   if (isNaN(date.getTime())) return '';
   return date.toISOString().split('T')[0] ?? '';
 }
+
+/**
+ * Calculate a default expense date for a given target year/month.
+ * Uses today's day number, clamped to the last day of the target month.
+ */
+export function getDefaultExpenseDate(year: number, month: number): string {
+  const today = new Date();
+  const day = today.getDate();
+  const lastDay = new Date(year, month, 0).getDate();
+  const targetDay = Math.min(day, lastDay);
+  return `${String(year)}-${String(month).padStart(2, '0')}-${String(targetDay).padStart(2, '0')}`;
+}
