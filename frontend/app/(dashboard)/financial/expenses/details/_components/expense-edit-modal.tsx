@@ -42,6 +42,7 @@ import {
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useExpenseCategories } from '@/lib/api/hooks/use-expense-categories';
+import { getDefaultExpenseDate } from '@/lib/utils/formatters';
 import { apiClient } from '@/lib/api/client';
 import type { ExpenseDetailItem } from '@/lib/api/hooks/use-financial-dashboard';
 
@@ -112,7 +113,7 @@ export function ExpenseEditModal({ mode, item, personId, defaultExpenseDate, onC
       subcategory_id: null,
       notes: '',
       expense_type: '',
-      expense_date: defaultExpenseDate ?? new Date().toISOString().split('T')[0] ?? '',
+      expense_date: defaultExpenseDate ?? getDefaultExpenseDate(new Date().getFullYear(), new Date().getMonth() + 1),
       is_installment: false,
       total_installments: null,
       current_installment: null,
@@ -159,7 +160,7 @@ export function ExpenseEditModal({ mode, item, personId, defaultExpenseDate, onC
         subcategory_id: null,
         notes: '',
         expense_type: '',
-        expense_date: defaultExpenseDate ?? new Date().toISOString().split('T')[0] ?? '',
+        expense_date: defaultExpenseDate ?? getDefaultExpenseDate(new Date().getFullYear(), new Date().getMonth() + 1),
         is_installment: false,
         total_installments: null,
         current_installment: null,

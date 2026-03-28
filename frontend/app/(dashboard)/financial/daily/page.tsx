@@ -15,7 +15,7 @@ import { useDailyBreakdown } from '@/lib/api/hooks/use-daily-control';
 import { usePersons } from '@/lib/api/hooks/use-persons';
 import { useBuildings } from '@/lib/api/hooks/use-buildings';
 import { useAuthStore } from '@/store/auth-store';
-import { getDefaultExpenseDate } from '@/lib/utils/formatters';
+import { getDefaultExpenseDate, MONTH_ABBR } from '@/lib/utils/formatters';
 import { DailySummaryCards } from './_components/daily-summary-cards';
 import { DailyBalanceChart } from './_components/daily-balance-chart';
 import { DailyTimeline, type DailyFilters } from './_components/daily-timeline';
@@ -28,7 +28,6 @@ const MONTH_NAMES = [
   'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
 ];
 
-const MONTH_ABBR = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 
 export default function DailyControlPage() {
   const { user } = useAuthStore();
@@ -48,7 +47,6 @@ export default function DailyControlPage() {
 
   const handleExpenseSaved = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: ['daily-control'] });
-    void queryClient.invalidateQueries({ queryKey: ['financial-dashboard'] });
   }, [queryClient]);
 
   const [filters, setFilters] = useState<DailyFilters>({

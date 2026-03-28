@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,13 +8,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useDashboardSummary } from '@/lib/api/hooks/use-financial-dashboard';
 import { useAuthStore } from '@/store/auth-store';
-import { formatCurrency, getDefaultExpenseDate } from '@/lib/utils/formatters';
+import { formatCurrency, getDefaultExpenseDate, MONTH_ABBR } from '@/lib/utils/formatters';
 import { MonthNavigator } from './_components/month-navigator';
 import { ExpenseListTable } from './_components/expense-list-table';
 import { PaymentScheduleConfig } from './_components/payment-schedule-config';
 import { ExpenseFormModal } from './_components/expense-form-modal';
-
-const MONTH_ABBR = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 
 export default function ExpensesPage() {
   const now = new Date();
@@ -26,16 +23,11 @@ export default function ExpensesPage() {
   const { data, isLoading, error } = useDashboardSummary(year, month);
   const { user } = useAuthStore();
   const isAdmin = user?.is_staff ?? false;
-  const queryClient = useQueryClient();
 
   const nextMonth = month === 12 ? 1 : month + 1;
   const nextYear = month === 12 ? year + 1 : year;
   const currentMonthAbbr = MONTH_ABBR[month - 1] ?? '';
   const nextMonthAbbr = MONTH_ABBR[nextMonth - 1] ?? '';
-
-  const handleExpenseSaved = () => {
-    void queryClient.invalidateQueries({ queryKey: ['financial-dashboard'] });
-  };
 
   return (
     <div className="space-y-6">
@@ -113,7 +105,6 @@ export default function ExpensesPage() {
           open={isCreating}
           onClose={() => setIsCreating(false)}
           defaultExpenseDate={getDefaultExpenseDate(year, month)}
-          onSuccess={handleExpenseSaved}
         />
       )}
 
@@ -122,7 +113,6 @@ export default function ExpensesPage() {
           open={isCreatingNextMonth}
           onClose={() => setIsCreatingNextMonth(false)}
           defaultExpenseDate={getDefaultExpenseDate(nextYear, nextMonth)}
-          onSuccess={handleExpenseSaved}
         />
       )}
     </div>

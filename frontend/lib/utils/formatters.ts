@@ -90,6 +90,8 @@ export function formatDateISO(date: Date | null | undefined): string {
   return date.toISOString().split('T')[0] ?? '';
 }
 
+export const MONTH_ABBR = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'] as const;
+
 /**
  * Calculate a default expense date for a given target year/month.
  * Uses today's day number, clamped to the last day of the target month.
