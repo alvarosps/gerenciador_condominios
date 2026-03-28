@@ -508,7 +508,7 @@ export function DailyTimeline({ data, isLoading, filters, isAdmin, onDayClick }:
         })}
       </div>
 
-      {selectedPersonExit !== null && selectedPersonExit.exit.person_id !== undefined && (
+      {selectedPersonExit?.exit.person_id !== undefined && (
         <PersonPayModal
           open={selectedPersonExit !== null}
           onOpenChange={(isOpen) => {
