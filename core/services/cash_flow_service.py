@@ -17,6 +17,7 @@ from core.models import (
     EmployeePayment,
     Expense,
     ExpenseInstallment,
+    ExpenseMonthSkip,
     ExpenseType,
     FinancialSettings,
     Income,
@@ -202,16 +203,20 @@ class CashFlowService:
 
     @staticmethod
     def _collect_card_installments(
-        month_start: date, next_month: date
+        month_start: date, next_month: date, skipped_expense_ids: set[int]
     ) -> tuple[Decimal, list[dict[str, Any]]]:
         """Collect card installment amounts and details."""
-        qs = ExpenseInstallment.objects.filter(
-            due_date__gte=month_start,
-            due_date__lt=next_month,
-            expense__expense_type=ExpenseType.CARD_PURCHASE,
-            expense__is_debt_installment=False,
-            expense__is_offset=False,
-        ).select_related("expense", "expense__person", "expense__credit_card")
+        qs = (
+            ExpenseInstallment.objects.filter(
+                due_date__gte=month_start,
+                due_date__lt=next_month,
+                expense__expense_type=ExpenseType.CARD_PURCHASE,
+                expense__is_debt_installment=False,
+                expense__is_offset=False,
+            )
+            .exclude(expense_id__in=skipped_expense_ids)
+            .select_related("expense", "expense__person", "expense__credit_card")
+        )
 
         card_installments = Decimal("0.00")
         details = []
@@ -233,15 +238,19 @@ class CashFlowService:
 
     @staticmethod
     def _collect_loan_installments(
-        month_start: date, next_month: date
+        month_start: date, next_month: date, skipped_expense_ids: set[int]
     ) -> tuple[Decimal, list[dict[str, Any]]]:
         """Collect loan installment amounts and details."""
-        qs = ExpenseInstallment.objects.filter(
-            due_date__gte=month_start,
-            due_date__lt=next_month,
-            expense__expense_type__in=[ExpenseType.BANK_LOAN, ExpenseType.PERSONAL_LOAN],
-            expense__is_offset=False,
-        ).select_related("expense", "expense__person")
+        qs = (
+            ExpenseInstallment.objects.filter(
+                due_date__gte=month_start,
+                due_date__lt=next_month,
+                expense__expense_type__in=[ExpenseType.BANK_LOAN, ExpenseType.PERSONAL_LOAN],
+                expense__is_offset=False,
+            )
+            .exclude(expense_id__in=skipped_expense_ids)
+            .select_related("expense", "expense__person")
+        )
 
         loan_installments = Decimal("0.00")
         details = []
@@ -260,16 +269,20 @@ class CashFlowService:
 
     @staticmethod
     def _collect_utility_bills(
-        month_start: date, next_month: date
+        month_start: date, next_month: date, skipped_expense_ids: set[int]
     ) -> tuple[Decimal, list[dict[str, Any]]]:
         """Collect utility bill amounts and details."""
-        qs = Expense.objects.filter(
-            expense_type__in=[ExpenseType.WATER_BILL, ExpenseType.ELECTRICITY_BILL],
-            is_debt_installment=False,
-            is_offset=False,
-            expense_date__gte=month_start,
-            expense_date__lt=next_month,
-        ).select_related("building")
+        qs = (
+            Expense.objects.filter(
+                expense_type__in=[ExpenseType.WATER_BILL, ExpenseType.ELECTRICITY_BILL],
+                is_debt_installment=False,
+                is_offset=False,
+                expense_date__gte=month_start,
+                expense_date__lt=next_month,
+            )
+            .exclude(pk__in=skipped_expense_ids)
+            .select_related("building")
+        )
 
         utility_bills = Decimal("0.00")
         details = []
@@ -288,14 +301,18 @@ class CashFlowService:
 
     @staticmethod
     def _collect_debt_installments(
-        month_start: date, next_month: date
+        month_start: date, next_month: date, skipped_expense_ids: set[int]
     ) -> tuple[Decimal, list[dict[str, Any]]]:
         """Collect debt installment amounts and details."""
-        qs = ExpenseInstallment.objects.filter(
-            due_date__gte=month_start,
-            due_date__lt=next_month,
-            expense__is_debt_installment=True,
-        ).select_related("expense", "expense__person")
+        qs = (
+            ExpenseInstallment.objects.filter(
+                due_date__gte=month_start,
+                due_date__lt=next_month,
+                expense__is_debt_installment=True,
+            )
+            .exclude(expense_id__in=skipped_expense_ids)
+            .select_related("expense", "expense__person")
+        )
 
         debt_installments = Decimal("0.00")
         details = []
@@ -314,14 +331,18 @@ class CashFlowService:
 
     @staticmethod
     def _collect_property_tax(
-        month_start: date, next_month: date
+        month_start: date, next_month: date, skipped_expense_ids: set[int]
     ) -> tuple[Decimal, list[dict[str, Any]]]:
         """Collect property tax installment amounts and details."""
-        qs = ExpenseInstallment.objects.filter(
-            due_date__gte=month_start,
-            due_date__lt=next_month,
-            expense__expense_type=ExpenseType.PROPERTY_TAX,
-        ).select_related("expense")
+        qs = (
+            ExpenseInstallment.objects.filter(
+                due_date__gte=month_start,
+                due_date__lt=next_month,
+                expense__expense_type=ExpenseType.PROPERTY_TAX,
+            )
+            .exclude(expense_id__in=skipped_expense_ids)
+            .select_related("expense")
+        )
 
         property_tax = Decimal("0.00")
         details = []
@@ -362,17 +383,20 @@ class CashFlowService:
     @staticmethod
     def _collect_fixed_expenses(
         month_start: date,
+        skipped_expense_ids: set[int],
     ) -> tuple[Decimal, list[dict[str, Any]]]:
         """Collect fixed recurring expense amounts and details."""
-        qs = Expense.objects.filter(
-            expense_type=ExpenseType.FIXED_EXPENSE,
-            is_recurring=True,
-            is_offset=False,
-            expected_monthly_amount__isnull=False,
-        ).select_related("person")
-
-        # Exclude expenses that ended before this month
-        qs = qs.exclude(end_date__lt=month_start)
+        qs = (
+            Expense.objects.filter(
+                expense_type=ExpenseType.FIXED_EXPENSE,
+                is_recurring=True,
+                is_offset=False,
+                expected_monthly_amount__isnull=False,
+            )
+            .exclude(end_date__lt=month_start)
+            .exclude(pk__in=skipped_expense_ids)
+            .select_related("person")
+        )
 
         fixed_expenses = Decimal("0.00")
         details = []
@@ -390,7 +414,7 @@ class CashFlowService:
 
     @staticmethod
     def _collect_one_time_expenses(
-        month_start: date, next_month: date
+        month_start: date, next_month: date, skipped_expense_ids: set[int]
     ) -> tuple[Decimal, list[dict[str, Any]]]:
         """Collect one-time expense amounts and details."""
         qs = Expense.objects.filter(
@@ -398,7 +422,7 @@ class CashFlowService:
             is_offset=False,
             expense_date__gte=month_start,
             expense_date__lt=next_month,
-        )
+        ).exclude(pk__in=skipped_expense_ids)
 
         one_time_expenses = Decimal("0.00")
         details = []
@@ -419,6 +443,12 @@ class CashFlowService:
         month_start = date(year, month, 1)
         next_month = _next_month_start(year, month)
 
+        skipped_expense_ids: set[int] = set(
+            ExpenseMonthSkip.objects.filter(
+                reference_month=month_start,
+            ).values_list("expense_id", flat=True)
+        )
+
         owner_repayments, owner_repayments_details = CashFlowService._collect_owner_repayments(
             month_start, next_month
         )
@@ -426,28 +456,28 @@ class CashFlowService:
             month_start
         )
         card_installments, card_installments_details = CashFlowService._collect_card_installments(
-            month_start, next_month
+            month_start, next_month, skipped_expense_ids
         )
         loan_installments, loan_installments_details = CashFlowService._collect_loan_installments(
-            month_start, next_month
+            month_start, next_month, skipped_expense_ids
         )
         utility_bills, utility_bills_details = CashFlowService._collect_utility_bills(
-            month_start, next_month
+            month_start, next_month, skipped_expense_ids
         )
         debt_installments, debt_installments_details = CashFlowService._collect_debt_installments(
-            month_start, next_month
+            month_start, next_month, skipped_expense_ids
         )
         property_tax, property_tax_details = CashFlowService._collect_property_tax(
-            month_start, next_month
+            month_start, next_month, skipped_expense_ids
         )
         employee_salary, employee_salary_details = CashFlowService._collect_employee_salary(
             month_start
         )
         fixed_expenses, fixed_expenses_details = CashFlowService._collect_fixed_expenses(
-            month_start
+            month_start, skipped_expense_ids
         )
         one_time_expenses, one_time_expenses_details = CashFlowService._collect_one_time_expenses(
-            month_start, next_month
+            month_start, next_month, skipped_expense_ids
         )
 
         total = (
@@ -704,6 +734,12 @@ class CashFlowService:
         month_start = date(year, month, 1)
         next_month = _next_month_start(year, month)
 
+        skipped_expense_ids: set[int] = set(
+            ExpenseMonthSkip.objects.filter(
+                reference_month=month_start,
+            ).values_list("expense_id", flat=True)
+        )
+
         # Receives: rent from owned apartments
         receives = Decimal("0.00")
         receives_details = []
@@ -742,15 +778,19 @@ class CashFlowService:
                 }
             )
 
-        # Card installments for this person (excluding offsets)
-        card_installments = ExpenseInstallment.objects.filter(
-            due_date__gte=month_start,
-            due_date__lt=next_month,
-            expense__person=person,
-            expense__expense_type=ExpenseType.CARD_PURCHASE,
-            expense__is_debt_installment=False,
-            expense__is_offset=False,
-        ).select_related("expense", "expense__credit_card")
+        # Card installments for this person (excluding offsets and skipped months)
+        card_installments = (
+            ExpenseInstallment.objects.filter(
+                due_date__gte=month_start,
+                due_date__lt=next_month,
+                expense__person=person,
+                expense__expense_type=ExpenseType.CARD_PURCHASE,
+                expense__is_debt_installment=False,
+                expense__is_offset=False,
+            )
+            .exclude(expense_id__in=skipped_expense_ids)
+            .select_related("expense", "expense__credit_card")
+        )
 
         card_total = Decimal("0.00")
         card_details = []
@@ -768,14 +808,18 @@ class CashFlowService:
                 }
             )
 
-        # Loan installments for this person (excluding offsets)
-        loan_installments = ExpenseInstallment.objects.filter(
-            due_date__gte=month_start,
-            due_date__lt=next_month,
-            expense__person=person,
-            expense__expense_type__in=[ExpenseType.BANK_LOAN, ExpenseType.PERSONAL_LOAN],
-            expense__is_offset=False,
-        ).select_related("expense")
+        # Loan installments for this person (excluding offsets and skipped months)
+        loan_installments = (
+            ExpenseInstallment.objects.filter(
+                due_date__gte=month_start,
+                due_date__lt=next_month,
+                expense__person=person,
+                expense__expense_type__in=[ExpenseType.BANK_LOAN, ExpenseType.PERSONAL_LOAN],
+                expense__is_offset=False,
+            )
+            .exclude(expense_id__in=skipped_expense_ids)
+            .select_related("expense")
+        )
 
         loan_total = Decimal("0.00")
         loan_details = []
@@ -830,13 +874,17 @@ class CashFlowService:
                 }
             )
 
-        # Fixed expenses for this person (recurring monthly charges)
-        fixed_for_person = Expense.objects.filter(
-            expense_type=ExpenseType.FIXED_EXPENSE,
-            is_recurring=True,
-            person=person,
-            is_offset=False,
-        ).exclude(end_date__lt=month_start)
+        # Fixed expenses for this person (recurring monthly charges, excluding skipped months)
+        fixed_for_person = (
+            Expense.objects.filter(
+                expense_type=ExpenseType.FIXED_EXPENSE,
+                is_recurring=True,
+                person=person,
+                is_offset=False,
+            )
+            .exclude(end_date__lt=month_start)
+            .exclude(pk__in=skipped_expense_ids)
+        )
 
         fixed_total = Decimal("0.00")
         fixed_details = []
