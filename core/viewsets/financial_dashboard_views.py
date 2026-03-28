@@ -1,6 +1,7 @@
 """Financial dashboard, cash flow, and daily control ViewSets."""
 
 from datetime import date
+from decimal import Decimal, InvalidOperation
 
 from django.core.exceptions import ObjectDoesNotExist
 from rest_framework import status, viewsets
@@ -9,7 +10,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 
-from core.models import Person
+from core.models import Person, PersonPayment
 from core.services.cash_flow_service import MONTHS_IN_YEAR, CashFlowService
 from core.services.daily_control_service import DailyControlService
 from core.services.financial_dashboard_service import FinancialDashboardService
@@ -280,13 +281,26 @@ class DailyControlViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=["post"])
     def mark_paid(self, request: Request) -> Response:
+        error = self._validate_mark_paid_base(request)
+        if error:
+            return error
+
+        item_type = str(request.data.get("item_type"))
+        payment_date = date.fromisoformat(str(request.data.get("payment_date")))
+
+        if item_type == "person_schedule":
+            return self._mark_person_schedule_paid(request, payment_date)
+
+        return self._mark_standard_item_paid(request, item_type, payment_date)
+
+    def _validate_mark_paid_base(self, request: Request) -> Response | None:
+        """Validate common mark_paid fields. Returns an error Response or None."""
         item_type = request.data.get("item_type")
-        item_id = request.data.get("item_id")
         payment_date_str = request.data.get("payment_date")
 
-        if not item_type or not item_id:
+        if not item_type:
             return Response(
-                {"error": "Os campos 'item_type' e 'item_id' são obrigatórios."},
+                {"error": "O campo 'item_type' é obrigatório."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -297,7 +311,28 @@ class DailyControlViewSet(viewsets.ViewSet):
             )
 
         try:
-            item_id = int(item_id)
+            date.fromisoformat(str(payment_date_str))
+        except ValueError:
+            return Response(
+                {"error": "O campo 'payment_date' deve estar no formato YYYY-MM-DD."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return None
+
+    def _mark_standard_item_paid(
+        self, request: Request, item_type: str, payment_date: date
+    ) -> Response:
+        """Mark a standard item (installment, expense, income, credit_card) as paid."""
+        item_id = request.data.get("item_id")
+        if not item_id:
+            return Response(
+                {"error": "O campo 'item_id' é obrigatório."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            item_id_int = int(item_id)
         except (ValueError, TypeError):
             return Response(
                 {"error": "O campo 'item_id' deve ser um inteiro."},
@@ -305,18 +340,54 @@ class DailyControlViewSet(viewsets.ViewSet):
             )
 
         try:
-            payment_date = date.fromisoformat(str(payment_date_str))
-        except ValueError:
-            return Response(
-                {"error": "O campo 'payment_date' deve estar no formato YYYY-MM-DD."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        try:
-            result = DailyControlService.mark_item_paid(str(item_type), item_id, payment_date)
+            result = DailyControlService.mark_item_paid(item_type, item_id_int, payment_date)
         except ObjectDoesNotExist as e:
             return Response({"error": str(e)}, status=status.HTTP_404_NOT_FOUND)
         except ValueError as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
         return Response(result, status=status.HTTP_200_OK)
+
+    def _mark_person_schedule_paid(self, request: Request, payment_date: date) -> Response:
+        person_id_val = request.data.get("person_id")
+        amount_val = request.data.get("amount")
+        year_val = request.data.get("year")
+        month_val = request.data.get("month")
+
+        if not person_id_val or amount_val is None or not year_val or not month_val:
+            return Response(
+                {
+                    "error": "Os campos 'person_id', 'amount', 'year' e 'month' são obrigatórios para person_schedule."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            person_id = int(person_id_val)
+            year = int(year_val)
+            month = int(month_val)
+            amount = Decimal(str(amount_val))
+        except (ValueError, TypeError, InvalidOperation):
+            return Response(
+                {
+                    "error": "Parâmetros inválidos: 'person_id', 'year' e 'month' devem ser inteiros e 'amount' decimal."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            person = Person.objects.get(pk=person_id)
+        except Person.DoesNotExist:
+            return Response({"error": "Pessoa não encontrada."}, status=status.HTTP_404_NOT_FOUND)
+
+        reference_month = date(year, month, 1)
+        PersonPayment.objects.create(
+            person=person,
+            reference_month=reference_month,
+            amount=amount,
+            payment_date=payment_date,
+        )
+        return Response(
+            {"status": "ok", "message": f"Pagamento de R${amount} registrado para {person.name}."},
+            status=status.HTTP_200_OK,
+        )

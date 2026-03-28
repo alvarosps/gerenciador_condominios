@@ -19,12 +19,14 @@ from .viewsets import (
     EmployeePaymentViewSet,
     ExpenseCategoryViewSet,
     ExpenseInstallmentViewSet,
+    ExpenseMonthSkipViewSet,
     ExpenseViewSet,
     FinancialDashboardViewSet,
     FinancialSettingsViewSet,
     IncomeViewSet,
     LandlordViewSet,
     PersonIncomeViewSet,
+    PersonPaymentScheduleViewSet,
     PersonPaymentViewSet,
     PersonViewSet,
     RentPaymentViewSet,
@@ -56,6 +58,10 @@ router.register(r"person-payments", PersonPaymentViewSet, basename="person-payme
 router.register(r"financial-dashboard", FinancialDashboardViewSet, basename="financial-dashboard")
 router.register(r"cash-flow", CashFlowViewSet, basename="cash-flow")
 router.register(r"daily-control", DailyControlViewSet, basename="daily-control")
+router.register(
+    r"person-payment-schedules", PersonPaymentScheduleViewSet, basename="person-payment-schedules"
+)
+router.register(r"expense-month-skips", ExpenseMonthSkipViewSet, basename="expense-month-skips")
 
 urlpatterns = [
     path("api/", include(router.urls)),
