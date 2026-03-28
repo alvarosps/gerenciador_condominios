@@ -13,7 +13,7 @@ import {
   useExpenseDetail,
 } from '@/lib/api/hooks/use-financial-dashboard';
 import type { ExpenseDetailItem } from '@/lib/api/hooks/use-financial-dashboard';
-import { formatMonthYear } from '@/lib/utils/formatters';
+import { formatMonthYear, getDefaultExpenseDate } from '@/lib/utils/formatters';
 import { apiClient } from '@/lib/api/client';
 import { DetailHeader } from './_components/detail-header';
 import { ExpenseAccordion } from './_components/expense-accordion';
@@ -32,6 +32,8 @@ const LABELS: Record<string, string> = {
 };
 
 const UTILITY_TYPES = ['electricity', 'water', 'iptu'];
+
+const MONTH_ABBR = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 
 function DetailPageSkeleton() {
   return (
@@ -61,6 +63,12 @@ function ExpenseDetailContent() {
   const [editTarget, setEditTarget] = useState<ExpenseDetailItem | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ExpenseDetailItem | null>(null);
   const [isCreating, setIsCreating] = useState(false);
+  const [isCreatingNextMonth, setIsCreatingNextMonth] = useState(false);
+
+  const nextMonth = month === 12 ? 1 : month + 1;
+  const nextYear = month === 12 ? year + 1 : year;
+  const currentMonthAbbr = MONTH_ABBR[month - 1] ?? '';
+  const nextMonthAbbr = MONTH_ABBR[nextMonth - 1] ?? '';
 
   const { data, isLoading, error } = useExpenseDetail(type, id, year, month);
 
@@ -127,10 +135,14 @@ function ExpenseDetailContent() {
       />
 
       {type !== 'employee' && (
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-2">
           <Button onClick={() => setIsCreating(true)}>
             <Plus className="h-4 w-4 mr-2" />
-            Nova Despesa
+            Nova Despesa ({currentMonthAbbr})
+          </Button>
+          <Button variant="outline" onClick={() => setIsCreatingNextMonth(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Nova Despesa ({nextMonthAbbr})
           </Button>
         </div>
       )}
@@ -268,7 +280,18 @@ function ExpenseDetailContent() {
         <ExpenseEditModal
           mode="create"
           personId={id}
+          defaultExpenseDate={getDefaultExpenseDate(year, month)}
           onClose={() => setIsCreating(false)}
+          onSaved={handleSaved}
+        />
+      )}
+
+      {isCreatingNextMonth && (
+        <ExpenseEditModal
+          mode="create"
+          personId={id}
+          defaultExpenseDate={getDefaultExpenseDate(nextYear, nextMonth)}
+          onClose={() => setIsCreatingNextMonth(false)}
           onSaved={handleSaved}
         />
       )}
