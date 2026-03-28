@@ -16,11 +16,15 @@ from django.core.exceptions import ObjectDoesNotExist
 from core.models import (
     Expense,
     ExpenseInstallment,
+    ExpenseMonthSkip,
     ExpenseType,
     Income,
     Lease,
+    PersonPayment,
+    PersonPaymentSchedule,
     RentPayment,
 )
+from core.services.person_payment_schedule_service import PersonPaymentScheduleService
 
 DAYS_OF_WEEK_PT = {
     0: "Segunda",
@@ -44,17 +48,35 @@ class DailyControlService:
         For each day, collects:
         - Entries: rent payments expected (lease.due_day), recurring income, one-time income
         - Exits: expense installments (due_date), fixed recurring expenses (recurrence_day),
-                 one-time expenses (expense_date)
+                 one-time expenses (expense_date), person payment schedules
 
         Excludes offset expenses (is_offset=True).
+        Excludes expenses marked as skipped for the month (ExpenseMonthSkip).
+        For persons with payment schedules, replaces individual expense entries with schedule entries.
         """
         month_start = date(year, month, 1)
         _, days_in_month = calendar.monthrange(year, month)
         next_month_start = _next_month_start(year, month)
 
+        skipped_expense_ids = set(
+            ExpenseMonthSkip.objects.filter(reference_month=month_start).values_list(
+                "expense_id", flat=True
+            )
+        )
+        scheduled_person_ids = set(
+            PersonPaymentSchedule.objects.filter(reference_month=month_start)
+            .values_list("person_id", flat=True)
+            .distinct()
+        )
+
         # Pre-fetch all data for the month
         entries_by_day = _collect_entries_by_day(year, month, month_start, next_month_start)
-        exits_by_day = _collect_exits_by_day(year, month, month_start, next_month_start)
+        exits_by_day = _collect_exits_by_day(
+            year, month, month_start, next_month_start, skipped_expense_ids, scheduled_person_ids
+        )
+        _collect_person_schedule_exits(
+            exits_by_day, month_start, scheduled_person_ids, days_in_month
+        )
 
         # Build day-by-day result
         cumulative_balance = Decimal("0.00")
@@ -93,10 +115,22 @@ class DailyControlService:
         Return aggregated summary for the month.
 
         Includes expected vs actual totals, overdue counts, and balance projections.
+        Excludes skipped expenses and uses schedule totals for persons with payment schedules.
         """
         today = date.today()
         month_start = date(year, month, 1)
         next_month_start = _next_month_start(year, month)
+
+        skipped_expense_ids = set(
+            ExpenseMonthSkip.objects.filter(reference_month=month_start).values_list(
+                "expense_id", flat=True
+            )
+        )
+        scheduled_person_ids = set(
+            PersonPaymentSchedule.objects.filter(reference_month=month_start)
+            .values_list("person_id", flat=True)
+            .distinct()
+        )
 
         # Expected income: rent from active leases + recurring income + one-time income in month
         expected_rent = _get_expected_rent_total(year, month, month_start)
@@ -108,14 +142,26 @@ class DailyControlService:
         received_extra = _get_received_extra_income(month_start, next_month_start)
         total_received_income = received_rent + received_extra
 
-        # Expected expenses: installments + fixed + one-time in month
-        total_expected_expenses = _get_expected_expenses_total(month_start, next_month_start)
+        # Expected expenses: installments + fixed + one-time in month (excluding skips/scheduled persons)
+        total_expected_expenses = _get_expected_expenses_total(
+            month_start, next_month_start, skipped_expense_ids, scheduled_person_ids
+        )
 
-        # Paid expenses: paid installments + paid expenses in month
-        total_paid_expenses = _get_paid_expenses_total(month_start, next_month_start)
+        # Paid expenses: paid installments + paid expenses in month (excluding skips/scheduled persons)
+        total_paid_expenses = _get_paid_expenses_total(
+            month_start, next_month_start, skipped_expense_ids, scheduled_person_ids
+        )
+
+        # Add schedule-based expected and paid amounts for scheduled persons
+        total_expected_expenses += _get_scheduled_persons_expected(
+            month_start, scheduled_person_ids
+        )
+        total_paid_expenses += _get_scheduled_persons_paid(month_start, scheduled_person_ids)
 
         # Overdue: unpaid items with due_date < today (only for current/past months)
-        overdue_count, overdue_total = _get_overdue_totals(month_start, next_month_start, today)
+        overdue_count, overdue_total = _get_overdue_totals(
+            month_start, next_month_start, today, skipped_expense_ids
+        )
 
         # Upcoming 7 days
         upcoming_count, upcoming_total = _get_upcoming_7_days(today)
@@ -146,6 +192,8 @@ class DailyControlService:
         """
         if item_type == "installment":
             return _mark_installment_paid(item_id, payment_date)
+        if item_type == "credit_card":
+            return _mark_credit_card_paid(item_id, payment_date)
         if item_type == "expense":
             return _mark_expense_paid(item_id, payment_date)
         if item_type == "income":
@@ -182,6 +230,26 @@ def _mark_installment_paid(item_id: int, payment_date: date) -> dict[str, Any]:
     item.paid_date = payment_date
     item.save(update_fields=["is_paid", "paid_date", "updated_at"])
     return {"status": "ok", "message": f"Parcela {item_id} marcada como paga."}
+
+
+def _mark_credit_card_paid(card_id: int, payment_date: date) -> dict[str, Any]:
+    """Mark all unpaid installments for a credit card in the current month as paid."""
+    today = date.today()
+    month_start = today.replace(day=1)
+    next_month = _next_month_start(today.year, today.month)
+
+    unpaid = ExpenseInstallment.objects.filter(
+        expense__credit_card_id=card_id,
+        expense__is_offset=False,
+        due_date__gte=month_start,
+        due_date__lt=next_month,
+        is_paid=False,
+    )
+
+    count = unpaid.update(is_paid=True, paid_date=payment_date)
+    if count == 0:
+        return {"status": "already_paid", "message": "Todas as parcelas do cartão já estão pagas."}
+    return {"status": "ok", "message": f"{count} parcelas do cartão marcadas como pagas."}
 
 
 def _mark_expense_paid(item_id: int, payment_date: date) -> dict[str, Any]:
@@ -306,51 +374,120 @@ def _collect_exits_by_day(
     month: int,
     month_start: date,
     next_month_start: date,
+    skipped_expense_ids: set[int],
+    scheduled_person_ids: set[int],
 ) -> dict[int, list[dict[str, Any]]]:
     """Collect all expense exits grouped by day of month."""
     exits: dict[int, list[dict[str, Any]]] = {}
     _, days_in_month = calendar.monthrange(year, month)
 
-    _collect_installment_exits(exits, month_start, next_month_start)
-    _collect_fixed_expense_exits(exits, month_start, days_in_month)
-    _collect_dated_expense_exits(exits, month_start, next_month_start)
+    _collect_installment_exits(
+        exits, month_start, next_month_start, skipped_expense_ids, scheduled_person_ids
+    )
+    _collect_fixed_expense_exits(
+        exits, month_start, days_in_month, skipped_expense_ids, scheduled_person_ids
+    )
+    _collect_dated_expense_exits(
+        exits, month_start, next_month_start, skipped_expense_ids, scheduled_person_ids
+    )
 
     return exits
 
 
 def _collect_installment_exits(
-    exits: dict[int, list[dict[str, Any]]], month_start: date, next_month_start: date
+    exits: dict[int, list[dict[str, Any]]],
+    month_start: date,
+    next_month_start: date,
+    skipped_expense_ids: set[int],
+    scheduled_person_ids: set[int],
 ) -> None:
-    """Add installment exits to the exits dict."""
-    installments = ExpenseInstallment.objects.filter(
-        due_date__gte=month_start,
-        due_date__lt=next_month_start,
-        expense__is_offset=False,
-    ).select_related("expense", "expense__person", "expense__credit_card")
+    """Add installment exits to the exits dict.
+
+    Credit card installments are grouped by card, showing a single total
+    per card per day. Non-card installments remain individual items.
+    Skipped expenses and expenses belonging to persons with schedules are excluded.
+    """
+    installments = (
+        ExpenseInstallment.objects.filter(
+            due_date__gte=month_start,
+            due_date__lt=next_month_start,
+            expense__is_offset=False,
+        )
+        .exclude(expense_id__in=skipped_expense_ids)
+        .select_related("expense", "expense__person", "expense__credit_card")
+    )
+
+    # Group credit card installments by (day, card_id)
+    card_groups: dict[tuple[int, int], list[ExpenseInstallment]] = {}
 
     for inst in installments:
+        if inst.expense.person_id in scheduled_person_ids:
+            continue
         day = inst.due_date.day
-        exit_item: dict[str, Any] = {
-            "type": "installment",
-            "id": inst.id,
-            "description": f"{inst.expense.description} {inst.installment_number}/{inst.total_installments}",
-            "amount": float(inst.amount),
+        card = inst.expense.credit_card
+
+        if card:
+            key = (day, card.id)
+            card_groups.setdefault(key, []).append(inst)
+        else:
+            # Non-card installments: show individually as before
+            exit_item: dict[str, Any] = {
+                "type": "installment",
+                "id": inst.id,
+                "description": f"{inst.expense.description} {inst.installment_number}/{inst.total_installments}",
+                "amount": float(inst.amount),
+                "due": True,
+                "paid": inst.is_paid,
+            }
+            if inst.expense.person:
+                exit_item["person"] = inst.expense.person.name
+            if inst.is_paid and inst.paid_date:
+                exit_item["payment_date"] = inst.paid_date.isoformat()
+            exits.setdefault(day, []).append(exit_item)
+
+    # Create grouped card entries
+    for (day, _card_id), card_installments in card_groups.items():
+        card = card_installments[0].expense.credit_card
+        if card is None:
+            continue
+        total_amount = sum(float(inst.amount) for inst in card_installments)
+        paid_count = sum(1 for inst in card_installments if inst.is_paid)
+        total_count = len(card_installments)
+        all_paid = paid_count == total_count
+        installment_ids = [inst.id for inst in card_installments]
+
+        person = card_installments[0].expense.person
+        exit_item = {
+            "type": "credit_card",
+            "id": card.id,
+            "description": f"{card.nickname} ({total_count} parcelas)",
+            "amount": total_amount,
             "due": True,
-            "paid": inst.is_paid,
+            "paid": all_paid,
+            "card": card.nickname,
+            "installment_ids": installment_ids,
         }
-        if inst.expense.person:
-            exit_item["person"] = inst.expense.person.name
-        if inst.expense.credit_card:
-            exit_item["card"] = inst.expense.credit_card.nickname
-        if inst.is_paid and inst.paid_date:
-            exit_item["payment_date"] = inst.paid_date.isoformat()
+        if person:
+            exit_item["person"] = person.name
+        if all_paid:
+            # Use the latest paid_date from all installments
+            paid_dates = [inst.paid_date for inst in card_installments if inst.paid_date]
+            if paid_dates:
+                exit_item["payment_date"] = max(paid_dates).isoformat()
         exits.setdefault(day, []).append(exit_item)
 
 
 def _collect_fixed_expense_exits(
-    exits: dict[int, list[dict[str, Any]]], month_start: date, days_in_month: int
+    exits: dict[int, list[dict[str, Any]]],
+    month_start: date,
+    days_in_month: int,
+    skipped_expense_ids: set[int],
+    scheduled_person_ids: set[int],
 ) -> None:
-    """Add fixed recurring expense exits to the exits dict."""
+    """Add fixed recurring expense exits to the exits dict.
+
+    Skipped expenses and expenses belonging to persons with schedules are excluded.
+    """
     fixed_expenses = (
         Expense.objects.filter(
             expense_type=ExpenseType.FIXED_EXPENSE,
@@ -359,10 +496,13 @@ def _collect_fixed_expense_exits(
             expected_monthly_amount__isnull=False,
         )
         .exclude(end_date__lt=month_start)
+        .exclude(pk__in=skipped_expense_ids)
         .select_related("person")
     )
 
     for exp in fixed_expenses:
+        if exp.person_id in scheduled_person_ids:
+            continue
         day = min(exp.recurrence_day or 1, days_in_month)
         exit_item: dict[str, Any] = {
             "type": "expense",
@@ -380,17 +520,30 @@ def _collect_fixed_expense_exits(
 
 
 def _collect_dated_expense_exits(
-    exits: dict[int, list[dict[str, Any]]], month_start: date, next_month_start: date
+    exits: dict[int, list[dict[str, Any]]],
+    month_start: date,
+    next_month_start: date,
+    skipped_expense_ids: set[int],
+    scheduled_person_ids: set[int],
 ) -> None:
-    """Add one-time and utility bill exits to the exits dict."""
+    """Add one-time and utility bill exits to the exits dict.
+
+    Skipped expenses and expenses belonging to persons with schedules are excluded.
+    """
     # One-time expenses
-    one_time_expenses = Expense.objects.filter(
-        expense_type=ExpenseType.ONE_TIME_EXPENSE,
-        is_offset=False,
-        expense_date__gte=month_start,
-        expense_date__lt=next_month_start,
+    one_time_expenses = (
+        Expense.objects.filter(
+            expense_type=ExpenseType.ONE_TIME_EXPENSE,
+            is_offset=False,
+            expense_date__gte=month_start,
+            expense_date__lt=next_month_start,
+        )
+        .exclude(pk__in=skipped_expense_ids)
+        .select_related("person")
     )
     for exp in one_time_expenses:
+        if exp.person_id in scheduled_person_ids:
+            continue
         exit_item: dict[str, Any] = {
             "type": "expense",
             "id": exp.id,
@@ -404,13 +557,19 @@ def _collect_dated_expense_exits(
         exits.setdefault(exp.expense_date.day, []).append(exit_item)
 
     # Utility bills
-    utility_expenses = Expense.objects.filter(
-        expense_type__in=[ExpenseType.WATER_BILL, ExpenseType.ELECTRICITY_BILL],
-        is_offset=False,
-        expense_date__gte=month_start,
-        expense_date__lt=next_month_start,
-    ).select_related("building")
+    utility_expenses = (
+        Expense.objects.filter(
+            expense_type__in=[ExpenseType.WATER_BILL, ExpenseType.ELECTRICITY_BILL],
+            is_offset=False,
+            expense_date__gte=month_start,
+            expense_date__lt=next_month_start,
+        )
+        .exclude(pk__in=skipped_expense_ids)
+        .select_related("building", "person")
+    )
     for exp in utility_expenses:
+        if exp.person_id in scheduled_person_ids:
+            continue
         exit_item = {
             "type": "expense",
             "id": exp.id,
@@ -424,6 +583,44 @@ def _collect_dated_expense_exits(
         if exp.is_paid and exp.paid_date:
             exit_item["payment_date"] = exp.paid_date.isoformat()
         exits.setdefault(exp.expense_date.day, []).append(exit_item)
+
+
+def _collect_person_schedule_exits(
+    exits: dict[int, list[dict[str, Any]]],
+    month_start: date,
+    scheduled_person_ids: set[int],
+    days_in_month: int,
+) -> None:
+    """Add person payment schedule entries to the exits dict."""
+    if not scheduled_person_ids:
+        return
+
+    schedules = (
+        PersonPaymentSchedule.objects.filter(
+            reference_month=month_start,
+            person_id__in=scheduled_person_ids,
+        )
+        .select_related("person")
+        .order_by("person_id", "due_day")
+    )
+
+    for schedule in schedules:
+        day = min(schedule.due_day, days_in_month)
+        paid = PersonPaymentScheduleService.is_schedule_paid(
+            schedule.person_id, month_start, schedule.due_day
+        )
+        exit_item: dict[str, Any] = {
+            "type": "person_schedule",
+            "id": schedule.pk,
+            "description": schedule.person.name,
+            "amount": float(schedule.amount),
+            "due": True,
+            "paid": paid,
+            "person": schedule.person.name,
+            "person_id": schedule.person_id,
+            "reference_month": month_start.isoformat(),
+        }
+        exits.setdefault(day, []).append(exit_item)
 
 
 def _get_expected_rent_total(year: int, month: int, month_start: date) -> Decimal:
@@ -483,45 +680,71 @@ def _get_received_extra_income(month_start: date, next_month_start: date) -> Dec
     return total
 
 
-def _get_expected_expenses_total(month_start: date, next_month_start: date) -> Decimal:
-    """Total expected expenses for the month (installments + fixed + one-time + utility)."""
+def _get_expected_expenses_total(
+    month_start: date,
+    next_month_start: date,
+    skipped_expense_ids: set[int],
+    scheduled_person_ids: set[int],
+) -> Decimal:
+    """Total expected expenses for the month (installments + fixed + one-time + utility).
+
+    Excludes skipped expenses and expenses for persons with payment schedules.
+    """
     total = Decimal("0.00")
 
-    # Installments (exclude offsets)
-    installments = ExpenseInstallment.objects.filter(
-        due_date__gte=month_start,
-        due_date__lt=next_month_start,
-        expense__is_offset=False,
+    # Installments (exclude offsets, skipped, and scheduled-person expenses)
+    installments = (
+        ExpenseInstallment.objects.filter(
+            due_date__gte=month_start,
+            due_date__lt=next_month_start,
+            expense__is_offset=False,
+        )
+        .exclude(expense_id__in=skipped_expense_ids)
+        .exclude(expense__person_id__in=scheduled_person_ids)
+        .select_related("expense")
     )
     for inst in installments:
         total += inst.amount
 
-    # Fixed recurring (exclude offsets, respect end_date)
-    fixed = Expense.objects.filter(
-        expense_type=ExpenseType.FIXED_EXPENSE,
-        is_recurring=True,
-        is_offset=False,
-        expected_monthly_amount__isnull=False,
-    ).exclude(end_date__lt=month_start)
+    # Fixed recurring (exclude offsets, respect end_date, skipped, scheduled persons)
+    fixed = (
+        Expense.objects.filter(
+            expense_type=ExpenseType.FIXED_EXPENSE,
+            is_recurring=True,
+            is_offset=False,
+            expected_monthly_amount__isnull=False,
+        )
+        .exclude(end_date__lt=month_start)
+        .exclude(pk__in=skipped_expense_ids)
+        .exclude(person_id__in=scheduled_person_ids)
+    )
     for exp in fixed:
         total += exp.expected_monthly_amount or Decimal("0.00")
 
     # One-time expenses
-    one_time = Expense.objects.filter(
-        expense_type=ExpenseType.ONE_TIME_EXPENSE,
-        is_offset=False,
-        expense_date__gte=month_start,
-        expense_date__lt=next_month_start,
+    one_time = (
+        Expense.objects.filter(
+            expense_type=ExpenseType.ONE_TIME_EXPENSE,
+            is_offset=False,
+            expense_date__gte=month_start,
+            expense_date__lt=next_month_start,
+        )
+        .exclude(pk__in=skipped_expense_ids)
+        .exclude(person_id__in=scheduled_person_ids)
     )
     for exp in one_time:
         total += exp.total_amount
 
     # Utility bills
-    utilities = Expense.objects.filter(
-        expense_type__in=[ExpenseType.WATER_BILL, ExpenseType.ELECTRICITY_BILL],
-        is_offset=False,
-        expense_date__gte=month_start,
-        expense_date__lt=next_month_start,
+    utilities = (
+        Expense.objects.filter(
+            expense_type__in=[ExpenseType.WATER_BILL, ExpenseType.ELECTRICITY_BILL],
+            is_offset=False,
+            expense_date__gte=month_start,
+            expense_date__lt=next_month_start,
+        )
+        .exclude(pk__in=skipped_expense_ids)
+        .exclude(person_id__in=scheduled_person_ids)
     )
     for exp in utilities:
         total += exp.total_amount
@@ -529,51 +752,75 @@ def _get_expected_expenses_total(month_start: date, next_month_start: date) -> D
     return total
 
 
-def _get_paid_expenses_total(month_start: date, next_month_start: date) -> Decimal:
-    """Total paid expenses for the month."""
+def _get_paid_expenses_total(
+    month_start: date,
+    next_month_start: date,
+    skipped_expense_ids: set[int],
+    scheduled_person_ids: set[int],
+) -> Decimal:
+    """Total paid expenses for the month.
+
+    Excludes skipped expenses and expenses for persons with payment schedules.
+    """
     total = Decimal("0.00")
 
     # Paid installments
-    paid_installments = ExpenseInstallment.objects.filter(
-        due_date__gte=month_start,
-        due_date__lt=next_month_start,
-        is_paid=True,
-        expense__is_offset=False,
+    paid_installments = (
+        ExpenseInstallment.objects.filter(
+            due_date__gte=month_start,
+            due_date__lt=next_month_start,
+            is_paid=True,
+            expense__is_offset=False,
+        )
+        .exclude(expense_id__in=skipped_expense_ids)
+        .exclude(expense__person_id__in=scheduled_person_ids)
+        .select_related("expense")
     )
     for inst in paid_installments:
         total += inst.amount
 
-    # Paid fixed recurring
-    # For fixed expenses, we check is_paid flag
-    paid_fixed = Expense.objects.filter(
-        expense_type=ExpenseType.FIXED_EXPENSE,
-        is_recurring=True,
-        is_offset=False,
-        is_paid=True,
-        paid_date__gte=month_start,
-        paid_date__lt=next_month_start,
+    # Paid fixed recurring (check is_paid flag)
+    paid_fixed = (
+        Expense.objects.filter(
+            expense_type=ExpenseType.FIXED_EXPENSE,
+            is_recurring=True,
+            is_offset=False,
+            is_paid=True,
+            paid_date__gte=month_start,
+            paid_date__lt=next_month_start,
+        )
+        .exclude(pk__in=skipped_expense_ids)
+        .exclude(person_id__in=scheduled_person_ids)
     )
     for exp in paid_fixed:
         total += exp.expected_monthly_amount or exp.total_amount
 
     # Paid one-time expenses
-    paid_one_time = Expense.objects.filter(
-        expense_type=ExpenseType.ONE_TIME_EXPENSE,
-        is_offset=False,
-        is_paid=True,
-        expense_date__gte=month_start,
-        expense_date__lt=next_month_start,
+    paid_one_time = (
+        Expense.objects.filter(
+            expense_type=ExpenseType.ONE_TIME_EXPENSE,
+            is_offset=False,
+            is_paid=True,
+            expense_date__gte=month_start,
+            expense_date__lt=next_month_start,
+        )
+        .exclude(pk__in=skipped_expense_ids)
+        .exclude(person_id__in=scheduled_person_ids)
     )
     for exp in paid_one_time:
         total += exp.total_amount
 
     # Paid utility bills
-    paid_utilities = Expense.objects.filter(
-        expense_type__in=[ExpenseType.WATER_BILL, ExpenseType.ELECTRICITY_BILL],
-        is_offset=False,
-        is_paid=True,
-        expense_date__gte=month_start,
-        expense_date__lt=next_month_start,
+    paid_utilities = (
+        Expense.objects.filter(
+            expense_type__in=[ExpenseType.WATER_BILL, ExpenseType.ELECTRICITY_BILL],
+            is_offset=False,
+            is_paid=True,
+            expense_date__gte=month_start,
+            expense_date__lt=next_month_start,
+        )
+        .exclude(pk__in=skipped_expense_ids)
+        .exclude(person_id__in=scheduled_person_ids)
     )
     for exp in paid_utilities:
         total += exp.total_amount
@@ -581,19 +828,48 @@ def _get_paid_expenses_total(month_start: date, next_month_start: date) -> Decim
     return total
 
 
+def _get_scheduled_persons_expected(month_start: date, scheduled_person_ids: set[int]) -> Decimal:
+    """Total expected amount from person payment schedules for the month."""
+    if not scheduled_person_ids:
+        return Decimal("0.00")
+    schedules = PersonPaymentSchedule.objects.filter(
+        reference_month=month_start,
+        person_id__in=scheduled_person_ids,
+    )
+    return sum((s.amount for s in schedules), Decimal("0.00"))
+
+
+def _get_scheduled_persons_paid(month_start: date, scheduled_person_ids: set[int]) -> Decimal:
+    """Total paid amount via PersonPayment for persons with schedules in the month."""
+    if not scheduled_person_ids:
+        return Decimal("0.00")
+    payments = PersonPayment.objects.filter(
+        reference_month=month_start,
+        person_id__in=scheduled_person_ids,
+    )
+    return sum((p.amount for p in payments), Decimal("0.00"))
+
+
 def _get_overdue_totals(
-    month_start: date, next_month_start: date, today: date
+    month_start: date,
+    next_month_start: date,
+    today: date,
+    skipped_expense_ids: set[int],
 ) -> tuple[int, Decimal]:
     """Count and sum overdue items (unpaid with due_date before today)."""
     count = 0
     total = Decimal("0.00")
 
     # Overdue installments
-    overdue_installments = ExpenseInstallment.objects.filter(
-        due_date__gte=month_start,
-        due_date__lt=min(next_month_start, today),
-        is_paid=False,
-        expense__is_offset=False,
+    overdue_installments = (
+        ExpenseInstallment.objects.filter(
+            due_date__gte=month_start,
+            due_date__lt=min(next_month_start, today),
+            is_paid=False,
+            expense__is_offset=False,
+        )
+        .exclude(expense_id__in=skipped_expense_ids)
+        .select_related("expense")
     )
     for inst in overdue_installments:
         count += 1
@@ -610,7 +886,7 @@ def _get_overdue_totals(
         is_paid=False,
         expense_date__gte=month_start,
         expense_date__lt=min(next_month_start, today),
-    )
+    ).exclude(pk__in=skipped_expense_ids)
     for exp in overdue_expenses:
         count += 1
         total += exp.total_amount
