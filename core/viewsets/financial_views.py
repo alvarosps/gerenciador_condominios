@@ -20,11 +20,13 @@ from core.models import (
     Expense,
     ExpenseCategory,
     ExpenseInstallment,
+    ExpenseMonthSkip,
     FinancialSettings,
     Income,
     Person,
     PersonIncome,
     PersonPayment,
+    PersonPaymentSchedule,
     RentPayment,
 )
 from core.permissions import FinancialReadOnly
@@ -33,14 +35,17 @@ from core.serializers import (
     EmployeePaymentSerializer,
     ExpenseCategorySerializer,
     ExpenseInstallmentSerializer,
+    ExpenseMonthSkipSerializer,
     ExpenseSerializer,
     FinancialSettingsSerializer,
     IncomeSerializer,
     PersonIncomeSerializer,
+    PersonPaymentScheduleSerializer,
     PersonPaymentSerializer,
     PersonSerializer,
     RentPaymentSerializer,
 )
+from core.services.person_payment_schedule_service import PersonPaymentScheduleService
 
 logger = logging.getLogger(__name__)
 
@@ -579,3 +584,119 @@ class PersonPaymentViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(reference_month__lte=month_to)
 
         return queryset
+
+
+class PersonPaymentScheduleViewSet(viewsets.ModelViewSet):
+    serializer_class = PersonPaymentScheduleSerializer
+    permission_classes = [FinancialReadOnly]
+
+    def get_queryset(self) -> QuerySet[PersonPaymentSchedule]:
+        qs = PersonPaymentSchedule.objects.select_related("person")
+        person_id = self.request.query_params.get("person_id")
+        reference_month = self.request.query_params.get("reference_month")
+        if person_id is not None:
+            qs = qs.filter(person_id=person_id)
+        if reference_month is not None:
+            qs = qs.filter(reference_month=reference_month)
+        return qs
+
+    @action(detail=False, methods=["post"])
+    def bulk_configure(self, request: Request) -> Response:
+        person_id_val = request.data.get("person_id")
+        reference_month_str = request.data.get("reference_month")
+        entries = request.data.get("entries")
+
+        if not person_id_val or not reference_month_str or not isinstance(entries, list):
+            return Response(
+                {"error": "Os campos 'person_id', 'reference_month' e 'entries' são obrigatórios."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            person_id = int(person_id_val)
+            reference_month = date.fromisoformat(str(reference_month_str))
+        except (ValueError, TypeError):
+            return Response(
+                {
+                    "error": (
+                        "Parâmetros inválidos: 'person_id' deve ser inteiro"
+                        " e 'reference_month' deve ser YYYY-MM-DD."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if reference_month.day != 1:
+            return Response(
+                {"error": "O campo 'reference_month' deve ser o primeiro dia do mês."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            Person.objects.get(pk=person_id)
+        except Person.DoesNotExist:
+            return Response({"error": "Pessoa não encontrada."}, status=status.HTTP_404_NOT_FOUND)
+
+        schedules = PersonPaymentScheduleService.bulk_configure(person_id, reference_month, entries)
+        totals = PersonPaymentScheduleService.get_person_month_total(
+            person_id, reference_month.year, reference_month.month
+        )
+        serializer = self.get_serializer(schedules, many=True)
+        return Response(
+            {
+                "schedules": serializer.data,
+                "total_configured": len(schedules),
+                "total_due": totals["net_total"],
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    @action(detail=False, methods=["get"])
+    def person_month_total(self, request: Request) -> Response:
+        person_id_str = self.request.query_params.get("person_id")
+        reference_month_str = self.request.query_params.get("reference_month")
+
+        if not person_id_str or not reference_month_str:
+            return Response(
+                {"error": "Os parâmetros 'person_id' e 'reference_month' são obrigatórios."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            person_id = int(person_id_str)
+            reference_month = date.fromisoformat(reference_month_str)
+        except (ValueError, TypeError):
+            return Response(
+                {
+                    "error": (
+                        "Parâmetros inválidos: 'person_id' deve ser inteiro"
+                        " e 'reference_month' deve ser YYYY-MM-DD."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            Person.objects.get(pk=person_id)
+        except Person.DoesNotExist:
+            return Response({"error": "Pessoa não encontrada."}, status=status.HTTP_404_NOT_FOUND)
+
+        totals = PersonPaymentScheduleService.get_person_month_total(
+            person_id, reference_month.year, reference_month.month
+        )
+        return Response(totals, status=status.HTTP_200_OK)
+
+
+class ExpenseMonthSkipViewSet(viewsets.ModelViewSet):
+    serializer_class = ExpenseMonthSkipSerializer
+    permission_classes = [FinancialReadOnly]
+
+    def get_queryset(self) -> QuerySet[ExpenseMonthSkip]:
+        qs = ExpenseMonthSkip.objects.select_related("expense")
+        reference_month = self.request.query_params.get("reference_month")
+        expense_id = self.request.query_params.get("expense_id")
+        if reference_month is not None:
+            qs = qs.filter(reference_month=reference_month)
+        if expense_id is not None:
+            qs = qs.filter(expense_id=expense_id)
+        return qs
