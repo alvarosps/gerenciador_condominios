@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
+import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -14,10 +15,12 @@ import { useDailyBreakdown } from '@/lib/api/hooks/use-daily-control';
 import { usePersons } from '@/lib/api/hooks/use-persons';
 import { useBuildings } from '@/lib/api/hooks/use-buildings';
 import { useAuthStore } from '@/store/auth-store';
+import { getDefaultExpenseDate } from '@/lib/utils/formatters';
 import { DailySummaryCards } from './_components/daily-summary-cards';
 import { DailyBalanceChart } from './_components/daily-balance-chart';
 import { DailyTimeline, type DailyFilters } from './_components/daily-timeline';
 import { DayDetailDrawer } from './_components/day-detail-drawer';
+import { ExpenseFormModal } from '@/app/(dashboard)/financial/expenses/_components/expense-form-modal';
 import type { DailyBreakdownDay } from '@/lib/api/hooks/use-daily-control';
 
 const MONTH_NAMES = [
@@ -25,13 +28,28 @@ const MONTH_NAMES = [
   'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
 ];
 
+const MONTH_ABBR = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+
 export default function DailyControlPage() {
   const { user } = useAuthStore();
   const isAdmin = user?.is_staff ?? false;
+  const queryClient = useQueryClient();
 
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
+  const [isCreating, setIsCreating] = useState(false);
+  const [isCreatingNextMonth, setIsCreatingNextMonth] = useState(false);
+
+  const nextMonth = month === 12 ? 1 : month + 1;
+  const nextYear = month === 12 ? year + 1 : year;
+  const currentMonthAbbr = MONTH_ABBR[month - 1] ?? '';
+  const nextMonthAbbr = MONTH_ABBR[nextMonth - 1] ?? '';
+
+  const handleExpenseSaved = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: ['daily-control'] });
+    void queryClient.invalidateQueries({ queryKey: ['financial-dashboard'] });
+  }, [queryClient]);
 
   const [filters, setFilters] = useState<DailyFilters>({
     direction: 'all',
@@ -90,16 +108,30 @@ export default function DailyControlPage() {
             Acompanhe entradas e saídas dia a dia
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" onClick={goToPrevMonth} aria-label="Mês anterior">
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <span className="text-lg font-semibold min-w-[160px] text-center">
-            {monthLabel} {year}
-          </span>
-          <Button variant="outline" size="icon" onClick={goToNextMonth} aria-label="Próximo mês">
-            <ChevronRight className="h-4 w-4" />
-          </Button>
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="icon" onClick={goToPrevMonth} aria-label="Mês anterior">
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-lg font-semibold min-w-[160px] text-center">
+              {monthLabel} {year}
+            </span>
+            <Button variant="outline" size="icon" onClick={goToNextMonth} aria-label="Próximo mês">
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+          {isAdmin && (
+            <div className="flex gap-2">
+              <Button size="sm" onClick={() => setIsCreating(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Nova Despesa ({currentMonthAbbr})
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setIsCreatingNextMonth(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Nova Despesa ({nextMonthAbbr})
+              </Button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -224,6 +256,24 @@ export default function DailyControlPage() {
         open={drawerOpen}
         onClose={handleDrawerClose}
       />
+
+      {isCreating && (
+        <ExpenseFormModal
+          open={isCreating}
+          onClose={() => setIsCreating(false)}
+          defaultExpenseDate={getDefaultExpenseDate(year, month)}
+          onSuccess={handleExpenseSaved}
+        />
+      )}
+
+      {isCreatingNextMonth && (
+        <ExpenseFormModal
+          open={isCreatingNextMonth}
+          onClose={() => setIsCreatingNextMonth(false)}
+          defaultExpenseDate={getDefaultExpenseDate(nextYear, nextMonth)}
+          onSuccess={handleExpenseSaved}
+        />
+      )}
     </div>
   );
 }

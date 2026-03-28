@@ -1,23 +1,41 @@
 'use client';
 
 import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { Plus } from 'lucide-react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useDashboardSummary } from '@/lib/api/hooks/use-financial-dashboard';
 import { useAuthStore } from '@/store/auth-store';
-import { formatCurrency } from '@/lib/utils/formatters';
+import { formatCurrency, getDefaultExpenseDate } from '@/lib/utils/formatters';
 import { MonthNavigator } from './_components/month-navigator';
 import { ExpenseListTable } from './_components/expense-list-table';
 import { PaymentScheduleConfig } from './_components/payment-schedule-config';
+import { ExpenseFormModal } from './_components/expense-form-modal';
+
+const MONTH_ABBR = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 
 export default function ExpensesPage() {
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
+  const [isCreating, setIsCreating] = useState(false);
+  const [isCreatingNextMonth, setIsCreatingNextMonth] = useState(false);
   const { data, isLoading, error } = useDashboardSummary(year, month);
   const { user } = useAuthStore();
   const isAdmin = user?.is_staff ?? false;
+  const queryClient = useQueryClient();
+
+  const nextMonth = month === 12 ? 1 : month + 1;
+  const nextYear = month === 12 ? year + 1 : year;
+  const currentMonthAbbr = MONTH_ABBR[month - 1] ?? '';
+  const nextMonthAbbr = MONTH_ABBR[nextMonth - 1] ?? '';
+
+  const handleExpenseSaved = () => {
+    void queryClient.invalidateQueries({ queryKey: ['financial-dashboard'] });
+  };
 
   return (
     <div className="space-y-6">
@@ -35,20 +53,34 @@ export default function ExpensesPage() {
         <TabsContent value="despesas">
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between flex-wrap gap-3">
                 <MonthNavigator
                   year={year}
                   month={month}
                   onMonthChange={(y, m) => { setYear(y); setMonth(m); }}
                 />
-                {data && (
-                  <div className="text-sm text-muted-foreground">
-                    Total:{' '}
-                    <span className="font-bold text-destructive">
-                      {formatCurrency(data.expense_summary.total)}
-                    </span>
-                  </div>
-                )}
+                <div className="flex items-center gap-3">
+                  {data && (
+                    <div className="text-sm text-muted-foreground">
+                      Total:{' '}
+                      <span className="font-bold text-destructive">
+                        {formatCurrency(data.expense_summary.total)}
+                      </span>
+                    </div>
+                  )}
+                  {isAdmin && (
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={() => setIsCreating(true)}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Nova Despesa ({currentMonthAbbr})
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setIsCreatingNextMonth(true)}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Nova Despesa ({nextMonthAbbr})
+                      </Button>
+                    </div>
+                  )}
+                </div>
               </div>
             </CardHeader>
             <CardContent>
@@ -75,6 +107,24 @@ export default function ExpensesPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {isCreating && (
+        <ExpenseFormModal
+          open={isCreating}
+          onClose={() => setIsCreating(false)}
+          defaultExpenseDate={getDefaultExpenseDate(year, month)}
+          onSuccess={handleExpenseSaved}
+        />
+      )}
+
+      {isCreatingNextMonth && (
+        <ExpenseFormModal
+          open={isCreatingNextMonth}
+          onClose={() => setIsCreatingNextMonth(false)}
+          defaultExpenseDate={getDefaultExpenseDate(nextYear, nextMonth)}
+          onSuccess={handleExpenseSaved}
+        />
+      )}
     </div>
   );
 }

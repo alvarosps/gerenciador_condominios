@@ -53,6 +53,7 @@ interface Props {
   expense?: Expense | null;
   defaultExpenseDate?: string;
   onClose: () => void;
+  onSuccess?: () => void;
 }
 
 const EXPENSE_TYPES = [
@@ -133,7 +134,7 @@ const INSTALLMENT_TYPES = ['card_purchase', 'bank_loan', 'personal_loan'];
 // Types that show debt_installment toggle (utility bills)
 const DEBT_INSTALLMENT_TYPES = ['water_bill', 'electricity_bill', 'property_tax'];
 
-export function ExpenseFormModal({ open, expense, defaultExpenseDate, onClose }: Props) {
+export function ExpenseFormModal({ open, expense, defaultExpenseDate, onClose, onSuccess }: Props) {
   const createMutation = useCreateExpense();
   const updateMutation = useUpdateExpense();
   const generateInstallmentsMutation = useGenerateInstallments();
@@ -275,6 +276,7 @@ export function ExpenseFormModal({ open, expense, defaultExpenseDate, onClose }:
         }
       }
 
+      onSuccess?.();
       onClose();
       form.reset();
     } catch {
