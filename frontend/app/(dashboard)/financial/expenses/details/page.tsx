@@ -13,7 +13,7 @@ import {
   useExpenseDetail,
 } from '@/lib/api/hooks/use-financial-dashboard';
 import type { ExpenseDetailItem } from '@/lib/api/hooks/use-financial-dashboard';
-import { formatMonthYear, getDefaultExpenseDate } from '@/lib/utils/formatters';
+import { formatMonthYear, getDefaultExpenseDate, MONTH_ABBR } from '@/lib/utils/formatters';
 import { apiClient } from '@/lib/api/client';
 import { DetailHeader } from './_components/detail-header';
 import { ExpenseAccordion } from './_components/expense-accordion';
@@ -32,8 +32,6 @@ const LABELS: Record<string, string> = {
 };
 
 const UTILITY_TYPES = ['electricity', 'water', 'iptu'];
-
-const MONTH_ABBR = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 
 function DetailPageSkeleton() {
   return (
