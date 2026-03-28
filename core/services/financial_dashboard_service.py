@@ -19,6 +19,7 @@ from core.models import (
     EmployeePayment,
     Expense,
     ExpenseInstallment,
+    ExpenseMonthSkip,
     ExpenseType,
     FinancialSettings,
     Income,
@@ -366,9 +367,15 @@ class FinancialDashboardService:
         month_start = date(year, month, 1)
         next_month = _next_month_start(year, month)
 
+        skipped_expense_ids: set[int] = set(
+            ExpenseMonthSkip.objects.filter(
+                reference_month=month_start,
+            ).values_list("expense_id", flat=True)
+        )
+
         income_summary = FinancialDashboardService._build_income_summary(month_start)
         expense_summary = FinancialDashboardService._build_expense_summary(
-            month_start, next_month, year, month
+            month_start, next_month, year, month, skipped_expense_ids
         )
         overdue_items = FinancialDashboardService._build_overdue_previous_months(year, month)
 
@@ -474,42 +481,64 @@ class FinancialDashboardService:
     @staticmethod
     def _calc_person_expense_total(person: Person, month_start: date, next_month: date) -> Decimal:
         """Calculate total expenses for a person in a month (quick version, no details)."""
-        card: Decimal = ExpenseInstallment.objects.filter(
-            due_date__gte=month_start,
-            due_date__lt=next_month,
-            expense__person=person,
-            expense__expense_type=ExpenseType.CARD_PURCHASE,
-            expense__is_debt_installment=False,
-            expense__is_offset=False,
-        ).aggregate(total=Coalesce(Sum("amount"), Decimal("0.00")))["total"]
+        skipped_expense_ids: set[int] = set(
+            ExpenseMonthSkip.objects.filter(
+                reference_month=month_start,
+            ).values_list("expense_id", flat=True)
+        )
+
+        card: Decimal = (
+            ExpenseInstallment.objects.filter(
+                due_date__gte=month_start,
+                due_date__lt=next_month,
+                expense__person=person,
+                expense__expense_type=ExpenseType.CARD_PURCHASE,
+                expense__is_debt_installment=False,
+                expense__is_offset=False,
+            )
+            .exclude(expense_id__in=skipped_expense_ids)
+            .aggregate(total=Coalesce(Sum("amount"), Decimal("0.00")))["total"]
+        )
 
         # Single-payment card purchases
-        card_single: Decimal = Expense.objects.filter(
-            expense_type=ExpenseType.CARD_PURCHASE,
-            person=person,
-            is_installment=False,
-            is_offset=False,
-            expense_date__gte=month_start,
-            expense_date__lt=next_month,
-        ).aggregate(total=Coalesce(Sum("total_amount"), Decimal("0.00")))["total"]
+        card_single: Decimal = (
+            Expense.objects.filter(
+                expense_type=ExpenseType.CARD_PURCHASE,
+                person=person,
+                is_installment=False,
+                is_offset=False,
+                expense_date__gte=month_start,
+                expense_date__lt=next_month,
+            )
+            .exclude(pk__in=skipped_expense_ids)
+            .aggregate(total=Coalesce(Sum("total_amount"), Decimal("0.00")))["total"]
+        )
 
-        loans: Decimal = ExpenseInstallment.objects.filter(
-            due_date__gte=month_start,
-            due_date__lt=next_month,
-            expense__person=person,
-            expense__expense_type__in=[ExpenseType.BANK_LOAN, ExpenseType.PERSONAL_LOAN],
-            expense__is_offset=False,
-        ).aggregate(total=Coalesce(Sum("amount"), Decimal("0.00")))["total"]
+        loans: Decimal = (
+            ExpenseInstallment.objects.filter(
+                due_date__gte=month_start,
+                due_date__lt=next_month,
+                expense__person=person,
+                expense__expense_type__in=[ExpenseType.BANK_LOAN, ExpenseType.PERSONAL_LOAN],
+                expense__is_offset=False,
+            )
+            .exclude(expense_id__in=skipped_expense_ids)
+            .aggregate(total=Coalesce(Sum("amount"), Decimal("0.00")))["total"]
+        )
 
         # Single-payment loans
-        loan_single: Decimal = Expense.objects.filter(
-            expense_type__in=[ExpenseType.BANK_LOAN, ExpenseType.PERSONAL_LOAN],
-            person=person,
-            is_installment=False,
-            is_offset=False,
-            expense_date__gte=month_start,
-            expense_date__lt=next_month,
-        ).aggregate(total=Coalesce(Sum("total_amount"), Decimal("0.00")))["total"]
+        loan_single: Decimal = (
+            Expense.objects.filter(
+                expense_type__in=[ExpenseType.BANK_LOAN, ExpenseType.PERSONAL_LOAN],
+                person=person,
+                is_installment=False,
+                is_offset=False,
+                expense_date__gte=month_start,
+                expense_date__lt=next_month,
+            )
+            .exclude(pk__in=skipped_expense_ids)
+            .aggregate(total=Coalesce(Sum("total_amount"), Decimal("0.00")))["total"]
+        )
 
         fixed: Decimal = (
             Expense.objects.filter(
@@ -519,16 +548,21 @@ class FinancialDashboardService:
                 is_offset=False,
             )
             .exclude(end_date__lt=month_start)
+            .exclude(pk__in=skipped_expense_ids)
             .aggregate(total=Coalesce(Sum("expected_monthly_amount"), Decimal("0.00")))["total"]
         )
 
-        one_time: Decimal = Expense.objects.filter(
-            expense_type=ExpenseType.ONE_TIME_EXPENSE,
-            person=person,
-            is_offset=False,
-            expense_date__gte=month_start,
-            expense_date__lt=next_month,
-        ).aggregate(total=Coalesce(Sum("total_amount"), Decimal("0.00")))["total"]
+        one_time: Decimal = (
+            Expense.objects.filter(
+                expense_type=ExpenseType.ONE_TIME_EXPENSE,
+                person=person,
+                is_offset=False,
+                expense_date__gte=month_start,
+                expense_date__lt=next_month,
+            )
+            .exclude(pk__in=skipped_expense_ids)
+            .aggregate(total=Coalesce(Sum("total_amount"), Decimal("0.00")))["total"]
+        )
 
         offset_inst: Decimal = ExpenseInstallment.objects.filter(
             due_date__gte=month_start,
@@ -798,7 +832,11 @@ class FinancialDashboardService:
 
     @staticmethod
     def _build_expense_summary(
-        month_start: date, next_month: date, year: int, month: int
+        month_start: date,
+        next_month: date,
+        year: int,
+        month: int,
+        skipped_expense_ids: set[int],
     ) -> dict[str, Any]:
         """Build expense breakdown: per person, utility bills, IPTU."""
         # Per-person expense summary with waterfall payment allocation
@@ -808,7 +846,7 @@ class FinancialDashboardService:
 
         for person in persons:
             person_data = FinancialDashboardService._get_person_month_expenses(
-                person, month_start, next_month
+                person, month_start, next_month, skipped_expense_ids
             )
             # Use waterfall for payable persons to get correct allocated payment
             if person_data["is_payable"]:
@@ -830,11 +868,15 @@ class FinancialDashboardService:
         )
 
         # IPTU installments grouped by building
-        iptu_installments = ExpenseInstallment.objects.filter(
-            due_date__gte=month_start,
-            due_date__lt=next_month,
-            expense__expense_type=ExpenseType.PROPERTY_TAX,
-        ).select_related("expense", "expense__building")
+        iptu_installments = (
+            ExpenseInstallment.objects.filter(
+                due_date__gte=month_start,
+                due_date__lt=next_month,
+                expense__expense_type=ExpenseType.PROPERTY_TAX,
+            )
+            .exclude(expense_id__in=skipped_expense_ids)
+            .select_related("expense", "expense__building")
+        )
 
         iptu_total = Decimal("0.00")
         iptu_by_building: dict[str, dict[str, Any]] = {}
@@ -869,7 +911,9 @@ class FinancialDashboardService:
         }
 
         # Categorized fixed expenses (not already assigned to a person)
-        fixed_categories = FinancialDashboardService._build_fixed_expense_categories(month_start)
+        fixed_categories = FinancialDashboardService._build_fixed_expense_categories(
+            month_start, skipped_expense_ids
+        )
 
         # Employee salary payments for this month + salary offset rents
         employee_payments = EmployeePayment.objects.filter(
@@ -933,14 +977,19 @@ class FinancialDashboardService:
     @staticmethod
     def _build_fixed_expense_categories(
         month_start: date,
+        skipped_expense_ids: set[int],
     ) -> dict[str, dict[str, Any]]:
         """Categorize fixed expenses into internet, celular, sítio, and outros."""
-        fixed_expenses = Expense.objects.filter(
-            expense_type=ExpenseType.FIXED_EXPENSE,
-            is_recurring=True,
-            is_offset=False,
-            person__isnull=True,
-        ).exclude(end_date__lt=month_start)
+        fixed_expenses = (
+            Expense.objects.filter(
+                expense_type=ExpenseType.FIXED_EXPENSE,
+                is_recurring=True,
+                is_offset=False,
+                person__isnull=True,
+            )
+            .exclude(end_date__lt=month_start)
+            .exclude(pk__in=skipped_expense_ids)
+        )
 
         internet: list[dict[str, Any]] = []
         internet_total = Decimal("0.00")
@@ -1139,18 +1188,25 @@ class FinancialDashboardService:
 
     @staticmethod
     def _get_person_month_expenses(
-        person: Person, month_start: date, next_month: date
+        person: Person,
+        month_start: date,
+        next_month: date,
+        skipped_expense_ids: set[int],
     ) -> dict[str, Any]:
         """Get a person's expense summary for a given month (cards, loans, fixed, one-time, offsets)."""
         # Card purchases — installment-based
-        card_installments = ExpenseInstallment.objects.filter(
-            due_date__gte=month_start,
-            due_date__lt=next_month,
-            expense__person=person,
-            expense__expense_type=ExpenseType.CARD_PURCHASE,
-            expense__is_debt_installment=False,
-            expense__is_offset=False,
-        ).select_related("expense", "expense__credit_card")
+        card_installments = (
+            ExpenseInstallment.objects.filter(
+                due_date__gte=month_start,
+                due_date__lt=next_month,
+                expense__person=person,
+                expense__expense_type=ExpenseType.CARD_PURCHASE,
+                expense__is_debt_installment=False,
+                expense__is_offset=False,
+            )
+            .exclude(expense_id__in=skipped_expense_ids)
+            .select_related("expense", "expense__credit_card")
+        )
         card_total = Decimal("0.00")
         card_details: list[dict[str, Any]] = []
         for inst in card_installments:
@@ -1167,14 +1223,18 @@ class FinancialDashboardService:
             )
 
         # Card purchases — single payment (faturas, not installment-based)
-        card_single = Expense.objects.filter(
-            expense_type=ExpenseType.CARD_PURCHASE,
-            person=person,
-            is_installment=False,
-            is_offset=False,
-            expense_date__gte=month_start,
-            expense_date__lt=next_month,
-        ).select_related("credit_card")
+        card_single = (
+            Expense.objects.filter(
+                expense_type=ExpenseType.CARD_PURCHASE,
+                person=person,
+                is_installment=False,
+                is_offset=False,
+                expense_date__gte=month_start,
+                expense_date__lt=next_month,
+            )
+            .exclude(pk__in=skipped_expense_ids)
+            .select_related("credit_card")
+        )
         for exp in card_single:
             card_total += exp.total_amount
             card_details.append(
@@ -1186,13 +1246,17 @@ class FinancialDashboardService:
             )
 
         # Loan installments (bank + personal loans)
-        loan_installments = ExpenseInstallment.objects.filter(
-            due_date__gte=month_start,
-            due_date__lt=next_month,
-            expense__person=person,
-            expense__expense_type__in=[ExpenseType.BANK_LOAN, ExpenseType.PERSONAL_LOAN],
-            expense__is_offset=False,
-        ).select_related("expense")
+        loan_installments = (
+            ExpenseInstallment.objects.filter(
+                due_date__gte=month_start,
+                due_date__lt=next_month,
+                expense__person=person,
+                expense__expense_type__in=[ExpenseType.BANK_LOAN, ExpenseType.PERSONAL_LOAN],
+                expense__is_offset=False,
+            )
+            .exclude(expense_id__in=skipped_expense_ids)
+            .select_related("expense")
+        )
         loan_total = Decimal("0.00")
         loan_details: list[dict[str, Any]] = []
         for inst in loan_installments:
@@ -1213,18 +1277,22 @@ class FinancialDashboardService:
             is_offset=False,
             expense_date__gte=month_start,
             expense_date__lt=next_month,
-        )
+        ).exclude(pk__in=skipped_expense_ids)
         for exp in loan_single:
             loan_total += exp.total_amount
             loan_details.append({"description": exp.description, "amount": exp.total_amount})
 
         # Fixed recurring expenses for this person
-        fixed_expenses = Expense.objects.filter(
-            expense_type=ExpenseType.FIXED_EXPENSE,
-            is_recurring=True,
-            person=person,
-            is_offset=False,
-        ).exclude(end_date__lt=month_start)
+        fixed_expenses = (
+            Expense.objects.filter(
+                expense_type=ExpenseType.FIXED_EXPENSE,
+                is_recurring=True,
+                person=person,
+                is_offset=False,
+            )
+            .exclude(end_date__lt=month_start)
+            .exclude(pk__in=skipped_expense_ids)
+        )
         fixed_total = Decimal("0.00")
         fixed_details: list[dict[str, Any]] = []
         for exp in fixed_expenses:
@@ -1239,7 +1307,7 @@ class FinancialDashboardService:
             is_offset=False,
             expense_date__gte=month_start,
             expense_date__lt=next_month,
-        )
+        ).exclude(pk__in=skipped_expense_ids)
         one_time_total = Decimal("0.00")
         one_time_details: list[dict[str, Any]] = []
         for exp in one_time_expenses:

@@ -1045,7 +1045,7 @@ class TestBuildFixedExpenseCategories:
             expected_monthly_amount=Decimal("120.00"),
         )
 
-        result = FinancialDashboardService._build_fixed_expense_categories(date(2026, 3, 1))
+        result = FinancialDashboardService._build_fixed_expense_categories(date(2026, 3, 1), set())
         assert result["internet"]["total"] == Decimal("120.00")
         assert len(result["internet"]["details"]) == 1
 
@@ -1061,7 +1061,7 @@ class TestBuildFixedExpenseCategories:
             expected_monthly_amount=Decimal("80.00"),
         )
 
-        result = FinancialDashboardService._build_fixed_expense_categories(date(2026, 3, 1))
+        result = FinancialDashboardService._build_fixed_expense_categories(date(2026, 3, 1), set())
         assert result["celular"]["total"] == Decimal("80.00")
 
     @pytest.mark.unit
@@ -1076,7 +1076,7 @@ class TestBuildFixedExpenseCategories:
             expected_monthly_amount=Decimal("200.00"),
         )
 
-        result = FinancialDashboardService._build_fixed_expense_categories(date(2026, 3, 1))
+        result = FinancialDashboardService._build_fixed_expense_categories(date(2026, 3, 1), set())
         assert result["sitio"]["total"] == Decimal("200.00")
 
     @pytest.mark.unit
@@ -1091,7 +1091,7 @@ class TestBuildFixedExpenseCategories:
             expected_monthly_amount=Decimal("150.00"),
         )
 
-        result = FinancialDashboardService._build_fixed_expense_categories(date(2026, 3, 1))
+        result = FinancialDashboardService._build_fixed_expense_categories(date(2026, 3, 1), set())
         assert result["sitio"]["total"] == Decimal("150.00")
 
     @pytest.mark.unit
@@ -1106,7 +1106,7 @@ class TestBuildFixedExpenseCategories:
             expected_monthly_amount=Decimal("55.00"),
         )
 
-        result = FinancialDashboardService._build_fixed_expense_categories(date(2026, 3, 1))
+        result = FinancialDashboardService._build_fixed_expense_categories(date(2026, 3, 1), set())
         assert result["outros_fixed"]["total"] == Decimal("55.00")
 
     @pytest.mark.unit
@@ -1122,7 +1122,7 @@ class TestBuildFixedExpenseCategories:
             person=person_rodrigo,
         )
 
-        result = FinancialDashboardService._build_fixed_expense_categories(date(2026, 3, 1))
+        result = FinancialDashboardService._build_fixed_expense_categories(date(2026, 3, 1), set())
         # Person-assigned expenses excluded from fixed categories
         assert result["internet"]["total"] == Decimal("0.00")
 
@@ -1139,7 +1139,7 @@ class TestBuildFixedExpenseCategories:
             end_date=date(2026, 2, 28),  # ended before March
         )
 
-        result = FinancialDashboardService._build_fixed_expense_categories(date(2026, 3, 1))
+        result = FinancialDashboardService._build_fixed_expense_categories(date(2026, 3, 1), set())
         assert result["internet"]["total"] == Decimal("0.00")
 
     @pytest.mark.unit
@@ -1154,7 +1154,7 @@ class TestBuildFixedExpenseCategories:
             expected_monthly_amount=None,
         )
 
-        result = FinancialDashboardService._build_fixed_expense_categories(date(2026, 3, 1))
+        result = FinancialDashboardService._build_fixed_expense_categories(date(2026, 3, 1), set())
         assert result["outros_fixed"]["total"] == Decimal("240.00")
 
 
@@ -1279,7 +1279,7 @@ class TestGetPersonMonthExpenses:
         )
 
         result = FinancialDashboardService._get_person_month_expenses(
-            person_rodrigo, date(2026, 3, 1), date(2026, 4, 1)
+            person_rodrigo, date(2026, 3, 1), date(2026, 4, 1), set()
         )
 
         assert result["card_total"] == Decimal("300.00")
@@ -1302,7 +1302,7 @@ class TestGetPersonMonthExpenses:
         )
 
         result = FinancialDashboardService._get_person_month_expenses(
-            person_rodrigo, date(2026, 3, 1), date(2026, 4, 1)
+            person_rodrigo, date(2026, 3, 1), date(2026, 4, 1), set()
         )
 
         assert result["card_total"] == Decimal("500.00")
@@ -1322,7 +1322,7 @@ class TestGetPersonMonthExpenses:
         )
 
         result = FinancialDashboardService._get_person_month_expenses(
-            person_rodrigo, date(2026, 3, 1), date(2026, 4, 1)
+            person_rodrigo, date(2026, 3, 1), date(2026, 4, 1), set()
         )
 
         assert result["loan_total"] == Decimal("500.00")
@@ -1340,7 +1340,7 @@ class TestGetPersonMonthExpenses:
         )
 
         result = FinancialDashboardService._get_person_month_expenses(
-            person_rodrigo, date(2026, 3, 1), date(2026, 4, 1)
+            person_rodrigo, date(2026, 3, 1), date(2026, 4, 1), set()
         )
 
         assert result["loan_total"] == Decimal("800.00")
@@ -1359,7 +1359,7 @@ class TestGetPersonMonthExpenses:
         )
 
         result = FinancialDashboardService._get_person_month_expenses(
-            person_rodrigo, date(2026, 3, 1), date(2026, 4, 1)
+            person_rodrigo, date(2026, 3, 1), date(2026, 4, 1), set()
         )
 
         assert result["fixed_total"] == Decimal("100.00")
@@ -1376,7 +1376,7 @@ class TestGetPersonMonthExpenses:
         )
 
         result = FinancialDashboardService._get_person_month_expenses(
-            person_rodrigo, date(2026, 3, 1), date(2026, 4, 1)
+            person_rodrigo, date(2026, 3, 1), date(2026, 4, 1), set()
         )
 
         assert result["one_time_total"] == Decimal("250.00")
@@ -1409,7 +1409,7 @@ class TestGetPersonMonthExpenses:
         )
 
         result = FinancialDashboardService._get_person_month_expenses(
-            person_rodrigo, date(2026, 3, 1), date(2026, 4, 1)
+            person_rodrigo, date(2026, 3, 1), date(2026, 4, 1), set()
         )
 
         assert result["offset_total"] == Decimal("100.00")
@@ -1435,7 +1435,7 @@ class TestGetPersonMonthExpenses:
         exp.save()
 
         result = FinancialDashboardService._get_person_month_expenses(
-            person_rodrigo, date(2026, 3, 1), date(2026, 4, 1)
+            person_rodrigo, date(2026, 3, 1), date(2026, 4, 1), set()
         )
 
         assert result["offset_total"] == Decimal("200.00")
@@ -1452,7 +1452,7 @@ class TestGetPersonMonthExpenses:
         )
 
         result = FinancialDashboardService._get_person_month_expenses(
-            person_rodrigo, date(2026, 3, 1), date(2026, 4, 1)
+            person_rodrigo, date(2026, 3, 1), date(2026, 4, 1), set()
         )
 
         assert result["stipend_total"] == Decimal("300.00")
@@ -1469,7 +1469,7 @@ class TestGetPersonMonthExpenses:
         )
 
         result = FinancialDashboardService._get_person_month_expenses(
-            person_rodrigo, date(2026, 3, 1), date(2026, 4, 1)
+            person_rodrigo, date(2026, 3, 1), date(2026, 4, 1), set()
         )
 
         assert result["total_paid"] == Decimal("400.00")
@@ -1490,7 +1490,7 @@ class TestGetPersonMonthExpenses:
         )
 
         result = FinancialDashboardService._get_person_month_expenses(
-            person_rodrigo, date(2026, 3, 1), date(2026, 4, 1)
+            person_rodrigo, date(2026, 3, 1), date(2026, 4, 1), set()
         )
 
         assert result["is_payable"] is True
