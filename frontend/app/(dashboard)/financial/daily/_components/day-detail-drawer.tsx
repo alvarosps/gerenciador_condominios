@@ -371,7 +371,7 @@ export function DayDetailDrawer({ day, open, onClose }: Props) {
         </SheetContent>
       </Sheet>
 
-      {selectedPersonExit !== null && selectedPersonExit.exit.person_id !== undefined && day !== null && (
+      {selectedPersonExit?.exit.person_id !== undefined && day !== null && (
         <PersonPayModal
           open={selectedPersonExit !== null}
           onOpenChange={(isOpen) => {
