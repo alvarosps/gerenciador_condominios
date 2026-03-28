@@ -22,8 +22,18 @@ from typing import Any
 from django.db.models.signals import m2m_changed, post_delete, post_save
 from django.dispatch import receiver
 
-from .cache import invalidate_related_caches
-from .models import Apartment, Building, Dependent, Furniture, Lease, Tenant
+from .cache import CacheManager, invalidate_related_caches
+from .models import (
+    Apartment,
+    Building,
+    Dependent,
+    ExpenseMonthSkip,
+    Furniture,
+    Lease,
+    PersonPayment,
+    PersonPaymentSchedule,
+    Tenant,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -260,6 +270,73 @@ def invalidate_dependent_cache_on_delete(
     """
     logger.info(f"Dependent {instance.pk} deleted, invalidating caches")
     invalidate_related_caches(instance, related_models=["Tenant"])
+
+
+# =============================================================================
+# Financial Model Signals
+# =============================================================================
+
+
+def _invalidate_financial_caches(model_name: str, pk: int) -> None:
+    """Invalidate all financial dashboard caches affected by financial model changes."""
+    logger.info(f"{model_name} {pk} changed, invalidating financial caches")
+    CacheManager.invalidate_pattern("daily-control:*")
+    CacheManager.invalidate_pattern("cash-flow:*")
+    CacheManager.invalidate_pattern("financial-dashboard:*")
+
+
+@receiver(post_save, sender=PersonPayment)
+def invalidate_person_payment_cache_on_save(
+    sender: type[PersonPayment], instance: PersonPayment, created: bool, **kwargs: Any
+) -> None:
+    action = "created" if created else "updated"
+    logger.info(f"PersonPayment {instance.pk} {action}, invalidating financial caches")
+    _invalidate_financial_caches("PersonPayment", instance.pk)
+
+
+@receiver(post_delete, sender=PersonPayment)
+def invalidate_person_payment_cache_on_delete(
+    sender: type[PersonPayment], instance: PersonPayment, **kwargs: Any
+) -> None:
+    _invalidate_financial_caches("PersonPayment", instance.pk)
+
+
+@receiver(post_save, sender=PersonPaymentSchedule)
+def invalidate_person_payment_schedule_cache_on_save(
+    sender: type[PersonPaymentSchedule],
+    instance: PersonPaymentSchedule,
+    created: bool,
+    **kwargs: Any,
+) -> None:
+    action = "created" if created else "updated"
+    logger.info(f"PersonPaymentSchedule {instance.pk} {action}, invalidating financial caches")
+    _invalidate_financial_caches("PersonPaymentSchedule", instance.pk)
+
+
+@receiver(post_delete, sender=PersonPaymentSchedule)
+def invalidate_person_payment_schedule_cache_on_delete(
+    sender: type[PersonPaymentSchedule], instance: PersonPaymentSchedule, **kwargs: Any
+) -> None:
+    _invalidate_financial_caches("PersonPaymentSchedule", instance.pk)
+
+
+@receiver(post_save, sender=ExpenseMonthSkip)
+def invalidate_expense_month_skip_cache_on_save(
+    sender: type[ExpenseMonthSkip],
+    instance: ExpenseMonthSkip,
+    created: bool,
+    **kwargs: Any,
+) -> None:
+    action = "created" if created else "updated"
+    logger.info(f"ExpenseMonthSkip {instance.pk} {action}, invalidating financial caches")
+    _invalidate_financial_caches("ExpenseMonthSkip", instance.pk)
+
+
+@receiver(post_delete, sender=ExpenseMonthSkip)
+def invalidate_expense_month_skip_cache_on_delete(
+    sender: type[ExpenseMonthSkip], instance: ExpenseMonthSkip, **kwargs: Any
+) -> None:
+    _invalidate_financial_caches("ExpenseMonthSkip", instance.pk)
 
 
 # =============================================================================
