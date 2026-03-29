@@ -41,6 +41,7 @@ export function Sidebar() {
     { key: ROUTES.FINANCIAL, label: 'Dashboard' },
     { key: ROUTES.FINANCIAL_DAILY, label: 'Controle Diário' },
     { key: ROUTES.FINANCIAL_EXPENSES, label: 'Despesas' },
+    { key: ROUTES.FINANCIAL_MONTHLY_PURCHASES, label: 'Compras do Mês' },
     { key: ROUTES.FINANCIAL_INCOMES, label: 'Receitas' },
     { key: ROUTES.FINANCIAL_RENT_PAYMENTS, label: 'Pgto. Aluguel' },
     { key: ROUTES.FINANCIAL_PERSONS, label: 'Pessoas' },

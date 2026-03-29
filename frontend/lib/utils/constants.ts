@@ -40,6 +40,7 @@ export const ROUTES = {
   SETTINGS: '/settings',
   FINANCIAL: '/financial',
   FINANCIAL_EXPENSES: '/financial/expenses',
+  FINANCIAL_MONTHLY_PURCHASES: '/financial/monthly-purchases',
   FINANCIAL_INCOMES: '/financial/incomes',
   FINANCIAL_RENT_PAYMENTS: '/financial/rent-payments',
   FINANCIAL_PERSONS: '/financial/persons',
