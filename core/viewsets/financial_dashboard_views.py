@@ -85,6 +85,20 @@ class FinancialDashboardViewSet(viewsets.ViewSet):
         data = FinancialDashboardService.get_dashboard_summary(year=year, month=month)
         return Response(data, status=status.HTTP_200_OK)
 
+    @action(detail=False, methods=["get"])
+    def monthly_purchases(self, request: Request) -> Response:
+        today = date.today()
+        try:
+            year = int(request.query_params.get("year", today.year))
+            month = int(request.query_params.get("month", today.month))
+        except ValueError:
+            return Response(
+                {"error": "Os parâmetros 'year' e 'month' devem ser inteiros válidos."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        data = FinancialDashboardService.get_monthly_purchases(year=year, month=month)
+        return Response(data, status=status.HTTP_200_OK)
+
     @action(detail=False, methods=["get"], url_path="expense_detail")
     def expense_detail(self, request: Request) -> Response:
         detail_type = request.query_params.get("type")

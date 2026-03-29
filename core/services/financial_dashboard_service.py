@@ -1881,6 +1881,252 @@ class FinancialDashboardService:
         }
 
     @staticmethod
+    def get_monthly_purchases(year: int, month: int) -> dict[str, Any]:
+        """Return new purchases/expenses introduced in the given month.
+
+        Groups items into: card_purchases, loans, utility_bills, one_time_expenses,
+        fixed_expenses. Also returns aggregation by category with percentages.
+        """
+        month_start = date(year, month, 1)
+        next_month = _next_month_start(year, month)
+
+        skipped_expense_ids: set[int] = set(
+            ExpenseMonthSkip.objects.filter(
+                reference_month=month_start,
+            ).values_list("expense_id", flat=True)
+        )
+
+        sel_inst = [
+            "expense",
+            "expense__person",
+            "expense__credit_card",
+            "expense__category",
+            "expense__category__parent",
+        ]
+        sel_exp = ["person", "credit_card", "category", "category__parent"]
+
+        # 1. Card purchases — first installment only, due this month
+        card_installments = (
+            ExpenseInstallment.objects.filter(
+                installment_number=1,
+                due_date__gte=month_start,
+                due_date__lt=next_month,
+                expense__expense_type=ExpenseType.CARD_PURCHASE,
+                expense__is_offset=False,
+                expense__is_debt_installment=False,
+            )
+            .exclude(expense_id__in=skipped_expense_ids)
+            .select_related(*sel_inst)
+        )
+        card_items = [
+            FinancialDashboardService._purchase_item_from_installment(inst)
+            for inst in card_installments
+        ]
+        card_total = sum((item["amount"] for item in card_items), Decimal("0.00"))
+
+        # 2. Loans — first installment only, due this month
+        loan_installments = (
+            ExpenseInstallment.objects.filter(
+                installment_number=1,
+                due_date__gte=month_start,
+                due_date__lt=next_month,
+                expense__expense_type__in=[ExpenseType.BANK_LOAN, ExpenseType.PERSONAL_LOAN],
+                expense__is_offset=False,
+            )
+            .exclude(expense_id__in=skipped_expense_ids)
+            .select_related(*sel_inst)
+        )
+        loan_items = [
+            FinancialDashboardService._purchase_item_from_installment(inst)
+            for inst in loan_installments
+        ]
+        loan_total = sum((item["amount"] for item in loan_items), Decimal("0.00"))
+
+        # 3. Utility bills — expense_date falls in this month
+        utility_expenses = (
+            Expense.objects.filter(
+                expense_type__in=[ExpenseType.WATER_BILL, ExpenseType.ELECTRICITY_BILL],
+                expense_date__gte=month_start,
+                expense_date__lt=next_month,
+                is_offset=False,
+            )
+            .exclude(pk__in=skipped_expense_ids)
+            .select_related(*sel_exp)
+        )
+        utility_items = [
+            FinancialDashboardService._purchase_item_from_expense(exp) for exp in utility_expenses
+        ]
+        utility_total = sum((item["amount"] for item in utility_items), Decimal("0.00"))
+
+        # 4. One-time expenses — expense_date falls in this month
+        one_time_expenses = (
+            Expense.objects.filter(
+                expense_type=ExpenseType.ONE_TIME_EXPENSE,
+                expense_date__gte=month_start,
+                expense_date__lt=next_month,
+                is_offset=False,
+            )
+            .exclude(pk__in=skipped_expense_ids)
+            .select_related(*sel_exp)
+        )
+        one_time_items = [
+            FinancialDashboardService._purchase_item_from_expense(exp) for exp in one_time_expenses
+        ]
+        one_time_total = sum((item["amount"] for item in one_time_items), Decimal("0.00"))
+
+        # 5. Fixed recurring — active this month (end_date null or >= month_start)
+        fixed_expenses = (
+            Expense.objects.filter(
+                expense_type=ExpenseType.FIXED_EXPENSE,
+                is_recurring=True,
+                expected_monthly_amount__isnull=False,
+                is_offset=False,
+            )
+            .exclude(end_date__lt=month_start)
+            .exclude(pk__in=skipped_expense_ids)
+            .select_related(*sel_exp)
+        )
+        fixed_items = [
+            FinancialDashboardService._purchase_item_from_fixed_expense(exp)
+            for exp in fixed_expenses
+        ]
+        fixed_total = sum((item["amount"] for item in fixed_items), Decimal("0.00"))
+
+        grand_total = card_total + loan_total + utility_total + one_time_total + fixed_total
+
+        by_category = FinancialDashboardService._aggregate_purchases_by_category(
+            card_items + loan_items + utility_items + one_time_items + fixed_items,
+            grand_total,
+        )
+
+        return {
+            "year": year,
+            "month": month,
+            "total": grand_total,
+            "by_type": {
+                "card_purchases": {
+                    "total": card_total,
+                    "count": len(card_items),
+                    "items": card_items,
+                },
+                "loans": {
+                    "total": loan_total,
+                    "count": len(loan_items),
+                    "items": loan_items,
+                },
+                "utility_bills": {
+                    "total": utility_total,
+                    "count": len(utility_items),
+                    "items": utility_items,
+                },
+                "one_time_expenses": {
+                    "total": one_time_total,
+                    "count": len(one_time_items),
+                    "items": one_time_items,
+                },
+                "fixed_expenses": {
+                    "total": fixed_total,
+                    "count": len(fixed_items),
+                    "items": fixed_items,
+                },
+            },
+            "by_category": by_category,
+        }
+
+    @staticmethod
+    def _purchase_item_from_installment(inst: Any) -> dict[str, Any]:
+        """Build a purchase item dict from an ExpenseInstallment."""
+        _cat_id, cat_name, cat_color, _sub_id, _sub_name = (
+            FinancialDashboardService._resolve_category_fields(inst.expense.category)
+        )
+        return {
+            "description": inst.expense.description,
+            "amount": inst.amount,
+            "total_amount": inst.expense.total_amount,
+            "total_installments": inst.total_installments,
+            "person_name": inst.expense.person.name if inst.expense.person else None,
+            "card_name": inst.expense.credit_card.nickname if inst.expense.credit_card else None,
+            "category_name": cat_name,
+            "category_color": cat_color,
+            "date": inst.due_date.isoformat(),
+            "expense_type": inst.expense.expense_type,
+        }
+
+    @staticmethod
+    def _purchase_item_from_expense(exp: Any) -> dict[str, Any]:
+        """Build a purchase item dict from a non-installment Expense."""
+        _cat_id, cat_name, cat_color, _sub_id, _sub_name = (
+            FinancialDashboardService._resolve_category_fields(exp.category)
+        )
+        return {
+            "description": exp.description,
+            "amount": exp.total_amount,
+            "total_amount": None,
+            "total_installments": None,
+            "person_name": exp.person.name if exp.person else None,
+            "card_name": exp.credit_card.nickname if exp.credit_card else None,
+            "category_name": cat_name,
+            "category_color": cat_color,
+            "date": exp.expense_date.isoformat() if exp.expense_date else None,
+            "expense_type": exp.expense_type,
+        }
+
+    @staticmethod
+    def _purchase_item_from_fixed_expense(exp: Any) -> dict[str, Any]:
+        """Build a purchase item dict from a fixed recurring Expense."""
+        _cat_id, cat_name, cat_color, _sub_id, _sub_name = (
+            FinancialDashboardService._resolve_category_fields(exp.category)
+        )
+        return {
+            "description": exp.description,
+            "amount": exp.expected_monthly_amount,
+            "total_amount": None,
+            "total_installments": None,
+            "person_name": exp.person.name if exp.person else None,
+            "card_name": exp.credit_card.nickname if exp.credit_card else None,
+            "category_name": cat_name,
+            "category_color": cat_color,
+            "date": None,
+            "expense_type": exp.expense_type,
+        }
+
+    @staticmethod
+    def _aggregate_purchases_by_category(
+        items: list[dict[str, Any]], grand_total: Decimal
+    ) -> list[dict[str, Any]]:
+        """Aggregate purchase items by category and compute percentages."""
+        category_map: dict[str | None, dict[str, Any]] = {}
+
+        for item in items:
+            key = item["category_name"]
+            if key not in category_map:
+                category_map[key] = {
+                    "category_name": item["category_name"],
+                    "color": item["category_color"] or "#6B7280",
+                    "total": Decimal("0.00"),
+                    "count": 0,
+                }
+            category_map[key]["total"] += item["amount"]
+            category_map[key]["count"] += 1
+
+        result = []
+        for entry in sorted(category_map.values(), key=lambda x: x["total"], reverse=True):
+            percentage = (
+                float(entry["total"] / grand_total * 100) if grand_total > Decimal("0.00") else 0.0
+            )
+            result.append(
+                {
+                    "category_name": entry["category_name"] or "Sem Categoria",
+                    "color": entry["color"],
+                    "total": entry["total"],
+                    "percentage": round(percentage, 2),
+                    "count": entry["count"],
+                }
+            )
+
+        return result
+
+    @staticmethod
     def _build_fixed_expense_categories_detail(
         month_start: date,
     ) -> dict[str, dict[str, Any]]:
