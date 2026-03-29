@@ -15,18 +15,13 @@ import { useDailyBreakdown } from '@/lib/api/hooks/use-daily-control';
 import { usePersons } from '@/lib/api/hooks/use-persons';
 import { useBuildings } from '@/lib/api/hooks/use-buildings';
 import { useAuthStore } from '@/store/auth-store';
-import { getDefaultExpenseDate, MONTH_ABBR } from '@/lib/utils/formatters';
+import { getDefaultExpenseDate, MONTH_ABBR, MONTH_NAMES } from '@/lib/utils/formatters';
 import { DailySummaryCards } from './_components/daily-summary-cards';
 import { DailyBalanceChart } from './_components/daily-balance-chart';
 import { DailyTimeline, type DailyFilters } from './_components/daily-timeline';
 import { DayDetailDrawer } from './_components/day-detail-drawer';
 import { ExpenseFormModal } from '@/app/(dashboard)/financial/expenses/_components/expense-form-modal';
 import type { DailyBreakdownDay } from '@/lib/api/hooks/use-daily-control';
-
-const MONTH_NAMES = [
-  'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-  'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
-];
 
 
 export default function DailyControlPage() {

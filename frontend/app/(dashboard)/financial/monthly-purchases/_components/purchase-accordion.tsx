@@ -25,7 +25,13 @@ interface PurchaseAccordionProps {
   fixedExpenses: MonthlyPurchaseGroup;
 }
 
-function CardPurchasesTable({ items }: { items: MonthlyPurchaseItem[] }) {
+interface ColumnDef {
+  header: string;
+  accessor: (item: MonthlyPurchaseItem) => string;
+  className?: string;
+}
+
+function PurchaseTable({ items, columns }: { items: MonthlyPurchaseItem[]; columns: ColumnDef[] }) {
   if (items.length === 0) {
     return <p className="text-center text-muted-foreground py-4 text-sm">Nenhum item</p>;
   }
@@ -33,23 +39,21 @@ function CardPurchasesTable({ items }: { items: MonthlyPurchaseItem[] }) {
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>Descrição</TableHead>
-          <TableHead>Pessoa</TableHead>
-          <TableHead>Cartão</TableHead>
-          <TableHead className="text-right">Valor Parcela</TableHead>
-          <TableHead className="text-right">Total</TableHead>
-          <TableHead className="text-right">Parcelas</TableHead>
+          {columns.map((col) => (
+            <TableHead key={col.header} className={col.className}>
+              {col.header}
+            </TableHead>
+          ))}
         </TableRow>
       </TableHeader>
       <TableBody>
         {items.map((item, idx) => (
           <TableRow key={idx}>
-            <TableCell>{item.description}</TableCell>
-            <TableCell className="text-muted-foreground">{item.person_name ?? '—'}</TableCell>
-            <TableCell className="text-muted-foreground">{item.card_name ?? '—'}</TableCell>
-            <TableCell className="text-right">{formatCurrency(item.amount)}</TableCell>
-            <TableCell className="text-right">{item.total_amount !== null ? formatCurrency(item.total_amount) : '—'}</TableCell>
-            <TableCell className="text-right">{item.total_installments !== null ? String(item.total_installments) : '—'}</TableCell>
+            {columns.map((col) => (
+              <TableCell key={col.header} className={col.className}>
+                {col.accessor(item)}
+              </TableCell>
+            ))}
           </TableRow>
         ))}
       </TableBody>
@@ -57,115 +61,41 @@ function CardPurchasesTable({ items }: { items: MonthlyPurchaseItem[] }) {
   );
 }
 
-function LoansTable({ items }: { items: MonthlyPurchaseItem[] }) {
-  if (items.length === 0) {
-    return <p className="text-center text-muted-foreground py-4 text-sm">Nenhum item</p>;
-  }
-  return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Descrição</TableHead>
-          <TableHead>Pessoa</TableHead>
-          <TableHead className="text-right">Valor Parcela</TableHead>
-          <TableHead className="text-right">Total</TableHead>
-          <TableHead className="text-right">Parcelas</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {items.map((item, idx) => (
-          <TableRow key={idx}>
-            <TableCell>{item.description}</TableCell>
-            <TableCell className="text-muted-foreground">{item.person_name ?? '—'}</TableCell>
-            <TableCell className="text-right">{formatCurrency(item.amount)}</TableCell>
-            <TableCell className="text-right">{item.total_amount !== null ? formatCurrency(item.total_amount) : '—'}</TableCell>
-            <TableCell className="text-right">{item.total_installments !== null ? String(item.total_installments) : '—'}</TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
-  );
-}
+const CARD_PURCHASES_COLUMNS: ColumnDef[] = [
+  { header: 'Descrição', accessor: (item) => item.description },
+  { header: 'Pessoa', accessor: (item) => item.person_name ?? '—', className: 'text-muted-foreground' },
+  { header: 'Cartão', accessor: (item) => item.card_name ?? '—', className: 'text-muted-foreground' },
+  { header: 'Valor Parcela', accessor: (item) => formatCurrency(item.amount), className: 'text-right' },
+  { header: 'Total', accessor: (item) => item.total_amount !== null ? formatCurrency(item.total_amount) : '—', className: 'text-right' },
+  { header: 'Parcelas', accessor: (item) => item.total_installments !== null ? String(item.total_installments) : '—', className: 'text-right' },
+];
 
-function UtilityBillsTable({ items }: { items: MonthlyPurchaseItem[] }) {
-  if (items.length === 0) {
-    return <p className="text-center text-muted-foreground py-4 text-sm">Nenhum item</p>;
-  }
-  return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Descrição</TableHead>
-          <TableHead className="text-right">Valor</TableHead>
-          <TableHead>Data</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {items.map((item, idx) => (
-          <TableRow key={idx}>
-            <TableCell>{item.description}</TableCell>
-            <TableCell className="text-right">{formatCurrency(item.amount)}</TableCell>
-            <TableCell className="text-muted-foreground">{item.date ? formatDate(item.date) : '—'}</TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
-  );
-}
+const LOANS_COLUMNS: ColumnDef[] = [
+  { header: 'Descrição', accessor: (item) => item.description },
+  { header: 'Pessoa', accessor: (item) => item.person_name ?? '—', className: 'text-muted-foreground' },
+  { header: 'Valor Parcela', accessor: (item) => formatCurrency(item.amount), className: 'text-right' },
+  { header: 'Total', accessor: (item) => item.total_amount !== null ? formatCurrency(item.total_amount) : '—', className: 'text-right' },
+  { header: 'Parcelas', accessor: (item) => item.total_installments !== null ? String(item.total_installments) : '—', className: 'text-right' },
+];
 
-function OneTimeExpensesTable({ items }: { items: MonthlyPurchaseItem[] }) {
-  if (items.length === 0) {
-    return <p className="text-center text-muted-foreground py-4 text-sm">Nenhum item</p>;
-  }
-  return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Descrição</TableHead>
-          <TableHead>Pessoa</TableHead>
-          <TableHead className="text-right">Valor</TableHead>
-          <TableHead>Data</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {items.map((item, idx) => (
-          <TableRow key={idx}>
-            <TableCell>{item.description}</TableCell>
-            <TableCell className="text-muted-foreground">{item.person_name ?? '—'}</TableCell>
-            <TableCell className="text-right">{formatCurrency(item.amount)}</TableCell>
-            <TableCell className="text-muted-foreground">{item.date ? formatDate(item.date) : '—'}</TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
-  );
-}
+const UTILITY_BILLS_COLUMNS: ColumnDef[] = [
+  { header: 'Descrição', accessor: (item) => item.description },
+  { header: 'Valor', accessor: (item) => formatCurrency(item.amount), className: 'text-right' },
+  { header: 'Data', accessor: (item) => item.date ? formatDate(item.date) : '—', className: 'text-muted-foreground' },
+];
 
-function FixedExpensesTable({ items }: { items: MonthlyPurchaseItem[] }) {
-  if (items.length === 0) {
-    return <p className="text-center text-muted-foreground py-4 text-sm">Nenhum item</p>;
-  }
-  return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Descrição</TableHead>
-          <TableHead>Pessoa</TableHead>
-          <TableHead className="text-right">Valor Mensal</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {items.map((item, idx) => (
-          <TableRow key={idx}>
-            <TableCell>{item.description}</TableCell>
-            <TableCell className="text-muted-foreground">{item.person_name ?? '—'}</TableCell>
-            <TableCell className="text-right">{formatCurrency(item.amount)}</TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
-  );
-}
+const ONE_TIME_EXPENSES_COLUMNS: ColumnDef[] = [
+  { header: 'Descrição', accessor: (item) => item.description },
+  { header: 'Pessoa', accessor: (item) => item.person_name ?? '—', className: 'text-muted-foreground' },
+  { header: 'Valor', accessor: (item) => formatCurrency(item.amount), className: 'text-right' },
+  { header: 'Data', accessor: (item) => item.date ? formatDate(item.date) : '—', className: 'text-muted-foreground' },
+];
+
+const FIXED_EXPENSES_COLUMNS: ColumnDef[] = [
+  { header: 'Descrição', accessor: (item) => item.description },
+  { header: 'Pessoa', accessor: (item) => item.person_name ?? '—', className: 'text-muted-foreground' },
+  { header: 'Valor Mensal', accessor: (item) => formatCurrency(item.amount), className: 'text-right' },
+];
 
 function accordionTitle(label: string, count: number, total: number) {
   return (
@@ -192,7 +122,7 @@ export function PurchaseAccordion({
           {accordionTitle('Compras no Cartão', cardPurchases.count, cardPurchases.total)}
         </AccordionTrigger>
         <AccordionContent className="px-4">
-          <CardPurchasesTable items={cardPurchases.items} />
+          <PurchaseTable items={cardPurchases.items} columns={CARD_PURCHASES_COLUMNS} />
         </AccordionContent>
       </AccordionItem>
 
@@ -201,7 +131,7 @@ export function PurchaseAccordion({
           {accordionTitle('Contas de Consumo', utilityBills.count, utilityBills.total)}
         </AccordionTrigger>
         <AccordionContent className="px-4">
-          <UtilityBillsTable items={utilityBills.items} />
+          <PurchaseTable items={utilityBills.items} columns={UTILITY_BILLS_COLUMNS} />
         </AccordionContent>
       </AccordionItem>
 
@@ -210,7 +140,7 @@ export function PurchaseAccordion({
           {accordionTitle('Empréstimos', loans.count, loans.total)}
         </AccordionTrigger>
         <AccordionContent className="px-4">
-          <LoansTable items={loans.items} />
+          <PurchaseTable items={loans.items} columns={LOANS_COLUMNS} />
         </AccordionContent>
       </AccordionItem>
 
@@ -219,7 +149,7 @@ export function PurchaseAccordion({
           {accordionTitle('Gastos Únicos', oneTimeExpenses.count, oneTimeExpenses.total)}
         </AccordionTrigger>
         <AccordionContent className="px-4">
-          <OneTimeExpensesTable items={oneTimeExpenses.items} />
+          <PurchaseTable items={oneTimeExpenses.items} columns={ONE_TIME_EXPENSES_COLUMNS} />
         </AccordionContent>
       </AccordionItem>
 
@@ -228,7 +158,7 @@ export function PurchaseAccordion({
           {accordionTitle('Gastos Fixos', fixedExpenses.count, fixedExpenses.total)}
         </AccordionTrigger>
         <AccordionContent className="px-4">
-          <FixedExpensesTable items={fixedExpenses.items} />
+          <PurchaseTable items={fixedExpenses.items} columns={FIXED_EXPENSES_COLUMNS} />
         </AccordionContent>
       </AccordionItem>
     </Accordion>
