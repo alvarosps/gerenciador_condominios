@@ -1,8 +1,10 @@
 'use client';
 
+import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { useDashboardSummary } from '@/lib/api/hooks/use-financial-dashboard';
 import { formatMonthYear } from '@/lib/utils/formatters';
+import { ROUTES } from '@/lib/utils/constants';
 import { BalanceCards, BalanceCardsSkeleton } from './_components/balance-cards';
 import { IncomeSummaryCard } from './_components/income-summary-card';
 import { OtherIncomeCard } from './_components/other-income-card';
@@ -63,6 +65,13 @@ export default function FinancialDashboardPage() {
       />
 
       <CategoryBreakdownChart />
+
+      <Link
+        href={ROUTES.FINANCIAL_MONTHLY_PURCHASES}
+        className="block text-center text-sm text-info hover:underline"
+      >
+        Ver compras do mês →
+      </Link>
     </div>
   );
 }
