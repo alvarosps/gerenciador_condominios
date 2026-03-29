@@ -92,6 +92,11 @@ export function formatDateISO(date: Date | null | undefined): string {
 
 export const MONTH_ABBR = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'] as const;
 
+export const MONTH_NAMES = [
+  'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+  'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
+] as const;
+
 /**
  * Calculate a default expense date for a given target year/month.
  * Uses today's day number, clamped to the last day of the target month.

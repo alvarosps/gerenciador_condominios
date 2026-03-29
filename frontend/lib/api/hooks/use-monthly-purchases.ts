@@ -8,6 +8,7 @@ export interface MonthlyPurchaseItem {
   total_installments: number | null;
   person_name: string | null;
   card_name: string | null;
+  category_id: number | null;
   category_name: string | null;
   category_color: string | null;
   date: string | null;

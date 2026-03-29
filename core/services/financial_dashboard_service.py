@@ -1932,6 +1932,7 @@ class FinancialDashboardService:
                 due_date__lt=next_month,
                 expense__expense_type__in=[ExpenseType.BANK_LOAN, ExpenseType.PERSONAL_LOAN],
                 expense__is_offset=False,
+                expense__is_debt_installment=False,
             )
             .exclude(expense_id__in=skipped_expense_ids)
             .select_related(*sel_inst)
@@ -1987,7 +1988,7 @@ class FinancialDashboardService:
             .select_related(*sel_exp)
         )
         fixed_items = [
-            FinancialDashboardService._purchase_item_from_fixed_expense(exp)
+            FinancialDashboardService._purchase_item_from_expense(exp, use_expected_amount=True)
             for exp in fixed_expenses
         ]
         fixed_total = sum((item["amount"] for item in fixed_items), Decimal("0.00"))
@@ -2036,7 +2037,7 @@ class FinancialDashboardService:
     @staticmethod
     def _purchase_item_from_installment(inst: Any) -> dict[str, Any]:
         """Build a purchase item dict from an ExpenseInstallment."""
-        _cat_id, cat_name, cat_color, _sub_id, _sub_name = (
+        cat_id, cat_name, cat_color, _sub_id, _sub_name = (
             FinancialDashboardService._resolve_category_fields(inst.expense.category)
         )
         return {
@@ -2046,6 +2047,7 @@ class FinancialDashboardService:
             "total_installments": inst.total_installments,
             "person_name": inst.expense.person.name if inst.expense.person else None,
             "card_name": inst.expense.credit_card.nickname if inst.expense.credit_card else None,
+            "category_id": cat_id,
             "category_name": cat_name,
             "category_color": cat_color,
             "date": inst.due_date.isoformat(),
@@ -2053,40 +2055,34 @@ class FinancialDashboardService:
         }
 
     @staticmethod
-    def _purchase_item_from_expense(exp: Any) -> dict[str, Any]:
-        """Build a purchase item dict from a non-installment Expense."""
-        _cat_id, cat_name, cat_color, _sub_id, _sub_name = (
-            FinancialDashboardService._resolve_category_fields(exp.category)
-        )
-        return {
-            "description": exp.description,
-            "amount": exp.total_amount,
-            "total_amount": None,
-            "total_installments": None,
-            "person_name": exp.person.name if exp.person else None,
-            "card_name": exp.credit_card.nickname if exp.credit_card else None,
-            "category_name": cat_name,
-            "category_color": cat_color,
-            "date": exp.expense_date.isoformat() if exp.expense_date else None,
-            "expense_type": exp.expense_type,
-        }
+    def _purchase_item_from_expense(
+        exp: Any, *, use_expected_amount: bool = False
+    ) -> dict[str, Any]:
+        """Build a purchase item dict from a non-installment Expense.
 
-    @staticmethod
-    def _purchase_item_from_fixed_expense(exp: Any) -> dict[str, Any]:
-        """Build a purchase item dict from a fixed recurring Expense."""
-        _cat_id, cat_name, cat_color, _sub_id, _sub_name = (
+        When use_expected_amount=True (fixed recurring expenses), uses expected_monthly_amount
+        for amount and None for date. Otherwise uses total_amount and expense_date.
+        """
+        cat_id, cat_name, cat_color, _sub_id, _sub_name = (
             FinancialDashboardService._resolve_category_fields(exp.category)
         )
+        if use_expected_amount:
+            amount = exp.expected_monthly_amount
+            expense_date = None
+        else:
+            amount = exp.total_amount
+            expense_date = exp.expense_date.isoformat() if exp.expense_date else None
         return {
             "description": exp.description,
-            "amount": exp.expected_monthly_amount,
+            "amount": amount,
             "total_amount": None,
             "total_installments": None,
             "person_name": exp.person.name if exp.person else None,
             "card_name": exp.credit_card.nickname if exp.credit_card else None,
+            "category_id": cat_id,
             "category_name": cat_name,
             "category_color": cat_color,
-            "date": None,
+            "date": expense_date,
             "expense_type": exp.expense_type,
         }
 
@@ -2095,12 +2091,13 @@ class FinancialDashboardService:
         items: list[dict[str, Any]], grand_total: Decimal
     ) -> list[dict[str, Any]]:
         """Aggregate purchase items by category and compute percentages."""
-        category_map: dict[str | None, dict[str, Any]] = {}
+        category_map: dict[int | None, dict[str, Any]] = {}
 
         for item in items:
-            key = item["category_name"]
+            key = item["category_id"]
             if key not in category_map:
                 category_map[key] = {
+                    "category_id": item["category_id"],
                     "category_name": item["category_name"],
                     "color": item["category_color"] or "#6B7280",
                     "total": Decimal("0.00"),
@@ -2116,6 +2113,7 @@ class FinancialDashboardService:
             )
             result.append(
                 {
+                    "category_id": entry["category_id"],
                     "category_name": entry["category_name"] or "Sem Categoria",
                     "color": entry["color"],
                     "total": entry["total"],

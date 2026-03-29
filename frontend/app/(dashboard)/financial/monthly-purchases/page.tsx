@@ -5,16 +5,11 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useMonthlyPurchases } from '@/lib/api/hooks/use-monthly-purchases';
-import { formatCurrency } from '@/lib/utils/formatters';
+import { formatCurrency, MONTH_NAMES } from '@/lib/utils/formatters';
 import { PurchaseSummaryCards } from './_components/purchase-summary-cards';
 import { PurchaseCategoryChart } from './_components/purchase-category-chart';
 import { PurchaseTypeChart } from './_components/purchase-type-chart';
 import { PurchaseAccordion } from './_components/purchase-accordion';
-
-const MONTH_NAMES = [
-  'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-  'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
-];
 
 export default function MonthlyPurchasesPage() {
   const now = new Date();
