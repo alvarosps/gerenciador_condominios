@@ -1,6 +1,6 @@
 # Mobile App — Design Spec
 
-**Data:** 2026-03-27 (rev.2 — atualizado após revisão completa do estado da aplicação)
+**Data:** 2026-03-28 (rev.3 — atualizado com PersonPaymentSchedule, ExpenseMonthSkip, e melhorias no controle diário)
 **Status:** Draft
 
 ## Resumo
@@ -148,7 +148,7 @@ class HasActiveLease(BasePermission):
 |-----|-------|-----------------|
 | **Dashboard** | Home | Resumo de ocupação. Inadimplência (late_payment_summary). Métricas de locação (lease_metrics). Comprovantes pendentes de aprovação. **Alertas de reajuste** (locações elegíveis para reajuste anual) |
 | **Imóveis** | Lista, Detalhes | Lista de prédios → apartamentos (com `rental_value` e `rental_value_double`). Detalhes do inquilino. Gerar contrato. Ver locações ativas. **Criar nova locação** |
-| **Financeiro** | Dashboard, Controle Diário | Dashboard financeiro (overview, dívidas por pessoa/tipo, categorias, parcelas). **Controle diário**: entradas/saídas do dia, resumo mensal, marcar como pago |
+| **Financeiro** | Dashboard, Controle Diário | Dashboard financeiro (overview, dívidas por pessoa/tipo, categorias, parcelas). **Controle diário**: entradas/saídas do dia (incluindo person_schedule), resumo mensal, marcar como pago, pular despesa (ExpenseMonthSkip), pagamento de pessoa com valor sugerido |
 | **Ações** | Lista, Operações | Marcar aluguel como pago. Aprovar/rejeitar comprovantes. **Aplicar reajuste de aluguel** (com envio de WhatsApp ao inquilino). Enviar notificações manuais. Calcular multa por atraso |
 | **Notificações** | Lista | Histórico de notificações do admin (novos comprovantes, contratos vencendo). Badge de não lidas |
 
@@ -213,7 +213,12 @@ Reutiliza os endpoints existentes do `DailyControlViewSet`:
 - **Cards resumo**: total entradas, total saídas, saldo do mês (esperado vs realizado)
 - **Navegação por mês**: setas prev/next como no frontend web
 - **Lista do dia**: agrupada por data, cada item mostra descrição, valor, status (pago/pendente), pessoa/prédio
-- **Ação rápida**: swipe ou tap para marcar como pago
+- **Tipos de saída**: installment, expense, one_time, credit_card, **person_schedule** (novo tipo com pagamento por pessoa)
+- **Ação rápida**: swipe ou tap para marcar como pago. Para `person_schedule`, abre modal com:
+  - Esperado até dia X, já pago no mês, valor sugerido (esperado - pago)
+  - Input para valor manual
+  - Usa `PersonPaymentScheduleService.get_suggested_payment()`
+- **Skip de despesa**: possibilidade de pular uma despesa recorrente em um mês específico (cria `ExpenseMonthSkip`)
 - **Filtros**: por pessoa, prédio, tipo (entrada/saída), status (pago/pendente)
 
 ## Regras de Negócio — Criar Locação (Admin)
@@ -305,7 +310,7 @@ pix_key: CharField(max_length=100, null=True, blank=True)
 pix_key_type: CharField(max_length=10, null=True, blank=True)  # cpf / cnpj / email / phone / random
 ```
 
-Estes campos NÃO existem ainda no model. Requer nova migração (próxima após 0029).
+Estes campos NÃO existem ainda no model. Requer nova migração (próxima após 0030).
 
 ### Alteração em FinancialSettings (existente) — REQUER MIGRAÇÃO
 
@@ -315,6 +320,56 @@ default_pix_key_type: CharField(max_length=10, null=True, blank=True)  # cpf / c
 ```
 
 Usado como fallback para apartamentos sem owner (condomínio próprio). Estes campos NÃO existem ainda. Requer nova migração. O endpoint PIX depende destes campos — devem ser criados antes da implementação do fluxo PIX.
+
+## Models Existentes Relevantes para o Mobile (não requerem alteração)
+
+Estes models já existem e são consumidos pelo admin mobile via endpoints existentes:
+
+### PersonPaymentSchedule (migration 0030)
+
+```
+person: ForeignKey(Person)
+reference_month: DateField          # primeiro dia do mês (2026-03-01)
+due_day: PositiveSmallIntegerField  # dia do pagamento (1-31)
+amount: DecimalField(12,2)
+# AuditMixin, SoftDeleteMixin
+# Unique: (person, reference_month, due_day) onde is_deleted=False
+```
+
+Usado no controle diário para agrupar saídas de uma pessoa em cronogramas de pagamento. O `PersonPaymentScheduleService` calcula totais, sugere valores de pagamento, e verifica status.
+
+### ExpenseMonthSkip (migration 0030)
+
+```
+expense: ForeignKey(Expense)
+reference_month: DateField          # mês a ser pulado
+# AuditMixin (sem SoftDeleteMixin)
+# Unique: (expense, reference_month)
+```
+
+Marca uma despesa como não cobrada em um mês específico. Respeitado por CashFlowService, FinancialDashboardService, e DailyControlService.
+
+### RentAdjustment (migration 0023)
+
+```
+lease: ForeignKey(Lease)
+adjustment_date: DateField
+percentage: DecimalField
+previous_value: DecimalField
+new_value: DecimalField
+apartment_updated: BooleanField
+# AuditMixin
+```
+
+### IPCAIndex (migration 0028)
+
+```
+reference_month: DateField(unique)
+value: DecimalField
+fetched_at: DateTimeField
+```
+
+Índice IPCA do IBGE para cálculo de reajuste de aluguel.
 
 ## Endpoints — Visão Completa
 
@@ -390,6 +445,12 @@ O admin mobile consome estes endpoints que já existem — **sem nenhuma altera�
 | `GET /api/daily-control/summary/` | Controle diário — resumo mensal |
 | `POST /api/daily-control/mark_paid/` | Controle diário — marcar como pago |
 | `GET /api/rent-payments/` | Lista de pagamentos de aluguel |
+| `GET /api/person-payment-schedules/` | Lista de cronogramas de pagamento por pessoa |
+| `GET /api/person-payment-schedules/person_month_total/` | Totais do mês por pessoa (devido, pago, pendente) |
+| `POST /api/person-payment-schedules/bulk_configure/` | Configurar cronograma de pagamento (admin) |
+| `GET /api/expense-month-skips/` | Lista de despesas puladas no mês |
+| `POST /api/expense-month-skips/` | Pular despesa em um mês específico |
+| `DELETE /api/expense-month-skips/{id}/` | Remover skip de despesa |
 
 ### Lógica PIX
 
@@ -484,7 +545,7 @@ mobile/
 │       │   └── new-lease.tsx       # Criar nova locação
 │       ├── financial/
 │       │   ├── index.tsx           # Dashboard financeiro (overview, dívidas, categorias)
-│       │   └── daily.tsx           # Controle diário (entradas/saídas, marcar pago)
+│       │   └── daily.tsx           # Controle diário (entradas/saídas, marcar pago, skip despesa, pagamento pessoa)
 │       ├── actions/
 │       │   ├── index.tsx           # Lista de ações pendentes
 │       │   ├── mark-paid.tsx       # Marcar aluguel como pago
@@ -561,14 +622,16 @@ Referência de quais features do sistema atual são expostas no mobile e quais f
 | Aplicar reajuste | `POST /api/leases/{id}/adjust_rent/` | Reutiliza existente + WhatsApp |
 | Marcar aluguel pago | `POST /api/dashboard/mark_rent_paid/` | Reutiliza existente |
 | Dashboard financeiro | `/api/financial-dashboard/*` | Reutiliza existentes |
-| Controle diário | `/api/daily-control/*` | Reutiliza existentes |
+| Controle diário | `/api/daily-control/*` | Reutiliza existentes (agora integra person_schedule e expense skips) |
+| Pagamento de pessoa (controle diário) | `/api/person-payment-schedules/*` | Reutiliza existentes (person_month_total, bulk_configure) |
+| Skip de despesa (controle diário) | `/api/expense-month-skips/*` | Reutiliza existentes (CRUD) |
 | Aprovar comprovantes | `/api/admin/proofs/*` | **Novo endpoint** |
 
 ### Apenas no Web (não no mobile)
 
 | Feature | Motivo |
 |---------|--------|
-| CRUD completo de despesas/incomes | Formulários complexos, melhor em tela grande |
+| CRUD completo de despesas/incomes | Formulários complexos, melhor em tela grande (exceto: skip de despesa e configuração de cronograma de pagamento são acessíveis via controle diário mobile) |
 | Cash flow projection (12 meses) | Gráfico complexo, melhor em tela grande |
 | Simulador financeiro (what-if) | Interface complexa de cenários |
 | Editor de contrato (WYSIWYG/código) | Impossível em mobile |
