@@ -1,6 +1,6 @@
 # Mobile App — Design Spec
 
-**Data:** 2026-03-28 (rev.3 — atualizado com PersonPaymentSchedule, ExpenseMonthSkip, e melhorias no controle diário)
+**Data:** 2026-03-29 (rev.4 — atualizado com Compras do Mês)
 **Status:** Draft
 
 ## Resumo
@@ -148,7 +148,7 @@ class HasActiveLease(BasePermission):
 |-----|-------|-----------------|
 | **Dashboard** | Home | Resumo de ocupação. Inadimplência (late_payment_summary). Métricas de locação (lease_metrics). Comprovantes pendentes de aprovação. **Alertas de reajuste** (locações elegíveis para reajuste anual) |
 | **Imóveis** | Lista, Detalhes | Lista de prédios → apartamentos (com `rental_value` e `rental_value_double`). Detalhes do inquilino. Gerar contrato. Ver locações ativas. **Criar nova locação** |
-| **Financeiro** | Dashboard, Controle Diário | Dashboard financeiro (overview, dívidas por pessoa/tipo, categorias, parcelas). **Controle diário**: entradas/saídas do dia (incluindo person_schedule), resumo mensal, marcar como pago, pular despesa (ExpenseMonthSkip), pagamento de pessoa com valor sugerido |
+| **Financeiro** | Dashboard, Controle Diário, Compras do Mês | Dashboard financeiro (overview, dívidas por pessoa/tipo, categorias, parcelas). **Controle diário**: entradas/saídas do dia (incluindo person_schedule), resumo mensal, marcar como pago, pular despesa (ExpenseMonthSkip), pagamento de pessoa com valor sugerido. **Compras do mês**: resumo de novas compras no mês por tipo (cartão, empréstimos, contas, pontuais, fixas) e por categoria |
 | **Ações** | Lista, Operações | Marcar aluguel como pago. Aprovar/rejeitar comprovantes. **Aplicar reajuste de aluguel** (com envio de WhatsApp ao inquilino). Enviar notificações manuais. Calcular multa por atraso |
 | **Notificações** | Lista | Histórico de notificações do admin (novos comprovantes, contratos vencendo). Badge de não lidas |
 
@@ -321,6 +321,26 @@ default_pix_key_type: CharField(max_length=10, null=True, blank=True)  # cpf / c
 
 Usado como fallback para apartamentos sem owner (condomínio próprio). Estes campos NÃO existem ainda. Requer nova migração. O endpoint PIX depende destes campos — devem ser criados antes da implementação do fluxo PIX.
 
+## Regras de Negócio — Compras do Mês (Admin)
+
+Reutiliza o endpoint existente `GET /api/financial-dashboard/monthly_purchases/?year=2026&month=3`.
+
+Mostra novas compras introduzidas no mês, agrupadas em 5 tipos:
+- **Compras no cartão** (card_purchases) — primeira parcela vence no mês
+- **Empréstimos** (loans) — bancários/pessoais, primeira parcela no mês
+- **Contas** (utility_bills) — água/luz, data da despesa no mês
+- **Pontuais** (one_time_expenses) — compras únicas no mês
+- **Fixas** (fixed_expenses) — despesas recorrentes ativas
+
+Também agrega por categoria de despesa (com percentual e cor).
+
+### Tela Mobile
+
+- **Navegação por mês**: setas prev/next
+- **Cards resumo**: total por tipo (5 cards com ícone e valor)
+- **Lista colapsável**: accordion por tipo com detalhes dos itens (descrição, pessoa, valor, parcelas)
+- **Read-only**: sem ações de escrita nesta tela
+
 ## Models Existentes Relevantes para o Mobile (não requerem alteração)
 
 Estes models já existem e são consumidos pelo admin mobile via endpoints existentes:
@@ -441,6 +461,7 @@ O admin mobile consome estes endpoints que já existem — **sem nenhuma altera�
 | `GET /api/financial-dashboard/upcoming_installments/` | Parcelas próximas |
 | `GET /api/financial-dashboard/overdue_installments/` | Parcelas atrasadas |
 | `GET /api/financial-dashboard/category_breakdown/` | Despesas por categoria |
+| `GET /api/financial-dashboard/monthly_purchases/` | Compras do mês (por tipo e por categoria) |
 | `GET /api/daily-control/breakdown/` | Controle diário — entradas/saídas |
 | `GET /api/daily-control/summary/` | Controle diário — resumo mensal |
 | `POST /api/daily-control/mark_paid/` | Controle diário — marcar como pago |
@@ -545,7 +566,8 @@ mobile/
 │       │   └── new-lease.tsx       # Criar nova locação
 │       ├── financial/
 │       │   ├── index.tsx           # Dashboard financeiro (overview, dívidas, categorias)
-│       │   └── daily.tsx           # Controle diário (entradas/saídas, marcar pago, skip despesa, pagamento pessoa)
+│       │   ├── daily.tsx           # Controle diário (entradas/saídas, marcar pago, skip despesa, pagamento pessoa)
+│       │   └── purchases.tsx       # Compras do mês (resumo por tipo e categoria, read-only)
 │       ├── actions/
 │       │   ├── index.tsx           # Lista de ações pendentes
 │       │   ├── mark-paid.tsx       # Marcar aluguel como pago
@@ -622,6 +644,7 @@ Referência de quais features do sistema atual são expostas no mobile e quais f
 | Aplicar reajuste | `POST /api/leases/{id}/adjust_rent/` | Reutiliza existente + WhatsApp |
 | Marcar aluguel pago | `POST /api/dashboard/mark_rent_paid/` | Reutiliza existente |
 | Dashboard financeiro | `/api/financial-dashboard/*` | Reutiliza existentes |
+| Compras do mês | `/api/financial-dashboard/monthly_purchases/` | Reutiliza existente (resumo por tipo e categoria, read-only) |
 | Controle diário | `/api/daily-control/*` | Reutiliza existentes (agora integra person_schedule e expense skips) |
 | Pagamento de pessoa (controle diário) | `/api/person-payment-schedules/*` | Reutiliza existentes (person_month_total, bulk_configure) |
 | Skip de despesa (controle diário) | `/api/expense-month-skips/*` | Reutiliza existentes (CRUD) |
