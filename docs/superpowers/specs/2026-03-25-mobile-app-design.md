@@ -655,6 +655,7 @@ Referência de quais features do sistema atual são expostas no mobile e quais f
 | Feature | Motivo |
 |---------|--------|
 | CRUD completo de despesas/incomes | Formulários complexos, melhor em tela grande (exceto: skip de despesa e configuração de cronograma de pagamento são acessíveis via controle diário mobile) |
+| Avanço/fechamento de mês (MonthSnapshot) | Operação administrativa complexa com validação de pendências, snapshots, e rollback — web only |
 | Cash flow projection (12 meses) | Gráfico complexo, melhor em tela grande |
 | Simulador financeiro (what-if) | Interface complexa de cenários |
 | Editor de contrato (WYSIWYG/código) | Impossível em mobile |
