@@ -5,6 +5,9 @@ Provides endpoints for mobile clients to register and unregister
 Expo push notification tokens.
 """
 
+from typing import cast
+
+from django.contrib.auth.models import User
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
@@ -44,14 +47,15 @@ class DeviceTokenViewSet(ViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        authenticated_user = cast(User, request.user)
         device, created = DeviceToken.objects.update_or_create(
             token=token,
             defaults={
-                "user": request.user,
+                "user": authenticated_user,
                 "platform": platform,
                 "is_active": True,
-                "created_by": request.user,
-                "updated_by": request.user,
+                "created_by": authenticated_user,
+                "updated_by": authenticated_user,
             },
         )
         return Response(
@@ -73,7 +77,9 @@ class DeviceTokenViewSet(ViewSet):
                 {"error": "token é obrigatório"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        updated = DeviceToken.objects.filter(token=token, user=request.user).update(is_active=False)
+        updated = DeviceToken.objects.filter(token=token, user=cast(User, request.user)).update(
+            is_active=False
+        )
         if updated == 0:
             return Response(
                 {"error": "Token não encontrado"},

@@ -10,7 +10,6 @@ from rest_framework import status
 
 from core.models import Apartment, Building, Lease, PaymentProof, Tenant
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------

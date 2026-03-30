@@ -5,6 +5,9 @@ Provides admin-only endpoints for listing pending payment proofs
 and approving or rejecting them.
 """
 
+from typing import cast
+
+from django.contrib.auth.models import User
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.decorators import action
@@ -49,13 +52,18 @@ class AdminProofViewSet(ViewSet):
         return paginator.get_paginated_response(serializer.data)
 
     @action(detail=True, methods=["post"], url_path="review")
-    def review(self, request: Request, pk: int | None = None) -> Response:
+    def review(self, request: Request, pk: str | None = None) -> Response:
         """
         POST /api/admin/proofs/{pk}/review/
 
         Approve or reject a payment proof.
         Body: {"action": "approve"|"reject", "reason": "..."}
         """
+        if not pk:
+            return Response(
+                {"error": "Comprovante não encontrado"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
         try:
             proof = PaymentProof.objects.get(pk=pk)
         except PaymentProof.DoesNotExist:
@@ -71,7 +79,7 @@ class AdminProofViewSet(ViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        proof.reviewed_by = request.user
+        proof.reviewed_by = cast(User, request.user)
         proof.reviewed_at = timezone.now()
 
         if action_type == "approve":
