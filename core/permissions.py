@@ -219,7 +219,7 @@ class IsAuthenticatedAndActive(permissions.BasePermission):
 class IsTenantUser(permissions.BasePermission):
     """Allows access only to authenticated tenants with a non-deleted record."""
 
-    def has_permission(self, request: Request, view: Any) -> bool:
+    def has_permission(self, request: Request, view: APIView) -> bool:
         if not (request.user.is_authenticated and not request.user.is_staff):
             return False
         tenant = getattr(request.user, "tenant_profile", None)
@@ -229,7 +229,7 @@ class IsTenantUser(permissions.BasePermission):
 class HasActiveLease(permissions.BasePermission):
     """Allows access only to tenants with an active (non-deleted) lease."""
 
-    def has_permission(self, request: Request, view: Any) -> bool:
+    def has_permission(self, request: Request, view: APIView) -> bool:
         tenant = getattr(request.user, "tenant_profile", None)
         if tenant is None:
             return False

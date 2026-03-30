@@ -4,12 +4,14 @@ Tests all permission classes with admin, regular user, and unauthenticated
 scenarios.  Uses real instances — no mocks of internal code.
 """
 
-from unittest.mock import MagicMock
+from datetime import date
+from decimal import Decimal
 
 import pytest
 from rest_framework.request import Request
 from rest_framework.test import APIRequestFactory
 
+from core.models import Apartment, Building, Lease, Tenant
 from core.permissions import (
     CanGenerateContract,
     CanModifyLease,
@@ -375,39 +377,56 @@ class TestGetPermissionClasses:
 # ---------------------------------------------------------------------------
 
 
+def _make_tenant_user(django_user_model, username: str) -> tuple:
+    """Create a non-staff User and a linked Tenant. Returns (user, tenant)."""
+    user = django_user_model.objects.create_user(
+        username=username,
+        password="pass",
+        is_staff=False,
+        is_active=True,
+    )
+    tenant = Tenant.objects.create(
+        user=user,
+        name="Tenant " + username,
+        cpf_cnpj="52998224725",
+        phone="11987654321",
+        marital_status="Solteiro(a)",
+        profession="Dev",
+    )
+    return user, tenant
+
+
 @pytest.mark.unit
-@pytest.mark.django_db
 class TestIsTenantUser:
     def test_denies_unauthenticated(self):
-        request = MagicMock()
-        request.user.is_authenticated = False
+        request = make_request("GET")
+        request.user = type("U", (), {"is_authenticated": False})()
         assert IsTenantUser().has_permission(request, None) is False
 
-    def test_denies_staff(self):
-        request = MagicMock()
-        request.user.is_authenticated = True
-        request.user.is_staff = True
+    def test_denies_staff(self, admin_user):
+        request = make_request("GET")
+        request.user = admin_user
         assert IsTenantUser().has_permission(request, None) is False
 
-    def test_denies_no_tenant_profile(self):
-        request = MagicMock()
-        request.user.is_authenticated = True
-        request.user.is_staff = False
-        request.user.tenant_profile = None
+    def test_denies_no_tenant_profile(self, regular_user):
+        # regular_user has no linked Tenant, so tenant_profile raises AttributeError
+        # which getattr(..., None) converts to None
+        request = make_request("GET")
+        request.user = regular_user
         assert IsTenantUser().has_permission(request, None) is False
 
-    def test_denies_deleted_tenant(self):
-        request = MagicMock()
-        request.user.is_authenticated = True
-        request.user.is_staff = False
-        request.user.tenant_profile = MagicMock(is_deleted=True)
+    def test_denies_deleted_tenant(self, django_user_model):
+        user, tenant = _make_tenant_user(django_user_model, "deleted_tenant_user")
+        tenant.is_deleted = True
+        tenant.save()
+        request = make_request("GET")
+        request.user = user
         assert IsTenantUser().has_permission(request, None) is False
 
-    def test_allows_active_tenant(self):
-        request = MagicMock()
-        request.user.is_authenticated = True
-        request.user.is_staff = False
-        request.user.tenant_profile = MagicMock(is_deleted=False)
+    def test_allows_active_tenant(self, django_user_model):
+        user, _tenant = _make_tenant_user(django_user_model, "active_tenant_user")
+        request = make_request("GET")
+        request.user = user
         assert IsTenantUser().has_permission(request, None) is True
 
 
@@ -416,24 +435,42 @@ class TestIsTenantUser:
 # ---------------------------------------------------------------------------
 
 
+def _make_building_and_apartment() -> Apartment:
+    """Create a Building + Apartment for lease tests."""
+    building = Building.objects.create(
+        street_number=9901, name="Perm Test Building", address="Rua Perm, 9901"
+    )
+    return Apartment.objects.create(
+        building=building, number=101, rental_value=Decimal("1500.00"), max_tenants=2
+    )
+
+
 @pytest.mark.unit
-@pytest.mark.django_db
 class TestHasActiveLease:
-    def test_denies_no_tenant(self):
-        request = MagicMock()
-        request.user.tenant_profile = None
+    def test_denies_no_tenant_profile(self, regular_user):
+        # regular_user has no linked Tenant record
+        request = make_request("GET")
+        request.user = regular_user
         assert HasActiveLease().has_permission(request, None) is False
 
-    def test_denies_no_active_lease(self):
-        request = MagicMock()
-        tenant = MagicMock()
-        tenant.leases.filter.return_value.exists.return_value = False
-        request.user.tenant_profile = tenant
+    def test_denies_no_active_lease(self, django_user_model):
+        user, _tenant = _make_tenant_user(django_user_model, "no_lease_user")
+        # Tenant exists but has no lease
+        request = make_request("GET")
+        request.user = user
         assert HasActiveLease().has_permission(request, None) is False
 
-    def test_allows_with_active_lease(self):
-        request = MagicMock()
-        tenant = MagicMock()
-        tenant.leases.filter.return_value.exists.return_value = True
-        request.user.tenant_profile = tenant
+    def test_allows_with_active_lease(self, django_user_model):
+        user, tenant = _make_tenant_user(django_user_model, "lease_user")
+        apartment = _make_building_and_apartment()
+        lease = Lease.objects.create(
+            apartment=apartment,
+            responsible_tenant=tenant,
+            start_date=date(2026, 1, 1),
+            validity_months=12,
+            rental_value=Decimal("1500.00"),
+        )
+        lease.tenants.add(tenant)
+        request = make_request("GET")
+        request.user = user
         assert HasActiveLease().has_permission(request, None) is True
