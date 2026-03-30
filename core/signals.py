@@ -27,9 +27,12 @@ from .models import (
     Apartment,
     Building,
     Dependent,
+    DeviceToken,
     ExpenseMonthSkip,
     Furniture,
     Lease,
+    Notification,
+    PaymentProof,
     PersonPayment,
     PersonPaymentSchedule,
     Tenant,
@@ -337,6 +340,62 @@ def invalidate_expense_month_skip_cache_on_delete(
     sender: type[ExpenseMonthSkip], instance: ExpenseMonthSkip, **kwargs: Any
 ) -> None:
     _invalidate_financial_caches("ExpenseMonthSkip", instance.pk)
+
+
+# =============================================================================
+# Mobile Model Signals
+# =============================================================================
+
+
+@receiver(post_save, sender=PaymentProof)
+def invalidate_payment_proof_cache_on_save(
+    sender: type[PaymentProof], instance: PaymentProof, created: bool, **kwargs: Any
+) -> None:
+    action = "created" if created else "updated"
+    logger.info(f"PaymentProof {instance.pk} {action}, invalidating caches")
+    invalidate_related_caches(instance, related_models=["Lease"])
+
+
+@receiver(post_delete, sender=PaymentProof)
+def invalidate_payment_proof_cache_on_delete(
+    sender: type[PaymentProof], instance: PaymentProof, **kwargs: Any
+) -> None:
+    logger.info(f"PaymentProof {instance.pk} deleted, invalidating caches")
+    invalidate_related_caches(instance, related_models=["Lease"])
+
+
+@receiver(post_save, sender=Notification)
+def invalidate_notification_cache_on_save(
+    sender: type[Notification], instance: Notification, created: bool, **kwargs: Any
+) -> None:
+    action = "created" if created else "updated"
+    logger.info(f"Notification {instance.pk} {action}, invalidating caches")
+    CacheManager.invalidate_model("Notification", instance.pk)
+
+
+@receiver(post_delete, sender=Notification)
+def invalidate_notification_cache_on_delete(
+    sender: type[Notification], instance: Notification, **kwargs: Any
+) -> None:
+    logger.info(f"Notification {instance.pk} deleted, invalidating caches")
+    CacheManager.invalidate_model("Notification", instance.pk)
+
+
+@receiver(post_save, sender=DeviceToken)
+def invalidate_device_token_cache_on_save(
+    sender: type[DeviceToken], instance: DeviceToken, created: bool, **kwargs: Any
+) -> None:
+    action = "created" if created else "updated"
+    logger.info(f"DeviceToken {instance.pk} {action}, invalidating caches")
+    CacheManager.invalidate_model("DeviceToken", instance.pk)
+
+
+@receiver(post_delete, sender=DeviceToken)
+def invalidate_device_token_cache_on_delete(
+    sender: type[DeviceToken], instance: DeviceToken, **kwargs: Any
+) -> None:
+    logger.info(f"DeviceToken {instance.pk} deleted, invalidating caches")
+    CacheManager.invalidate_model("DeviceToken", instance.pk)
 
 
 # =============================================================================
