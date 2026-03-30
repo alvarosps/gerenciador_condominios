@@ -857,6 +857,15 @@ class ContractRule(AuditMixin, SoftDeleteMixin, models.Model):
 # =============================================================================
 
 
+PIX_KEY_TYPE_CHOICES = [
+    ("cpf", "CPF"),
+    ("cnpj", "CNPJ"),
+    ("email", "E-mail"),
+    ("phone", "Telefone"),
+    ("random", "Chave aleatória"),
+]
+
+
 class Person(AuditMixin, SoftDeleteMixin, models.Model):
     name = models.CharField(max_length=200)
     relationship = models.CharField(max_length=50)
@@ -878,6 +887,10 @@ class Person(AuditMixin, SoftDeleteMixin, models.Model):
         related_name="person_profile",
     )
     notes = models.TextField(blank=True)
+    pix_key = models.CharField(max_length=100, blank=True, default="")
+    pix_key_type = models.CharField(
+        max_length=10, blank=True, default="", choices=PIX_KEY_TYPE_CHOICES
+    )
 
     all_objects = models.Manager()
     objects = SoftDeleteManager()
@@ -1216,6 +1229,10 @@ class FinancialSettings(models.Model):
     notes = models.TextField(blank=True)
     updated_at = models.DateTimeField(auto_now=True)
     updated_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL)
+    default_pix_key = models.CharField(max_length=100, blank=True, default="")
+    default_pix_key_type = models.CharField(
+        max_length=10, blank=True, default="", choices=PIX_KEY_TYPE_CHOICES
+    )
 
     class Meta:
         verbose_name_plural = "Financial settings"
@@ -1256,3 +1273,208 @@ class IPCAIndex(models.Model):
 
     def __str__(self) -> str:
         return f"IPCA {self.reference_month.strftime('%m/%Y')}: {self.value}"
+
+
+class MonthSnapshot(AuditMixin, models.Model):
+    """
+    Snapshot imutável do estado financeiro de um mês finalizado.
+    Criado pelo MonthAdvanceService quando o mês é "fechado".
+    """
+
+    reference_month = models.DateField(
+        help_text="Primeiro dia do mês de referência (ex: 2026-03-01)"
+    )
+
+    # === Receitas ===
+    total_rent_income = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    total_extra_income = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    total_person_payments_received = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    total_income = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+
+    # === Despesas ===
+    total_card_installments = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    total_loan_installments = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    total_utility_bills = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    total_fixed_expenses = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    total_one_time_expenses = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    total_employee_salary = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    total_owner_repayments = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    total_person_stipends = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    total_debt_installments = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    total_property_tax = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    total_expenses = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+
+    # === Saldo ===
+    net_balance = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    cumulative_ending_balance = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=0,
+        help_text=(
+            "Saldo acumulado ao final do mês (snapshot anterior + net_balance deste mês). "
+            "Serve como ponto de partida para o controle diário do mês seguinte."
+        ),
+    )
+
+    # === Detalhamento ===
+    detailed_breakdown = models.JSONField(
+        default=dict,
+        help_text="Breakdown completo por categoria com itens individuais",
+    )
+
+    # === Status ===
+    is_finalized = models.BooleanField(
+        default=False, help_text="True quando o mês está oficialmente fechado"
+    )
+    finalized_at = models.DateTimeField(null=True, blank=True)
+    notes = models.TextField(blank=True, default="")
+
+    class Meta:
+        ordering = ["-reference_month"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["reference_month"],
+                name="unique_month_snapshot",
+            )
+        ]
+
+    def __str__(self) -> str:
+        status = "Finalizado" if self.is_finalized else "Aberto"
+        return f"Snapshot {self.reference_month.strftime('%m/%Y')} ({status})"
+
+
+# =============================================================================
+# MOBILE APP MODELS
+# =============================================================================
+
+_WHATSAPP_MAX_ATTEMPTS = 3
+
+
+class WhatsAppVerification(models.Model):
+    """Verification codes for WhatsApp-based tenant authentication."""
+
+    cpf_cnpj = models.CharField(max_length=20)
+    code = models.CharField(max_length=6)
+    phone = models.CharField(max_length=20)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    attempts = models.PositiveIntegerField(default=0)
+    is_used = models.BooleanField(default=False)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["cpf_cnpj", "is_used", "expires_at"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"WhatsApp verification for {self.cpf_cnpj}"
+
+    @property
+    def is_expired(self) -> bool:
+        return timezone.now() > self.expires_at
+
+    @property
+    def is_valid(self) -> bool:
+        return not self.is_used and not self.is_expired and self.attempts < _WHATSAPP_MAX_ATTEMPTS
+
+
+class DeviceToken(AuditMixin, models.Model):
+    """Expo push notification tokens for mobile devices."""
+
+    PLATFORM_CHOICES = [
+        ("ios", "iOS"),
+        ("android", "Android"),
+    ]
+
+    user = models.ForeignKey(
+        "auth.User",
+        on_delete=models.CASCADE,
+        related_name="device_tokens",
+    )
+    token = models.CharField(max_length=255, unique=True)
+    platform = models.CharField(max_length=10, choices=PLATFORM_CHOICES)
+    is_active = models.BooleanField(default=True)
+
+    def __str__(self) -> str:
+        return f"{self.platform} token for {self.user}"
+
+
+class PaymentProof(AuditMixin, SoftDeleteMixin, models.Model):
+    """Proof of payment uploaded by tenants (photo/PDF of PIX receipt)."""
+
+    STATUS_CHOICES = [
+        ("pending", "Pendente"),
+        ("approved", "Aprovado"),
+        ("rejected", "Rejeitado"),
+    ]
+
+    lease = models.ForeignKey(
+        "Lease",
+        on_delete=models.CASCADE,
+        related_name="payment_proofs",
+    )
+    reference_month = models.DateField()
+    file = models.FileField(upload_to="payment_proofs/%Y/%m/")
+    pix_code = models.TextField(blank=True, default="")
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="pending")
+    reviewed_by = models.ForeignKey(
+        "auth.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="reviewed_proofs",
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    rejection_reason = models.TextField(blank=True, default="")
+
+    objects = SoftDeleteManager()
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["status", "-created_at"]),
+            models.Index(fields=["lease", "reference_month"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"Proof for {self.lease} - {self.reference_month:%Y-%m}"
+
+
+class Notification(AuditMixin, models.Model):
+    """Push/in-app notifications for tenants and admins."""
+
+    TYPE_CHOICES = [
+        ("due_reminder", "Lembrete de vencimento"),
+        ("due_today", "Vencimento hoje"),
+        ("overdue", "Aluguel atrasado"),
+        ("proof_approved", "Comprovante aprovado"),
+        ("proof_rejected", "Comprovante rejeitado"),
+        ("rent_adjustment", "Reajuste de aluguel"),
+        ("admin_notice", "Aviso do admin"),
+        ("new_proof", "Novo comprovante"),
+        ("contract_expiring", "Contrato vencendo"),
+        ("adjustment_eligible", "Reajuste elegível"),
+    ]
+
+    recipient = models.ForeignKey(
+        "auth.User",
+        on_delete=models.CASCADE,
+        related_name="notifications",
+    )
+    type = models.CharField(max_length=30, choices=TYPE_CHOICES)
+    title = models.CharField(max_length=200)
+    body = models.TextField()
+    is_read = models.BooleanField(default=False)
+    read_at = models.DateTimeField(null=True, blank=True)
+    sent_at = models.DateTimeField()
+    data = models.JSONField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-sent_at"]
+        indexes = [
+            models.Index(fields=["recipient", "-sent_at"]),
+            models.Index(fields=["recipient", "is_read"]),
+            models.Index(fields=["type", "recipient", "sent_at"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.type} → {self.recipient} ({self.sent_at:%Y-%m-%d})"
