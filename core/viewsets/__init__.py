@@ -29,6 +29,7 @@ from .financial_views import (
     PersonViewSet,
     RentPaymentViewSet,
 )
+from .device_views import DeviceTokenViewSet
 from .landlord_views import LandlordViewSet
 from .month_advance_views import MonthAdvanceViewSet
 from .proof_views import AdminProofViewSet
@@ -37,6 +38,7 @@ from .template_views import ContractTemplateViewSet
 
 __all__ = [
     "AdminProofViewSet",
+    "DeviceTokenViewSet",
     "CashFlowViewSet",
     "ContractRuleViewSet",
     "ContractTemplateViewSet",
