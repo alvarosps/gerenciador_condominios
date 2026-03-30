@@ -4,8 +4,9 @@ Tests all permission classes with admin, regular user, and unauthenticated
 scenarios.  Uses real instances — no mocks of internal code.
 """
 
+from unittest.mock import MagicMock
+
 import pytest
-from django.test import RequestFactory
 from rest_framework.request import Request
 from rest_framework.test import APIRequestFactory
 
@@ -13,15 +14,16 @@ from core.permissions import (
     CanGenerateContract,
     CanModifyLease,
     FinancialReadOnly,
+    HasActiveLease,
     IsAdminUser,
     IsAuthenticatedAndActive,
     IsAuthenticatedOrReadOnly,
     IsOwnerOrAdmin,
     IsTenantOrAdmin,
+    IsTenantUser,
     ReadOnlyForNonAdmin,
     get_permission_classes,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -92,7 +94,9 @@ class TestIsAdminUser:
 
     def test_unauthenticated_denied(self):
         request = make_request("GET")
-        request.user = type("U", (), {"is_authenticated": False, "is_staff": False, "is_superuser": False})()
+        request.user = type(
+            "U", (), {"is_authenticated": False, "is_staff": False, "is_superuser": False}
+        )()
         assert self.perm.has_permission(request, None) is False
 
 
@@ -364,3 +368,72 @@ class TestGetPermissionClasses:
     def test_financial_read_only_type(self):
         classes = get_permission_classes("financial_read_only")
         assert FinancialReadOnly in classes
+
+
+# ---------------------------------------------------------------------------
+# IsTenantUser
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+@pytest.mark.django_db
+class TestIsTenantUser:
+    def test_denies_unauthenticated(self):
+        request = MagicMock()
+        request.user.is_authenticated = False
+        assert IsTenantUser().has_permission(request, None) is False
+
+    def test_denies_staff(self):
+        request = MagicMock()
+        request.user.is_authenticated = True
+        request.user.is_staff = True
+        assert IsTenantUser().has_permission(request, None) is False
+
+    def test_denies_no_tenant_profile(self):
+        request = MagicMock()
+        request.user.is_authenticated = True
+        request.user.is_staff = False
+        request.user.tenant_profile = None
+        assert IsTenantUser().has_permission(request, None) is False
+
+    def test_denies_deleted_tenant(self):
+        request = MagicMock()
+        request.user.is_authenticated = True
+        request.user.is_staff = False
+        request.user.tenant_profile = MagicMock(is_deleted=True)
+        assert IsTenantUser().has_permission(request, None) is False
+
+    def test_allows_active_tenant(self):
+        request = MagicMock()
+        request.user.is_authenticated = True
+        request.user.is_staff = False
+        request.user.tenant_profile = MagicMock(is_deleted=False)
+        assert IsTenantUser().has_permission(request, None) is True
+
+
+# ---------------------------------------------------------------------------
+# HasActiveLease
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+@pytest.mark.django_db
+class TestHasActiveLease:
+    def test_denies_no_tenant(self):
+        request = MagicMock()
+        request.user.tenant_profile = None
+        assert HasActiveLease().has_permission(request, None) is False
+
+    def test_denies_no_active_lease(self):
+        request = MagicMock()
+        tenant = MagicMock()
+        tenant.leases.filter.return_value.exists.return_value = False
+        request.user.tenant_profile = tenant
+        assert HasActiveLease().has_permission(request, None) is False
+
+    def test_allows_with_active_lease(self):
+        request = MagicMock()
+        tenant = MagicMock()
+        tenant.leases.filter.return_value.exists.return_value = True
+        request.user.tenant_profile = tenant
+        assert HasActiveLease().has_permission(request, None) is True
