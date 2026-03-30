@@ -10,8 +10,6 @@ from .views import (
     LeaseViewSet,
     TenantViewSet,
 )
-from .viewsets.auth_views import SetPasswordViewSet, WhatsAppAuthViewSet
-
 from .viewsets import (
     CashFlowViewSet,
     ContractRuleViewSet,
@@ -34,6 +32,8 @@ from .viewsets import (
     PersonViewSet,
     RentPaymentViewSet,
 )
+from .viewsets.auth_views import SetPasswordViewSet, WhatsAppAuthViewSet
+from .viewsets.tenant_views import TenantViewSet as TenantPortalViewSet
 
 router = DefaultRouter()
 router.register(r"buildings", BuildingViewSet)
@@ -71,9 +71,49 @@ _whatsapp_auth = WhatsAppAuthViewSet.as_view({"post": "request_code"})
 _whatsapp_verify = WhatsAppAuthViewSet.as_view({"post": "verify_code"})
 _set_password = SetPasswordViewSet.as_view({"post": "set_password"})
 
+# Tenant portal — manual URLs to avoid router conflicts with existing TenantViewSet
+
+_tenant_me = TenantPortalViewSet.as_view({"get": "me"})
+_tenant_contract = TenantPortalViewSet.as_view({"get": "contract"})
+_tenant_payments = TenantPortalViewSet.as_view({"get": "payments"})
+_tenant_adjustments = TenantPortalViewSet.as_view({"get": "rent_adjustments"})
+_tenant_pix = TenantPortalViewSet.as_view({"post": "payments_pix"})
+_tenant_proof_upload = TenantPortalViewSet.as_view({"post": "payments_proof_upload"})
+_tenant_proof_status = TenantPortalViewSet.as_view({"get": "payments_proof_status"})
+_tenant_simulate = TenantPortalViewSet.as_view({"post": "due_date_simulate"})
+_tenant_notifications = TenantPortalViewSet.as_view({"get": "notifications"})
+_tenant_notif_read = TenantPortalViewSet.as_view({"patch": "notification_mark_read"})
+_tenant_notif_read_all = TenantPortalViewSet.as_view({"post": "notifications_read_all"})
+
 urlpatterns = [
+    # Auth
     path("api/auth/whatsapp/request/", _whatsapp_auth, name="whatsapp-request"),
     path("api/auth/whatsapp/verify/", _whatsapp_verify, name="whatsapp-verify"),
     path("api/auth/set-password/", _set_password, name="set-password"),
+    # Tenant portal
+    path("api/tenant/me/", _tenant_me, name="tenant-me"),
+    path("api/tenant/contract/", _tenant_contract, name="tenant-contract"),
+    path("api/tenant/payments/", _tenant_payments, name="tenant-payments"),
+    path("api/tenant/rent-adjustments/", _tenant_adjustments, name="tenant-adjustments"),
+    path("api/tenant/payments/pix/", _tenant_pix, name="tenant-pix"),
+    path("api/tenant/payments/proof/", _tenant_proof_upload, name="tenant-proof-upload"),
+    path(
+        "api/tenant/payments/proof/<int:proof_id>/",
+        _tenant_proof_status,
+        name="tenant-proof-status",
+    ),
+    path("api/tenant/due-date/simulate/", _tenant_simulate, name="tenant-simulate"),
+    path("api/tenant/notifications/", _tenant_notifications, name="tenant-notifications"),
+    path(
+        "api/tenant/notifications/<int:notification_id>/read/",
+        _tenant_notif_read,
+        name="tenant-notif-read",
+    ),
+    path(
+        "api/tenant/notifications/read-all/",
+        _tenant_notif_read_all,
+        name="tenant-notif-read-all",
+    ),
+    # API router
     path("api/", include(router.urls)),
 ]
