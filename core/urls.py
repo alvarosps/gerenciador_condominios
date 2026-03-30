@@ -11,6 +11,7 @@ from .views import (
     TenantViewSet,
 )
 from .viewsets import (
+    AdminProofViewSet,
     CashFlowViewSet,
     ContractRuleViewSet,
     ContractTemplateViewSet,
@@ -66,6 +67,7 @@ router.register(
 )
 router.register(r"expense-month-skips", ExpenseMonthSkipViewSet, basename="expense-month-skips")
 router.register(r"month-advance", MonthAdvanceViewSet, basename="month-advance")
+router.register(r"admin/proofs", AdminProofViewSet, basename="admin-proofs")
 
 _whatsapp_auth = WhatsAppAuthViewSet.as_view({"post": "request_code"})
 _whatsapp_verify = WhatsAppAuthViewSet.as_view({"post": "verify_code"})
