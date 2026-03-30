@@ -233,6 +233,7 @@ module = [
     "boto3.*",
     "botocore.*",
     "django_redis.*",
+    "twilio.*",
 ]
 ignore_missing_imports = true
 
