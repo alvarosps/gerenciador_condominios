@@ -432,6 +432,9 @@ def disconnect_all_signals() -> None:
     post_save.disconnect(sender=Lease)
     post_save.disconnect(sender=Furniture)
     post_save.disconnect(sender=Dependent)
+    post_save.disconnect(sender=PaymentProof)
+    post_save.disconnect(sender=Notification)
+    post_save.disconnect(sender=DeviceToken)
 
     # Disconnect all post_delete signals
     post_delete.disconnect(sender=Building)
@@ -441,6 +444,9 @@ def disconnect_all_signals() -> None:
     post_delete.disconnect(sender=Lease)
     post_delete.disconnect(sender=Furniture)
     post_delete.disconnect(sender=Dependent)
+    post_delete.disconnect(sender=PaymentProof)
+    post_delete.disconnect(sender=Notification)
+    post_delete.disconnect(sender=DeviceToken)
 
     # Disconnect m2m_changed signals
     m2m_changed.disconnect(sender=Apartment.furnitures.through)

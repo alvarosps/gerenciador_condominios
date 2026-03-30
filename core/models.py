@@ -1387,7 +1387,7 @@ class DeviceToken(AuditMixin, models.Model):
     ]
 
     user = models.ForeignKey(
-        "auth.User",
+        settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name="device_tokens",
     )
@@ -1418,7 +1418,7 @@ class PaymentProof(AuditMixin, SoftDeleteMixin, models.Model):
     pix_code = models.TextField(blank=True, default="")
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="pending")
     reviewed_by = models.ForeignKey(
-        "auth.User",
+        settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
@@ -1427,6 +1427,7 @@ class PaymentProof(AuditMixin, SoftDeleteMixin, models.Model):
     reviewed_at = models.DateTimeField(null=True, blank=True)
     rejection_reason = models.TextField(blank=True, default="")
 
+    all_objects = models.Manager()
     objects = SoftDeleteManager()
 
     class Meta:
@@ -1456,7 +1457,7 @@ class Notification(AuditMixin, models.Model):
     ]
 
     recipient = models.ForeignKey(
-        "auth.User",
+        settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name="notifications",
     )
