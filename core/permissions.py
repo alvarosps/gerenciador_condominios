@@ -216,6 +216,26 @@ class IsAuthenticatedAndActive(permissions.BasePermission):
         return bool(request.user and request.user.is_authenticated and request.user.is_active)
 
 
+class IsTenantUser(permissions.BasePermission):
+    """Allows access only to authenticated tenants with a non-deleted record."""
+
+    def has_permission(self, request: Request, view: Any) -> bool:
+        if not (request.user.is_authenticated and not request.user.is_staff):
+            return False
+        tenant = getattr(request.user, "tenant_profile", None)
+        return tenant is not None and not tenant.is_deleted
+
+
+class HasActiveLease(permissions.BasePermission):
+    """Allows access only to tenants with an active (non-deleted) lease."""
+
+    def has_permission(self, request: Request, view: Any) -> bool:
+        tenant = getattr(request.user, "tenant_profile", None)
+        if tenant is None:
+            return False
+        return bool(tenant.leases.filter(is_deleted=False).exists())
+
+
 # Permission class mapping for easy import and documentation
 PERMISSION_CLASSES: dict[str, list[type[permissions.BasePermission]]] = {
     "public_read": [IsAuthenticatedOrReadOnly],
@@ -227,6 +247,8 @@ PERMISSION_CLASSES: dict[str, list[type[permissions.BasePermission]]] = {
     "can_generate_contract": [IsAuthenticatedAndActive, CanGenerateContract],
     "can_modify_lease": [CanModifyLease],
     "authenticated": [IsAuthenticatedAndActive],
+    "tenant_user": [IsTenantUser],
+    "tenant_with_lease": [IsTenantUser, HasActiveLease],
 }
 
 

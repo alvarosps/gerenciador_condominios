@@ -6,11 +6,11 @@ from decimal import Decimal, InvalidOperation
 from django.core.exceptions import ObjectDoesNotExist
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 
 from core.models import Person, PersonPayment
+from core.permissions import FinancialReadOnly, IsAdminUser
 from core.services.cash_flow_service import MONTHS_IN_YEAR, CashFlowService
 from core.services.daily_control_service import DailyControlService
 from core.services.financial_dashboard_service import FinancialDashboardService
@@ -23,7 +23,7 @@ _DEFAULT_PROJECTION_MONTHS = 12
 class FinancialDashboardViewSet(viewsets.ViewSet):
     """Read-only ViewSet exposing FinancialDashboardService aggregations."""
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [FinancialReadOnly]
 
     @action(detail=False, methods=["get"])
     def overview(self, request: Request) -> Response:
@@ -132,7 +132,7 @@ class FinancialDashboardViewSet(viewsets.ViewSet):
 class CashFlowViewSet(viewsets.ViewSet):
     """ViewSet for cash flow calculation and simulation endpoints."""
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAdminUser]
 
     @action(detail=False, methods=["get"])
     def monthly(self, request: Request) -> Response:
@@ -249,7 +249,7 @@ class CashFlowViewSet(viewsets.ViewSet):
 class DailyControlViewSet(viewsets.ViewSet):
     """ViewSet for daily financial control — breakdown, summary, and mark-paid."""
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAdminUser]
 
     @action(detail=False, methods=["get"])
     def breakdown(self, request: Request) -> Response:
