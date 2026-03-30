@@ -10,6 +10,8 @@ from .views import (
     LeaseViewSet,
     TenantViewSet,
 )
+from .viewsets.auth_views import SetPasswordViewSet, WhatsAppAuthViewSet
+
 from .viewsets import (
     CashFlowViewSet,
     ContractRuleViewSet,
@@ -25,6 +27,7 @@ from .viewsets import (
     FinancialSettingsViewSet,
     IncomeViewSet,
     LandlordViewSet,
+    MonthAdvanceViewSet,
     PersonIncomeViewSet,
     PersonPaymentScheduleViewSet,
     PersonPaymentViewSet,
@@ -62,7 +65,15 @@ router.register(
     r"person-payment-schedules", PersonPaymentScheduleViewSet, basename="person-payment-schedules"
 )
 router.register(r"expense-month-skips", ExpenseMonthSkipViewSet, basename="expense-month-skips")
+router.register(r"month-advance", MonthAdvanceViewSet, basename="month-advance")
+
+_whatsapp_auth = WhatsAppAuthViewSet.as_view({"post": "request_code"})
+_whatsapp_verify = WhatsAppAuthViewSet.as_view({"post": "verify_code"})
+_set_password = SetPasswordViewSet.as_view({"post": "set_password"})
 
 urlpatterns = [
+    path("api/auth/whatsapp/request/", _whatsapp_auth, name="whatsapp-request"),
+    path("api/auth/whatsapp/verify/", _whatsapp_verify, name="whatsapp-verify"),
+    path("api/auth/set-password/", _set_password, name="set-password"),
     path("api/", include(router.urls)),
 ]
