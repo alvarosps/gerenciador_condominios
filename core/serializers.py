@@ -25,6 +25,8 @@ from .models import (
     Landlord,
     Lease,
     MonthSnapshot,
+    Notification,
+    PaymentProof,
     Person,
     PersonIncome,
     PersonPayment,
@@ -1168,3 +1170,45 @@ class FinancialSettingsSerializer(serializers.ModelSerializer):
             "updated_by",
         ]
         read_only_fields = ["id", "updated_at"]
+
+
+class PaymentProofSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PaymentProof
+        fields = [
+            "id",
+            "lease",
+            "reference_month",
+            "file",
+            "pix_code",
+            "status",
+            "reviewed_by",
+            "reviewed_at",
+            "rejection_reason",
+            "created_at",
+        ]
+        read_only_fields = [
+            "id",
+            "lease",
+            "status",
+            "reviewed_by",
+            "reviewed_at",
+            "rejection_reason",
+            "created_at",
+        ]
+
+
+class NotificationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Notification
+        fields = [
+            "id",
+            "type",
+            "title",
+            "body",
+            "is_read",
+            "read_at",
+            "sent_at",
+            "data",
+        ]
+        read_only_fields = ["id", "type", "title", "body", "sent_at", "data"]
