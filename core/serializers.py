@@ -24,6 +24,7 @@ from .models import (
     Income,
     Landlord,
     Lease,
+    MonthSnapshot,
     Person,
     PersonIncome,
     PersonPayment,
@@ -613,6 +614,32 @@ class RentAdjustmentSerializer(serializers.ModelSerializer):
 # =============================================================================
 
 
+class FinalizedMonthProtectionMixin(serializers.Serializer):
+    """Prevents modification of financial data in finalized months."""
+
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
+        attrs = super().validate(attrs)
+
+        reference_month = self._get_reference_month(attrs)
+        if reference_month is None:
+            return attrs
+
+        is_finalized = MonthSnapshot.objects.filter(
+            reference_month=reference_month, is_finalized=True
+        ).exists()
+
+        if is_finalized:
+            month_label = reference_month.strftime("%m/%Y")
+            msg = f"O mês {month_label} está finalizado. Use rollback para reabrir antes de editar."
+            raise serializers.ValidationError(msg)
+
+        return attrs
+
+    def _get_reference_month(self, attrs: dict[str, Any]) -> date | None:
+        """Override in subclasses to extract the relevant month."""
+        return None
+
+
 class PersonSerializer(serializers.ModelSerializer):
     credit_cards = serializers.SerializerMethodField()
     user_id = serializers.PrimaryKeyRelatedField(
@@ -638,6 +665,8 @@ class PersonSerializer(serializers.ModelSerializer):
             "user",
             "user_id",
             "notes",
+            "pix_key",
+            "pix_key_type",
             "credit_cards",
             "created_at",
             "updated_at",
@@ -701,7 +730,7 @@ class ExpenseCategorySerializer(serializers.ModelSerializer):
         return list(ExpenseCategorySerializer(children, many=True).data)
 
 
-class ExpenseInstallmentSerializer(serializers.ModelSerializer):
+class ExpenseInstallmentSerializer(FinalizedMonthProtectionMixin, serializers.ModelSerializer):
     is_overdue = serializers.SerializerMethodField()
 
     class Meta:
@@ -722,6 +751,14 @@ class ExpenseInstallmentSerializer(serializers.ModelSerializer):
 
     def get_is_overdue(self, obj: ExpenseInstallment) -> bool:
         return not obj.is_paid and obj.due_date < date.today()
+
+    def _get_reference_month(self, attrs: dict[str, Any]) -> date | None:
+        due_date = attrs.get("due_date")
+        if due_date is None and self.instance:
+            due_date = self.instance.due_date
+        if due_date:
+            return date(due_date.year, due_date.month, 1)
+        return None
 
 
 class ExpenseSerializer(serializers.ModelSerializer):
@@ -941,7 +978,7 @@ class IncomeSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "created_at", "updated_at"]
 
 
-class RentPaymentSerializer(serializers.ModelSerializer):
+class RentPaymentSerializer(FinalizedMonthProtectionMixin, serializers.ModelSerializer):
     lease = LeaseSerializer(read_only=True)
     lease_id = serializers.PrimaryKeyRelatedField(
         queryset=Lease.objects.all(), source="lease", write_only=True
@@ -968,8 +1005,16 @@ class RentPaymentSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(msg)
         return value
 
+    def _get_reference_month(self, attrs: dict[str, Any]) -> date | None:
+        reference_month = attrs.get("reference_month")
+        if reference_month is None and self.instance:
+            reference_month = self.instance.reference_month
+        if reference_month:
+            return date(reference_month.year, reference_month.month, 1)
+        return None
 
-class EmployeePaymentSerializer(serializers.ModelSerializer):
+
+class EmployeePaymentSerializer(FinalizedMonthProtectionMixin, serializers.ModelSerializer):
     person = PersonSimpleSerializer(read_only=True)
     person_id = serializers.PrimaryKeyRelatedField(
         queryset=Person.objects.all(), source="person", write_only=True
@@ -1002,8 +1047,16 @@ class EmployeePaymentSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(msg)
         return value
 
+    def _get_reference_month(self, attrs: dict[str, Any]) -> date | None:
+        reference_month = attrs.get("reference_month")
+        if reference_month is None and self.instance:
+            reference_month = self.instance.reference_month
+        if reference_month:
+            return date(reference_month.year, reference_month.month, 1)
+        return None
 
-class PersonPaymentSerializer(serializers.ModelSerializer):
+
+class PersonPaymentSerializer(FinalizedMonthProtectionMixin, serializers.ModelSerializer):
     person = PersonSimpleSerializer(read_only=True)
     person_id = serializers.PrimaryKeyRelatedField(
         queryset=Person.objects.all(),
@@ -1031,6 +1084,14 @@ class PersonPaymentSerializer(serializers.ModelSerializer):
             msg = "O mês de referência deve ser o primeiro dia do mês."
             raise serializers.ValidationError(msg)
         return value
+
+    def _get_reference_month(self, attrs: dict[str, Any]) -> date | None:
+        reference_month = attrs.get("reference_month")
+        if reference_month is None and self.instance:
+            reference_month = self.instance.reference_month
+        if reference_month:
+            return date(reference_month.year, reference_month.month, 1)
+        return None
 
 
 class PersonPaymentScheduleSerializer(serializers.ModelSerializer):
@@ -1100,6 +1161,8 @@ class FinancialSettingsSerializer(serializers.ModelSerializer):
             "id",
             "initial_balance",
             "initial_balance_date",
+            "default_pix_key",
+            "default_pix_key_type",
             "notes",
             "updated_at",
             "updated_by",
