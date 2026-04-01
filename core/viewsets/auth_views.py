@@ -12,12 +12,15 @@ Endpoints:
 
 import logging
 from datetime import timedelta
+from typing import cast
 
-from django.contrib.auth import get_user_model
+from django.contrib.auth.models import User
+from django.db import transaction
 from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny
+from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 
@@ -30,8 +33,6 @@ from core.services.whatsapp_service import (
 )
 
 logger = logging.getLogger(__name__)
-
-User = get_user_model()
 
 _CODE_EXPIRY_MINUTES = 5
 _RATE_LIMIT_WINDOW_MINUTES = 15
@@ -51,7 +52,7 @@ class WhatsAppAuthViewSet(viewsets.ViewSet):
     permission_classes = [AllowAny]
 
     @action(detail=False, methods=["post"], url_path="request")
-    def request_code(self, request):
+    def request_code(self, request: Request) -> Response:
         """
         Send a 6-digit OTP to the tenant's WhatsApp.
 
@@ -103,7 +104,7 @@ class WhatsAppAuthViewSet(viewsets.ViewSet):
         return Response({"detail": "Código enviado via WhatsApp."}, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=["post"], url_path="verify")
-    def verify_code(self, request):
+    def verify_code(self, request: Request) -> Response:
         """
         Verify the OTP and return JWT tokens.
 
@@ -132,41 +133,43 @@ class WhatsAppAuthViewSet(viewsets.ViewSet):
         except Tenant.DoesNotExist:
             return Response({"error": "Inquilino não encontrado"}, status=status.HTTP_404_NOT_FOUND)
 
-        verification = (
-            WhatsAppVerification.objects.filter(cpf_cnpj=cpf_cnpj, is_used=False)
-            .order_by("-created_at")
-            .first()
-        )
-
-        if verification is None:
-            return Response(
-                {"error": "Nenhuma verificação pendente encontrada"},
-                status=status.HTTP_404_NOT_FOUND,
+        with transaction.atomic():
+            verification = (
+                WhatsAppVerification.objects.select_for_update()
+                .filter(cpf_cnpj=cpf_cnpj, is_used=False)
+                .order_by("-created_at")
+                .first()
             )
 
-        if not verification.is_valid:
-            return Response(
-                {"error": "Código expirado ou esgotado. Solicite um novo código."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+            if verification is None:
+                return Response(
+                    {"error": "Nenhuma verificação pendente encontrada"},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
 
-        if verification.code != code:
-            verification.attempts += 1
-            verification.save(update_fields=["attempts"])
-            return Response({"error": "Código inválido."}, status=status.HTTP_400_BAD_REQUEST)
+            if not verification.is_valid:
+                return Response(
+                    {"error": "Código expirado ou esgotado. Solicite um novo código."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
-        verification.is_used = True
-        verification.save(update_fields=["is_used"])
+            if verification.code != code:
+                verification.attempts += 1
+                verification.save(update_fields=["attempts"])
+                return Response({"error": "Código inválido."}, status=status.HTTP_400_BAD_REQUEST)
 
-        if tenant.user is None:
-            user = User.objects.create_user(
-                username=f"tenant_{tenant.pk}",
-                is_staff=False,
-                is_active=True,
-            )
-            tenant.user = user
-            tenant.save(update_fields=["user"])
-            logger.info("Created user account for tenant pk=%s", tenant.pk)
+            verification.is_used = True
+            verification.save(update_fields=["is_used"])
+
+            if tenant.user is None:
+                user = User.objects.create_user(
+                    username=f"tenant_{tenant.pk}",
+                    is_staff=False,
+                    is_active=True,
+                )
+                tenant.user = user
+                tenant.save(update_fields=["user"])
+                logger.info("Created user account for tenant pk=%s", tenant.pk)
 
         refresh = RefreshToken.for_user(tenant.user)
         return Response(
@@ -190,7 +193,7 @@ class SetPasswordViewSet(viewsets.ViewSet):
 
     permission_classes = [IsAdminUser]
 
-    def set_password(self, request):
+    def set_password(self, request: Request) -> Response:
         """
         Set a new password on the currently authenticated user.
 
@@ -210,8 +213,9 @@ class SetPasswordViewSet(viewsets.ViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        request.user.set_password(password)
-        request.user.save(update_fields=["password"])
-        logger.info("Password updated for user pk=%s", request.user.pk)
+        user = cast(User, request.user)
+        user.set_password(password)
+        user.save(update_fields=["password"])
+        logger.info("Password updated for user pk=%s", user.pk)
 
         return Response({"detail": "Senha atualizada com sucesso."}, status=status.HTTP_200_OK)

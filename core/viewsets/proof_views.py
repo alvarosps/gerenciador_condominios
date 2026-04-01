@@ -19,6 +19,7 @@ from core.models import PaymentProof
 from core.pagination import CustomPageNumberPagination
 from core.permissions import IsAdminUser
 from core.serializers import PaymentProofSerializer
+from core.services.notification_service import notify_proof_reviewed
 
 _VALID_REVIEW_ACTIONS = ("approve", "reject")
 
@@ -72,6 +73,12 @@ class AdminProofViewSet(ViewSet):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
+        if proof.status != "pending":
+            return Response(
+                {"error": "Apenas comprovantes pendentes podem ser revisados."},
+                status=status.HTTP_409_CONFLICT,
+            )
+
         action_type = request.data.get("action")
         if action_type not in _VALID_REVIEW_ACTIONS:
             return Response(
@@ -89,4 +96,5 @@ class AdminProofViewSet(ViewSet):
             proof.rejection_reason = request.data.get("reason", "")
 
         proof.save(update_fields=["status", "reviewed_by", "reviewed_at", "rejection_reason"])
+        notify_proof_reviewed(proof)
         return Response(PaymentProofSerializer(proof).data)

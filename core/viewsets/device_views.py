@@ -54,8 +54,10 @@ class DeviceTokenViewSet(ViewSet):
                 "user": authenticated_user,
                 "platform": platform,
                 "is_active": True,
-                "created_by": authenticated_user,
                 "updated_by": authenticated_user,
+            },
+            create_defaults={
+                "created_by": authenticated_user,
             },
         )
         return Response(
