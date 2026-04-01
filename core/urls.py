@@ -69,6 +69,7 @@ router.register(
 router.register(r"expense-month-skips", ExpenseMonthSkipViewSet, basename="expense-month-skips")
 router.register(r"month-advance", MonthAdvanceViewSet, basename="month-advance")
 router.register(r"admin/proofs", AdminProofViewSet, basename="admin-proofs")
+router.register(r"admin/notifications", AdminNotificationViewSet, basename="admin-notifications")
 router.register(r"devices", DeviceTokenViewSet, basename="devices")
 
 _whatsapp_auth = WhatsAppAuthViewSet.as_view({"post": "request_code"})
