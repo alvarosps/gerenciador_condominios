@@ -11,12 +11,13 @@ import {
 } from "@/lib/notifications";
 
 export default function RootLayout() {
-  const { isAuthenticated, isLoading, role, hydrateFromStorage } = useAuthStore();
+  const { isLoading, hydrateFromStorage } = useAuthStore();
 
   useEffect(() => {
     void hydrateFromStorage();
   }, [hydrateFromStorage]);
 
+  const { isAuthenticated } = useAuthStore();
   useEffect(() => {
     if (isAuthenticated) {
       void registerForPushNotifications();
@@ -37,15 +38,10 @@ export default function RootLayout() {
     <QueryClientProvider client={queryClient}>
       <PaperProvider>
         <Stack screenOptions={{ headerShown: false }}>
-          {isAuthenticated && role === "tenant" && (
-            <Stack.Screen name="(tenant)" />
-          )}
-          {isAuthenticated && role === "admin" && (
-            <Stack.Screen name="(admin)" />
-          )}
-          {!isAuthenticated && (
-            <Stack.Screen name="login" />
-          )}
+          <Stack.Screen name="index" />
+          <Stack.Screen name="login" />
+          <Stack.Screen name="(tenant)" />
+          <Stack.Screen name="(admin)" />
         </Stack>
       </PaperProvider>
     </QueryClientProvider>

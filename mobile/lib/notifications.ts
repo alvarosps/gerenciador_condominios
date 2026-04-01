@@ -18,7 +18,6 @@ Notifications.setNotificationHandler({
 
 export async function registerForPushNotifications(): Promise<string | null> {
   if (!Device.isDevice) {
-    console.warn("Push notifications require a physical device");
     return null;
   }
 
@@ -43,14 +42,15 @@ export async function registerForPushNotifications(): Promise<string | null> {
       token,
       platform: Platform.OS,
     });
-  } catch (error) {
-    console.error("Failed to register push token:", error);
+  } catch {
+    // Best effort — registration failure should not block the user
   }
 
   return token;
 }
 
 export async function unregisterPushToken(): Promise<void> {
+  if (!Device.isDevice) return;
   try {
     const tokenData = await Notifications.getExpoPushTokenAsync();
     await apiClient.post("/devices/unregister/", {

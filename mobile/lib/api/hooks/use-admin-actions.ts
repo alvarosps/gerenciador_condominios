@@ -24,21 +24,21 @@ interface ReviewProofInput {
 interface ApplyRentAdjustmentInput {
   lease_id: number;
   percentage: string;
-  adjustment_date: string;
-  update_apartment_price: boolean;
+  renewal_date: string;
+  update_apartment_prices: boolean;
 }
 
 interface LateFeeResult {
-  days_late: number;
-  daily_rate: string;
-  late_fee: string;
-  total_due: string;
+  late_days?: number;
+  late_fee?: string;
+  message?: string;
 }
 
 export function useMarkRentPaid() {
   const qc = useQueryClient();
   return useMutation<void, Error, MarkRentPaidInput>({
     mutationFn: async (input) => {
+      // Note: backend always books current month. reference_month is sent for future support.
       await apiClient.post("/dashboard/mark_rent_paid/", input);
     },
     onSuccess: () => {

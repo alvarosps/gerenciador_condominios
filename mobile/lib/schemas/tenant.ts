@@ -21,8 +21,8 @@ export const LeaseSchema = z.object({
 export const DependentSchema = z.object({
   id: z.number(),
   name: z.string(),
-  phone: z.string(),
-  cpf_cnpj: z.string(),
+  phone: z.string().nullable(),
+  cpf_cnpj: z.string().nullable(),
 });
 
 export const TenantMeSchema = z.object({
@@ -46,7 +46,7 @@ export const RentPaymentSchema = z.object({
   reference_month: z.string(),
   amount_paid: z.string(),
   payment_date: z.string(),
-  notes: z.string(),
+  notes: z.string().nullable(),
 });
 
 export const RentAdjustmentSchema = z.object({

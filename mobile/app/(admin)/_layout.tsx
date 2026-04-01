@@ -1,7 +1,13 @@
-import { Tabs } from "expo-router";
+import { Redirect, Tabs } from "expo-router";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
+import { useAuthStore } from "@/store/auth-store";
 
 export default function AdminTabLayout() {
+  const { isAuthenticated, role } = useAuthStore();
+
+  if (!isAuthenticated) return <Redirect href="/login" />;
+  if (role !== "admin") return <Redirect href="/(tenant)" />;
+
   return (
     <Tabs
       screenOptions={{ tabBarActiveTintColor: "#2196F3", tabBarInactiveTintColor: "gray" }}

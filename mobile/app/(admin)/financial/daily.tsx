@@ -37,7 +37,11 @@ export default function DailyControlScreen() {
 
   function handleMarkPaid(id: number, type: string): void {
     markPaid.mutate(
-      { item_id: id, item_type: type },
+      {
+        item_id: id,
+        item_type: type,
+        payment_date: new Date().toISOString().split("T")[0],
+      },
       {
         onError: () => Alert.alert("Erro", "Não foi possível marcar como pago."),
       },
