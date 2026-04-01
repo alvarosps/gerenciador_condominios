@@ -143,7 +143,7 @@ export default function PixScreen() {
             Enviar Comprovante
           </Text>
           <TextInput
-            label="Mês de referência (AAAA-MM-DD)"
+            label="Mês de referência (YYYY-MM-DD)"
             value={referenceMonth}
             onChangeText={setReferenceMonth}
             mode="outlined"

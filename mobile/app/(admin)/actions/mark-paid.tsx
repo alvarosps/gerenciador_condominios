@@ -90,11 +90,11 @@ export default function MarkPaidScreen() {
         <Card.Title title="Dados do Pagamento" />
         <Card.Content style={styles.formContent}>
           <TextInput
-            label="Mês de referência (YYYY-MM)"
+            label="Mês de referência (YYYY-MM-DD)"
             value={referenceMonth}
             onChangeText={setReferenceMonth}
             mode="outlined"
-            placeholder="2026-03"
+            placeholder="2026-04-01"
             style={styles.input}
           />
           <TextInput

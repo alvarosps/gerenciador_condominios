@@ -88,8 +88,8 @@ export const PaymentProofAdminSchema = z.object({
   file: z.string(),
   status: z.enum(["pending", "approved", "rejected"]),
   created_at: z.string(),
-  tenant_name: z.string(),
-  apartment_number: z.string(),
+  tenant_name: z.string().optional(),
+  apartment_number: z.string().optional(),
 });
 
 export const TenantSearchResultSchema = z.object({

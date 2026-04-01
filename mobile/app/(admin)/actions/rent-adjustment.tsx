@@ -40,8 +40,8 @@ export default function RentAdjustmentScreen() {
               {
                 lease_id: selectedAlert.lease_id,
                 percentage,
-                adjustment_date: adjustmentDate,
-                update_apartment_price: updateApartmentPrice,
+                renewal_date: adjustmentDate,
+                update_apartment_prices: updateApartmentPrice,
               },
               {
                 onSuccess: () => {

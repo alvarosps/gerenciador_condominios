@@ -2,13 +2,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api/client";
 import type { DailySummaryData, FinancialOverview, MonthlyPurchaseGroup } from "@/lib/schemas/admin";
 
-interface PaginatedResponse<T> {
-  count: number;
-  next: string | null;
-  previous: string | null;
-  results: T[];
-}
-
 interface InstallmentItem {
   id: number;
   description: string;
@@ -38,6 +31,7 @@ interface MonthlyPurchases {
 interface MarkDailyPaidInput {
   item_id: number;
   item_type: string;
+  payment_date: string; // YYYY-MM-DD format, required
   amount_paid?: string;
 }
 
@@ -55,11 +49,11 @@ export function useUpcomingInstallments(days: number = 30) {
   return useQuery<InstallmentItem[]>({
     queryKey: ["admin", "financial", "upcoming_installments", days],
     queryFn: async () => {
-      const response = await apiClient.get<PaginatedResponse<InstallmentItem>>(
+      const response = await apiClient.get<InstallmentItem[]>(
         "/financial-dashboard/upcoming_installments/",
         { params: { days } },
       );
-      return response.data.results;
+      return response.data;
     },
   });
 }
@@ -68,10 +62,10 @@ export function useOverdueInstallments() {
   return useQuery<InstallmentItem[]>({
     queryKey: ["admin", "financial", "overdue_installments"],
     queryFn: async () => {
-      const response = await apiClient.get<PaginatedResponse<InstallmentItem>>(
+      const response = await apiClient.get<InstallmentItem[]>(
         "/financial-dashboard/overdue_installments/",
       );
-      return response.data.results;
+      return response.data;
     },
   });
 }
