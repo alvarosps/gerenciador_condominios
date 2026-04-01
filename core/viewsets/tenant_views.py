@@ -25,6 +25,8 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 
 from core.models import (
+    FinancialSettings,
+    Landlord,
     Lease,
     Notification,
     PaymentProof,
@@ -41,6 +43,8 @@ from core.serializers import (
     RentPaymentSerializer,
 )
 from core.services.fee_calculator import FeeCalculatorService
+from core.services.notification_service import notify_new_proof
+from core.services.pix_service import generate_pix_payload
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +60,7 @@ def _get_tenant(request: Request) -> Tenant | None:
 def _get_active_lease(tenant: Tenant) -> Lease | None:
     """Return the active (non-deleted) lease for a tenant, or None."""
     return (
-        tenant.leases.filter(is_deleted=False)
+        tenant.leases_responsible.filter(is_deleted=False)
         .select_related("apartment", "apartment__building", "apartment__owner")
         .first()
     )
@@ -326,6 +330,7 @@ class TenantViewSet(viewsets.ViewSet):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         proof = serializer.save(lease=lease)
+        notify_new_proof(proof)
         logger.info(
             "Payment proof uploaded for lease %s (month: %s)", lease.pk, proof.reference_month
         )
@@ -427,13 +432,13 @@ class TenantViewSet(viewsets.ViewSet):
 
         result = FeeCalculatorService.calculate_due_date_change_fee(
             rental_value=lease.rental_value,
-            current_due_day=lease.due_day,
+            current_due_day=tenant.due_day,
             new_due_day=new_due_day,
         )
 
         return Response(
             {
-                "current_due_day": lease.due_day,
+                "current_due_day": tenant.due_day,
                 "new_due_day": new_due_day,
                 "days_difference": result["days_difference"],
                 "daily_rate": result["daily_rate"],

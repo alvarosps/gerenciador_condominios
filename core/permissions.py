@@ -233,7 +233,7 @@ class HasActiveLease(permissions.BasePermission):
         tenant = getattr(request.user, "tenant_profile", None)
         if tenant is None:
             return False
-        return bool(tenant.leases.filter(is_deleted=False).exists())
+        return bool(tenant.leases_responsible.filter(is_deleted=False).exists())
 
 
 # Permission class mapping for easy import and documentation
