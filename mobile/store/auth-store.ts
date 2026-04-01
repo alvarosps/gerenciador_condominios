@@ -41,6 +41,8 @@ export const useAuthStore = create<AuthStore>((set) => ({
   },
 
   clearAuth: async () => {
+    const { unregisterPushToken } = await import("@/lib/notifications");
+    await unregisterPushToken();
     const { clearTokens } = await import("@/lib/secure-store");
     await clearTokens();
     set({
