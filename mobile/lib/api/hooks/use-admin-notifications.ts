@@ -2,9 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api/client";
 import type { TenantNotification } from "@/lib/schemas/tenant";
 
-// TODO: backend needs to expose GET /notifications/, PATCH /notifications/{id}/read/,
-// and POST /notifications/read-all/ endpoints accessible to admin users.
-// The /tenant/notifications/ endpoint uses IsTenantUser which rejects is_staff=True.
+// Backend endpoints: GET/PATCH/POST /admin/notifications/ (IsAdminUser permission)
 
 interface PaginatedResponse<T> {
   count: number;
@@ -18,7 +16,7 @@ export function useAdminNotifications() {
     queryKey: ["admin", "notifications"],
     queryFn: async () => {
       const response = await apiClient.get<PaginatedResponse<TenantNotification>>(
-        "/notifications/",
+        "/admin/notifications/",
         { params: { page_size: 50 } },
       );
       return response.data.results;
@@ -31,7 +29,7 @@ export function useMarkAdminNotificationRead() {
   return useMutation<TenantNotification, Error, number>({
     mutationFn: async (notificationId) => {
       const response = await apiClient.patch<TenantNotification>(
-        `/notifications/${notificationId}/read/`,
+        `/admin/notifications/${notificationId}/read/`,
       );
       return response.data;
     },
