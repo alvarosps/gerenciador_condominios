@@ -5,6 +5,10 @@ import { PaperProvider } from "react-native-paper";
 import { queryClient } from "@/lib/query-client";
 import { useAuthStore } from "@/store/auth-store";
 import { LoadingScreen } from "@/components/ui/loading-screen";
+import {
+  registerForPushNotifications,
+  useNotificationDeepLinking,
+} from "@/lib/notifications";
 
 export default function RootLayout() {
   const { isAuthenticated, isLoading, role, hydrateFromStorage } = useAuthStore();
@@ -12,6 +16,14 @@ export default function RootLayout() {
   useEffect(() => {
     void hydrateFromStorage();
   }, [hydrateFromStorage]);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      void registerForPushNotifications();
+    }
+  }, [isAuthenticated]);
+
+  useNotificationDeepLinking();
 
   if (isLoading) {
     return (
