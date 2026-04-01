@@ -35,6 +35,7 @@ from .viewsets import (
     RentPaymentViewSet,
 )
 from .viewsets.auth_views import SetPasswordViewSet, WhatsAppAuthViewSet
+from .viewsets.notification_views import AdminNotificationViewSet
 from .viewsets.tenant_views import TenantViewSet as TenantPortalViewSet
 
 router = DefaultRouter()
