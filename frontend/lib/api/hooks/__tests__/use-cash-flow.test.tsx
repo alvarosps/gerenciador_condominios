@@ -5,7 +5,7 @@ import { useMonthlyCashFlow, useCashFlowProjection, usePersonSummary } from '../
 import { createWrapper } from '@/tests/test-utils';
 import { server } from '@/tests/mocks/server';
 
-const API_BASE = 'http://localhost:8000/api';
+const API_BASE = 'http://localhost:8008/api';
 
 describe('useMonthlyCashFlow', () => {
   it('should fetch monthly data', async () => {
@@ -55,7 +55,7 @@ describe('useMonthlyCashFlow', () => {
 
 describe('useCashFlowProjection', () => {
   it('should fetch projection', async () => {
-    const { result } = renderHook(() => useCashFlowProjection(3), {
+    const { result } = renderHook(() => useCashFlowProjection({ months: 3 }), {
       wrapper: createWrapper(),
     });
 
@@ -84,7 +84,7 @@ describe('useCashFlowProjection', () => {
   });
 
   it('should include is_projected flag in each month', async () => {
-    const { result } = renderHook(() => useCashFlowProjection(3), {
+    const { result } = renderHook(() => useCashFlowProjection({ months: 3 }), {
       wrapper: createWrapper(),
     });
 

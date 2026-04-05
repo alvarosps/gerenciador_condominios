@@ -33,6 +33,17 @@ export const apartmentSchema = z.object({
       interfone_configured: z.boolean(),
       start_date: z.string(),
       validity_months: z.number(),
+      rental_value: z
+        .string()
+        .or(z.number())
+        .transform((val) => Number(val)),
+      pending_rental_value: z
+        .string()
+        .or(z.number())
+        .nullable()
+        .optional()
+        .transform((val) => (val !== null && val !== undefined ? Number(val) : null)),
+      pending_rental_value_date: z.string().nullable().optional(),
       responsible_tenant: z.object({ id: z.number(), name: z.string() }),
     })
     .nullable()

@@ -83,6 +83,8 @@ class IsTenantOrAdmin(permissions.BasePermission):
     """
 
     def has_object_permission(self, request: Request, view: APIView, obj: Any) -> bool:
+        if not request.user or not request.user.is_authenticated:
+            return False
         # Admins can access any lease
         if request.user.is_staff or request.user.is_superuser:
             return True

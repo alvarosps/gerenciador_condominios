@@ -53,12 +53,14 @@ export const useAuthStore = create<AuthState>()(
         set({
           token,
           refreshToken,
+          user: null,
           isAuthenticated: true,
         }),
 
       setToken: (token) =>
         set({
           token,
+          isAuthenticated: true,
         }),
 
       setUser: (user) =>

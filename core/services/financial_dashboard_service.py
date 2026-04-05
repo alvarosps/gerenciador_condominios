@@ -11,7 +11,9 @@ from typing import Any
 
 from django.db.models import Count, Q, Sum
 from django.db.models.functions import Coalesce
+from django.utils import timezone
 
+from core.cache import cache_result
 from core.models import (
     Apartment,
     Building,
@@ -56,12 +58,13 @@ class FinancialDashboardService:
     """Aggregated financial metrics for dashboard widgets."""
 
     @staticmethod
+    @cache_result(timeout=120, key_prefix="financial-dashboard-overview")
     def get_overview() -> dict[str, Any]:
         """
         Return financial overview with current month balance, debts,
         monthly obligations/income, and months until break-even.
         """
-        today = date.today()
+        today = timezone.now().date()
         year, month = today.year, today.month
 
         # Current month via CashFlowService
@@ -124,9 +127,10 @@ class FinancialDashboardService:
         return None
 
     @staticmethod
+    @cache_result(timeout=120, key_prefix="financial-dashboard-debt-person")
     def get_debt_by_person() -> list[dict[str, Any]]:
         """Return debt breakdown per person: card debt, loan debt, monthly amounts."""
-        today = date.today()
+        today = timezone.now().date()
         month_start = date(today.year, today.month, 1)
         next_month = _next_month_start(today.year, today.month)
 
@@ -193,6 +197,7 @@ class FinancialDashboardService:
         return result
 
     @staticmethod
+    @cache_result(timeout=120, key_prefix="financial-dashboard-debt-type")
     def get_debt_by_type() -> dict[str, Decimal]:
         """Return total unpaid debt grouped by expense type."""
         unpaid = ExpenseInstallment.objects.filter(is_paid=False, expense__is_offset=False)
@@ -243,9 +248,10 @@ class FinancialDashboardService:
         }
 
     @staticmethod
+    @cache_result(timeout=120, key_prefix="financial-dashboard-upcoming")
     def get_upcoming_installments(days: int = 30) -> list[dict[str, Any]]:
         """Return unpaid installments due within the next N days, ordered by due_date."""
-        today = date.today()
+        today = timezone.now().date()
         end_date = today + timedelta(days=days)
 
         installments = (
@@ -278,9 +284,10 @@ class FinancialDashboardService:
         ]
 
     @staticmethod
+    @cache_result(timeout=120, key_prefix="financial-dashboard-overdue")
     def get_overdue_installments() -> list[dict[str, Any]]:
         """Return unpaid installments with due_date before today, ordered by due_date."""
-        today = date.today()
+        today = timezone.now().date()
 
         installments = (
             ExpenseInstallment.objects.filter(
@@ -311,6 +318,7 @@ class FinancialDashboardService:
         ]
 
     @staticmethod
+    @cache_result(timeout=120, key_prefix="financial-dashboard-category")
     def get_expense_category_breakdown(year: int, month: int) -> list[dict[str, Any]]:
         """Return expense totals grouped by category for a given month."""
         month_start = date(year, month, 1)
@@ -362,6 +370,7 @@ class FinancialDashboardService:
         return result
 
     @staticmethod
+    @cache_result(timeout=120, key_prefix="financial-dashboard-summary")
     def get_dashboard_summary(year: int, month: int) -> dict[str, Any]:
         """Return consolidated dashboard summary: income breakdown, expense by person, and balance."""
         month_start = date(year, month, 1)
@@ -831,6 +840,32 @@ class FinancialDashboardService:
         return extra_income_total, extra_incomes
 
     @staticmethod
+    @staticmethod
+    def _ensure_employee_payments(month_start: date) -> None:
+        """Auto-create EmployeePayment for employees missing one this month.
+
+        Uses the most recent payment's base_salary as default.
+        Only creates with base_salary; variable_amount stays 0 for manual adjustment.
+        """
+        employees = Person.objects.filter(is_employee=True)
+        for employee in employees:
+            if EmployeePayment.objects.filter(
+                person=employee, reference_month=month_start
+            ).exists():
+                continue
+            last_payment = (
+                EmployeePayment.objects.filter(person=employee).order_by("-reference_month").first()
+            )
+            if last_payment is None:
+                continue
+            EmployeePayment.objects.create(
+                person=employee,
+                reference_month=month_start,
+                base_salary=last_payment.base_salary,
+                variable_amount=Decimal("0.00"),
+            )
+
+    @staticmethod
     def _build_expense_summary(
         month_start: date,
         next_month: date,
@@ -916,6 +951,8 @@ class FinancialDashboardService:
         )
 
         # Employee salary payments for this month + salary offset rents
+        # Auto-create missing payments for employees based on previous month
+        FinancialDashboardService._ensure_employee_payments(month_start)
         employee_payments = EmployeePayment.objects.filter(
             reference_month=month_start,
         ).select_related("person")
@@ -926,8 +963,14 @@ class FinancialDashboardService:
             employee_total += amount
             employee_details.append(
                 {
+                    "employee_payment_id": payment.pk,
+                    "person_name": payment.person.name,
                     "description": f"{payment.person.name} — Salário",
                     "amount": amount,
+                    "base_salary": payment.base_salary,
+                    "variable_amount": payment.variable_amount,
+                    "notes": payment.notes,
+                    "is_paid": payment.is_paid,
                     "breakdown": f"Base R${payment.base_salary}"
                     + (
                         f" + Variável R${payment.variable_amount}"
@@ -947,8 +990,11 @@ class FinancialDashboardService:
             apt_label = f"{lease.apartment.number}/{lease.apartment.building.street_number}"
             employee_details.append(
                 {
+                    "employee_payment_id": None,
                     "description": f"{lease.responsible_tenant.name} — Aluguel Apto {apt_label}",
                     "amount": lease.rental_value,
+                    "notes": "Compensação salarial (aluguel não gera receita)",
+                    "is_salary_offset": True,
                 }
             )
 
@@ -979,7 +1025,10 @@ class FinancialDashboardService:
         month_start: date,
         skipped_expense_ids: set[int],
     ) -> dict[str, dict[str, Any]]:
-        """Categorize fixed expenses into internet, celular, sítio, and outros."""
+        """Categorize fixed expenses + orphan one-time expenses into internet, celular, sítio, and outros."""
+        next_month = month_start.replace(day=28) + timedelta(days=4)
+        next_month = next_month.replace(day=1)
+
         fixed_expenses = (
             Expense.objects.filter(
                 expense_type=ExpenseType.FIXED_EXPENSE,
@@ -990,6 +1039,15 @@ class FinancialDashboardService:
             .exclude(end_date__lt=month_start)
             .exclude(pk__in=skipped_expense_ids)
         )
+
+        # One-time expenses without a person (not captured elsewhere)
+        orphan_one_time = Expense.objects.filter(
+            expense_type=ExpenseType.ONE_TIME_EXPENSE,
+            is_offset=False,
+            person__isnull=True,
+            expense_date__gte=month_start,
+            expense_date__lt=next_month,
+        ).exclude(pk__in=skipped_expense_ids)
 
         internet: list[dict[str, Any]] = []
         internet_total = Decimal("0.00")
@@ -1017,6 +1075,11 @@ class FinancialDashboardService:
             else:
                 outros.append(item)
                 outros_total += amount
+
+        for exp in orphan_one_time:
+            amount = exp.total_amount
+            outros.append({"description": exp.description, "amount": amount})
+            outros_total += amount
 
         return {
             "internet": {"total": internet_total, "details": internet},
@@ -1064,9 +1127,13 @@ class FinancialDashboardService:
                 debt_by_building[building_name] = []
             debt_by_building[building_name].append(
                 {
+                    "expense_id": inst.expense_id,
+                    "installment_id": inst.pk,
                     "description": inst.expense.description,
                     "amount": inst.amount,
                     "installment": f"{inst.installment_number}/{inst.total_installments}",
+                    "installment_number": inst.installment_number,
+                    "total_installments": inst.total_installments,
                 }
             )
 
@@ -1091,7 +1158,12 @@ class FinancialDashboardService:
                 else bill.total_amount
             )
             buildings_map[building_name]["bills"].append(
-                {"description": bill.description, "amount": amount}
+                {
+                    "expense_id": bill.pk,
+                    "installment_id": None,
+                    "description": bill.description,
+                    "amount": amount,
+                }
             )
             buildings_map[building_name]["bill_total"] += amount
             buildings_map[building_name]["total"] += amount
@@ -1441,6 +1513,39 @@ class FinancialDashboardService:
         }
 
     @staticmethod
+    def _collect_overdue_installments(
+        expense_type: str,
+        month_start: date,
+    ) -> list[dict[str, Any]]:
+        """Collect unpaid installments with due_date before month_start for a given expense type."""
+        today = timezone.now().date()
+        overdue_qs = (
+            ExpenseInstallment.objects.filter(
+                due_date__lt=month_start,
+                is_paid=False,
+                expense__expense_type=expense_type,
+                expense__is_offset=False,
+            )
+            .select_related(
+                "expense",
+                "expense__building",
+                "expense__category",
+                "expense__category__parent",
+                "expense__credit_card",
+            )
+            .order_by("due_date")
+        )
+        items = []
+        for inst in overdue_qs:
+            item = FinancialDashboardService._enriched_installment_item(inst)
+            item["days_overdue"] = (today - inst.due_date).days
+            item["is_paid"] = False
+            building = inst.expense.building
+            item["building_name"] = str(building.street_number) if building else None
+            items.append(item)
+        return items
+
+    @staticmethod
     def _enriched_expense_item(exp: Any) -> dict[str, Any]:
         """Build enriched detail item from a single Expense (no installment)."""
         cat_id, cat_name, cat_color, sub_id, sub_name = (
@@ -1750,7 +1855,14 @@ class FinancialDashboardService:
         utility_data = FinancialDashboardService._build_utility_by_building(
             expense_type, month_start, next_month
         )
-        return {"detail_type": detail_type, "label": label, **utility_data}
+        overdue = FinancialDashboardService._collect_overdue_installments(expense_type, month_start)
+        return {
+            "detail_type": detail_type,
+            "label": label,
+            **utility_data,
+            "overdue": overdue,
+            "overdue_total": sum(item["amount"] for item in overdue),
+        }
 
     @staticmethod
     def _detail_iptu(month_start: date, next_month: date) -> dict[str, Any]:
@@ -1778,36 +1890,23 @@ class FinancialDashboardService:
                     "bill_total": Decimal("0.00"),
                     "total": Decimal("0.00"),
                 }
-            cat_id, cat_name, cat_color, sub_id, sub_name = (
-                FinancialDashboardService._resolve_category_fields(inst.expense.category)
-            )
             entry = iptu_by_building[building_name]
-            entry["bills"].append(
-                {
-                    "expense_id": inst.expense.id,
-                    "installment_id": inst.id,
-                    "description": inst.expense.description,
-                    "installment_number": inst.installment_number,
-                    "total_installments": inst.total_installments,
-                    "category_id": cat_id,
-                    "category_name": cat_name,
-                    "category_color": cat_color,
-                    "subcategory_id": sub_id,
-                    "subcategory_name": sub_name,
-                    "notes": inst.expense.notes,
-                    "amount": inst.amount,
-                    "due_date": inst.due_date.isoformat(),
-                }
-            )
+            entry["bills"].append(FinancialDashboardService._enriched_installment_item(inst))
             entry["bill_total"] += inst.amount
             entry["total"] += inst.amount
             iptu_total += inst.amount
+
+        overdue = FinancialDashboardService._collect_overdue_installments(
+            ExpenseType.PROPERTY_TAX, month_start
+        )
 
         return {
             "detail_type": "iptu",
             "label": "IPTU",
             "total": iptu_total,
             "by_building": sorted(iptu_by_building.values(), key=lambda x: x["building_name"]),
+            "overdue": overdue,
+            "overdue_total": sum(item["amount"] for item in overdue),
         }
 
     @staticmethod
@@ -1822,6 +1921,8 @@ class FinancialDashboardService:
     @staticmethod
     def _detail_employee(month_start: date) -> dict[str, Any]:
         """Return employee salary payment detail + salary offset rents for the month."""
+        FinancialDashboardService._ensure_employee_payments(month_start)
+
         employee_total = Decimal("0.00")
         employee_details: list[dict[str, Any]] = []
 
@@ -1835,10 +1936,13 @@ class FinancialDashboardService:
                 {
                     "expense_id": None,
                     "installment_id": None,
+                    "employee_payment_id": payment.pk,
+                    "person_name": payment.person.name,
                     "description": f"{payment.person.name} — Salário",
                     "amount": amount,
                     "base_salary": payment.base_salary,
                     "variable_amount": payment.variable_amount,
+                    "is_paid": payment.is_paid,
                     "notes": f"Base R${payment.base_salary}"
                     + (
                         f" + Variável R${payment.variable_amount}"
@@ -2128,7 +2232,10 @@ class FinancialDashboardService:
     def _build_fixed_expense_categories_detail(
         month_start: date,
     ) -> dict[str, dict[str, Any]]:
-        """Categorize fixed expenses into internet, celular, sítio, and outros — with enriched items."""
+        """Categorize fixed expenses + orphan one-time expenses — with enriched items."""
+        next_month = month_start.replace(day=28) + timedelta(days=4)
+        next_month = next_month.replace(day=1)
+
         fixed_expenses = (
             Expense.objects.filter(
                 expense_type=ExpenseType.FIXED_EXPENSE,
@@ -2140,6 +2247,14 @@ class FinancialDashboardService:
             .select_related("category", "category__parent")
         )
 
+        orphan_one_time = Expense.objects.filter(
+            expense_type=ExpenseType.ONE_TIME_EXPENSE,
+            is_offset=False,
+            person__isnull=True,
+            expense_date__gte=month_start,
+            expense_date__lt=next_month,
+        ).select_related("category", "category__parent")
+
         internet: list[dict[str, Any]] = []
         internet_total = Decimal("0.00")
         celular: list[dict[str, Any]] = []
@@ -2149,12 +2264,11 @@ class FinancialDashboardService:
         outros: list[dict[str, Any]] = []
         outros_total = Decimal("0.00")
 
-        for exp in fixed_expenses:
-            amount = exp.expected_monthly_amount or exp.total_amount
+        def _make_detail_item(exp: Expense, amount: Decimal) -> dict[str, Any]:
             cat_id, cat_name, cat_color, sub_id, sub_name = (
                 FinancialDashboardService._resolve_category_fields(exp.category)
             )
-            item: dict[str, Any] = {
+            return {
                 "expense_id": exp.id,
                 "installment_id": None,
                 "description": exp.description,
@@ -2169,6 +2283,10 @@ class FinancialDashboardService:
                 "amount": amount,
                 "due_date": None,
             }
+
+        for exp in fixed_expenses:
+            amount = exp.expected_monthly_amount or exp.total_amount
+            item = _make_detail_item(exp, amount)
             desc_lower = exp.description.lower()
 
             if "internet" in desc_lower:
@@ -2183,6 +2301,12 @@ class FinancialDashboardService:
             else:
                 outros.append(item)
                 outros_total += amount
+
+        for exp in orphan_one_time:
+            amount = exp.total_amount
+            item = _make_detail_item(exp, amount)
+            outros.append(item)
+            outros_total += amount
 
         return {
             "internet": {"total": internet_total, "details": internet},

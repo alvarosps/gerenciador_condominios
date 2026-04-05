@@ -19,7 +19,7 @@ const config = {
   // OpenAPI schema URL (can be overridden via --url argument)
   input: process.env.NEXT_PUBLIC_API_URL
     ? `${process.env.NEXT_PUBLIC_API_URL}/schema/`
-    : 'http://localhost:8000/api/schema/',
+    : 'http://localhost:8008/api/schema/',
 
   // Output directory for generated files
   output: path.join(__dirname, '../lib/api/generated'),

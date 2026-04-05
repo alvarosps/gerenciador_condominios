@@ -42,6 +42,8 @@ import {
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useExpenseCategories } from '@/lib/api/hooks/use-expense-categories';
+import { useCreditCards } from '@/lib/api/hooks/use-credit-cards';
+import { useBuildings } from '@/lib/api/hooks/use-buildings';
 import { getDefaultExpenseDate } from '@/lib/utils/formatters';
 import { apiClient } from '@/lib/api/client';
 import type { ExpenseDetailItem } from '@/lib/api/hooks/use-financial-dashboard';
@@ -67,6 +69,8 @@ const formSchema = z.object({
   notes: z.string(),
   expense_type: z.string(),
   expense_date: z.string(),
+  credit_card_id: z.number().nullable(),
+  building_id: z.number().nullable(),
   is_installment: z.boolean(),
   total_installments: z.number().min(1).nullable(),
   current_installment: z.number().min(1).nullable(),
@@ -79,6 +83,7 @@ interface EditProps {
   mode: 'edit';
   item: ExpenseDetailItem;
   personId?: number | null;
+  detailType?: string;
   defaultExpenseDate?: string;
   onClose: () => void;
   onSaved: () => void;
@@ -88,6 +93,7 @@ interface CreateProps {
   mode: 'create';
   item?: undefined;
   personId?: number | null;
+  detailType?: string;
   defaultExpenseDate?: string;
   onClose: () => void;
   onSaved: () => void;
@@ -95,14 +101,29 @@ interface CreateProps {
 
 type Props = EditProps | CreateProps;
 
-export function ExpenseEditModal({ mode, item, personId, defaultExpenseDate, onClose, onSaved }: Props) {
+const DETAIL_TYPE_TO_EXPENSE_TYPE: Record<string, string> = {
+  electricity: 'electricity_bill',
+  water: 'water_bill',
+  iptu: 'property_tax',
+};
+
+const BUILDING_REQUIRED_TYPES = ['water_bill', 'electricity_bill', 'property_tax'];
+
+export function ExpenseEditModal({ mode, item, personId, detailType, defaultExpenseDate, onClose, onSaved }: Props) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [pendingValues, setPendingValues] = useState<FormValues | null>(null);
 
   const { data: categories, isLoading: categoriesLoading } = useExpenseCategories();
+  const { data: allCreditCards } = useCreditCards();
+  const { data: buildings } = useBuildings();
 
   const isCreate = mode === 'create';
+  const presetExpenseType = detailType ? (DETAIL_TYPE_TO_EXPENSE_TYPE[detailType] ?? '') : '';
+
+  const filteredCreditCards = allCreditCards?.filter(
+    (card) => card.person?.id === personId
+  ) ?? [];
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -112,8 +133,10 @@ export function ExpenseEditModal({ mode, item, personId, defaultExpenseDate, onC
       category_id: null,
       subcategory_id: null,
       notes: '',
-      expense_type: '',
+      expense_type: presetExpenseType,
       expense_date: defaultExpenseDate ?? getDefaultExpenseDate(new Date().getFullYear(), new Date().getMonth() + 1),
+      credit_card_id: null,
+      building_id: null,
       is_installment: false,
       total_installments: null,
       current_installment: null,
@@ -127,6 +150,8 @@ export function ExpenseEditModal({ mode, item, personId, defaultExpenseDate, onC
   const hasInstallment = item?.installment_id !== null && item?.installment_id !== undefined;
   const showInstallmentFields =
     (isCreate && INSTALLMENT_TYPES.includes(watchedExpenseType)) || (!isCreate && hasInstallment);
+  const showCreditCardField = isCreate && watchedExpenseType === 'card_purchase';
+  const showBuildingField = isCreate && BUILDING_REQUIRED_TYPES.includes(watchedExpenseType);
 
   // Top-level categories have no parent (parent is null/undefined, not a number or object)
   const topLevelCategories =
@@ -145,8 +170,10 @@ export function ExpenseEditModal({ mode, item, personId, defaultExpenseDate, onC
         category_id: item.category_id ?? null,
         subcategory_id: item.subcategory_id ?? null,
         notes: item.notes ?? '',
-        expense_type: '',
+        expense_type: presetExpenseType,
         expense_date: '',
+        credit_card_id: null,
+        building_id: null,
         is_installment: hasInstallment,
         total_installments: item.total_installments ?? null,
         current_installment: item.installment_number ?? null,
@@ -159,15 +186,17 @@ export function ExpenseEditModal({ mode, item, personId, defaultExpenseDate, onC
         category_id: null,
         subcategory_id: null,
         notes: '',
-        expense_type: '',
+        expense_type: presetExpenseType,
         expense_date: defaultExpenseDate ?? getDefaultExpenseDate(new Date().getFullYear(), new Date().getMonth() + 1),
+        credit_card_id: null,
+        building_id: null,
         is_installment: false,
         total_installments: null,
         current_installment: null,
         is_offset: false,
       });
     }
-  }, [item, isCreate, form, hasInstallment, defaultExpenseDate]);
+  }, [item, isCreate, form, hasInstallment, defaultExpenseDate, presetExpenseType]);
 
   useEffect(() => {
     form.setValue('subcategory_id', null);
@@ -187,7 +216,9 @@ export function ExpenseEditModal({ mode, item, personId, defaultExpenseDate, onC
       const totalParcelas = pendingValues.total_installments ?? 1;
       const isParcelado = pendingValues.is_installment && totalParcelas > 0;
       const parcelaAmount = pendingValues.amount;
-      const totalAmount = isParcelado ? parcelaAmount * totalParcelas : parcelaAmount;
+      const totalAmount = isParcelado
+        ? Math.round(parcelaAmount * totalParcelas * 100) / 100
+        : parcelaAmount;
 
       if (isCreate) {
         // === CREATE ===
@@ -200,6 +231,8 @@ export function ExpenseEditModal({ mode, item, personId, defaultExpenseDate, onC
           expense_date: pendingValues.expense_date,
           category_id: effectiveCategoryId,
           person_id: personId ?? null,
+          credit_card_id: pendingValues.credit_card_id,
+          building_id: pendingValues.building_id,
           notes: pendingValues.notes,
           is_installment: isParcelado,
           total_installments: isParcelado ? totalParcelas : null,
@@ -299,8 +332,8 @@ export function ExpenseEditModal({ mode, item, personId, defaultExpenseDate, onC
 
           <Form {...form}>
             <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-              {/* Expense type - only for creation */}
-              {isCreate && (
+              {/* Expense type - only for creation, hidden when preset from detail type */}
+              {isCreate && !presetExpenseType && (
                 <FormField
                   control={form.control}
                   name="expense_type"
@@ -379,6 +412,70 @@ export function ExpenseEditModal({ mode, item, personId, defaultExpenseDate, onC
                       <FormControl>
                         <Input type="date" {...field} />
                       </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+
+              {/* Credit card field for card_purchase */}
+              {showCreditCardField && (
+                <FormField
+                  control={form.control}
+                  name="credit_card_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Cartão de Crédito</FormLabel>
+                      <Select
+                        value={field.value ? String(field.value) : 'none'}
+                        onValueChange={(value) => field.onChange(value === 'none' ? null : Number(value))}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione o cartão" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="none">Nenhum</SelectItem>
+                          {filteredCreditCards.map((card) => (
+                            <SelectItem key={card.id} value={String(card.id)}>
+                              {card.nickname} (****{card.last_four_digits})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+
+              {/* Building field for utility types */}
+              {showBuildingField && (
+                <FormField
+                  control={form.control}
+                  name="building_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Prédio</FormLabel>
+                      <Select
+                        value={field.value ? String(field.value) : 'none'}
+                        onValueChange={(value) => field.onChange(value === 'none' ? null : Number(value))}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione o prédio" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="none">Nenhum</SelectItem>
+                          {buildings?.map((b) => (
+                            <SelectItem key={b.id} value={String(b.id)}>
+                              {b.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}

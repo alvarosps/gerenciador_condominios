@@ -67,7 +67,8 @@ const CARD_PURCHASES_COLUMNS: ColumnDef[] = [
   { header: 'Cartão', accessor: (item) => item.card_name ?? '—', className: 'text-muted-foreground' },
   { header: 'Valor Parcela', accessor: (item) => formatCurrency(item.amount), className: 'text-right' },
   { header: 'Total', accessor: (item) => item.total_amount !== null ? formatCurrency(item.total_amount) : '—', className: 'text-right' },
-  { header: 'Parcelas', accessor: (item) => item.total_installments !== null ? String(item.total_installments) : '—', className: 'text-right' },
+  { header: 'Parcela Atual', accessor: () => '1', className: 'text-center' },
+  { header: 'Nº Parcelas', accessor: (item) => item.total_installments !== null ? String(item.total_installments) : '—', className: 'text-center' },
 ];
 
 const LOANS_COLUMNS: ColumnDef[] = [
@@ -75,7 +76,8 @@ const LOANS_COLUMNS: ColumnDef[] = [
   { header: 'Pessoa', accessor: (item) => item.person_name ?? '—', className: 'text-muted-foreground' },
   { header: 'Valor Parcela', accessor: (item) => formatCurrency(item.amount), className: 'text-right' },
   { header: 'Total', accessor: (item) => item.total_amount !== null ? formatCurrency(item.total_amount) : '—', className: 'text-right' },
-  { header: 'Parcelas', accessor: (item) => item.total_installments !== null ? String(item.total_installments) : '—', className: 'text-right' },
+  { header: 'Parcela Atual', accessor: () => '1', className: 'text-center' },
+  { header: 'Nº Parcelas', accessor: (item) => item.total_installments !== null ? String(item.total_installments) : '—', className: 'text-center' },
 ];
 
 const UTILITY_BILLS_COLUMNS: ColumnDef[] = [

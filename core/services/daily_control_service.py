@@ -12,14 +12,18 @@ from decimal import Decimal
 from typing import Any
 
 from django.core.exceptions import ObjectDoesNotExist
+from django.db import transaction
+from django.utils import timezone
 
 from core.models import (
     Expense,
     ExpenseInstallment,
     ExpenseMonthSkip,
     ExpenseType,
+    FinancialSettings,
     Income,
     Lease,
+    MonthSnapshot,
     PersonPayment,
     PersonPaymentSchedule,
     RentPayment,
@@ -79,7 +83,8 @@ class DailyControlService:
         )
 
         # Build day-by-day result
-        cumulative_balance = Decimal("0.00")
+        starting_balance = DailyControlService._get_starting_balance(month_start)
+        cumulative_balance = starting_balance
         days = []
 
         for day_num in range(1, days_in_month + 1):
@@ -117,7 +122,7 @@ class DailyControlService:
         Includes expected vs actual totals, overdue counts, and balance projections.
         Excludes skipped expenses and uses schedule totals for persons with payment schedules.
         """
-        today = date.today()
+        today = timezone.now().date()
         month_start = date(year, month, 1)
         next_month_start = _next_month_start(year, month)
 
@@ -166,6 +171,7 @@ class DailyControlService:
         # Upcoming 7 days
         upcoming_count, upcoming_total = _get_upcoming_7_days(today)
 
+        starting_balance = DailyControlService._get_starting_balance(month_start)
         current_balance = total_received_income - total_paid_expenses
         projected_balance = total_expected_income - total_expected_expenses
 
@@ -180,7 +186,39 @@ class DailyControlService:
             "upcoming_7_days_total": upcoming_total,
             "current_balance": current_balance,
             "projected_balance": projected_balance,
+            "starting_balance": starting_balance,
+            "ending_balance": starting_balance + total_received_income - total_paid_expenses,
         }
+
+    @staticmethod
+    def _get_starting_balance(month_start: date) -> Decimal:
+        """
+        Get the cumulative balance at the START of a month.
+
+        Uses MonthSnapshot.cumulative_ending_balance from the previous month.
+        If no previous snapshot exists, falls back to FinancialSettings.initial_balance.
+        """
+        previous_snapshot = (
+            MonthSnapshot.objects.filter(
+                reference_month__lt=month_start,
+                is_finalized=True,
+            )
+            .order_by("-reference_month")
+            .first()
+        )
+
+        if previous_snapshot:
+            return previous_snapshot.cumulative_ending_balance
+
+        settings = FinancialSettings.objects.first()
+        if (
+            settings
+            and settings.initial_balance_date
+            and settings.initial_balance_date <= month_start
+        ):
+            return settings.initial_balance
+
+        return Decimal("0.00")
 
     @staticmethod
     def mark_item_paid(item_type: str, item_id: int, payment_date: date) -> dict[str, Any]:
@@ -219,22 +257,23 @@ def _next_month_start(year: int, month: int) -> date:
 
 def _mark_installment_paid(item_id: int, payment_date: date) -> dict[str, Any]:
     """Mark an installment as paid."""
-    try:
-        item = ExpenseInstallment.objects.get(pk=item_id)
-    except ExpenseInstallment.DoesNotExist as err:
-        msg = f"Parcela {item_id} não encontrada."
-        raise ObjectDoesNotExist(msg) from err
-    if item.is_paid:
-        return {"status": "already_paid", "message": "Parcela já está paga."}
-    item.is_paid = True
-    item.paid_date = payment_date
-    item.save(update_fields=["is_paid", "paid_date", "updated_at"])
+    with transaction.atomic():
+        try:
+            item = ExpenseInstallment.objects.select_for_update().get(pk=item_id)
+        except ExpenseInstallment.DoesNotExist as err:
+            msg = f"Parcela {item_id} não encontrada."
+            raise ObjectDoesNotExist(msg) from err
+        if item.is_paid:
+            return {"status": "already_paid", "message": "Parcela já está paga."}
+        item.is_paid = True
+        item.paid_date = payment_date
+        item.save(update_fields=["is_paid", "paid_date", "updated_at"])
     return {"status": "ok", "message": f"Parcela {item_id} marcada como paga."}
 
 
 def _mark_credit_card_paid(card_id: int, payment_date: date) -> dict[str, Any]:
     """Mark all unpaid installments for a credit card in the current month as paid."""
-    today = date.today()
+    today = timezone.now().date()
     month_start = today.replace(day=1)
     next_month = _next_month_start(today.year, today.month)
 
@@ -254,31 +293,33 @@ def _mark_credit_card_paid(card_id: int, payment_date: date) -> dict[str, Any]:
 
 def _mark_expense_paid(item_id: int, payment_date: date) -> dict[str, Any]:
     """Mark an expense as paid."""
-    try:
-        item = Expense.objects.get(pk=item_id)
-    except Expense.DoesNotExist as err:
-        msg = f"Despesa {item_id} não encontrada."
-        raise ObjectDoesNotExist(msg) from err
-    if item.is_paid:
-        return {"status": "already_paid", "message": "Despesa já está paga."}
-    item.is_paid = True
-    item.paid_date = payment_date
-    item.save(update_fields=["is_paid", "paid_date", "updated_at"])
+    with transaction.atomic():
+        try:
+            item = Expense.objects.select_for_update().get(pk=item_id)
+        except Expense.DoesNotExist as err:
+            msg = f"Despesa {item_id} não encontrada."
+            raise ObjectDoesNotExist(msg) from err
+        if item.is_paid:
+            return {"status": "already_paid", "message": "Despesa já está paga."}
+        item.is_paid = True
+        item.paid_date = payment_date
+        item.save(update_fields=["is_paid", "paid_date", "updated_at"])
     return {"status": "ok", "message": f"Despesa {item_id} marcada como paga."}
 
 
 def _mark_income_received(item_id: int, payment_date: date) -> dict[str, Any]:
     """Mark an income as received."""
-    try:
-        item = Income.objects.get(pk=item_id)
-    except Income.DoesNotExist as err:
-        msg = f"Receita {item_id} não encontrada."
-        raise ObjectDoesNotExist(msg) from err
-    if item.is_received:
-        return {"status": "already_paid", "message": "Receita já está recebida."}
-    item.is_received = True
-    item.received_date = payment_date
-    item.save(update_fields=["is_received", "received_date", "updated_at"])
+    with transaction.atomic():
+        try:
+            item = Income.objects.select_for_update().get(pk=item_id)
+        except Income.DoesNotExist as err:
+            msg = f"Receita {item_id} não encontrada."
+            raise ObjectDoesNotExist(msg) from err
+        if item.is_received:
+            return {"status": "already_paid", "message": "Receita já está recebida."}
+        item.is_received = True
+        item.received_date = payment_date
+        item.save(update_fields=["is_received", "received_date", "updated_at"])
     return {"status": "ok", "message": f"Receita {item_id} marcada como recebida."}
 
 

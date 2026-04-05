@@ -145,6 +145,15 @@ class FileSystemDocumentStorage(IDocumentStorage):
         self.base_path.mkdir(parents=True, exist_ok=True)
         logger.info(f"FileSystemDocumentStorage initialized at: {self.base_path}")
 
+    def _validate_path(self, file_path: str) -> Path:
+        """Validate file path doesn't escape base directory."""
+        full_path = (self.base_path / file_path).resolve()
+        base_resolved = self.base_path.resolve()
+        if not str(full_path).startswith(str(base_resolved)):
+            msg = f"Invalid file path: path traversal detected in '{file_path}'"
+            raise StorageError(msg)
+        return full_path
+
     def save(self, file_path: str, content: bytes, metadata: dict | None = None) -> str:
         """
         Save document to local filesystem.
@@ -160,7 +169,7 @@ class FileSystemDocumentStorage(IDocumentStorage):
         Raises:
             StorageError: If save fails
         """
-        full_path = self.base_path / file_path
+        full_path = self._validate_path(file_path)
         full_path.parent.mkdir(parents=True, exist_ok=True)
 
         try:
@@ -187,7 +196,7 @@ class FileSystemDocumentStorage(IDocumentStorage):
             FileNotFoundError: If file doesn't exist
             StorageError: If read fails
         """
-        full_path = self.base_path / file_path
+        full_path = self._validate_path(file_path)
 
         if not full_path.exists():
             msg = f"Document not found: {file_path}"
@@ -216,7 +225,7 @@ class FileSystemDocumentStorage(IDocumentStorage):
         Raises:
             StorageError: If delete fails
         """
-        full_path = self.base_path / file_path
+        full_path = self._validate_path(file_path)
 
         if not full_path.exists():
             return False
@@ -241,7 +250,7 @@ class FileSystemDocumentStorage(IDocumentStorage):
         Returns:
             bool: True if exists
         """
-        full_path = self.base_path / file_path
+        full_path = self._validate_path(file_path)
         return full_path.exists()
 
     def get_url(self, file_path: str, expiry: int | None = None) -> str:
@@ -258,7 +267,7 @@ class FileSystemDocumentStorage(IDocumentStorage):
         Raises:
             FileNotFoundError: If file doesn't exist
         """
-        full_path = self.base_path / file_path
+        full_path = self._validate_path(file_path)
 
         if not full_path.exists():
             msg = f"Document not found: {file_path}"

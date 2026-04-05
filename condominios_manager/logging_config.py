@@ -80,7 +80,7 @@ LOGGING = {
             "style": "{",
         },
         "json": {
-            "()": "pythonjsonlogger.json.JsonFormatter",
+            "()": "pythonjsonlogger.jsonlogger.JsonFormatter",
             "format": "%(asctime)s %(name)s %(levelname)s %(message)s %(pathname)s %(lineno)d",
         },
     },

@@ -92,7 +92,7 @@ function CustomTooltip({
 
 function ChartSkeleton() {
   return (
-    <Card>
+    <Card aria-live="polite" aria-busy={true}>
       <CardHeader>
         <Skeleton className="h-6 w-48" />
       </CardHeader>

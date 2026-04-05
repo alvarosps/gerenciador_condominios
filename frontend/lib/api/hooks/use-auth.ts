@@ -50,7 +50,7 @@ export function useLogin() {
       if (typeof window !== 'undefined') {
         localStorage.setItem('access_token', tokens.access);
         localStorage.setItem('refresh_token', tokens.refresh);
-        document.cookie = `access_token=${tokens.access}; path=/; max-age=31536000; SameSite=Lax`;
+        document.cookie = `access_token=${tokens.access}; path=/; max-age=3600; SameSite=Lax`;
       }
 
       // Fetch user profile with the new token
@@ -149,7 +149,7 @@ export function useRefreshToken() {
         localStorage.setItem('access_token', data.access);
 
         // Update cookie for middleware auth check (24 hour expiry)
-        document.cookie = `access_token=${data.access}; path=/; max-age=31536000; SameSite=Lax`;
+        document.cookie = `access_token=${data.access}; path=/; max-age=3600; SameSite=Lax`;
       }
     },
   });
@@ -180,7 +180,7 @@ export function useCurrentUser() {
  */
 export function useGoogleLogin() {
   return () => {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000/api';
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8008/api';
     window.location.href = `${apiUrl}/auth/google/`;
   };
 }

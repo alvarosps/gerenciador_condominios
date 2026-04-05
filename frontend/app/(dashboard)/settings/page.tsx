@@ -20,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Loader2, Save, User, MapPin, Phone } from 'lucide-react';
+import { Loader2, Save, User, MapPin, Phone, TrendingUp } from 'lucide-react';
 import { toast } from 'sonner';
 import { useLandlord, useUpdateLandlord } from '@/lib/api/hooks/use-landlord';
 import {
@@ -51,6 +51,7 @@ export default function SettingsPage() {
       state: '',
       zip_code: '',
       country: 'Brasil',
+      rent_adjustment_percentage: 0,
       is_active: true,
     },
   });
@@ -73,6 +74,7 @@ export default function SettingsPage() {
         state: landlord.state ?? '',
         zip_code: landlord.zip_code ?? '',
         country: landlord.country ?? 'Brasil',
+        rent_adjustment_percentage: landlord.rent_adjustment_percentage ?? 0,
         is_active: landlord.is_active ?? true,
       });
     }
@@ -338,6 +340,36 @@ export default function SettingsPage() {
             <div>
               <Label htmlFor="country">País</Label>
               <Input id="country" {...form.register('country')} />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5" />
+              Reajuste de Aluguel
+            </CardTitle>
+            <CardDescription>
+              Percentual padrão aplicado nos reajustes anuais de aluguel
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="max-w-xs">
+              <Label htmlFor="rent_adjustment_percentage">Taxa de Reajuste Anual (%)</Label>
+              <Input
+                id="rent_adjustment_percentage"
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="Ex: 5.23"
+                {...form.register('rent_adjustment_percentage', { valueAsNumber: true })}
+              />
+              {form.formState.errors.rent_adjustment_percentage && (
+                <p className="text-sm text-destructive mt-1">
+                  {form.formState.errors.rent_adjustment_percentage.message}
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>

@@ -30,16 +30,19 @@ A comprehensive property management system for rental properties in Brazil, buil
 ## Features
 
 ### Property Management
+
 - **Buildings**: Manage multiple buildings with address, utilities, and common expenses
 - **Apartments**: Track apartments with bedrooms, floor, position, and rental values
 - **Furniture Inventory**: Track furniture condition and assignment to apartments/tenants
 
 ### Tenant Management
+
 - **Tenant Registry**: Store tenant information with CPF/CNPJ validation
 - **Dependents**: Track tenant dependents and family members
 - **Multi-step Wizard**: 6-step form for complete tenant registration
 
 ### Lease Management
+
 - **Lease Tracking**: Manage active, expired, and terminated leases
 - **Multiple Tenants**: Support for multiple tenants per lease
 - **Contract Generation**: Automatic PDF contract generation with customizable templates
@@ -47,6 +50,7 @@ A comprehensive property management system for rental properties in Brazil, buil
 - **Due Date Changes**: Track and calculate fees for due date changes
 
 ### Dashboard & Analytics
+
 - **Financial Summary**: Total revenue, average rent, collected fees
 - **Late Payments**: Track overdue leases with amounts
 - **Lease Metrics**: Expiring leases (30/60/90 days), occupancy rates
@@ -54,6 +58,7 @@ A comprehensive property management system for rental properties in Brazil, buil
 - **Building Analytics**: Per-building revenue and occupancy
 
 ### Contract Template Editor
+
 - **Monaco Editor**: HTML editing with syntax highlighting
 - **Live Preview**: See changes with sample data
 - **Auto-Backup**: Automatic backup on save
@@ -62,6 +67,7 @@ A comprehensive property management system for rental properties in Brazil, buil
 ## Tech Stack
 
 ### Backend
+
 - **Django 5.0.2** with Django REST Framework 3.14
 - **PostgreSQL 15+** database
 - **JWT Authentication** with SimpleJWT
@@ -69,6 +75,7 @@ A comprehensive property management system for rental properties in Brazil, buil
 - **Pyppeteer** for PDF generation (Chrome headless)
 
 ### Frontend
+
 - **Next.js 14** with App Router
 - **React 18** with TypeScript
 - **Ant Design 5** + Tailwind CSS
@@ -78,6 +85,7 @@ A comprehensive property management system for rental properties in Brazil, buil
 - **Monaco Editor** for template editing
 
 ### Testing
+
 - **Backend**: pytest with pytest-django (523 tests, 83.86% coverage)
 - **Frontend**: Vitest + React Testing Library + MSW (93 tests)
 
@@ -145,8 +153,8 @@ npm run dev
 ### 4. Access the Application
 
 - **Frontend**: http://localhost:4000
-- **Backend API**: http://localhost:8000/api/
-- **Django Admin**: http://localhost:8000/admin/
+- **Backend API**: http://localhost:8008/api/
+- **Django Admin**: http://localhost:8008/admin/
 
 ## Environment Variables
 
@@ -170,7 +178,7 @@ REDIS_URL=redis://localhost:6379/0
 ### Frontend (.env.local)
 
 ```env
-NEXT_PUBLIC_API_URL=http://localhost:8000/api
+NEXT_PUBLIC_API_URL=http://localhost:8008/api
 ```
 
 ## Database Management
@@ -324,14 +332,14 @@ POST /api/token/refresh/
 
 All resources support standard REST operations:
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/{resource}/` | List all (paginated) |
-| POST | `/api/{resource}/` | Create new |
-| GET | `/api/{resource}/{id}/` | Get by ID |
-| PUT | `/api/{resource}/{id}/` | Full update |
-| PATCH | `/api/{resource}/{id}/` | Partial update |
-| DELETE | `/api/{resource}/{id}/` | Delete |
+| Method | Endpoint                | Description          |
+| ------ | ----------------------- | -------------------- |
+| GET    | `/api/{resource}/`      | List all (paginated) |
+| POST   | `/api/{resource}/`      | Create new           |
+| GET    | `/api/{resource}/{id}/` | Get by ID            |
+| PUT    | `/api/{resource}/{id}/` | Full update          |
+| PATCH  | `/api/{resource}/{id}/` | Partial update       |
+| DELETE | `/api/{resource}/{id}/` | Delete               |
 
 **Available Resources**: `buildings`, `apartments`, `tenants`, `leases`, `furnitures`, `dependents`
 

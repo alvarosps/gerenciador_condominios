@@ -9,6 +9,7 @@ for better separation of concerns:
 - rule_views: Contract rule management endpoints
 """
 
+from .device_views import DeviceTokenViewSet
 from .financial_dashboard_views import (
     CashFlowViewSet,
     DailyControlViewSet,
@@ -29,7 +30,6 @@ from .financial_views import (
     PersonViewSet,
     RentPaymentViewSet,
 )
-from .device_views import DeviceTokenViewSet
 from .landlord_views import LandlordViewSet
 from .month_advance_views import MonthAdvanceViewSet
 from .proof_views import AdminProofViewSet
@@ -38,12 +38,12 @@ from .template_views import ContractTemplateViewSet
 
 __all__ = [
     "AdminProofViewSet",
-    "DeviceTokenViewSet",
     "CashFlowViewSet",
     "ContractRuleViewSet",
     "ContractTemplateViewSet",
     "CreditCardViewSet",
     "DailyControlViewSet",
+    "DeviceTokenViewSet",
     "EmployeePaymentViewSet",
     "ExpenseCategoryViewSet",
     "ExpenseInstallmentViewSet",

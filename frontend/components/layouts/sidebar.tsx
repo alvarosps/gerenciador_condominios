@@ -32,7 +32,11 @@ interface SubMenuItem {
   label: string;
 }
 
-export function Sidebar() {
+interface SidebarProps {
+  onNavigate?: () => void;
+}
+
+export function Sidebar({ onNavigate }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({});
@@ -104,6 +108,7 @@ export function Sidebar() {
 
   const handleMenuClick = (key: string): void => {
     router.push(key);
+    onNavigate?.();
   };
 
   const toggleExpanded = (key: string): void => {
@@ -115,7 +120,7 @@ export function Sidebar() {
   };
 
   const handleApiDocsClick = (): void => {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000/api';
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8008/api';
     window.open(`${apiUrl}/schema/swagger-ui/`, '_blank', 'noopener,noreferrer');
   };
 

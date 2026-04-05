@@ -1,4 +1,5 @@
 # Enterprise Frontend Implementation Plan
+
 ## Condomínios Manager - Zero-Defect Quality Standard
 
 **Project Type:** Enterprise Property Management System
@@ -13,6 +14,7 @@
 This plan outlines the complete implementation of an enterprise-level frontend application for Condomínios Manager. The current Django backend (100% functional) will be integrated with a modern Next.js 14 frontend built to the highest quality standards.
 
 **Zero-Defect Strategy:**
+
 - TypeScript strict mode (compile-time safety)
 - Zod runtime validation (runtime safety)
 - Pre-commit hooks (prevent bad code from entering repository)
@@ -25,24 +27,29 @@ This plan outlines the complete implementation of an enterprise-level frontend a
 ## Technology Stack
 
 ### Core Framework
+
 - **Next.js 14** (App Router) - Production-ready React framework with SSR, routing, optimization
 - **React 18** - Latest React with concurrent features
 - **TypeScript 5+** (strict mode) - Type safety at compile time
 
 ### State Management & Data Fetching
+
 - **TanStack Query v5** - Server state management, caching, synchronization
 - **Zustand** - Minimal client state (user preferences, UI state)
 
 ### UI & Styling
+
 - **Ant Design v5** - Enterprise-grade component library
 - **Tailwind CSS** - Utility-first styling for custom components
 - **Recharts** - Data visualization and charts
 
 ### Forms & Validation
+
 - **React Hook Form** - Performant form handling
 - **Zod** - Schema validation (runtime + TypeScript integration)
 
 ### Code Quality Tools
+
 - **ESLint** - Code linting (strict rules, zero warnings allowed)
 - **Prettier** - Code formatting
 - **Husky** - Git hooks for pre-commit checks
@@ -50,12 +57,14 @@ This plan outlines the complete implementation of an enterprise-level frontend a
 - **lint-staged** - Run linters on staged files only
 
 ### Testing
+
 - **Vitest** - Unit testing framework (faster than Jest)
 - **React Testing Library** - Component testing
 - **Playwright** - E2E testing
 - **MSW (Mock Service Worker)** - API mocking for tests
 
 ### Additional Tools
+
 - **Monaco Editor** - Code editor for contract template editing
 - **xlsx** - Excel export functionality
 - **date-fns** - Date manipulation
@@ -202,12 +211,14 @@ This plan outlines the complete implementation of an enterprise-level frontend a
 #### Tasks:
 
 1. **Project Initialization**
+
    ```bash
    npx create-next-app@latest frontend --typescript --tailwind --app --src-dir=false
    cd frontend
    ```
 
 2. **Install Dependencies**
+
    ```bash
    # Core
    npm install antd @ant-design/icons @tanstack/react-query zustand zod
@@ -222,6 +233,7 @@ This plan outlines the complete implementation of an enterprise-level frontend a
    ```
 
 3. **Configure TypeScript (tsconfig.json)**
+
    ```json
    {
      "compilerOptions": {
@@ -252,6 +264,7 @@ This plan outlines the complete implementation of an enterprise-level frontend a
    ```
 
 4. **Configure ESLint (.eslintrc.json)**
+
    ```json
    {
      "extends": [
@@ -273,6 +286,7 @@ This plan outlines the complete implementation of an enterprise-level frontend a
    ```
 
 5. **Configure Prettier (.prettierrc)**
+
    ```json
    {
      "semi": true,
@@ -285,11 +299,13 @@ This plan outlines the complete implementation of an enterprise-level frontend a
    ```
 
 6. **Set up Husky & lint-staged**
+
    ```bash
    npx husky init
    ```
 
    **.husky/pre-commit:**
+
    ```bash
    #!/usr/bin/env sh
    . "$(dirname -- "$0")/_/husky.sh"
@@ -300,6 +316,7 @@ This plan outlines the complete implementation of an enterprise-level frontend a
    ```
 
    **package.json (lint-staged):**
+
    ```json
    {
      "lint-staged": {
@@ -322,9 +339,10 @@ This plan outlines the complete implementation of an enterprise-level frontend a
    - `components/forms/form-modal.tsx` - Reusable modal for create/edit
 
 8. **Configure TanStack Query**
+
    ```typescript
    // lib/config/query-client.ts
-   import { QueryClient } from '@tanstack/react-query';
+   import { QueryClient } from "@tanstack/react-query";
 
    export const queryClient = new QueryClient({
      defaultOptions: {
@@ -338,6 +356,7 @@ This plan outlines the complete implementation of an enterprise-level frontend a
    ```
 
 9. **Set up Ant Design Theme**
+
    ```typescript
    // app/layout.tsx
    import { ConfigProvider } from 'antd';
@@ -364,21 +383,22 @@ This plan outlines the complete implementation of an enterprise-level frontend a
    ```
 
 10. **Create API Client**
+
     ```typescript
     // lib/api/client.ts
-    import axios from 'axios';
+    import axios from "axios";
 
     export const apiClient = axios.create({
-      baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api',
+      baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:8008/api",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
     });
 
     // Request interceptor
     apiClient.interceptors.request.use((config) => {
       // Add auth token if exists
-      const token = localStorage.getItem('auth_token');
+      const token = localStorage.getItem("auth_token");
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
@@ -392,29 +412,31 @@ This plan outlines the complete implementation of an enterprise-level frontend a
         // Global error handling
         if (error.response?.status === 401) {
           // Redirect to login
-          window.location.href = '/login';
+          window.location.href = "/login";
         }
         return Promise.reject(error);
-      }
+      },
     );
     ```
 
 11. **Create Zod Schemas**
+
     ```typescript
     // lib/schemas/building.schema.ts
-    import { z } from 'zod';
+    import { z } from "zod";
 
     export const buildingSchema = z.object({
       id: z.number().optional(),
-      street_number: z.number().positive('Número deve ser positivo'),
-      name: z.string().min(1, 'Nome é obrigatório'),
-      address: z.string().min(1, 'Endereço é obrigatório'),
+      street_number: z.number().positive("Número deve ser positivo"),
+      name: z.string().min(1, "Nome é obrigatório"),
+      address: z.string().min(1, "Endereço é obrigatório"),
     });
 
     export type Building = z.infer<typeof buildingSchema>;
     ```
 
 12. **Set up CI/CD Pipeline**
+
     ```yaml
     # .github/workflows/ci.yml
     name: CI
@@ -431,8 +453,8 @@ This plan outlines the complete implementation of an enterprise-level frontend a
           - uses: actions/checkout@v3
           - uses: actions/setup-node@v3
             with:
-              node-version: '20'
-              cache: 'npm'
+              node-version: "20"
+              cache: "npm"
 
           - name: Install dependencies
             run: npm ci
@@ -454,6 +476,7 @@ This plan outlines the complete implementation of an enterprise-level frontend a
     ```
 
 **Deliverables:**
+
 - ✅ Next.js project configured with TypeScript strict mode
 - ✅ All quality tools installed and configured
 - ✅ Pre-commit hooks preventing bad code
@@ -465,6 +488,7 @@ This plan outlines the complete implementation of an enterprise-level frontend a
 - ✅ Zod schemas created
 
 **Quality Metrics:**
+
 - TypeScript strict mode: ✅ Enabled
 - ESLint warnings: 0
 - Prettier formatting: ✅ Consistent
@@ -482,17 +506,22 @@ This plan outlines the complete implementation of an enterprise-level frontend a
 #### Buildings Module
 
 1. **Create API Hooks**
+
    ```typescript
    // lib/api/hooks/use-buildings.ts
-   import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-   import { apiClient } from '../client';
-   import { Building, buildingSchema } from '@/lib/schemas/building.schema';
+   import {
+     useQuery,
+     useMutation,
+     useQueryClient,
+   } from "@tanstack/react-query";
+   import { apiClient } from "../client";
+   import { Building, buildingSchema } from "@/lib/schemas/building.schema";
 
    export function useBuildings() {
      return useQuery({
-       queryKey: ['buildings'],
+       queryKey: ["buildings"],
        queryFn: async () => {
-         const { data } = await apiClient.get<Building[]>('/buildings/');
+         const { data } = await apiClient.get<Building[]>("/buildings/");
          return data.map((b) => buildingSchema.parse(b));
        },
      });
@@ -501,13 +530,13 @@ This plan outlines the complete implementation of an enterprise-level frontend a
    export function useCreateBuilding() {
      const queryClient = useQueryClient();
      return useMutation({
-       mutationFn: async (data: Omit<Building, 'id'>) => {
+       mutationFn: async (data: Omit<Building, "id">) => {
          const validated = buildingSchema.omit({ id: true }).parse(data);
-         const response = await apiClient.post('/buildings/', validated);
+         const response = await apiClient.post("/buildings/", validated);
          return response.data;
        },
        onSuccess: () => {
-         queryClient.invalidateQueries({ queryKey: ['buildings'] });
+         queryClient.invalidateQueries({ queryKey: ["buildings"] });
        },
      });
    }
@@ -521,7 +550,7 @@ This plan outlines the complete implementation of an enterprise-level frontend a
          return response.data;
        },
        onSuccess: () => {
-         queryClient.invalidateQueries({ queryKey: ['buildings'] });
+         queryClient.invalidateQueries({ queryKey: ["buildings"] });
        },
      });
    }
@@ -533,13 +562,14 @@ This plan outlines the complete implementation of an enterprise-level frontend a
          await apiClient.delete(`/buildings/${id}/`);
        },
        onSuccess: () => {
-         queryClient.invalidateQueries({ queryKey: ['buildings'] });
+         queryClient.invalidateQueries({ queryKey: ["buildings"] });
        },
      });
    }
    ```
 
 2. **Create Buildings List Page**
+
    ```typescript
    // app/(dashboard)/buildings/page.tsx
    'use client';
@@ -639,6 +669,7 @@ This plan outlines the complete implementation of an enterprise-level frontend a
    ```
 
 3. **Create Building Form Modal**
+
    ```typescript
    // app/(dashboard)/buildings/_components/building-form-modal.tsx
    import { useEffect } from 'react';
@@ -724,6 +755,7 @@ This plan outlines the complete implementation of an enterprise-level frontend a
    ```
 
 4. **Create Unit Tests**
+
    ```typescript
    // app/(dashboard)/buildings/__tests__/buildings.test.tsx
    import { render, screen, waitFor } from '@testing-library/react';
@@ -778,12 +810,14 @@ This plan outlines the complete implementation of an enterprise-level frontend a
 #### Furniture Module
 
 Implement same pattern as Buildings:
+
 - API hooks (use-furniture.ts)
 - List page with DataTable
 - Form modal for create/edit
 - Unit tests
 
 **Deliverables:**
+
 - ✅ Buildings CRUD complete with tests
 - ✅ Furniture CRUD complete with tests
 - ✅ All API hooks implemented
@@ -793,6 +827,7 @@ Implement same pattern as Buildings:
 - ✅ 80%+ test coverage
 
 **Quality Metrics:**
+
 - ESLint warnings: 0
 - TypeScript errors: 0
 - Test coverage: 80%+
@@ -807,6 +842,7 @@ Implement same pattern as Buildings:
 **Agents:** `frontend-developer`, `test-engineer`
 
 #### Key Features:
+
 - List apartments with building names
 - Filter by building, rental status, price range
 - Create/edit with building dropdown
@@ -818,33 +854,40 @@ Implement same pattern as Buildings:
 #### Implementation:
 
 1. **Apartment Schema**
+
    ```typescript
    // lib/schemas/apartment.schema.ts
-   import { z } from 'zod';
+   import { z } from "zod";
 
    export const apartmentSchema = z.object({
      id: z.number().optional(),
-     building_id: z.number().positive('Selecione um prédio'),
-     building: z.object({
-       id: z.number(),
-       street_number: z.number(),
-       name: z.string(),
-       address: z.string(),
-     }).optional(),
-     number: z.number().positive('Número deve ser positivo'),
+     building_id: z.number().positive("Selecione um prédio"),
+     building: z
+       .object({
+         id: z.number(),
+         street_number: z.number(),
+         name: z.string(),
+         address: z.string(),
+       })
+       .optional(),
+     number: z.number().positive("Número deve ser positivo"),
      interfone_configured: z.boolean().default(false),
      contract_generated: z.boolean().default(false),
      contract_signed: z.boolean().default(false),
-     rental_value: z.number().positive('Valor deve ser positivo'),
-     cleaning_fee: z.number().min(0, 'Valor não pode ser negativo').default(0),
-     max_tenants: z.number().positive('Deve ter pelo menos 1 inquilino'),
+     rental_value: z.number().positive("Valor deve ser positivo"),
+     cleaning_fee: z.number().min(0, "Valor não pode ser negativo").default(0),
+     max_tenants: z.number().positive("Deve ter pelo menos 1 inquilino"),
      is_rented: z.boolean().default(false),
      lease_date: z.string().nullable().optional(),
      last_rent_increase_date: z.string().nullable().optional(),
-     furnitures: z.array(z.object({
-       id: z.number(),
-       name: z.string(),
-     })).default([]),
+     furnitures: z
+       .array(
+         z.object({
+           id: z.number(),
+           name: z.string(),
+         }),
+       )
+       .default([]),
      furniture_ids: z.array(z.number()).optional(),
    });
 
@@ -852,6 +895,7 @@ Implement same pattern as Buildings:
    ```
 
 2. **Apartment Form with Furniture Selection**
+
    ```typescript
    // app/(dashboard)/apartments/_components/apartment-form-modal.tsx
    import { Form, InputNumber, Select, Checkbox, DatePicker } from 'antd';
@@ -908,6 +952,7 @@ Implement same pattern as Buildings:
    ```
 
 3. **Apartment List with Filters**
+
    ```typescript
    // app/(dashboard)/apartments/page.tsx
    import { useState } from 'react';
@@ -962,6 +1007,7 @@ Implement same pattern as Buildings:
    ```
 
 **Deliverables:**
+
 - ✅ Apartments CRUD complete
 - ✅ Building relationship working
 - ✅ Furniture multi-select working
@@ -979,6 +1025,7 @@ Implement same pattern as Buildings:
 **Agents:** `frontend-developer`, `test-engineer`
 
 #### Key Features:
+
 - Multi-step wizard for tenant creation
 - CPF/CNPJ validation (checksum algorithm)
 - Brazilian phone formatting
@@ -989,10 +1036,11 @@ Implement same pattern as Buildings:
 #### Implementation:
 
 1. **CPF/CNPJ Validator**
+
    ```typescript
    // lib/utils/validators.ts
    export function validateCPF(cpf: string): boolean {
-     const cleanCPF = cpf.replace(/\D/g, '');
+     const cleanCPF = cpf.replace(/\D/g, "");
      if (cleanCPF.length !== 11) return false;
 
      // Check if all digits are the same
@@ -1024,17 +1072,18 @@ Implement same pattern as Buildings:
    }
 
    export function formatCPF(cpf: string): string {
-     const clean = cpf.replace(/\D/g, '');
-     return clean.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+     const clean = cpf.replace(/\D/g, "");
+     return clean.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
    }
 
    export function formatPhone(phone: string): string {
-     const clean = phone.replace(/\D/g, '');
-     return clean.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
+     const clean = phone.replace(/\D/g, "");
+     return clean.replace(/(\d{2})(\d{5})(\d{4})/, "($1) $2-$3");
    }
    ```
 
 2. **Tenant Multi-Step Form**
+
    ```typescript
    // app/(dashboard)/tenants/_components/tenant-form-wizard.tsx
    import { Steps, Form, Button } from 'antd';
@@ -1106,6 +1155,7 @@ Implement same pattern as Buildings:
    ```
 
 3. **Dependents Management**
+
    ```typescript
    // app/(dashboard)/tenants/_components/dependents-step.tsx
    import { Form, Input, Button, List } from 'antd';
@@ -1170,6 +1220,7 @@ Implement same pattern as Buildings:
    ```
 
 **Deliverables:**
+
 - ✅ Tenant CRUD with wizard
 - ✅ CPF/CNPJ validation working
 - ✅ Phone formatting
@@ -1186,6 +1237,7 @@ Implement same pattern as Buildings:
 **Agents:** `frontend-developer`, `test-engineer`
 
 #### Key Features:
+
 - Lease creation wizard (6 steps)
 - Apartment availability check
 - Tenant count validation
@@ -1198,6 +1250,7 @@ Implement same pattern as Buildings:
 #### Implementation:
 
 1. **Lease Creation Wizard - Step 1: Select Apartment**
+
    ```typescript
    // app/(dashboard)/leases/_components/wizard-steps/select-apartment.tsx
    import { Select, Card, Tag } from 'antd';
@@ -1241,11 +1294,13 @@ Implement same pattern as Buildings:
    ```
 
 2. **Lease Creation Wizard - Step 2: Select Responsible Tenant**
+
    ```typescript
    // Similar to step 1, show tenant dropdown with details
    ```
 
 3. **Lease Creation Wizard - Step 3: Select All Tenants**
+
    ```typescript
    // app/(dashboard)/leases/_components/wizard-steps/select-tenants.tsx
    import { Select, Alert } from 'antd';
@@ -1300,6 +1355,7 @@ Implement same pattern as Buildings:
    ```
 
 4. **Lease Creation Wizard - Step 6: Review with Furniture Calculation**
+
    ```typescript
    // app/(dashboard)/leases/_components/wizard-steps/review.tsx
    import { Card, Descriptions, List, Tag } from 'antd';
@@ -1386,6 +1442,7 @@ Implement same pattern as Buildings:
    ```
 
 5. **Lease Detail Page with Actions**
+
    ```typescript
    // app/(dashboard)/leases/[id]/page.tsx
    import { Button, Card, Descriptions, Modal, Tag } from 'antd';
@@ -1460,6 +1517,7 @@ Implement same pattern as Buildings:
    ```
 
 6. **Late Fee Calculator**
+
    ```typescript
    // app/(dashboard)/leases/_components/late-fee-calculator-modal.tsx
    import { Modal, Descriptions, Alert } from 'antd';
@@ -1518,6 +1576,7 @@ Implement same pattern as Buildings:
    ```
 
 7. **Due Date Changer**
+
    ```typescript
    // app/(dashboard)/leases/_components/due-date-changer-modal.tsx
    import { Modal, Form, InputNumber, Alert, Descriptions } from 'antd';
@@ -1596,6 +1655,7 @@ Implement same pattern as Buildings:
    ```
 
 **Deliverables:**
+
 - ✅ Lease creation wizard (6 steps)
 - ✅ Validation for apartment availability
 - ✅ Tenant count validation
@@ -1911,6 +1971,7 @@ export default function ContractTemplatePage() {
 ```
 
 **Deliverables:**
+
 - ✅ Monaco editor integrated
 - ✅ Live preview with sample data
 - ✅ Save template functionality
@@ -1928,6 +1989,7 @@ export default function ContractTemplatePage() {
 **Agents:** `frontend-developer`, `data-analyst`
 
 #### Key Features:
+
 - KPI cards (total buildings, apartments, leases, occupancy rate)
 - Charts (occupancy, revenue trend, buildings comparison)
 - Leases expiring soon widget
@@ -2091,6 +2153,7 @@ export default function DashboardPage() {
 ```
 
 **Deliverables:**
+
 - ✅ Dashboard with KPI cards
 - ✅ Occupancy pie chart
 - ✅ Revenue charts
@@ -2107,6 +2170,7 @@ export default function DashboardPage() {
 **Agents:** `frontend-developer`, `ui-ux-designer`
 
 #### Features:
+
 - Global search across all entities
 - Advanced filtering system
 - Bulk operations (delete, export, status update)
@@ -2115,6 +2179,7 @@ export default function DashboardPage() {
 - Accessibility improvements
 
 **Deliverables:**
+
 - ✅ Global search working
 - ✅ Advanced filters on all pages
 - ✅ Bulk operations implemented
@@ -2161,6 +2226,7 @@ export default function DashboardPage() {
    - Keyboard navigation
 
 **Deliverables:**
+
 - ✅ 80%+ code coverage
 - ✅ All E2E tests passing
 - ✅ Lighthouse score > 90
@@ -2179,6 +2245,7 @@ export default function DashboardPage() {
 #### Deployment Setup:
 
 1. **Docker Configuration**
+
    ```dockerfile
    # Dockerfile
    FROM node:20-alpine AS builder
@@ -2201,22 +2268,23 @@ export default function DashboardPage() {
    ```
 
 2. **Docker Compose (Full Stack)**
+
    ```yaml
-   version: '3.8'
+   version: "3.8"
    services:
      frontend:
        build: ./frontend
        ports:
          - "3000:3000"
        environment:
-         - NEXT_PUBLIC_API_URL=http://backend:8000/api
+         - NEXT_PUBLIC_API_URL=http://backend:8008/api
        depends_on:
          - backend
 
      backend:
        build: ./
        ports:
-         - "8000:8000"
+         - "8008:8008"
        environment:
          - DATABASE_URL=postgresql://postgres:postgres@db:5432/condominio
        depends_on:
@@ -2236,6 +2304,7 @@ export default function DashboardPage() {
    ```
 
 3. **CI/CD Pipeline**
+
    ```yaml
    # .github/workflows/deploy.yml
    name: Deploy to Production
@@ -2268,6 +2337,7 @@ export default function DashboardPage() {
    ```
 
 **Deliverables:**
+
 - ✅ Docker images built
 - ✅ CI/CD pipeline configured
 - ✅ Production deployment successful
@@ -2309,12 +2379,14 @@ export default function DashboardPage() {
 Every feature must pass these gates before merge:
 
 ### Pre-commit (Automated via Husky):
+
 - ✅ ESLint passes (zero warnings)
 - ✅ Prettier formatting applied
 - ✅ TypeScript compilation succeeds
 - ✅ Related unit tests pass
 
 ### Pull Request (CI/CD):
+
 - ✅ All unit tests pass
 - ✅ Code coverage ≥ 80%
 - ✅ Integration tests pass
@@ -2322,12 +2394,14 @@ Every feature must pass these gates before merge:
 - ✅ Bundle size within limits
 
 ### Pre-merge (Manual):
+
 - ✅ Code review approved
 - ✅ E2E tests pass
 - ✅ Accessibility audit passed
 - ✅ Performance metrics acceptable
 
 ### Pre-deployment:
+
 - ✅ All tests passing in staging
 - ✅ Security scan passed
 - ✅ User acceptance testing completed
@@ -2337,6 +2411,7 @@ Every feature must pass these gates before merge:
 ## Success Metrics
 
 ### Technical Metrics:
+
 - Zero ESLint warnings
 - Zero TypeScript errors
 - 80%+ code coverage
@@ -2346,6 +2421,7 @@ Every feature must pass these gates before merge:
 - Time to Interactive < 3s
 
 ### Business Metrics:
+
 - All CRUD operations functional
 - Contract generation working
 - Late fee calculation accurate
@@ -2357,18 +2433,18 @@ Every feature must pass these gates before merge:
 
 ## Timeline Summary
 
-| Phase | Week | Focus | Deliverable |
-|-------|------|-------|-------------|
-| 1 | Week 1 | Foundation | Project setup with quality gates |
-| 2 | Week 2 | Buildings & Furniture | 2 CRUD modules with tests |
-| 3 | Week 3 | Apartments | Complex CRUD with relationships |
-| 4 | Week 4 | Tenants | Multi-step wizard with validation |
-| 5 | Week 5 | Leases | Complete lease management |
-| 6 | Week 6 | Template Editor | Visual contract editor |
-| 7 | Week 7 | Dashboard | Analytics and metrics |
-| 8 | Week 8 | Advanced Features | Search, filters, bulk ops |
-| 9 | Week 9 | Testing & QA | Comprehensive testing |
-| 10 | Week 10 | Deployment | Production launch |
+| Phase | Week    | Focus                 | Deliverable                       |
+| ----- | ------- | --------------------- | --------------------------------- |
+| 1     | Week 1  | Foundation            | Project setup with quality gates  |
+| 2     | Week 2  | Buildings & Furniture | 2 CRUD modules with tests         |
+| 3     | Week 3  | Apartments            | Complex CRUD with relationships   |
+| 4     | Week 4  | Tenants               | Multi-step wizard with validation |
+| 5     | Week 5  | Leases                | Complete lease management         |
+| 6     | Week 6  | Template Editor       | Visual contract editor            |
+| 7     | Week 7  | Dashboard             | Analytics and metrics             |
+| 8     | Week 8  | Advanced Features     | Search, filters, bulk ops         |
+| 9     | Week 9  | Testing & QA          | Comprehensive testing             |
+| 10    | Week 10 | Deployment            | Production launch                 |
 
 **Total Duration:** 10 weeks
 
@@ -2408,6 +2484,7 @@ Every feature must pass these gates before merge:
 ## Post-Launch Roadmap
 
 ### Phase 11 (Optional - Month 3):
+
 - Real-time notifications (WebSockets)
 - Advanced reporting and analytics
 - Document management system

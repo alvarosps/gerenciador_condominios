@@ -51,7 +51,7 @@ const ToolbarButton: React.FC<ToolbarButtonProps> = React.memo(
       className={cn('h-8 w-8', isActive && 'bg-muted')}
       onClick={onClick}
       disabled={disabled}
-      title={title}
+      aria-label={title}
     >
       {children}
     </Button>

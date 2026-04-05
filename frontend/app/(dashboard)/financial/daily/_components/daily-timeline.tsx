@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+import { format, parseISO } from 'date-fns';
 import { ArrowDownCircle, ArrowUpCircle, CheckCircle2, SkipForward, User } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -433,12 +434,13 @@ export function DailyTimeline({ data, isLoading, filters, isAdmin, onDayClick }:
           const isCollapsed = collapsed.has(day.date) ?? (!hasItems);
           const cumulativeBalance = day.cumulative_balance;
 
-          const dayReferenceMonth = day.date.substring(0, 7) + '-01';
+          const dayReferenceMonth = format(parseISO(day.date), 'yyyy-MM') + '-01';
 
           return (
             <div key={day.date} className="border rounded-lg overflow-hidden">
               <button
                 className="w-full flex items-center justify-between px-4 py-3 bg-muted/30 hover:bg-muted/60 transition-colors"
+                aria-expanded={!isCollapsed}
                 onClick={() => {
                   toggleCollapse(day.date);
                   if (onDayClick && hasItems) onDayClick(day);

@@ -181,7 +181,20 @@ class CashFlowViewSet(viewsets.ViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        result = CashFlowService.get_cash_flow_projection(months)
+        full_occupancy_future = request.query_params.get("full_occupancy_future") == "true"
+        full_occupancy_current = request.query_params.get("full_occupancy_current") == "true"
+        extra_monthly_str = request.query_params.get("extra_monthly_expenses", "0")
+        try:
+            extra_monthly = Decimal(extra_monthly_str)
+        except (ValueError, InvalidOperation):
+            extra_monthly = Decimal("0.00")
+
+        result = CashFlowService.get_cash_flow_projection(
+            months,
+            full_occupancy_future=full_occupancy_future,
+            full_occupancy_current=full_occupancy_current,
+            extra_monthly_expenses=extra_monthly,
+        )
         return Response(result, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=["get"], url_path="person_summary")

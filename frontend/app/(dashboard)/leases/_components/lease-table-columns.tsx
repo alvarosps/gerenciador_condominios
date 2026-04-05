@@ -204,8 +204,33 @@ export function createLeaseColumns(handlers: LeaseActionHandlers): Column<Lease>
     {
       title: 'Valor',
       key: 'rental_value',
-      width: 120,
-      render: (_, record: Lease) => formatCurrency(record.rental_value ?? 0),
+      width: 160,
+      render: (_, record: Lease) => {
+        const current = record.rental_value ?? 0;
+        const pending = record.pending_rental_value;
+        const pendingDate = record.pending_rental_value_date;
+
+        if (pending && pendingDate) {
+          return (
+            <div className="space-y-0.5">
+              <div>{formatCurrency(current)}</div>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger>
+                    <div className="text-xs text-success font-medium">
+                      → {formatCurrency(pending)} em {format(parseISO(pendingDate), 'dd/MM')}
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Reajuste pendente a partir de {format(parseISO(pendingDate), 'dd/MM/yyyy')}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+          );
+        }
+        return formatCurrency(current);
+      },
       sorter: (a: Lease, b: Lease) => (a.rental_value ?? 0) - (b.rental_value ?? 0),
     },
     {
@@ -218,15 +243,30 @@ export function createLeaseColumns(handlers: LeaseActionHandlers): Column<Lease>
     {
       title: 'Último Reajuste',
       key: 'last_adjustment',
-      width: 130,
+      width: 150,
       render: (_, record: Lease) => {
-        const dateStr = record.last_adjustment_date;
+        const dateStr = record.last_rent_increase_date;
+        const pendingDate = record.pending_rental_value_date;
+
+        if (pendingDate) {
+          return (
+            <div className="space-y-0.5">
+              <div className="text-muted-foreground text-xs">
+                {dateStr ? format(parseISO(dateStr), 'dd/MM/yyyy') : 'Nunca'}
+              </div>
+              <div className="text-yellow-500 font-medium text-xs">
+                Próximo: {format(parseISO(pendingDate), 'dd/MM/yyyy')}
+              </div>
+            </div>
+          );
+        }
+
         if (!dateStr) return <span className="text-muted-foreground">Nunca</span>;
         return format(parseISO(dateStr), 'dd/MM/yyyy');
       },
       sorter: (a: Lease, b: Lease) => {
-        const aDate = a.last_adjustment_date ?? '';
-        const bDate = b.last_adjustment_date ?? '';
+        const aDate = a.pending_rental_value_date ?? a.last_rent_increase_date ?? '';
+        const bDate = b.pending_rental_value_date ?? b.last_rent_increase_date ?? '';
         return aDate.localeCompare(bDate);
       },
     },
@@ -270,6 +310,7 @@ export function createLeaseColumns(handlers: LeaseActionHandlers): Column<Lease>
                 <Button
                   variant="ghost"
                   size="icon"
+                  aria-label="Editar Locação"
                   onClick={() => handlers.onEdit(record)}
                 >
                   <Pencil className="h-4 w-4" />
@@ -283,6 +324,7 @@ export function createLeaseColumns(handlers: LeaseActionHandlers): Column<Lease>
                 <Button
                   variant="ghost"
                   size="icon"
+                  aria-label="Gerar Contrato"
                   onClick={() => handlers.onGenerateContract(record)}
                 >
                   <FilePlus className="h-4 w-4" />
@@ -296,6 +338,7 @@ export function createLeaseColumns(handlers: LeaseActionHandlers): Column<Lease>
                 <Button
                   variant="ghost"
                   size="icon"
+                  aria-label="Calcular Multa"
                   onClick={() => handlers.onCalculateLateFee(record)}
                 >
                   <Calculator className="h-4 w-4" />
@@ -309,6 +352,7 @@ export function createLeaseColumns(handlers: LeaseActionHandlers): Column<Lease>
                 <Button
                   variant="ghost"
                   size="icon"
+                  aria-label="Mudar Vencimento"
                   onClick={() => handlers.onChangeDueDate(record)}
                 >
                   <Calendar className="h-4 w-4" />
@@ -322,6 +366,7 @@ export function createLeaseColumns(handlers: LeaseActionHandlers): Column<Lease>
                 <Button
                   variant="ghost"
                   size="icon"
+                  aria-label="Reajustar Aluguel"
                   onClick={() => handlers.onAdjustRent(record)}
                 >
                   <TrendingUp className="h-4 w-4" />
@@ -335,6 +380,7 @@ export function createLeaseColumns(handlers: LeaseActionHandlers): Column<Lease>
                 <Button
                   variant="ghost"
                   size="icon"
+                  aria-label="Histórico de Reajustes"
                   onClick={() => handlers.onViewAdjustmentHistory(record)}
                 >
                   <History className="h-4 w-4" />
@@ -348,6 +394,7 @@ export function createLeaseColumns(handlers: LeaseActionHandlers): Column<Lease>
                 <Button
                   variant="ghost"
                   size="icon"
+                  aria-label="Excluir"
                   onClick={() => handlers.onDelete(record)}
                   disabled={handlers.isDeleting}
                 >
@@ -362,6 +409,7 @@ export function createLeaseColumns(handlers: LeaseActionHandlers): Column<Lease>
                 <Button
                   variant="ghost"
                   size="icon"
+                  aria-label="Encerrar Contrato"
                   onClick={() => handlers.onTerminate(record)}
                 >
                   <XCircle className="h-4 w-4" />

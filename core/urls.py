@@ -9,6 +9,7 @@ from .views import (
     FurnitureViewSet,
     LeaseViewSet,
     TenantViewSet,
+    health_check,
 )
 from .viewsets import (
     AdminProofViewSet,
@@ -92,6 +93,8 @@ _tenant_notif_read = TenantPortalViewSet.as_view({"patch": "notification_mark_re
 _tenant_notif_read_all = TenantPortalViewSet.as_view({"post": "notifications_read_all"})
 
 urlpatterns = [
+    # Health check
+    path("api/health/", health_check, name="health-check"),
     # Auth
     path("api/auth/whatsapp/request/", _whatsapp_auth, name="whatsapp-request"),
     path("api/auth/whatsapp/verify/", _whatsapp_verify, name="whatsapp-verify"),

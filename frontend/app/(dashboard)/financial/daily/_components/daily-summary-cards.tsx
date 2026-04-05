@@ -33,7 +33,7 @@ export function DailySummaryCards({ year, month }: Props) {
 
   if (isLoading) {
     return (
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4" aria-live="polite" aria-busy={true}>
         <SummaryCardSkeleton />
         <SummaryCardSkeleton />
         <SummaryCardSkeleton />

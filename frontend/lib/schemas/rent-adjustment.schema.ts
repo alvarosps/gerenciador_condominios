@@ -51,14 +51,24 @@ export const rentAdjustmentAlertSchema = z.object({
   last_adjustment: z
     .object({
       id: z.number(),
-      adjustment_date: z.string(),
+      date: z.string(),
       percentage: z
         .string()
         .or(z.number())
         .transform((val) => Number(val)),
     })
     .nullable(),
+  last_rent_increase_date: z.string(),
   prepaid_warning: z.boolean(),
+  ipca_percentage: z
+    .string()
+    .or(z.number())
+    .transform((val) => Number(val)),
+  ipca_source: z.enum(['ipca', 'fallback']),
+  new_value: z
+    .string()
+    .or(z.number())
+    .transform((val) => Number(val)),
 });
 
 export type RentAdjustmentAlert = z.infer<typeof rentAdjustmentAlertSchema>;

@@ -1,0 +1,58 @@
+Nos dados, falta:
+- Emprestimo pro kitnet no Nubank da Camila R$723,26 9/12 31 de março
+- Gasto único Tiago R$600
+- Empréstimo Tiago R$2000
+- Fisioterapia Célia R$350 Março
+
+- Para Abril, considerar
+- R$4000 entrada parcelamento água
+
+Março: -18810,85
+Simulações, assumindo:
+- todos kitnets alugados
+- R$2000 de novos gastos por mês (mercado, sitio, etc) + R$2100 contas de agua e luz (diferenças)
+- R$500 parcelas (compras parceladas por mês)
+Abril: --5220,87
+Maio: -4034,56
+Junho: -760,95
+Julho: -853,53
+Agosto: +143
+Setembro: +1921,55
+Outubro: +1063,53
+Novembro: +2381,30
+Dezembro: +4233,94
+Janeiro: +4534,33
+Fevereiro: +4488,32
+
+ou seja, o que está faltando para balancear o caixa até Agosto:
+18810,85 + 5220,87 + 4034,56 + 760,95 + 853,53 = 29680,76
++ R$5000 Alessandra
++ R$4000 entrada DMAE 836
+= 38630,76 -> 40k fluxo de caixa estabiliza, mas não garante se tiver emergências até Agosto.
+50k teria aprox 11k de caixa extra para emergências até Agosto.
+
+Criação de fluxo de caixa:
+1. Assumindo emprestimo 40k em Abril:
+Opções:
+- Nubank: 24xR$2967,14 ou 36xR$2474,47 ou 48xR$2266,56
+- Consignado: 48x1594,82
+Fluxo de caixa até Agosto: R$1000 (sobrando após ter todas as contas pagas até Agosto)
+Agosto: 1143
+Setembro: 3524,30
+Outubro: 4587,83
+Novembro: 6969,13
+Dezembro: 11203,07
+Janeiro: 15737,40
+Fevereiro: 20217,72
+
+2. Assumindo empréstimo 50k em Abril:
+- Consignado: 48x1993,52
+Fluxo de caixa até Agosto: R$11000 (sobrando após ter todas as contas pagas até Agosto)
+Agosto: 12143
+Setembro: 14524,30
+Outubro: 15587,83
+Novembro: 17969,13
+Dezembro: 22203,07
+Janeiro: 26737,40
+Fevereiro: 31217,72
+

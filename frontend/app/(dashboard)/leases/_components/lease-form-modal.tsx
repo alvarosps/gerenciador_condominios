@@ -150,7 +150,7 @@ export function LeaseFormModal({ open, lease, onClose }: Props) {
         rental_value: lease.rental_value ?? 0,
         resident_dependent_id: lease.resident_dependent_id ?? null,
         due_day: lease.responsible_tenant?.due_day ?? parseLocalDate(lease.start_date).getDate(),
-        last_rent_increase_date: lease.last_adjustment_date ?? lease.apartment?.last_rent_increase_date ?? null,
+        last_rent_increase_date: lease.last_rent_increase_date ?? null,
         start_date: parseLocalDate(lease.start_date),
         validity_months: lease.validity_months,
         tag_fee: lease.tag_fee,
@@ -313,16 +313,12 @@ export function LeaseFormModal({ open, lease, onClose }: Props) {
       }
 
       if (lease?.id) {
-        // Update apartment.last_rent_increase_date if changed
-        if (values.last_rent_increase_date && lease.apartment?.id) {
-          const currentDate = lease.last_adjustment_date ?? lease.apartment.last_rent_increase_date;
-          if (values.last_rent_increase_date !== currentDate) {
-            await apiClient.patch(`/apartments/${String(lease.apartment.id)}/`, {
-              last_rent_increase_date: values.last_rent_increase_date,
-            });
-          }
-        }
-        await updateMutation.mutateAsync({ ...payload, id: lease.id });
+        const updatePayload = {
+          ...payload,
+          id: lease.id,
+          last_rent_increase_date: values.last_rent_increase_date ?? null,
+        };
+        await updateMutation.mutateAsync(updatePayload);
         toast.success('Locação atualizada com sucesso');
       } else {
         await createMutation.mutateAsync(payload);

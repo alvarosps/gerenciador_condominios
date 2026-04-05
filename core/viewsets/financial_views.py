@@ -7,8 +7,10 @@ from typing import cast
 
 from dateutil.relativedelta import relativedelta
 from django.contrib.auth.models import User
+from django.db import transaction
 from django.db.models import QuerySet
 from django.http import QueryDict
+from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.request import Request
@@ -103,7 +105,7 @@ class FinancialSettingsViewSet(viewsets.ViewSet):
                 pk=1,
                 defaults={
                     "initial_balance": 0,
-                    "initial_balance_date": date.today(),
+                    "initial_balance_date": timezone.now().date(),
                 },
             )
             if created:
@@ -116,7 +118,7 @@ class FinancialSettingsViewSet(viewsets.ViewSet):
         try:
             settings_obj = FinancialSettings.objects.get(pk=1)
         except FinancialSettings.DoesNotExist:
-            settings_obj = FinancialSettings(pk=1, initial_balance_date=date.today())
+            settings_obj = FinancialSettings(pk=1, initial_balance_date=timezone.now().date())
 
         serializer = FinancialSettingsSerializer(
             settings_obj,
@@ -192,11 +194,12 @@ class ExpenseViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"])
     def mark_paid(self, request: Request, pk: str | None = None) -> Response:
-        expense = self.get_object()
-        paid_date = request.data.get("paid_date", date.today())
-        expense.is_paid = True
-        expense.paid_date = paid_date
-        expense.save(update_fields=["is_paid", "paid_date", "updated_at"])
+        paid_date = request.data.get("paid_date", timezone.now().date())
+        with transaction.atomic():
+            expense = Expense.objects.select_for_update().get(pk=pk)
+            expense.is_paid = True
+            expense.paid_date = paid_date
+            expense.save(update_fields=["is_paid", "paid_date", "updated_at"])
         serializer = self.get_serializer(expense)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -247,7 +250,9 @@ class ExpenseViewSet(viewsets.ModelViewSet):
                 )
             )
 
-        ExpenseInstallment.objects.bulk_create(installments)
+        with transaction.atomic():
+            ExpenseInstallment.objects.bulk_create(installments)
+
         expense = self.get_queryset().get(pk=expense.pk)
         serializer = self.get_serializer(expense)
         return Response(serializer.data, status=status.HTTP_200_OK)
@@ -323,7 +328,7 @@ class ExpenseInstallmentViewSet(viewsets.ModelViewSet):
 
         is_overdue = params.get("is_overdue")
         if is_overdue is not None and is_overdue.lower() == "true":
-            queryset = queryset.filter(is_paid=False, due_date__lt=date.today())
+            queryset = queryset.filter(is_paid=False, due_date__lt=timezone.now().date())
 
         due_date_from = params.get("due_date_from")
         if due_date_from is not None:
@@ -347,18 +352,18 @@ class ExpenseInstallmentViewSet(viewsets.ModelViewSet):
         """If all installments are paid, mark the expense as paid too."""
         if not expense.installments.filter(is_paid=False).exists():
             expense.is_paid = True
-            expense.paid_date = date.today()
+            expense.paid_date = timezone.now().date()
             expense.save(update_fields=["is_paid", "paid_date", "updated_at"])
 
     @action(detail=True, methods=["post"])
     def mark_paid(self, request: Request, pk: str | None = None) -> Response:
-        installment = self.get_object()
-        paid_date = request.data.get("paid_date", date.today())
-        installment.is_paid = True
-        installment.paid_date = paid_date
-        installment.save(update_fields=["is_paid", "paid_date", "updated_at"])
-
-        self._check_and_complete_expense(installment.expense)
+        paid_date = request.data.get("paid_date", timezone.now().date())
+        with transaction.atomic():
+            installment = ExpenseInstallment.objects.select_for_update().get(pk=pk)
+            installment.is_paid = True
+            installment.paid_date = paid_date
+            installment.save(update_fields=["is_paid", "paid_date", "updated_at"])
+            self._check_and_complete_expense(installment.expense)
 
         serializer = self.get_serializer(installment)
         return Response(serializer.data, status=status.HTTP_200_OK)
@@ -366,7 +371,7 @@ class ExpenseInstallmentViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=["post"])
     def bulk_mark_paid(self, request: Request) -> Response:
         installment_ids = request.data.get("installment_ids", [])
-        paid_date = request.data.get("paid_date", date.today())
+        paid_date = request.data.get("paid_date", timezone.now().date())
 
         if not installment_ids:
             return Response(
@@ -374,18 +379,21 @@ class ExpenseInstallmentViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        installments = ExpenseInstallment.objects.filter(pk__in=installment_ids)
-        if installments.count() != len(installment_ids):
-            return Response(
-                {"error": "Uma ou mais parcelas não foram encontradas."},
-                status=status.HTTP_400_BAD_REQUEST,
+        with transaction.atomic():
+            installments = ExpenseInstallment.objects.select_for_update().filter(
+                pk__in=installment_ids
             )
+            if installments.count() != len(installment_ids):
+                return Response(
+                    {"error": "Uma ou mais parcelas não foram encontradas."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
-        installments.update(is_paid=True, paid_date=paid_date)
+            installments.update(is_paid=True, paid_date=paid_date)
 
-        affected_expense_ids = set(installments.values_list("expense_id", flat=True))
-        for expense in Expense.objects.filter(pk__in=affected_expense_ids):
-            self._check_and_complete_expense(expense)
+            affected_expense_ids = set(installments.values_list("expense_id", flat=True))
+            for expense in Expense.objects.filter(pk__in=affected_expense_ids):
+                self._check_and_complete_expense(expense)
 
         updated_installments = ExpenseInstallment.objects.filter(pk__in=installment_ids)
         serializer = self.get_serializer(updated_installments, many=True)
@@ -433,11 +441,12 @@ class IncomeViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"])
     def mark_received(self, request: Request, pk: str | None = None) -> Response:
-        income = self.get_object()
-        received_date = request.data.get("received_date", date.today())
-        income.is_received = True
-        income.received_date = received_date
-        income.save(update_fields=["is_received", "received_date", "updated_at"])
+        received_date = request.data.get("received_date", timezone.now().date())
+        with transaction.atomic():
+            income = Income.objects.select_for_update().get(pk=pk)
+            income.is_received = True
+            income.received_date = received_date
+            income.save(update_fields=["is_received", "received_date", "updated_at"])
         serializer = self.get_serializer(income)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -521,11 +530,12 @@ class EmployeePaymentViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"])
     def mark_paid(self, request: Request, pk: str | None = None) -> Response:
-        payment = self.get_object()
-        payment_date = request.data.get("payment_date", date.today())
-        payment.is_paid = True
-        payment.payment_date = payment_date
-        payment.save(update_fields=["is_paid", "payment_date", "updated_at"])
+        payment_date = request.data.get("payment_date", timezone.now().date())
+        with transaction.atomic():
+            payment = EmployeePayment.objects.select_for_update().get(pk=pk)
+            payment.is_paid = True
+            payment.payment_date = payment_date
+            payment.save(update_fields=["is_paid", "payment_date", "updated_at"])
         serializer = self.get_serializer(payment)
         return Response(serializer.data, status=status.HTTP_200_OK)
 

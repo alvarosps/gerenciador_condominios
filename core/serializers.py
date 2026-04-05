@@ -4,6 +4,7 @@ from typing import Any
 
 from django.contrib.auth import get_user_model
 from django.db.models import Sum
+from django.utils import timezone
 from rest_framework import serializers
 
 from core.validators import BrazilianPhoneValidator, CNPJValidator, CPFValidator, validate_due_day
@@ -76,6 +77,15 @@ class TenantSimpleSerializer(serializers.ModelSerializer):
     class Meta:
         model = Tenant
         fields = ["id", "name"]
+        read_only_fields = fields
+
+
+class TenantSummarySerializer(serializers.ModelSerializer):
+    """Lightweight serializer for tenant references in other serializers."""
+
+    class Meta:
+        model = Tenant
+        fields = ["id", "name", "cpf_cnpj"]
         read_only_fields = fields
 
 
@@ -330,11 +340,11 @@ class LeaseSerializer(serializers.ModelSerializer):
     apartment_id = serializers.PrimaryKeyRelatedField(
         queryset=Apartment.objects.all(), source="apartment", write_only=True
     )
-    responsible_tenant = TenantSerializer(read_only=True)
+    responsible_tenant = TenantSummarySerializer(read_only=True)
     responsible_tenant_id = serializers.PrimaryKeyRelatedField(
         queryset=Tenant.objects.all(), source="responsible_tenant", write_only=True
     )
-    tenants = TenantSerializer(many=True, read_only=True)
+    tenants = TenantSummarySerializer(many=True, read_only=True)
     tenant_ids = serializers.PrimaryKeyRelatedField(
         queryset=Tenant.objects.all(), many=True, source="tenants", write_only=True
     )
@@ -752,7 +762,7 @@ class ExpenseInstallmentSerializer(FinalizedMonthProtectionMixin, serializers.Mo
         read_only_fields = ["id"]
 
     def get_is_overdue(self, obj: ExpenseInstallment) -> bool:
-        return not obj.is_paid and obj.due_date < date.today()
+        return not obj.is_paid and obj.due_date < timezone.now().date()
 
     def _get_reference_month(self, attrs: dict[str, Any]) -> date | None:
         due_date = attrs.get("due_date")

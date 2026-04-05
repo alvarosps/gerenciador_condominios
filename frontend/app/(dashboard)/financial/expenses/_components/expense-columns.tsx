@@ -142,7 +142,7 @@ export function createExpenseColumns(handlers: ExpenseActionHandlers): Column<Ex
               <>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" onClick={() => handlers.onEdit(record)}>
+                    <Button variant="ghost" size="icon" aria-label="Editar" onClick={() => handlers.onEdit(record)}>
                       <Pencil className="h-4 w-4" />
                     </Button>
                   </TooltipTrigger>
@@ -154,6 +154,7 @@ export function createExpenseColumns(handlers: ExpenseActionHandlers): Column<Ex
                     <Button
                       variant="ghost"
                       size="icon"
+                      aria-label="Excluir"
                       onClick={() => handlers.onDelete(record)}
                       disabled={handlers.isDeleting}
                     >
@@ -171,6 +172,7 @@ export function createExpenseColumns(handlers: ExpenseActionHandlers): Column<Ex
                   <Button
                     variant="ghost"
                     size="icon"
+                    aria-label="Ver Parcelas"
                     onClick={() => handlers.onViewInstallments(record)}
                   >
                     <List className="h-4 w-4" />
@@ -186,6 +188,7 @@ export function createExpenseColumns(handlers: ExpenseActionHandlers): Column<Ex
                   <Button
                     variant="ghost"
                     size="icon"
+                    aria-label="Marcar como Pago"
                     onClick={() => handlers.onMarkPaid(record)}
                     disabled={handlers.isMarkingPaid}
                   >

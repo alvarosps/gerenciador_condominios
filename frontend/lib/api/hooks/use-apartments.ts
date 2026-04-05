@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
+import { queryKeys } from '../query-keys';
 import { type Apartment, apartmentSchema } from '@/lib/schemas/apartment.schema';
 import { type PaginatedResponse, extractResults } from '@/lib/types/api';
 
@@ -18,7 +19,7 @@ export function useApartments(filters?: {
     : {};
 
   return useQuery({
-    queryKey: ['apartments', cleanFilters],
+    queryKey: queryKeys.apartments.list(cleanFilters),
     queryFn: async () => {
       const { data } = await apiClient.get<PaginatedResponse<Apartment> | Apartment[]>('/apartments/', {
         params: { ...cleanFilters, page_size: 10000 },
@@ -36,7 +37,7 @@ export function useApartments(filters?: {
  */
 export function useApartment(id: number | null) {
   return useQuery({
-    queryKey: ['apartments', id],
+    queryKey: id ? queryKeys.apartments.detail(id) : queryKeys.apartments.all,
     queryFn: async () => {
       if (!id) throw new Error('Apartment ID is required');
       const { data} = await apiClient.get<Apartment>(`/apartments/${id}/`);
@@ -60,9 +61,9 @@ export function useCreateApartment() {
       return response.data;
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['apartments'] });
-      void queryClient.invalidateQueries({ queryKey: ['leases'] });
-      void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.apartments.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.leases.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all });
     },
   });
 }
@@ -87,10 +88,12 @@ export function useUpdateApartment() {
       return response.data;
     },
     onSuccess: (data) => {
-      void queryClient.invalidateQueries({ queryKey: ['apartments'] });
-      void queryClient.invalidateQueries({ queryKey: ['apartments', data.id] });
-      void queryClient.invalidateQueries({ queryKey: ['leases'] });
-      void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.apartments.all });
+      if (data.id !== undefined) {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.apartments.detail(data.id) });
+      }
+      void queryClient.invalidateQueries({ queryKey: queryKeys.leases.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all });
     },
   });
 }
@@ -106,9 +109,9 @@ export function useDeleteApartment() {
       await apiClient.delete(`/apartments/${id}/`);
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['apartments'] });
-      void queryClient.invalidateQueries({ queryKey: ['leases'] });
-      void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.apartments.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.leases.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all });
     },
   });
 }

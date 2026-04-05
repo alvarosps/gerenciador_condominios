@@ -27,7 +27,7 @@ export default function SimulatorPage() {
   const [isAddingScenario, setIsAddingScenario] = useState(false);
   const [simulationResult, setSimulationResult] = useState<SimulationResult | null>(null);
 
-  const { data: baseProjection, isLoading: isLoadingBase, error: baseError } = useCashFlowProjection(12);
+  const { data: baseProjection, isLoading: isLoadingBase, error: baseError } = useCashFlowProjection({ months: 12 });
   const simulation = useSimulation();
   const mutateRef = useRef(simulation.mutate);
   mutateRef.current = simulation.mutate;

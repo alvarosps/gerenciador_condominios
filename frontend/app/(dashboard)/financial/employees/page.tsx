@@ -148,7 +148,7 @@ function createEmployeePaymentColumns(
               <>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" onClick={() => handlers.onEdit(record)}>
+                    <Button variant="ghost" size="icon" aria-label="Editar" onClick={() => handlers.onEdit(record)}>
                       <Pencil className="h-4 w-4" />
                     </Button>
                   </TooltipTrigger>
@@ -160,6 +160,7 @@ function createEmployeePaymentColumns(
                     <Button
                       variant="ghost"
                       size="icon"
+                      aria-label="Excluir"
                       onClick={() => handlers.onDelete(record)}
                       disabled={handlers.isDeleting}
                     >
@@ -177,6 +178,7 @@ function createEmployeePaymentColumns(
                   <Button
                     variant="ghost"
                     size="icon"
+                    aria-label="Marcar como Pago"
                     onClick={() => void handlers.onMarkPaid(record)}
                     disabled={handlers.isMarkingPaid}
                   >

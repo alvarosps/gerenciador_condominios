@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
+import { queryKeys } from '../query-keys';
 
 export interface DailyEntry {
   type: string;
@@ -66,7 +67,7 @@ const STALE_TIME = 1000 * 60 * 5;
 
 export function useDailyBreakdown(year: number, month: number) {
   return useQuery({
-    queryKey: ['daily-control', 'breakdown', year, month],
+    queryKey: queryKeys.dailyControl.breakdown(year, month),
     queryFn: async () => {
       const { data } = await apiClient.get<DailyBreakdownDay[]>('/daily-control/breakdown/', {
         params: { year, month },
@@ -79,7 +80,7 @@ export function useDailyBreakdown(year: number, month: number) {
 
 export function useDailySummary(year: number, month: number) {
   return useQuery({
-    queryKey: ['daily-control', 'summary', year, month],
+    queryKey: queryKeys.dailyControl.summary(year, month),
     queryFn: async () => {
       const { data } = await apiClient.get<DailySummary>('/daily-control/summary/', {
         params: { year, month },
@@ -99,10 +100,10 @@ export function useMarkItemPaid() {
       return data;
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['daily-control'] });
-      void queryClient.invalidateQueries({ queryKey: ['expenses'] });
-      void queryClient.invalidateQueries({ queryKey: ['financial-dashboard'] });
-      void queryClient.invalidateQueries({ queryKey: ['cash-flow'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.dailyControl.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.expenses.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.financialDashboard.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.cashFlow.all });
     },
   });
 }

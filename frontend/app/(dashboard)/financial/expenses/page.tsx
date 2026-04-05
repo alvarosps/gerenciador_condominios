@@ -77,7 +77,7 @@ export default function ExpensesPage() {
             </CardHeader>
             <CardContent>
               {isLoading && (
-                <div className="space-y-3">
+                <div className="space-y-3" aria-live="polite" aria-busy={true}>
                   {Array.from({ length: 8 }).map((_, i) => (
                     <Skeleton key={i} className="h-12 w-full" />
                   ))}

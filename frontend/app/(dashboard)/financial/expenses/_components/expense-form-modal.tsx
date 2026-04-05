@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -45,7 +45,7 @@ import { usePersons } from '@/lib/api/hooks/use-persons';
 import { useCreditCards } from '@/lib/api/hooks/use-credit-cards';
 import { useBuildings } from '@/lib/api/hooks/use-buildings';
 import { useExpenseCategories } from '@/lib/api/hooks/use-expense-categories';
-import { type Expense } from '@/lib/schemas/expense.schema';
+import { type Expense, validateExpenseRules } from '@/lib/schemas/expense.schema';
 import { ROUTES } from '@/lib/utils/constants';
 
 interface Props {
@@ -68,56 +68,31 @@ const EXPENSE_TYPES = [
   { value: 'employee_salary', label: 'Sal\u00e1rio Funcion\u00e1rio' },
 ];
 
-const expenseFormSchema = z.object({
-  description: z.string().min(1, 'Descri\u00e7\u00e3o \u00e9 obrigat\u00f3ria'),
-  expense_type: z.string().min(1, 'Tipo \u00e9 obrigat\u00f3rio'),
-  total_amount: z.number().min(0.01, 'Valor deve ser maior que zero'),
-  expense_date: z.string().min(1, 'Data \u00e9 obrigat\u00f3ria'),
-  person_id: z.number().nullable(),
-  credit_card_id: z.number().nullable(),
-  building_id: z.number().nullable(),
-  category_id: z.number().nullable(),
-  is_installment: z.boolean(),
-  total_installments: z.number().nullable(),
-  is_debt_installment: z.boolean(),
-  is_offset: z.boolean(),
-  is_recurring: z.boolean(),
-  expected_monthly_amount: z.number().nullable(),
-  recurrence_day: z.number().nullable(),
-  bank_name: z.string(),
-  interest_rate: z.number().nullable(),
-  end_date: z.string().nullable(),
-  notes: z.string(),
-});
+const expenseFormSchema = z
+  .object({
+    description: z.string().min(1, 'Descri\u00e7\u00e3o \u00e9 obrigat\u00f3ria'),
+    expense_type: z.string().min(1, 'Tipo \u00e9 obrigat\u00f3rio'),
+    total_amount: z.number().min(0.01, 'Valor deve ser maior que zero'),
+    expense_date: z.string().min(1, 'Data \u00e9 obrigat\u00f3ria'),
+    person_id: z.number().nullable(),
+    credit_card_id: z.number().nullable(),
+    building_id: z.number().nullable(),
+    category_id: z.number().nullable(),
+    is_installment: z.boolean(),
+    total_installments: z.number().nullable(),
+    is_debt_installment: z.boolean(),
+    is_offset: z.boolean(),
+    is_recurring: z.boolean(),
+    expected_monthly_amount: z.number().nullable(),
+    recurrence_day: z.number().nullable(),
+    bank_name: z.string(),
+    interest_rate: z.number().nullable(),
+    end_date: z.string().nullable(),
+    notes: z.string(),
+  })
+  .superRefine(validateExpenseRules);
 
 type ExpenseFormValues = z.infer<typeof expenseFormSchema>;
-
-function validateConditionalFields(values: ExpenseFormValues): string | null {
-  const type = values.expense_type;
-
-  if (type === 'card_purchase') {
-    if (!values.person_id) return 'Pessoa \u00e9 obrigat\u00f3ria para compra no cart\u00e3o';
-    if (!values.credit_card_id) return 'Cart\u00e3o \u00e9 obrigat\u00f3rio para compra no cart\u00e3o';
-  }
-
-  if (type === 'bank_loan' && !values.person_id) {
-    return 'Pessoa \u00e9 obrigat\u00f3ria para empr\u00e9stimo banc\u00e1rio';
-  }
-
-  if (type === 'personal_loan' && !values.person_id) {
-    return 'Pessoa \u00e9 obrigat\u00f3ria para empr\u00e9stimo pessoal';
-  }
-
-  if (['water_bill', 'electricity_bill', 'property_tax'].includes(type) && !values.building_id) {
-    return 'Pr\u00e9dio \u00e9 obrigat\u00f3rio para este tipo de despesa';
-  }
-
-  if (values.is_installment && (!values.total_installments || values.total_installments < 2)) {
-    return 'N\u00famero de parcelas deve ser pelo menos 2';
-  }
-
-  return null;
-}
 
 // Types that require person
 const PERSON_REQUIRED_TYPES = ['card_purchase', 'bank_loan', 'personal_loan'];
@@ -176,7 +151,7 @@ export function ExpenseFormModal({ open, expense, defaultExpenseDate, onClose, o
 
   const filteredCreditCards = useMemo(() => {
     if (!allCreditCards || !watchedPersonId) return [];
-    return allCreditCards.filter((card) => card.person_id === watchedPersonId);
+    return allCreditCards.filter((card) => card.person?.id === watchedPersonId);
   }, [allCreditCards, watchedPersonId]);
 
   // Reset conditional fields when type changes
@@ -254,12 +229,11 @@ export function ExpenseFormModal({ open, expense, defaultExpenseDate, onClose, o
   const showFixedExpenseFields = watchedType === 'fixed_expense';
   const isEmployeeSalary = watchedType === 'employee_salary';
 
+  const isSubmittingRef = useRef(false);
+
   const handleSubmit = async (values: ExpenseFormValues) => {
-    const validationError = validateConditionalFields(values);
-    if (validationError) {
-      toast.error(validationError);
-      return;
-    }
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
 
     try {
       if (expense?.id) {
@@ -281,6 +255,8 @@ export function ExpenseFormModal({ open, expense, defaultExpenseDate, onClose, o
       form.reset();
     } catch {
       toast.error('Erro ao salvar despesa');
+    } finally {
+      isSubmittingRef.current = false;
     }
   };
 

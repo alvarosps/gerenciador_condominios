@@ -216,6 +216,20 @@ class Building(AuditMixin, SoftDeleteMixin, models.Model):
         """Return string representation of building."""
         return f"{self.name} - {self.street_number}"
 
+    def delete(
+        self,
+        using: str | None = None,
+        keep_parents: bool = False,
+        hard_delete: bool = False,
+        deleted_by: Any = None,
+    ) -> tuple[int, dict[str, int]]:
+        if not hard_delete:
+            for apartment in self.apartments.filter(is_deleted=False):
+                apartment.delete(hard_delete=False, deleted_by=deleted_by)
+        return super().delete(
+            using=using, keep_parents=keep_parents, hard_delete=hard_delete, deleted_by=deleted_by
+        )
+
 
 class Furniture(AuditMixin, SoftDeleteMixin, models.Model):
     """
@@ -319,11 +333,39 @@ class Apartment(AuditMixin, SoftDeleteMixin, models.Model):
             models.Index(fields=["building", "is_rented"], name="apt_building_rented_idx"),
             models.Index(fields=["is_rented", "rental_value"], name="apt_rented_value_idx"),
             models.Index(fields=["building", "number"], name="apt_building_number_idx"),
+            models.Index(fields=["is_rented"], name="apt_is_rented_idx"),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(rental_value__gte=0),
+                name="apt_rental_value_non_negative",
+            ),
+            models.CheckConstraint(
+                check=models.Q(cleaning_fee__gte=0),
+                name="apt_cleaning_fee_non_negative",
+            ),
         ]
 
     def __str__(self) -> str:
         """Return string representation of apartment."""
         return f"Apto {self.number} - {self.building.street_number}"
+
+    def delete(
+        self,
+        using: str | None = None,
+        keep_parents: bool = False,
+        hard_delete: bool = False,
+        deleted_by: Any = None,
+    ) -> tuple[int, dict[str, int]]:
+        if not hard_delete:
+            self.leases.filter(is_deleted=False).update(
+                is_deleted=True,
+                deleted_at=timezone.now(),
+                deleted_by=deleted_by,
+            )
+        return super().delete(
+            using=using, keep_parents=keep_parents, hard_delete=hard_delete, deleted_by=deleted_by
+        )
 
 
 class Tenant(AuditMixin, SoftDeleteMixin, models.Model):
@@ -611,7 +653,11 @@ class Lease(AuditMixin, SoftDeleteMixin, models.Model):
                 fields=["apartment"],
                 condition=models.Q(is_deleted=False),
                 name="unique_active_lease_per_apartment",
-            )
+            ),
+            models.CheckConstraint(
+                check=models.Q(rental_value__gte=0),
+                name="lease_rental_value_non_negative",
+            ),
         ]
 
     def __str__(self) -> str:
@@ -856,6 +902,7 @@ class ContractRule(AuditMixin, SoftDeleteMixin, models.Model):
 # FINANCIAL MODULE MODELS
 # =============================================================================
 
+_MAX_CALENDAR_DAY = 31
 
 PIX_KEY_TYPE_CHOICES = [
     ("cpf", "CPF"),
@@ -903,7 +950,7 @@ class Person(AuditMixin, SoftDeleteMixin, models.Model):
 
 
 class CreditCard(AuditMixin, SoftDeleteMixin, models.Model):
-    person = models.ForeignKey(Person, related_name="credit_cards", on_delete=models.CASCADE)
+    person = models.ForeignKey(Person, related_name="credit_cards", on_delete=models.PROTECT)
     nickname = models.CharField(max_length=100)
     last_four_digits = models.CharField(max_length=4, blank=True)
     closing_day = models.PositiveSmallIntegerField(
@@ -919,10 +966,23 @@ class CreditCard(AuditMixin, SoftDeleteMixin, models.Model):
 
     class Meta:
         ordering = ["person", "nickname"]
-        unique_together = ["person", "nickname"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["person", "nickname"],
+                condition=models.Q(is_deleted=False),
+                name="unique_active_credit_card",
+            ),
+        ]
 
     def __str__(self) -> str:
         return f"{self.nickname} ({self.person.name})"
+
+    def clean(self) -> None:
+        super().clean()
+        if self.due_day is not None and not (1 <= self.due_day <= _MAX_CALENDAR_DAY):
+            raise ValidationError({"due_day": "O dia de vencimento deve ser entre 1 e 31."})
+        if self.closing_day is not None and not (1 <= self.closing_day <= _MAX_CALENDAR_DAY):
+            raise ValidationError({"closing_day": "O dia de fechamento deve ser entre 1 e 31."})
 
 
 class ExpenseCategory(AuditMixin, SoftDeleteMixin, models.Model):
@@ -1009,10 +1069,54 @@ class Expense(AuditMixin, SoftDeleteMixin, models.Model):
             models.Index(fields=["-expense_date"], name="expense_date_idx"),
             models.Index(fields=["expense_type", "-expense_date"], name="expense_type_date_idx"),
             models.Index(fields=["is_paid", "-expense_date"], name="expense_paid_date_idx"),
+            models.Index(fields=["person", "expense_type"], name="exp_person_type_idx"),
+            models.Index(fields=["person", "expense_date"], name="exp_person_date_idx"),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(total_amount__gte=0),
+                name="expense_total_amount_non_negative",
+            ),
         ]
 
     def __str__(self) -> str:
         return f"{self.description} - R${self.total_amount}"
+
+    def clean(self) -> None:
+        super().clean()
+        if self.total_amount is not None and self.total_amount <= 0:
+            raise ValidationError({"total_amount": "O valor total deve ser positivo."})
+
+    def delete(
+        self,
+        using: str | None = None,
+        keep_parents: bool = False,
+        hard_delete: bool = False,
+        deleted_by: Any = None,
+    ) -> tuple[int, dict[str, int]]:
+        result = super().delete(
+            using=using,
+            keep_parents=keep_parents,
+            hard_delete=hard_delete,
+            deleted_by=deleted_by,
+        )
+        # Cascade soft-delete to child installments
+        if not hard_delete:
+            self.installments.filter(is_deleted=False).update(
+                is_deleted=True,
+                deleted_at=self.deleted_at,
+                deleted_by=deleted_by,
+            )
+        return result
+
+    def restore(self, restored_by: Any = None) -> None:
+        super().restore(restored_by=restored_by)
+        # Cascade restore to child installments
+        self.installments.filter(is_deleted=True).update(
+            is_deleted=False,
+            deleted_at=None,
+            deleted_by=None,
+        )
 
 
 class ExpenseInstallment(AuditMixin, SoftDeleteMixin, models.Model):
@@ -1029,11 +1133,25 @@ class ExpenseInstallment(AuditMixin, SoftDeleteMixin, models.Model):
     objects = SoftDeleteManager()
 
     class Meta:
-        unique_together = ["expense", "installment_number"]
         ordering = ["due_date", "installment_number"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["expense", "installment_number"],
+                condition=models.Q(is_deleted=False),
+                name="unique_active_expense_installment",
+            ),
+            models.CheckConstraint(
+                check=models.Q(amount__gte=0),
+                name="installment_amount_non_negative",
+            ),
+        ]
         indexes = [
             models.Index(fields=["due_date"], name="installment_due_date_idx"),
             models.Index(fields=["is_paid", "due_date"], name="installment_paid_due_idx"),
+            models.Index(
+                fields=["expense", "due_date", "is_paid"],
+                name="inst_exp_date_paid_idx",
+            ),
         ]
 
     def __str__(self) -> str:
@@ -1046,7 +1164,7 @@ class PersonIncomeType(models.TextChoices):
 
 
 class PersonIncome(AuditMixin, SoftDeleteMixin, models.Model):
-    person = models.ForeignKey(Person, related_name="incomes", on_delete=models.CASCADE)
+    person = models.ForeignKey(Person, related_name="incomes", on_delete=models.PROTECT)
     income_type = models.CharField(max_length=20, choices=PersonIncomeType.choices)
     apartment = models.ForeignKey(Apartment, null=True, blank=True, on_delete=models.SET_NULL)
     fixed_amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
@@ -1105,8 +1223,18 @@ class RentPayment(AuditMixin, SoftDeleteMixin, models.Model):
     objects = SoftDeleteManager()
 
     class Meta:
-        unique_together = ["lease", "reference_month"]
         ordering = ["-reference_month"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["lease", "reference_month"],
+                condition=models.Q(is_deleted=False),
+                name="unique_active_rent_payment",
+            ),
+            models.CheckConstraint(
+                check=models.Q(amount_paid__gt=0),
+                name="rent_payment_amount_positive",
+            ),
+        ]
         indexes = [
             models.Index(fields=["-reference_month"], name="rent_payment_month_idx"),
             models.Index(fields=["lease", "-reference_month"], name="rent_payment_lease_month_idx"),
@@ -1115,9 +1243,14 @@ class RentPayment(AuditMixin, SoftDeleteMixin, models.Model):
     def __str__(self) -> str:
         return f"Pagamento {self.reference_month.strftime('%m/%Y')} - Apto {self.lease.apartment.number}"
 
+    def clean(self) -> None:
+        super().clean()
+        if self.amount_paid is not None and self.amount_paid <= 0:
+            raise ValidationError({"amount_paid": "O valor pago deve ser positivo."})
+
 
 class EmployeePayment(AuditMixin, SoftDeleteMixin, models.Model):
-    person = models.ForeignKey(Person, related_name="employee_payments", on_delete=models.CASCADE)
+    person = models.ForeignKey(Person, related_name="employee_payments", on_delete=models.PROTECT)
     reference_month = models.DateField()
     base_salary = models.DecimalField(max_digits=12, decimal_places=2)
     variable_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
@@ -1131,11 +1264,26 @@ class EmployeePayment(AuditMixin, SoftDeleteMixin, models.Model):
     objects = SoftDeleteManager()
 
     class Meta:
-        unique_together = ["person", "reference_month"]
         ordering = ["-reference_month"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["person", "reference_month"],
+                condition=models.Q(is_deleted=False),
+                name="unique_active_employee_payment",
+            ),
+            models.CheckConstraint(
+                check=models.Q(base_salary__gte=0),
+                name="employee_base_salary_non_negative",
+            ),
+        ]
 
     def __str__(self) -> str:
         return f"Pagamento {self.person.name} - {self.reference_month.strftime('%m/%Y')}"
+
+    def clean(self) -> None:
+        super().clean()
+        if self.base_salary is not None and self.base_salary < 0:
+            raise ValidationError({"base_salary": "O salário base não pode ser negativo."})
 
     @property
     def total_paid(self) -> Decimal:
@@ -1143,7 +1291,7 @@ class EmployeePayment(AuditMixin, SoftDeleteMixin, models.Model):
 
 
 class PersonPayment(AuditMixin, SoftDeleteMixin, models.Model):
-    person = models.ForeignKey(Person, related_name="payments_received", on_delete=models.CASCADE)
+    person = models.ForeignKey(Person, related_name="payments_received", on_delete=models.PROTECT)
     reference_month = models.DateField(
         help_text="Primeiro dia do mês de referência (ex: 2026-03-01)"
     )
@@ -1159,9 +1307,20 @@ class PersonPayment(AuditMixin, SoftDeleteMixin, models.Model):
         indexes = [
             models.Index(fields=["person", "reference_month"], name="person_payment_month_idx"),
         ]
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(amount__gt=0),
+                name="person_payment_amount_positive",
+            ),
+        ]
 
     def __str__(self) -> str:
         return f"Pagamento R${self.amount} a {self.person.name} - {self.reference_month.strftime('%m/%Y')}"
+
+    def clean(self) -> None:
+        super().clean()
+        if self.amount is not None and self.amount <= 0:
+            raise ValidationError({"amount": "O valor deve ser positivo."})
 
 
 class PersonPaymentSchedule(AuditMixin, SoftDeleteMixin, models.Model):

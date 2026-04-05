@@ -9,7 +9,7 @@ const nextConfig = {
     return [
       {
         source: '/api/:path*',
-        destination: 'http://localhost:8000/api/:path*',
+        destination: 'http://localhost:8008/api/:path*',
       },
     ];
   },
@@ -22,7 +22,7 @@ const nextConfig = {
     ignoreBuildErrors: false,
   },
   // Continue build even if some pages fail during static generation
-  staticPageGenerationTimeout: 1000,
+  staticPageGenerationTimeout: 120,
   // Disable static page generation for error pages
   onDemandEntries: {
     maxInactiveAge: 60 * 1000,

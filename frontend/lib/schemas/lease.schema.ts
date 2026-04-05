@@ -18,7 +18,12 @@ export const leaseSchema = z.object({
     .transform((val) => (val !== null && val !== undefined ? Number(val) : undefined)),
   resident_dependent: dependentSchema.optional().nullable(),
   resident_dependent_id: z.number().optional().nullable(),
-  last_adjustment_date: z.string().optional().nullable(),
+  last_rent_increase_date: z.string().optional().nullable(),
+  pending_rental_value: z.preprocess(
+    (val) => (val !== null && val !== undefined ? Number(val) : null),
+    z.number().nullable().optional(),
+  ),
+  pending_rental_value_date: z.string().nullable().optional(),
   start_date: z.string().min(1, 'Data de início é obrigatória'),
   final_date: z.string().optional().nullable(),
   next_month_date: z.string().optional().nullable(),

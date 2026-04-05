@@ -47,7 +47,7 @@ export class ErrorBoundary extends Component<Props, State> {
                 <p>
                   Desculpe, algo deu errado. Por favor, tente recarregar a página.
                 </p>
-                {this.state.error && (
+                {process.env.NODE_ENV === 'development' && this.state.error && (
                   <pre className="overflow-auto rounded-md bg-muted p-3 text-sm font-mono">
                     {this.state.error.message}
                   </pre>

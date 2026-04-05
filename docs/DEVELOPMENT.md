@@ -21,7 +21,7 @@ python manage.py migrate
 python manage.py createsuperuser
 
 # Rodar servidor
-python manage.py runserver  # http://localhost:8000
+python manage.py runserver  # http://localhost:8008
 ```
 
 ### Frontend

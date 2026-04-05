@@ -30,8 +30,8 @@ export default function DailyControlPage() {
   const queryClient = useQueryClient();
 
   const now = new Date();
-  const [year, setYear] = useState(now.getFullYear());
-  const [month, setMonth] = useState(now.getMonth() + 1);
+  const [period, setPeriod] = useState({ year: now.getFullYear(), month: now.getMonth() + 1 });
+  const { year, month } = period;
   const [isCreating, setIsCreating] = useState(false);
   const [isCreatingNextMonth, setIsCreatingNextMonth] = useState(false);
 
@@ -59,22 +59,16 @@ export default function DailyControlPage() {
   const { data: buildings } = useBuildings();
 
   const goToPrevMonth = useCallback(() => {
-    setMonth((prev) => {
-      if (prev === 1) {
-        setYear((y) => y - 1);
-        return 12;
-      }
-      return prev - 1;
+    setPeriod((prev) => {
+      if (prev.month === 1) return { year: prev.year - 1, month: 12 };
+      return { ...prev, month: prev.month - 1 };
     });
   }, []);
 
   const goToNextMonth = useCallback(() => {
-    setMonth((prev) => {
-      if (prev === 12) {
-        setYear((y) => y + 1);
-        return 1;
-      }
-      return prev + 1;
+    setPeriod((prev) => {
+      if (prev.month === 12) return { year: prev.year + 1, month: 1 };
+      return { ...prev, month: prev.month + 1 };
     });
   }, []);
 

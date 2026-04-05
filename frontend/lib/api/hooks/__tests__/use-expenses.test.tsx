@@ -15,7 +15,7 @@ import { createWrapper, createTestQueryClient } from '@/tests/test-utils';
 import { mockExpenses } from '@/tests/mocks/data';
 import { server } from '@/tests/mocks/server';
 
-const API_BASE = 'http://localhost:8000/api';
+const API_BASE = 'http://localhost:8008/api';
 
 describe('useExpenses', () => {
   it('should fetch all expenses without filters', async () => {

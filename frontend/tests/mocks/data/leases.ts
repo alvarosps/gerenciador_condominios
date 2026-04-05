@@ -26,6 +26,8 @@ export const mockLeases: Lease[] = [
     contract_signed: true,
     interfone_configured: true,
     number_of_tenants: 1,
+    pending_rental_value: null,
+    pending_rental_value_date: null,
     pdf_path: 'contracts/836/contract_apto_101_1.pdf',
   },
   {
@@ -51,6 +53,8 @@ export const mockLeases: Lease[] = [
     contract_signed: false,
     interfone_configured: false,
     number_of_tenants: 2,
+    pending_rental_value: null,
+    pending_rental_value_date: null,
     pdf_path: 'contracts/836/contract_apto_102_2.pdf',
   },
   {
@@ -76,6 +80,8 @@ export const mockLeases: Lease[] = [
     contract_signed: false,
     interfone_configured: false,
     number_of_tenants: 1,
+    pending_rental_value: null,
+    pending_rental_value_date: null,
     pdf_path: null,
   },
 ];
@@ -109,6 +115,8 @@ export function createMockLease(overrides: Partial<Lease> = {}): Lease {
     contract_signed: false,
     interfone_configured: false,
     number_of_tenants: 1,
+    pending_rental_value: null,
+    pending_rental_value_date: null,
     pdf_path: null,
     ...overrides,
   };

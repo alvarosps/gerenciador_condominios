@@ -7,7 +7,7 @@ import { useTenantMe } from "@/lib/api/hooks/use-tenant";
 import { useAuthStore } from "@/store/auth-store";
 import { getAccessToken } from "@/lib/secure-store";
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:8000/api";
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:8008/api";
 
 export default function ContractScreen() {
   const { data: tenant, isLoading } = useTenantMe();

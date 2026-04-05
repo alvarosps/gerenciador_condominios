@@ -8,13 +8,12 @@ This service handles all date-related business logic:
 - Days until due calculations
 """
 
-from __future__ import annotations
-
 import logging
 from datetime import date, timedelta
 from typing import Any
 
 from dateutil.relativedelta import relativedelta
+from django.utils import timezone
 
 FEBRUARY = 2
 LEAP_DAY = 29
@@ -162,7 +161,7 @@ class DateCalculatorService:
             False  # Current day (15) < due day (20)
         """
         if current_date is None:
-            current_date = date.today()
+            current_date = timezone.now().date()
 
         return current_date.day >= due_day
 
@@ -187,7 +186,7 @@ class DateCalculatorService:
             0  # Past due, next due date is next month
         """
         if current_date is None:
-            current_date = date.today()
+            current_date = timezone.now().date()
 
         if current_date.day < due_day:
             # Due date is later this month
