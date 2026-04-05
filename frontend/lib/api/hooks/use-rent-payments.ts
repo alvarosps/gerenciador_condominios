@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
 import { type RentPayment, rentPaymentSchema } from '@/lib/schemas/rent-payment.schema';
 import { type PaginatedResponse, extractResults } from '@/lib/types/api';
+import { queryKeys } from '@/lib/api/query-keys';
 
 export interface RentPaymentFilters {
   lease_id?: number;
@@ -14,7 +15,7 @@ export function useRentPayments(filters?: RentPaymentFilters) {
     : {};
 
   return useQuery({
-    queryKey: ['rent-payments', cleanFilters],
+    queryKey: queryKeys.rentPayments.list(cleanFilters),
     queryFn: async () => {
       const { data } = await apiClient.get<PaginatedResponse<RentPayment> | RentPayment[]>('/rent-payments/', {
         params: { page_size: 10000, ...cleanFilters },
@@ -27,7 +28,7 @@ export function useRentPayments(filters?: RentPaymentFilters) {
 
 export function useRentPayment(id: number | null) {
   return useQuery({
-    queryKey: ['rent-payments', id],
+    queryKey: queryKeys.rentPayments.detail(id ?? 0),
     queryFn: async () => {
       if (!id) throw new Error('RentPayment ID is required');
       const { data } = await apiClient.get<RentPayment>(`/rent-payments/${id}/`);
@@ -46,9 +47,9 @@ export function useCreateRentPayment() {
       return response.data;
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['rent-payments'] });
-      void queryClient.invalidateQueries({ queryKey: ['financial-dashboard'] });
-      void queryClient.invalidateQueries({ queryKey: ['cash-flow'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.rentPayments.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.financialDashboard.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.cashFlow.all });
     },
   });
 }
@@ -64,10 +65,12 @@ export function useUpdateRentPayment() {
       return response.data;
     },
     onSuccess: (data) => {
-      void queryClient.invalidateQueries({ queryKey: ['rent-payments'] });
-      void queryClient.invalidateQueries({ queryKey: ['rent-payments', data.id] });
-      void queryClient.invalidateQueries({ queryKey: ['financial-dashboard'] });
-      void queryClient.invalidateQueries({ queryKey: ['cash-flow'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.rentPayments.all });
+      if (data.id !== undefined) {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.rentPayments.detail(data.id) });
+      }
+      void queryClient.invalidateQueries({ queryKey: queryKeys.financialDashboard.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.cashFlow.all });
     },
   });
 }
@@ -80,9 +83,9 @@ export function useDeleteRentPayment() {
       await apiClient.delete(`/rent-payments/${id}/`);
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['rent-payments'] });
-      void queryClient.invalidateQueries({ queryKey: ['financial-dashboard'] });
-      void queryClient.invalidateQueries({ queryKey: ['cash-flow'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.rentPayments.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.financialDashboard.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.cashFlow.all });
     },
   });
 }

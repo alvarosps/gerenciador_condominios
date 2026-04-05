@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
 import { type PersonIncome, personIncomeSchema } from '@/lib/schemas/person-income.schema';
 import { type PaginatedResponse, extractResults } from '@/lib/types/api';
+import { queryKeys } from '@/lib/api/query-keys';
 
 export interface PersonIncomeFilters {
   person_id?: number;
@@ -16,7 +17,7 @@ export function usePersonIncomes(filters?: PersonIncomeFilters) {
     : {};
 
   return useQuery({
-    queryKey: ['person-incomes', cleanFilters],
+    queryKey: queryKeys.personIncomes.list(cleanFilters),
     queryFn: async () => {
       const { data } = await apiClient.get<PaginatedResponse<PersonIncome> | PersonIncome[]>('/person-incomes/', {
         params: { page_size: 10000, ...cleanFilters },
@@ -36,8 +37,8 @@ export function useCreatePersonIncome() {
       return response.data;
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['person-incomes'] });
-      void queryClient.invalidateQueries({ queryKey: ['cash-flow'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.personIncomes.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.cashFlow.all });
     },
   });
 }
@@ -52,8 +53,8 @@ export function useUpdatePersonIncome() {
       return response.data;
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['person-incomes'] });
-      void queryClient.invalidateQueries({ queryKey: ['cash-flow'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.personIncomes.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.cashFlow.all });
     },
   });
 }
@@ -66,8 +67,8 @@ export function useDeletePersonIncome() {
       await apiClient.delete(`/person-incomes/${id}/`);
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['person-incomes'] });
-      void queryClient.invalidateQueries({ queryKey: ['cash-flow'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.personIncomes.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.cashFlow.all });
     },
   });
 }

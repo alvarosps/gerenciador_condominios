@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
 import { type PersonPayment, personPaymentSchema } from '@/lib/schemas/person-payment.schema';
 import { type PaginatedResponse, extractResults } from '@/lib/types/api';
+import { queryKeys } from '@/lib/api/query-keys';
 
 export interface PersonPaymentFilters {
   person_id?: number;
@@ -16,7 +17,7 @@ export function usePersonPayments(filters?: PersonPaymentFilters) {
     : {};
 
   return useQuery({
-    queryKey: ['person-payments', cleanFilters],
+    queryKey: queryKeys.personPayments.list(cleanFilters),
     queryFn: async () => {
       const { data } = await apiClient.get<PaginatedResponse<PersonPayment> | PersonPayment[]>('/person-payments/', {
         params: { page_size: 10000, ...cleanFilters },
@@ -36,8 +37,8 @@ export function useCreatePersonPayment() {
       return response.data;
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['person-payments'] });
-      void queryClient.invalidateQueries({ queryKey: ['cash-flow'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.personPayments.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.cashFlow.all });
     },
   });
 }
@@ -52,8 +53,8 @@ export function useUpdatePersonPayment() {
       return response.data;
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['person-payments'] });
-      void queryClient.invalidateQueries({ queryKey: ['cash-flow'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.personPayments.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.cashFlow.all });
     },
   });
 }
@@ -66,8 +67,8 @@ export function useDeletePersonPayment() {
       await apiClient.delete(`/person-payments/${id}/`);
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['person-payments'] });
-      void queryClient.invalidateQueries({ queryKey: ['cash-flow'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.personPayments.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.cashFlow.all });
     },
   });
 }

@@ -5,6 +5,7 @@ import {
   expenseMonthSkipSchema,
 } from '@/lib/schemas/expense-month-skip.schema';
 import { type PaginatedResponse, extractResults } from '@/lib/types/api';
+import { queryKeys } from '@/lib/api/query-keys';
 
 export interface ExpenseMonthSkipFilters {
   expense_id?: number;
@@ -17,7 +18,7 @@ export function useExpenseMonthSkips(filters?: ExpenseMonthSkipFilters) {
     : {};
 
   return useQuery({
-    queryKey: ['expense-month-skips', cleanFilters],
+    queryKey: queryKeys.expenseMonthSkips.list(cleanFilters),
     queryFn: async () => {
       const { data } = await apiClient.get<
         PaginatedResponse<ExpenseMonthSkip> | ExpenseMonthSkip[]
@@ -39,9 +40,9 @@ export function useCreateExpenseMonthSkip() {
       return response.data;
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['expense-month-skips'] });
-      void queryClient.invalidateQueries({ queryKey: ['daily-control'] });
-      void queryClient.invalidateQueries({ queryKey: ['cash-flow'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.expenseMonthSkips.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.dailyControl.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.cashFlow.all });
     },
   });
 }
@@ -54,9 +55,9 @@ export function useDeleteExpenseMonthSkip() {
       await apiClient.delete(`/expense-month-skips/${id}/`);
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['expense-month-skips'] });
-      void queryClient.invalidateQueries({ queryKey: ['daily-control'] });
-      void queryClient.invalidateQueries({ queryKey: ['cash-flow'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.expenseMonthSkips.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.dailyControl.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.cashFlow.all });
     },
   });
 }

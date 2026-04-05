@@ -4,6 +4,7 @@ from datetime import date
 from decimal import Decimal, InvalidOperation
 
 from django.core.exceptions import ObjectDoesNotExist
+from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.request import Request
@@ -59,7 +60,7 @@ class FinancialDashboardViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=["get"])
     def category_breakdown(self, request: Request) -> Response:
-        today = date.today()
+        today = timezone.now().date()
         try:
             year = int(request.query_params.get("year", today.year))
             month = int(request.query_params.get("month", today.month))
@@ -73,7 +74,7 @@ class FinancialDashboardViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=["get"], url_path="dashboard_summary")
     def dashboard_summary(self, request: Request) -> Response:
-        today = date.today()
+        today = timezone.now().date()
         try:
             year = int(request.query_params.get("year", today.year))
             month = int(request.query_params.get("month", today.month))
@@ -87,7 +88,7 @@ class FinancialDashboardViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=["get"])
     def monthly_purchases(self, request: Request) -> Response:
-        today = date.today()
+        today = timezone.now().date()
         try:
             year = int(request.query_params.get("year", today.year))
             month = int(request.query_params.get("month", today.month))
@@ -111,7 +112,7 @@ class FinancialDashboardViewSet(viewsets.ViewSet):
         detail_id_str = request.query_params.get("id")
         detail_id = int(detail_id_str) if detail_id_str else None
 
-        today = date.today()
+        today = timezone.now().date()
         try:
             year = int(request.query_params.get("year", today.year))
             month = int(request.query_params.get("month", today.month))
@@ -266,7 +267,7 @@ class DailyControlViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=["get"])
     def breakdown(self, request: Request) -> Response:
-        today = date.today()
+        today = timezone.now().date()
         try:
             year = int(request.query_params.get("year", today.year))
             month = int(request.query_params.get("month", today.month))
@@ -287,7 +288,7 @@ class DailyControlViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=["get"])
     def summary(self, request: Request) -> Response:
-        today = date.today()
+        today = timezone.now().date()
         try:
             year = int(request.query_params.get("year", today.year))
             month = int(request.query_params.get("month", today.month))

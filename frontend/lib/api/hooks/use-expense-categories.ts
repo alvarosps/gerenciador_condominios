@@ -2,10 +2,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
 import { type ExpenseCategory, expenseCategorySchema } from '@/lib/schemas/expense-category.schema';
 import { type PaginatedResponse, extractResults } from '@/lib/types/api';
+import { queryKeys } from '@/lib/api/query-keys';
 
 export function useExpenseCategories() {
   return useQuery({
-    queryKey: ['expense-categories'],
+    queryKey: queryKeys.expenseCategories.list(),
     queryFn: async () => {
       const { data } = await apiClient.get<PaginatedResponse<ExpenseCategory> | ExpenseCategory[]>(
         '/expense-categories/',
@@ -19,7 +20,7 @@ export function useExpenseCategories() {
 
 export function useExpenseCategory(id: number | null) {
   return useQuery({
-    queryKey: ['expense-categories', id],
+    queryKey: queryKeys.expenseCategories.detail(id ?? 0),
     queryFn: async () => {
       if (!id) throw new Error('ExpenseCategory ID is required');
       const { data } = await apiClient.get<ExpenseCategory>(`/expense-categories/${id}/`);
@@ -38,7 +39,7 @@ export function useCreateExpenseCategory() {
       return response.data;
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['expense-categories'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.expenseCategories.all });
     },
   });
 }
@@ -54,8 +55,10 @@ export function useUpdateExpenseCategory() {
       return response.data;
     },
     onSuccess: (data) => {
-      void queryClient.invalidateQueries({ queryKey: ['expense-categories'] });
-      void queryClient.invalidateQueries({ queryKey: ['expense-categories', data.id] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.expenseCategories.all });
+      if (data.id !== undefined) {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.expenseCategories.detail(data.id) });
+      }
     },
   });
 }
@@ -68,7 +71,7 @@ export function useDeleteExpenseCategory() {
       await apiClient.delete(`/expense-categories/${id}/`);
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['expense-categories'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.expenseCategories.all });
     },
   });
 }
