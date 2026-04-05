@@ -1,12 +1,12 @@
 """Lease lifecycle services: terminate and transfer."""
 
-from datetime import date
 from decimal import Decimal
 from typing import Any
 
 from django.db import transaction
+from django.utils import timezone
 
-from core.models import Lease
+from core.models import Lease, Tenant
 
 
 @transaction.atomic
@@ -37,6 +37,21 @@ def transfer_lease(lease_id: int, payload: dict[str, Any], user: Any) -> Lease:
     new_apartment_id: int = payload["apartment_id"]
     responsible_tenant_id: int = payload["responsible_tenant_id"]
     tenant_ids: list[int] = payload.get("tenant_ids", [])
+    validity_months: int = payload.get("validity_months", 12)
+
+    if not Tenant.objects.filter(pk=responsible_tenant_id).exists():
+        msg = f"Tenant {responsible_tenant_id} not found"
+        raise ValueError(msg)
+
+    if tenant_ids:
+        found = Tenant.objects.filter(pk__in=tenant_ids).count()
+        if found != len(tenant_ids):
+            msg = "One or more tenant IDs not found"
+            raise ValueError(msg)
+
+    if validity_months <= 0:
+        msg = "validity_months must be positive"
+        raise ValueError(msg)
 
     if Lease.objects.filter(apartment_id=new_apartment_id).exists():
         msg = "O apartamento destino já está alugado."
@@ -61,8 +76,8 @@ def transfer_lease(lease_id: int, payload: dict[str, Any], user: Any) -> Lease:
     new_lease = Lease.objects.create(
         apartment_id=new_apartment_id,
         responsible_tenant_id=responsible_tenant_id,
-        start_date=payload.get("start_date", date.today()),
-        validity_months=payload.get("validity_months", 12),
+        start_date=payload.get("start_date", timezone.now().date()),
+        validity_months=validity_months,
         tag_fee=Decimal(str(payload.get("tag_fee", 0))),
         rental_value=rental_value,
         deposit_amount=deposit_amount,

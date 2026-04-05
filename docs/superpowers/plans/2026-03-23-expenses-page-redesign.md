@@ -15,6 +15,7 @@
 ## File Structure
 
 ### New files
+
 ```
 frontend/app/(dashboard)/financial/expenses/page.tsx               # REWRITE: monthly expense list
 frontend/app/(dashboard)/financial/expenses/_components/
@@ -33,12 +34,14 @@ frontend/lib/api/hooks/use-financial-dashboard.ts                   # ADD: useEx
 ```
 
 ### Modified files
+
 ```
 frontend/app/(dashboard)/financial/_components/expense-summary-card.tsx   # ADD: "Ver detalhes" links in modals
 frontend/app/(dashboard)/financial/expenses/_components/                  # KEEP: expense-form-modal.tsx, installments-drawer.tsx (reuse in detail page)
 ```
 
 ### Files to keep but no longer import from page.tsx
+
 ```
 frontend/app/(dashboard)/financial/expenses/_components/expense-filters.tsx   # Not used in new list page
 frontend/app/(dashboard)/financial/expenses/_components/expense-columns.tsx   # Not used in new list page
@@ -49,6 +52,7 @@ frontend/app/(dashboard)/financial/expenses/_components/expense-columns.tsx   # 
 ## Task 1: Backend — `get_expense_detail()` service method
 
 **Files:**
+
 - Modify: `core/services/financial_dashboard_service.py` (add method after `get_dashboard_summary`)
 
 This method returns full expense details for a given type+id+month. For persons, it returns all expense installments and single expenses grouped by category (cards, loans, fixed, one-time, offsets, stipends) with full category/subcategory info. For utilities, returns building-grouped data. For fixed categories, returns the item list.
@@ -112,6 +116,7 @@ def get_expense_detail(
 ```
 
 The full implementation should include all category/subcategory data from the Expense model's `category` FK (with nested subcategories). Enrich each expense item with:
+
 - `category_id`, `category_name`, `category_color`
 - `subcategory_id`, `subcategory_name` (from `category.parent` relationship)
 - `notes` field from Expense model
@@ -134,6 +139,7 @@ git commit -m "feat(financial): add get_expense_detail service method"
 ## Task 2: Backend — `expense_detail` ViewSet action
 
 **Files:**
+
 - Modify: `core/viewsets/financial_dashboard_views.py` (add action to FinancialDashboardViewSet)
 
 - [ ] **Step 1: Add expense_detail action**
@@ -179,7 +185,7 @@ Run: `python -m ruff check core/viewsets/financial_dashboard_views.py`
 
 - [ ] **Step 3: Test endpoint manually**
 
-Run: `curl http://localhost:8000/api/financial-dashboard/expense_detail/?type=person&id=3&year=2026&month=3` (with auth header)
+Run: `curl http://localhost:8008/api/financial-dashboard/expense_detail/?type=person&id=3&year=2026&month=3` (with auth header)
 Expected: JSON with Alvaro's full expense detail
 
 - [ ] **Step 4: Commit**
@@ -194,6 +200,7 @@ git commit -m "feat(financial): add expense_detail API endpoint"
 ## Task 3: Frontend — `useExpenseDetail()` hook + types
 
 **Files:**
+
 - Modify: `frontend/lib/api/hooks/use-financial-dashboard.ts`
 
 - [ ] **Step 1: Add ExpenseDetailItem interface and useExpenseDetail hook**
@@ -248,14 +255,19 @@ export interface ExpenseDetailResponse {
 Add hook:
 
 ```typescript
-export function useExpenseDetail(type: string, id: number | null, year: number, month: number) {
+export function useExpenseDetail(
+  type: string,
+  id: number | null,
+  year: number,
+  month: number,
+) {
   return useQuery({
-    queryKey: ['financial-dashboard', 'expense_detail', type, id, year, month],
+    queryKey: ["financial-dashboard", "expense_detail", type, id, year, month],
     queryFn: async () => {
       const params: Record<string, string | number> = { type, year, month };
       if (id !== null) params.id = id;
       const { data } = await apiClient.get<ExpenseDetailResponse>(
-        '/financial-dashboard/expense_detail/',
+        "/financial-dashboard/expense_detail/",
         { params },
       );
       return data;
@@ -284,6 +296,7 @@ git commit -m "feat(financial): add useExpenseDetail hook and types"
 ## Task 4: Frontend — Month Navigator component
 
 **Files:**
+
 - Create: `frontend/app/(dashboard)/financial/expenses/_components/month-navigator.tsx`
 
 - [ ] **Step 1: Create MonthNavigator component**
@@ -346,6 +359,7 @@ git commit -m "feat(financial): add MonthNavigator component"
 ## Task 5: Frontend — Expense List Table component
 
 **Files:**
+
 - Create: `frontend/app/(dashboard)/financial/expenses/_components/expense-list-table.tsx`
 
 - [ ] **Step 1: Create ExpenseListTable component**
@@ -357,6 +371,7 @@ The link navigates to `/financial/expenses/details?type=<type>&id=<id>&year=<yea
 Use the same progress bar logic from the dashboard's `PersonExpenseItem` component. For non-payable persons, show subtitle "Salário administração condomínio".
 
 Map each expense category to a row:
+
 - `by_person` → one row per person with `type=person&id={person_id}`
 - `water` → `type=water`
 - `electricity` → `type=electricity`
@@ -385,6 +400,7 @@ git commit -m "feat(financial): add ExpenseListTable component"
 ## Task 6: Frontend — Rewrite expenses list page
 
 **Files:**
+
 - Rewrite: `frontend/app/(dashboard)/financial/expenses/page.tsx`
 
 - [ ] **Step 1: Rewrite page.tsx**
@@ -394,6 +410,7 @@ Replace the current CRUD table with the monthly summary list. Uses `useDashboard
 State: `year` and `month` as `useState` (initialized from `new Date()`).
 
 Layout:
+
 ```
 <h1>Despesas</h1>
 <p>Gerencie despesas mensal</p>
@@ -429,6 +446,7 @@ git commit -m "feat(financial): rewrite expenses page as monthly summary list"
 ## Task 7: Frontend — Detail page header component
 
 **Files:**
+
 - Create: `frontend/app/(dashboard)/financial/expenses/details/_components/detail-header.tsx`
 
 - [ ] **Step 1: Create DetailHeader component**
@@ -449,6 +467,7 @@ git commit -m "feat(financial): add expense detail header component"
 ## Task 8: Frontend — Detail table component
 
 **Files:**
+
 - Create: `frontend/app/(dashboard)/financial/expenses/details/_components/expense-detail-table.tsx`
 
 - [ ] **Step 1: Create ExpenseDetailTable component**
@@ -471,6 +490,7 @@ git commit -m "feat(financial): add expense detail table component"
 ## Task 9: Frontend — Expense accordion component
 
 **Files:**
+
 - Create: `frontend/app/(dashboard)/financial/expenses/details/_components/expense-accordion.tsx`
 
 - [ ] **Step 1: Create ExpenseAccordion component**
@@ -491,11 +511,13 @@ git commit -m "feat(financial): add expense accordion component"
 ## Task 10: Frontend — Expense edit modal
 
 **Files:**
+
 - Create: `frontend/app/(dashboard)/financial/expenses/details/_components/expense-edit-modal.tsx`
 
 - [ ] **Step 1: Create ExpenseEditModal component**
 
 Modal (Shadcn Dialog) with fields:
+
 - Description (text input)
 - Value (currency input)
 - Category (dropdown from `useExpenseCategories()`)
@@ -524,6 +546,7 @@ git commit -m "feat(financial): add expense edit modal with cascading categories
 ## Task 11: Frontend — Detail page assembly
 
 **Files:**
+
 - Create: `frontend/app/(dashboard)/financial/expenses/details/page.tsx`
 
 - [ ] **Step 1: Create detail page**
@@ -531,6 +554,7 @@ git commit -m "feat(financial): add expense edit modal with cascading categories
 Uses `useSearchParams()` to read `type`, `id`, `year`, `month`. Calls `useExpenseDetail(type, id, year, month)`.
 
 Layout:
+
 ```
 <DetailHeader ... />
 <ExpenseAccordion title="Cartões" items={data.card_details} ... />
@@ -555,6 +579,7 @@ Run: `cd frontend && eval "$(fnm env --shell bash)" && npm run type-check && npm
 - [ ] **Step 3: Test in browser**
 
 Navigate to `/financial/expenses`, click "Ver detalhes" on Rodrigo. Verify:
+
 - Header shows correct total and progress
 - Accordions expand/collapse
 - Table shows 10 items with "Ver todos" button
@@ -573,6 +598,7 @@ git commit -m "feat(financial): add expense detail page with accordions and edit
 ## Task 12: Dashboard — Add "Ver detalhes" links to modals
 
 **Files:**
+
 - Modify: `frontend/app/(dashboard)/financial/_components/expense-summary-card.tsx`
 
 - [ ] **Step 1: Add "Ver detalhes" link to PersonDetailModal**
@@ -618,16 +644,18 @@ git commit -m "feat(financial): add 'Ver detalhes' links to dashboard expense mo
 ## Task 13: Cache invalidation + final integration
 
 **Files:**
+
 - Modify: `frontend/app/(dashboard)/financial/expenses/details/_components/expense-edit-modal.tsx`
 - Modify: `frontend/app/(dashboard)/financial/expenses/details/page.tsx`
 
 - [ ] **Step 1: Ensure mutations invalidate all related queries**
 
 On successful edit/delete, invalidate:
+
 ```typescript
-void queryClient.invalidateQueries({ queryKey: ['financial-dashboard'] });
-void queryClient.invalidateQueries({ queryKey: ['expenses'] });
-void queryClient.invalidateQueries({ queryKey: ['expense-installments'] });
+void queryClient.invalidateQueries({ queryKey: ["financial-dashboard"] });
+void queryClient.invalidateQueries({ queryKey: ["expenses"] });
+void queryClient.invalidateQueries({ queryKey: ["expense-installments"] });
 ```
 
 This ensures: dashboard summary, expense detail, and any cached expense lists all refresh.

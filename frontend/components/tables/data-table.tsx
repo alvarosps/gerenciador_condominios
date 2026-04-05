@@ -208,7 +208,11 @@ export function DataTable<T extends Record<string, unknown>>({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center p-8 border rounded-md">
+      <div
+        className="flex items-center justify-center p-8 border rounded-md"
+        aria-live="polite"
+        aria-busy={true}
+      >
         <div className="flex flex-col items-center gap-2">
           <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
           <p className="text-sm text-muted-foreground">Carregando...</p>
@@ -342,6 +346,7 @@ export function DataTable<T extends Record<string, unknown>>({
               <Button
                 variant="outline"
                 size="sm"
+                aria-label="Página anterior"
                 onClick={() => handlePageChange(currentPage - 1)}
                 disabled={currentPage === 1}
               >
@@ -355,6 +360,7 @@ export function DataTable<T extends Record<string, unknown>>({
               <Button
                 variant="outline"
                 size="sm"
+                aria-label="Próxima página"
                 onClick={() => handlePageChange(currentPage + 1)}
                 disabled={currentPage === totalPages}
               >

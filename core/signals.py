@@ -28,8 +28,12 @@ from .models import (
     Building,
     Dependent,
     DeviceToken,
+    EmployeePayment,
+    Expense,
+    ExpenseInstallment,
     ExpenseMonthSkip,
     Furniture,
+    Income,
     Lease,
     Notification,
     PaymentProof,
@@ -340,6 +344,73 @@ def invalidate_expense_month_skip_cache_on_delete(
     sender: type[ExpenseMonthSkip], instance: ExpenseMonthSkip, **kwargs: Any
 ) -> None:
     _invalidate_financial_caches("ExpenseMonthSkip", instance.pk)
+
+
+@receiver(post_save, sender=Expense)
+def invalidate_expense_cache_on_save(
+    sender: type[Expense], instance: Expense, created: bool, **kwargs: Any
+) -> None:
+    action = "created" if created else "updated"
+    logger.info(f"Expense {instance.pk} {action}, invalidating financial caches")
+    _invalidate_financial_caches("Expense", instance.pk)
+
+
+@receiver(post_delete, sender=Expense)
+def invalidate_expense_cache_on_delete(
+    sender: type[Expense], instance: Expense, **kwargs: Any
+) -> None:
+    _invalidate_financial_caches("Expense", instance.pk)
+
+
+@receiver(post_save, sender=ExpenseInstallment)
+def invalidate_expense_installment_cache_on_save(
+    sender: type[ExpenseInstallment],
+    instance: ExpenseInstallment,
+    created: bool,
+    **kwargs: Any,
+) -> None:
+    action = "created" if created else "updated"
+    logger.info(f"ExpenseInstallment {instance.pk} {action}, invalidating financial caches")
+    _invalidate_financial_caches("ExpenseInstallment", instance.pk)
+
+
+@receiver(post_delete, sender=ExpenseInstallment)
+def invalidate_expense_installment_cache_on_delete(
+    sender: type[ExpenseInstallment], instance: ExpenseInstallment, **kwargs: Any
+) -> None:
+    _invalidate_financial_caches("ExpenseInstallment", instance.pk)
+
+
+@receiver(post_save, sender=Income)
+def invalidate_income_cache_on_save(
+    sender: type[Income], instance: Income, created: bool, **kwargs: Any
+) -> None:
+    action = "created" if created else "updated"
+    logger.info(f"Income {instance.pk} {action}, invalidating financial caches")
+    _invalidate_financial_caches("Income", instance.pk)
+
+
+@receiver(post_delete, sender=Income)
+def invalidate_income_cache_on_delete(
+    sender: type[Income], instance: Income, **kwargs: Any
+) -> None:
+    _invalidate_financial_caches("Income", instance.pk)
+
+
+@receiver(post_save, sender=EmployeePayment)
+def invalidate_employee_payment_cache_on_save(
+    sender: type[EmployeePayment], instance: EmployeePayment, created: bool, **kwargs: Any
+) -> None:
+    action = "created" if created else "updated"
+    logger.info(f"EmployeePayment {instance.pk} {action}, invalidating financial caches")
+    _invalidate_financial_caches("EmployeePayment", instance.pk)
+
+
+@receiver(post_delete, sender=EmployeePayment)
+def invalidate_employee_payment_cache_on_delete(
+    sender: type[EmployeePayment], instance: EmployeePayment, **kwargs: Any
+) -> None:
+    _invalidate_financial_caches("EmployeePayment", instance.pk)
 
 
 # =============================================================================

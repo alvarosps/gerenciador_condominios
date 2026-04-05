@@ -8,6 +8,8 @@ from datetime import date
 from decimal import Decimal
 from typing import Any
 
+from django.db import transaction
+
 from core.models import (
     Expense,
     ExpenseInstallment,
@@ -19,6 +21,7 @@ from core.models import (
 )
 
 MONTHS_IN_YEAR = 12
+MAX_DAY_OF_MONTH = 31
 
 
 def _next_month_start(year: int, month: int) -> date:
@@ -117,12 +120,19 @@ class PersonPaymentScheduleService:
         }
 
     @staticmethod
+    @transaction.atomic
     def bulk_configure(
         person_id: int,
         reference_month: date,
         entries: list[dict[str, Any]],
     ) -> list[PersonPaymentSchedule]:
         """Replace all payment schedules for a person/month with the given entries."""
+        for entry in entries:
+            due_day = entry.get("due_day")
+            if due_day is not None and not (1 <= due_day <= MAX_DAY_OF_MONTH):
+                msg = f"due_day must be between 1 and {MAX_DAY_OF_MONTH}, got {due_day}"
+                raise ValueError(msg)
+
         person = Person.objects.get(pk=person_id)
 
         # Soft-delete existing schedules for this person/month

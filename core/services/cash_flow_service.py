@@ -9,8 +9,9 @@ from datetime import date
 from decimal import Decimal
 from typing import Any
 
-from django.db.models import Max, Q, Sum
+from django.db.models import Avg, Max, Q, Sum
 from django.db.models.functions import Coalesce
+from django.utils import timezone
 
 from core.models import (
     Apartment,
@@ -22,6 +23,7 @@ from core.models import (
     FinancialSettings,
     Income,
     Lease,
+    MonthSnapshot,
     Person,
     PersonIncome,
     PersonIncomeType,
@@ -202,26 +204,32 @@ class CashFlowService:
         return person_stipends, details
 
     @staticmethod
-    def _collect_card_installments(
-        month_start: date, next_month: date, skipped_expense_ids: set[int]
+    def _collect_installments(
+        month_start: date,
+        next_month: date,
+        expense_filter: Q,
+        skipped_expense_ids: set[int],
     ) -> tuple[Decimal, list[dict[str, Any]]]:
-        """Collect card installment amounts and details."""
+        """Generic installment collector for a given expense filter.
+
+        Returns total amount and a list of detail dicts with keys:
+        description, person_name, card_name, installment, amount, due_date.
+        person_name and card_name are None when not applicable.
+        """
         qs = (
             ExpenseInstallment.objects.filter(
                 due_date__gte=month_start,
                 due_date__lt=next_month,
-                expense__expense_type=ExpenseType.CARD_PURCHASE,
-                expense__is_debt_installment=False,
-                expense__is_offset=False,
             )
+            .filter(expense_filter)
             .exclude(expense_id__in=skipped_expense_ids)
             .select_related("expense", "expense__person", "expense__credit_card")
         )
 
-        card_installments = Decimal("0.00")
+        total = Decimal("0.00")
         details = []
         for inst in qs:
-            card_installments += inst.amount
+            total += inst.amount
             details.append(
                 {
                     "description": inst.expense.description,
@@ -234,38 +242,38 @@ class CashFlowService:
                     "due_date": inst.due_date,
                 }
             )
-        return card_installments, details
+        return total, details
+
+    @staticmethod
+    def _collect_card_installments(
+        month_start: date, next_month: date, skipped_expense_ids: set[int]
+    ) -> tuple[Decimal, list[dict[str, Any]]]:
+        """Collect card installment amounts and details."""
+        return CashFlowService._collect_installments(
+            month_start,
+            next_month,
+            Q(
+                expense__expense_type=ExpenseType.CARD_PURCHASE,
+                expense__is_debt_installment=False,
+                expense__is_offset=False,
+            ),
+            skipped_expense_ids,
+        )
 
     @staticmethod
     def _collect_loan_installments(
         month_start: date, next_month: date, skipped_expense_ids: set[int]
     ) -> tuple[Decimal, list[dict[str, Any]]]:
         """Collect loan installment amounts and details."""
-        qs = (
-            ExpenseInstallment.objects.filter(
-                due_date__gte=month_start,
-                due_date__lt=next_month,
+        return CashFlowService._collect_installments(
+            month_start,
+            next_month,
+            Q(
                 expense__expense_type__in=[ExpenseType.BANK_LOAN, ExpenseType.PERSONAL_LOAN],
                 expense__is_offset=False,
-            )
-            .exclude(expense_id__in=skipped_expense_ids)
-            .select_related("expense", "expense__person")
+            ),
+            skipped_expense_ids,
         )
-
-        loan_installments = Decimal("0.00")
-        details = []
-        for inst in qs:
-            loan_installments += inst.amount
-            details.append(
-                {
-                    "description": inst.expense.description,
-                    "person_name": inst.expense.person.name if inst.expense.person else None,
-                    "installment": f"{inst.installment_number}/{inst.total_installments}",
-                    "amount": inst.amount,
-                    "due_date": inst.due_date,
-                }
-            )
-        return loan_installments, details
 
     @staticmethod
     def _collect_utility_bills(
@@ -304,59 +312,24 @@ class CashFlowService:
         month_start: date, next_month: date, skipped_expense_ids: set[int]
     ) -> tuple[Decimal, list[dict[str, Any]]]:
         """Collect debt installment amounts and details."""
-        qs = (
-            ExpenseInstallment.objects.filter(
-                due_date__gte=month_start,
-                due_date__lt=next_month,
-                expense__is_debt_installment=True,
-            )
-            .exclude(expense_id__in=skipped_expense_ids)
-            .select_related("expense", "expense__person")
+        return CashFlowService._collect_installments(
+            month_start,
+            next_month,
+            Q(expense__is_debt_installment=True),
+            skipped_expense_ids,
         )
-
-        debt_installments = Decimal("0.00")
-        details = []
-        for inst in qs:
-            debt_installments += inst.amount
-            details.append(
-                {
-                    "description": inst.expense.description,
-                    "person_name": inst.expense.person.name if inst.expense.person else None,
-                    "installment": f"{inst.installment_number}/{inst.total_installments}",
-                    "amount": inst.amount,
-                    "due_date": inst.due_date,
-                }
-            )
-        return debt_installments, details
 
     @staticmethod
     def _collect_property_tax(
         month_start: date, next_month: date, skipped_expense_ids: set[int]
     ) -> tuple[Decimal, list[dict[str, Any]]]:
         """Collect property tax installment amounts and details."""
-        qs = (
-            ExpenseInstallment.objects.filter(
-                due_date__gte=month_start,
-                due_date__lt=next_month,
-                expense__expense_type=ExpenseType.PROPERTY_TAX,
-            )
-            .exclude(expense_id__in=skipped_expense_ids)
-            .select_related("expense")
+        return CashFlowService._collect_installments(
+            month_start,
+            next_month,
+            Q(expense__expense_type=ExpenseType.PROPERTY_TAX),
+            skipped_expense_ids,
         )
-
-        property_tax = Decimal("0.00")
-        details = []
-        for inst in qs:
-            property_tax += inst.amount
-            details.append(
-                {
-                    "description": inst.expense.description,
-                    "installment": f"{inst.installment_number}/{inst.total_installments}",
-                    "amount": inst.amount,
-                    "due_date": inst.due_date,
-                }
-            )
-        return property_tax, details
 
     @staticmethod
     def _collect_employee_salary(month_start: date) -> tuple[Decimal, list[dict[str, Any]]]:
@@ -532,7 +505,13 @@ class CashFlowService:
         }
 
     @staticmethod
-    def get_cash_flow_projection(months: int = 12) -> list[dict[str, Any]]:
+    def get_cash_flow_projection(
+        months: int = 12,
+        *,
+        full_occupancy_future: bool = False,
+        full_occupancy_current: bool = False,
+        extra_monthly_expenses: Decimal = Decimal("0.00"),
+    ) -> list[dict[str, Any]]:
         """
         Project cash flow for N months starting from the current month.
 
@@ -542,14 +521,25 @@ class CashFlowService:
         - Utility bills: Average of last 3 registered months per building/type
         - Fixed expenses: expected_monthly_amount
         - Recurring income: expected_monthly_amount
+
+        Simulation options:
+        - full_occupancy_future: assume all apartments are rented in future months
+        - full_occupancy_current: assume all apartments are rented in current month too
+        - extra_monthly_expenses: add a fixed amount to monthly expenses (groceries, etc.)
         """
-        today = date.today()
+        today = timezone.now().date()
         current_year = today.year
         current_month = today.month
+        current_month_date = date(current_year, current_month, 1)
 
         # Get initial balance from FinancialSettings
         settings = FinancialSettings.objects.first()
         initial_balance = settings.initial_balance if settings else Decimal("0.00")
+
+        # Pre-calculate full occupancy bonus once (if needed)
+        full_occupancy_bonus = Decimal("0.00")
+        if full_occupancy_future or full_occupancy_current:
+            full_occupancy_bonus = CashFlowService._get_full_occupancy_bonus()
 
         projection = []
         cumulative_balance = initial_balance
@@ -563,7 +553,29 @@ class CashFlowService:
                 year += 1
 
             target_date = date(year, month, 1)
-            is_projected = target_date > date(today.year, today.month, 1)
+            is_projected = target_date > current_month_date
+            is_current = target_date == current_month_date
+
+            snapshot = MonthSnapshot.objects.filter(
+                reference_month=target_date,
+                is_finalized=True,
+            ).first()
+
+            if snapshot is not None:
+                projection.append(
+                    {
+                        "year": year,
+                        "month": month,
+                        "income_total": str(snapshot.total_income),
+                        "expenses_total": str(snapshot.total_expenses),
+                        "balance": str(snapshot.net_balance),
+                        "cumulative_balance": str(snapshot.cumulative_ending_balance),
+                        "is_projected": is_projected,
+                        "is_snapshot": True,
+                    }
+                )
+                cumulative_balance = Decimal(str(snapshot.cumulative_ending_balance))
+                continue
 
             if is_projected:
                 income_total = CashFlowService._get_projected_income(year, month)
@@ -572,6 +584,16 @@ class CashFlowService:
                 cash_flow = CashFlowService.get_monthly_cash_flow(year, month)
                 income_total = cash_flow["income"]["total"]
                 expenses_total = cash_flow["expenses"]["total"]
+
+            # Apply simulation adjustments
+            apply_occupancy = (is_projected and full_occupancy_future) or (
+                is_current and full_occupancy_current
+            )
+            if apply_occupancy:
+                income_total += full_occupancy_bonus
+
+            if extra_monthly_expenses > 0:
+                expenses_total += extra_monthly_expenses
 
             balance = income_total - expenses_total
             cumulative_balance += balance
@@ -589,6 +611,36 @@ class CashFlowService:
             )
 
         return projection
+
+    @staticmethod
+    def _get_full_occupancy_bonus() -> Decimal:
+        """Calculate additional rent income if all vacant apartments were rented.
+
+        Uses the average rental value of currently rented apartments as estimate
+        for vacant ones.
+        """
+        vacant_apartments = Apartment.objects.filter(
+            is_rented=False,
+            owner__isnull=True,
+        )
+        vacant_count = vacant_apartments.count()
+        if vacant_count == 0:
+            return Decimal("0.00")
+
+        # Average rent from currently occupied apartments (excluding owner/salary offset)
+        rented_leases = Lease.objects.filter(
+            apartment__is_rented=True,
+            apartment__owner__isnull=True,
+            is_salary_offset=False,
+        )
+        if not rented_leases.exists():
+            return Decimal("0.00")
+
+        avg_rent: Decimal = rented_leases.aggregate(
+            avg=Coalesce(Avg("rental_value"), Decimal("0.00"))
+        )["avg"]
+
+        return avg_rent * vacant_count
 
     @staticmethod
     def _get_projected_income(year: int, month: int) -> Decimal:

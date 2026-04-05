@@ -113,6 +113,7 @@ export function InstallmentsDrawer({ open, expense, onClose }: Props) {
                     <Button
                       variant="ghost"
                       size="icon"
+                      aria-label="Marcar parcela como paga"
                       onClick={() => void handleMarkPaid(installmentId)}
                       disabled={markPaidMutation.isPending}
                     >

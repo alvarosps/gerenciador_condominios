@@ -13,11 +13,15 @@ import {
   useExpenseDetail,
 } from '@/lib/api/hooks/use-financial-dashboard';
 import type { ExpenseDetailItem } from '@/lib/api/hooks/use-financial-dashboard';
+import { useMarkInstallmentPaid } from '@/lib/api/hooks/use-expense-installments';
+import { useMarkExpensePaid } from '@/lib/api/hooks/use-expenses';
 import { formatMonthYear, getDefaultExpenseDate, MONTH_ABBR } from '@/lib/utils/formatters';
 import { apiClient } from '@/lib/api/client';
 import { DetailHeader } from './_components/detail-header';
 import { ExpenseAccordion } from './_components/expense-accordion';
 import { ExpenseEditModal } from './_components/expense-edit-modal';
+import { EmployeePaymentModal } from './_components/employee-payment-modal';
+import { OverdueSection } from './_components/overdue-section';
 
 const LABELS: Record<string, string> = {
   person: '',
@@ -60,6 +64,7 @@ function ExpenseDetailContent() {
 
   const [editTarget, setEditTarget] = useState<ExpenseDetailItem | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ExpenseDetailItem | null>(null);
+  const [employeeEditTarget, setEmployeeEditTarget] = useState<Record<string, unknown> | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [isCreatingNextMonth, setIsCreatingNextMonth] = useState(false);
 
@@ -69,8 +74,25 @@ function ExpenseDetailContent() {
   const nextMonthAbbr = MONTH_ABBR[nextMonth - 1] ?? '';
 
   const { data, isLoading, error } = useExpenseDetail(type, id, year, month);
+  const markInstallmentPaid = useMarkInstallmentPaid();
+  const markExpensePaid = useMarkExpensePaid();
+
+  const isNonPersonType = type !== 'person' && type !== 'employee';
 
   const monthLabel = formatMonthYear(year, month);
+
+  const handleMarkPaid = async (item: ExpenseDetailItem) => {
+    try {
+      if (item.installment_id) {
+        await markInstallmentPaid.mutateAsync(item.installment_id);
+      } else {
+        await markExpensePaid.mutateAsync(item.expense_id);
+      }
+      toast.success(`"${item.description}" marcada como paga`);
+    } catch {
+      toast.error('Erro ao marcar como paga');
+    }
+  };
 
   const handleSaved = async () => {
     await queryClient.invalidateQueries({ queryKey: ['financial-dashboard'] });
@@ -132,17 +154,25 @@ function ExpenseDetailContent() {
         month={month}
       />
 
-      {type !== 'employee' && (
-        <div className="flex justify-end gap-2">
-          <Button onClick={() => setIsCreating(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Nova Despesa ({currentMonthAbbr})
-          </Button>
-          <Button variant="outline" onClick={() => setIsCreatingNextMonth(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Nova Despesa ({nextMonthAbbr})
-          </Button>
-        </div>
+      <div className="flex justify-end gap-2">
+        <Button onClick={() => setIsCreating(true)}>
+          <Plus className="h-4 w-4 mr-2" />
+          Nova Despesa ({currentMonthAbbr})
+        </Button>
+        <Button variant="outline" onClick={() => setIsCreatingNextMonth(true)}>
+          <Plus className="h-4 w-4 mr-2" />
+          Nova Despesa ({nextMonthAbbr})
+        </Button>
+      </div>
+
+      {(data.overdue?.length ?? 0) > 0 && (
+        <OverdueSection
+          items={data.overdue ?? []}
+          total={data.overdue_total ?? 0}
+          onEdit={setEditTarget}
+          onDelete={setDeleteTarget}
+          onPaid={handleSaved}
+        />
       )}
 
       <Card>
@@ -232,8 +262,34 @@ function ExpenseDetailContent() {
                 notes: typeof item.notes === 'string' ? item.notes : (item.installment !== null && item.installment !== undefined ? `${item.installment as number}` : String(idx)),
               });
 
-              const billItems = (building.bills ?? []).map((bill, i) => mapToDetail(bill as unknown as Record<string, unknown>, i));
-              const debtItems = (building.debt_installments ?? []).map((item, i) => mapToDetail(item as unknown as Record<string, unknown>, i));
+              const debts = building.debt_installments ?? [];
+              const bills = building.bills ?? [];
+
+              // When a building has both bills and debt installments,
+              // the debt is already included in the bill value — show it as a note
+              const debtNote = debts.length > 0 && bills.length > 0
+                ? debts.map((d) => {
+                    const rec = d as unknown as Record<string, unknown>;
+                    const desc = typeof rec.description === 'string' ? rec.description : '';
+                    const inst = rec.installment as string | undefined;
+                    const amt = Number(rec.amount ?? 0);
+                    return `${desc} ${inst ?? ''} (R$${amt.toFixed(2).replace('.', ',')})`;
+                  }).join('; ')
+                : null;
+
+              const billItems = bills.map((bill, i) => {
+                const item = mapToDetail(bill as unknown as Record<string, unknown>, i);
+                if (debtNote) {
+                  return { ...item, notes: `Inclui: ${debtNote}` };
+                }
+                return item;
+              });
+
+              // Only show debt items as standalone rows when there are no bills
+              const debtItems = bills.length === 0
+                ? debts.map((item, i) => mapToDetail(item as unknown as Record<string, unknown>, i))
+                : [];
+
               const allItems = [...billItems, ...debtItems];
               const hasEditableItems = allItems.some((item) => item.expense_id > 0);
 
@@ -246,18 +302,42 @@ function ExpenseDetailContent() {
                   total={building.total}
                   onEdit={hasEditableItems ? setEditTarget : () => undefined}
                   onDelete={hasEditableItems ? setDeleteTarget : () => undefined}
+                  onMarkPaid={hasEditableItems ? handleMarkPaid : undefined}
+                  isMarkingPaid={markInstallmentPaid.isPending || markExpensePaid.isPending}
                 />
               );
             })}
 
-          {!UTILITY_TYPES.includes(type) && type !== 'person' && (
+          {!UTILITY_TYPES.includes(type) && type !== 'person' && type !== 'employee' && (
             <ExpenseAccordion
               title={LABELS[type] ?? type}
               color="text-muted-foreground"
               items={data.details ?? []}
               total={data.total ?? 0}
-              onEdit={type === 'employee' ? () => undefined : setEditTarget}
-              onDelete={type === 'employee' ? () => undefined : setDeleteTarget}
+              onEdit={setEditTarget}
+              onDelete={setDeleteTarget}
+              onMarkPaid={isNonPersonType ? handleMarkPaid : undefined}
+              isMarkingPaid={markInstallmentPaid.isPending || markExpensePaid.isPending}
+              defaultOpen
+            />
+          )}
+
+          {type === 'employee' && (
+            <ExpenseAccordion
+              title={LABELS[type] ?? type}
+              color="text-muted-foreground"
+              items={data.details ?? []}
+              total={data.total ?? 0}
+              onEdit={(item) => {
+                // Find the raw detail data with employee_payment_id
+                const raw = (data.details ?? []).find(
+                  (d) => d.description === item.description
+                ) as unknown as Record<string, unknown> | undefined;
+                if (raw?.employee_payment_id) {
+                  setEmployeeEditTarget(raw);
+                }
+              }}
+              onDelete={() => undefined}
               defaultOpen
             />
           )}
@@ -269,6 +349,7 @@ function ExpenseDetailContent() {
           mode="edit"
           item={editTarget}
           personId={id}
+          detailType={type}
           onClose={() => setEditTarget(null)}
           onSaved={handleSaved}
         />
@@ -278,6 +359,7 @@ function ExpenseDetailContent() {
         <ExpenseEditModal
           mode="create"
           personId={id}
+          detailType={type}
           defaultExpenseDate={getDefaultExpenseDate(year, month)}
           onClose={() => setIsCreating(false)}
           onSaved={handleSaved}
@@ -288,8 +370,23 @@ function ExpenseDetailContent() {
         <ExpenseEditModal
           mode="create"
           personId={id}
+          detailType={type}
           defaultExpenseDate={getDefaultExpenseDate(nextYear, nextMonth)}
           onClose={() => setIsCreatingNextMonth(false)}
+          onSaved={handleSaved}
+        />
+      )}
+
+      {employeeEditTarget !== null && (
+        <EmployeePaymentModal
+          payment={{
+            employee_payment_id: employeeEditTarget.employee_payment_id as number,
+            person_name: employeeEditTarget.person_name as string,
+            base_salary: Number(employeeEditTarget.base_salary ?? 0),
+            variable_amount: Number(employeeEditTarget.variable_amount ?? 0),
+            notes: (employeeEditTarget.notes as string) ?? '',
+          }}
+          onClose={() => setEmployeeEditTarget(null)}
           onSaved={handleSaved}
         />
       )}

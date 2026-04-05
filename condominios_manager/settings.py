@@ -28,12 +28,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = config(
-    "SECRET_KEY", default="django-insecure-b7ya%t^1&z1v#af1mlzjsm*$l9o^zj!h9a3*)tf@2k&z8b*^)h"
-)
+SECRET_KEY = config("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = config("DEBUG", default=True, cast=bool)
+DEBUG = config("DEBUG", default=False, cast=bool)
 
 ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="localhost,127.0.0.1", cast=Csv())
 
@@ -228,6 +226,16 @@ REST_FRAMEWORK = {
     "PAGE_SIZE": config("PAGE_SIZE", default=20, cast=int),
     # OpenAPI/Swagger schema generation (Phase 8)
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "100/hour",
+        "user": "1000/hour",
+        "auth": "10/minute",
+        "verification": "5/minute",
+    },
 }
 
 # DRF-Spectacular Settings (Phase 8: OpenAPI/Swagger Documentation)
@@ -268,8 +276,8 @@ SPECTACULAR_SETTINGS = {
     "COMPONENT_SPLIT_REQUEST": True,
     "SCHEMA_PATH_PREFIX": r"/api/",
     "SERVERS": [
-        {"url": "http://localhost:8000", "description": "Local development server"},
-        {"url": "http://localhost:8000/api", "description": "Local API base"},
+        {"url": "http://localhost:8008", "description": "Local development server"},
+        {"url": "http://localhost:8008/api", "description": "Local API base"},
     ],
     # UI customization
     "SWAGGER_UI_SETTINGS": {
@@ -289,17 +297,14 @@ SPECTACULAR_SETTINGS = {
 # JWT Settings (djangorestframework-simplejwt)
 
 SIMPLE_JWT = {
-    # Token lifetimes - Set to 1 year (365 days) for long-lived sessions
-    # For development/personal use, effectively "never expires"
     "ACCESS_TOKEN_LIFETIME": timedelta(
-        days=config("JWT_ACCESS_TOKEN_LIFETIME_DAYS", default=365, cast=int)
+        minutes=config("JWT_ACCESS_TOKEN_LIFETIME_MINUTES", default=60, cast=int)
     ),
     "REFRESH_TOKEN_LIFETIME": timedelta(
-        days=config("JWT_REFRESH_TOKEN_LIFETIME_DAYS", default=365, cast=int)
+        days=config("JWT_REFRESH_TOKEN_LIFETIME_DAYS", default=7, cast=int)
     ),
-    # Token refresh settings - Disable rotation to prevent token invalidation issues
-    "ROTATE_REFRESH_TOKENS": config("JWT_ROTATE_REFRESH_TOKENS", default=False, cast=bool),
-    "BLACKLIST_AFTER_ROTATION": config("JWT_BLACKLIST_AFTER_ROTATION", default=False, cast=bool),
+    "ROTATE_REFRESH_TOKENS": config("JWT_ROTATE_REFRESH_TOKENS", default=True, cast=bool),
+    "BLACKLIST_AFTER_ROTATION": config("JWT_BLACKLIST_AFTER_ROTATION", default=True, cast=bool),
     # Security settings
     "ALGORITHM": config("JWT_ALGORITHM", default="HS256"),
     "SIGNING_KEY": SECRET_KEY,
@@ -316,6 +321,13 @@ SIMPLE_JWT = {
     "SLIDING_TOKEN_LIFETIME": timedelta(minutes=5),
     "SLIDING_TOKEN_REFRESH_LIFETIME": timedelta(days=1),
 }
+
+# Cookie security (only enforce in non-debug mode)
+if not DEBUG:
+    CSRF_COOKIE_SECURE = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_HTTPONLY = True
 
 # Django-allauth Configuration
 ACCOUNT_AUTHENTICATION_METHOD = "username_email"  # Allow login with username or email
@@ -458,7 +470,7 @@ DEFAULT_TAG_FEE_MULTIPLE = config("DEFAULT_TAG_FEE_MULTIPLE", default=80.00, cas
 LATE_FEE_PERCENTAGE = config("LATE_FEE_PERCENTAGE", default=0.05, cast=float)
 DAYS_PER_MONTH = config("DAYS_PER_MONTH", default=30, cast=int)
 
-# Twilio (WhatsApp)
+# Twilio WhatsApp integration settings
 TWILIO_ACCOUNT_SID = config("TWILIO_ACCOUNT_SID", default="")
 TWILIO_AUTH_TOKEN = config("TWILIO_AUTH_TOKEN", default="")
 TWILIO_WHATSAPP_FROM = config("TWILIO_WHATSAPP_FROM", default="")

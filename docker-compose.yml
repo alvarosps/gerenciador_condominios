@@ -31,8 +31,7 @@ services:
     container_name: condominios_web
     command: >
       sh -c "python manage.py migrate &&
-             python manage.py collectstatic --noinput &&
-             gunicorn --bind 0.0.0.0:8000 --workers 3 --timeout 60 condominios_manager.wsgi:application"
+             gunicorn --bind 0.0.0.0:8008 --workers 3 --timeout 60 condominios_manager.wsgi:application"
     environment:
       - DJANGO_SETTINGS_MODULE=condominios_manager.settings
       - DEBUG=${DEBUG:-False}
@@ -41,8 +40,7 @@ services:
       - DB_PASSWORD=${DB_PASSWORD:-postgres}
       - DB_HOST=db
       - DB_PORT=5432
-      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
-      - CHROME_EXECUTABLE_PATH=/usr/bin/chromium
+      - SECRET_KEY=${SECRET_KEY}
       - REDIS_URL=redis://redis:6379/0
     volumes:
       - ./logs:/app/logs
@@ -50,7 +48,7 @@ services:
       - ./static:/app/static
       - ./media:/app/media
     ports:
-      - "${WEB_PORT:-8000}:8000"
+      - "${WEB_PORT:-8008}:8008"
     depends_on:
       db:
         condition: service_healthy
@@ -60,7 +58,7 @@ services:
       - condominios_network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      test: ["CMD", "curl", "-f", "http://localhost:8008/"]
       interval: 30s
       timeout: 10s
       retries: 3

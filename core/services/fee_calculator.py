@@ -13,6 +13,7 @@ from datetime import date
 from decimal import Decimal
 
 from django.conf import settings
+from django.utils import timezone
 
 _DECEMBER = 12  # Month number for December
 
@@ -39,6 +40,9 @@ class FeeCalculatorService:
             >>> FeeCalculatorService.calculate_daily_rate(Decimal("1500.00"))
             Decimal('50.00')  # 1500 / 30
         """
+        if rental_value < Decimal(0):
+            msg = "rental_value must be non-negative"
+            raise ValueError(msg)
         days_per_month = Decimal(str(settings.DAYS_PER_MONTH))
         return rental_value / days_per_month
 
@@ -72,6 +76,9 @@ class FeeCalculatorService:
             >>> result["late_fee"]
             Decimal('375.00')  # (1500/30) × 5 × 1.05
         """
+        if rental_value < Decimal(0):
+            msg = "rental_value must be non-negative"
+            raise ValueError(msg)
         if current_date.day > due_day:
             late_days = current_date.day - due_day
             daily_rate = FeeCalculatorService.calculate_daily_rate(rental_value)
@@ -129,7 +136,7 @@ class FeeCalculatorService:
             total_due = 1250 + 625 = 1875
         """
         if reference_date is None:
-            reference_date = date.today()
+            reference_date = timezone.now().date()
 
         year, month = reference_date.year, reference_date.month
 

@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '../client';
+import { queryKeys } from '../query-keys';
 
 export interface CashFlowRentDetail {
   apartment_id: number;
@@ -113,7 +114,7 @@ const REFETCH_INTERVAL = 1000 * 60 * 5;
 
 export function useMonthlyCashFlow(year: number, month: number) {
   return useQuery({
-    queryKey: ['cash-flow', 'monthly', year, month],
+    queryKey: queryKeys.cashFlow.monthly(year, month),
     queryFn: async () => {
       const { data } = await apiClient.get<CashFlowMonth>('/cash-flow/monthly/', {
         params: { year, month },
@@ -125,12 +126,25 @@ export function useMonthlyCashFlow(year: number, month: number) {
   });
 }
 
-export function useCashFlowProjection(months?: number) {
+export interface ProjectionOptions {
+  months?: number;
+  fullOccupancyFuture?: boolean;
+  fullOccupancyCurrent?: boolean;
+  extraMonthlyExpenses?: number;
+}
+
+export function useCashFlowProjection(options?: ProjectionOptions) {
+  const params: Record<string, string | number> = {};
+  if (options?.months) params.months = options.months;
+  if (options?.fullOccupancyFuture) params.full_occupancy_future = 'true';
+  if (options?.fullOccupancyCurrent) params.full_occupancy_current = 'true';
+  if (options?.extraMonthlyExpenses) params.extra_monthly_expenses = options.extraMonthlyExpenses;
+
   return useQuery({
-    queryKey: ['cash-flow', 'projection', months],
+    queryKey: queryKeys.cashFlow.projection(params),
     queryFn: async () => {
       const { data } = await apiClient.get<CashFlowProjectionMonth[]>('/cash-flow/projection/', {
-        params: months ? { months } : undefined,
+        params,
       });
       return data;
     },
@@ -141,7 +155,7 @@ export function useCashFlowProjection(months?: number) {
 
 export function usePersonSummary(personId: number, year: number, month: number) {
   return useQuery({
-    queryKey: ['cash-flow', 'person_summary', personId, year, month],
+    queryKey: queryKeys.cashFlow.personSummary(personId, year, month),
     queryFn: async () => {
       const { data } = await apiClient.get<PersonSummary>('/cash-flow/person_summary/', {
         params: { person_id: personId, year, month },

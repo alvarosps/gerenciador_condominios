@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
+import { queryKeys } from '../query-keys';
 import { type Expense, expenseSchema } from '@/lib/schemas/expense.schema';
 import { type PaginatedResponse, extractResults } from '@/lib/types/api';
 
@@ -20,7 +21,7 @@ export function useExpenses(filters?: ExpenseFilters) {
     : {};
 
   return useQuery({
-    queryKey: ['expenses', cleanFilters],
+    queryKey: queryKeys.expenses.list(cleanFilters),
     queryFn: async () => {
       const { data } = await apiClient.get<PaginatedResponse<Expense> | Expense[]>('/expenses/', {
         params: { page_size: 10000, ...cleanFilters },
@@ -33,7 +34,7 @@ export function useExpenses(filters?: ExpenseFilters) {
 
 export function useExpense(id: number | null) {
   return useQuery({
-    queryKey: ['expenses', id],
+    queryKey: id ? queryKeys.expenses.detail(id) : queryKeys.expenses.all,
     queryFn: async () => {
       if (!id) throw new Error('Expense ID is required');
       const { data } = await apiClient.get<Expense>(`/expenses/${id}/`);
@@ -54,9 +55,9 @@ export function useCreateExpense() {
       return response.data;
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['expenses'] });
-      void queryClient.invalidateQueries({ queryKey: ['financial-dashboard'] });
-      void queryClient.invalidateQueries({ queryKey: ['cash-flow'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.expenses.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.financialDashboard.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.cashFlow.all });
     },
   });
 }
@@ -79,10 +80,12 @@ export function useUpdateExpense() {
       return response.data;
     },
     onSuccess: (data) => {
-      void queryClient.invalidateQueries({ queryKey: ['expenses'] });
-      void queryClient.invalidateQueries({ queryKey: ['expenses', data.id] });
-      void queryClient.invalidateQueries({ queryKey: ['financial-dashboard'] });
-      void queryClient.invalidateQueries({ queryKey: ['cash-flow'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.expenses.all });
+      if (data.id !== undefined) {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.expenses.detail(data.id) });
+      }
+      void queryClient.invalidateQueries({ queryKey: queryKeys.financialDashboard.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.cashFlow.all });
     },
   });
 }
@@ -95,9 +98,9 @@ export function useDeleteExpense() {
       await apiClient.delete(`/expenses/${id}/`);
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['expenses'] });
-      void queryClient.invalidateQueries({ queryKey: ['financial-dashboard'] });
-      void queryClient.invalidateQueries({ queryKey: ['cash-flow'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.expenses.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.financialDashboard.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.cashFlow.all });
     },
   });
 }
@@ -111,9 +114,9 @@ export function useMarkExpensePaid() {
       return data;
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['expenses'] });
-      void queryClient.invalidateQueries({ queryKey: ['financial-dashboard'] });
-      void queryClient.invalidateQueries({ queryKey: ['cash-flow'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.expenses.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.financialDashboard.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.cashFlow.all });
     },
   });
 }
@@ -129,10 +132,10 @@ export function useGenerateInstallments() {
       return data;
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['expenses'] });
-      void queryClient.invalidateQueries({ queryKey: ['expense-installments'] });
-      void queryClient.invalidateQueries({ queryKey: ['financial-dashboard'] });
-      void queryClient.invalidateQueries({ queryKey: ['cash-flow'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.expenses.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.expenseInstallments.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.financialDashboard.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.cashFlow.all });
     },
   });
 }

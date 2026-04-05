@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
+import { queryKeys } from '../query-keys';
 import { type Tenant, tenantSchema } from '@/lib/schemas/tenant.schema';
 import { type PaginatedResponse, extractResults } from '@/lib/types/api';
 
@@ -18,7 +19,7 @@ export function useTenants(filters?: {
     : {};
 
   return useQuery({
-    queryKey: ['tenants', cleanFilters],
+    queryKey: queryKeys.tenants.list(cleanFilters),
     queryFn: async () => {
       const { data } = await apiClient.get<PaginatedResponse<Tenant> | Tenant[]>('/tenants/', {
         params: { ...cleanFilters, page_size: 10000 },
@@ -36,7 +37,7 @@ export function useTenants(filters?: {
  */
 export function useTenant(id: number | null) {
   return useQuery({
-    queryKey: ['tenants', id],
+    queryKey: id ? queryKeys.tenants.detail(id) : queryKeys.tenants.all,
     queryFn: async () => {
       if (!id) throw new Error('Tenant ID is required');
       const { data } = await apiClient.get<Tenant>(`/tenants/${id}/`);
@@ -59,8 +60,8 @@ export function useCreateTenant() {
       return response.data;
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['tenants'] });
-      void queryClient.invalidateQueries({ queryKey: ['leases'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.tenants.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.leases.all });
     },
   });
 }
@@ -85,9 +86,11 @@ export function useUpdateTenant() {
       return response.data;
     },
     onSuccess: (data) => {
-      void queryClient.invalidateQueries({ queryKey: ['tenants'] });
-      void queryClient.invalidateQueries({ queryKey: ['tenants', data.id] });
-      void queryClient.invalidateQueries({ queryKey: ['leases'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.tenants.all });
+      if (data.id !== undefined) {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.tenants.detail(data.id) });
+      }
+      void queryClient.invalidateQueries({ queryKey: queryKeys.leases.all });
     },
   });
 }
@@ -103,8 +106,8 @@ export function useDeleteTenant() {
       await apiClient.delete(`/tenants/${id}/`);
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['tenants'] });
-      void queryClient.invalidateQueries({ queryKey: ['leases'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.tenants.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.leases.all });
     },
   });
 }

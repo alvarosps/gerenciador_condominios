@@ -25,7 +25,7 @@ function getContractPdfUrl(lease: Lease): string | null {
   const leaseId = lease.id;
   if (!buildingNumber || !aptNumber || !leaseId) return null;
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000/api';
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8008/api';
   const baseUrl = apiUrl.replace(/\/api\/?$/, '');
   return `${baseUrl}/contracts/${String(buildingNumber)}/contract_apto_${String(aptNumber)}_${String(leaseId)}.pdf`;
 }

@@ -5,28 +5,28 @@
  * They simulate the Django REST Framework API endpoints.
  */
 
-import { http, HttpResponse, delay } from 'msw';
 import type { Expense } from '@/lib/schemas/expense.schema';
+import { delay, http, HttpResponse } from 'msw';
 import {
-  mockBuildings,
-  mockFurniture,
-  mockApartments,
-  mockTenants,
-  mockLeases,
-  mockPersons,
-  mockExpenses,
-  mockPersonPayments,
-  createMockBuilding,
-  createMockFurniture,
   createMockApartment,
-  createMockTenant,
+  createMockBuilding,
+  createMockExpense,
+  createMockFurniture,
   createMockLease,
   createMockPerson,
-  createMockExpense,
   createMockPersonPayment,
+  createMockTenant,
+  mockApartments,
+  mockBuildings,
+  mockExpenses,
+  mockFurniture,
+  mockLeases,
+  mockPersonPayments,
+  mockPersons,
+  mockTenants,
 } from './data';
 
-const API_BASE = 'http://localhost:8000/api';
+const API_BASE = 'http://localhost:8008/api';
 
 // Mutable copies for CRUD operations during tests
 let buildings = [...mockBuildings];
@@ -430,16 +430,19 @@ const authHandlers = [
     if (data.password !== data.password2) {
       return HttpResponse.json({ detail: 'Passwords do not match' }, { status: 400 });
     }
-    return HttpResponse.json({
-      access: 'mock-access-token-12345',
-      refresh: 'mock-refresh-token-67890',
-      user: {
-        id: 2,
-        email: data.email,
-        first_name: data.first_name,
-        last_name: data.last_name,
+    return HttpResponse.json(
+      {
+        access: 'mock-access-token-12345',
+        refresh: 'mock-refresh-token-67890',
+        user: {
+          id: 2,
+          email: data.email,
+          first_name: data.first_name,
+          last_name: data.last_name,
+        },
       },
-    }, { status: 201 });
+      { status: 201 }
+    );
   }),
 
   // Refresh token
@@ -535,7 +538,7 @@ const dashboardHandlers = [
         total_apartments: 10,
         rented_apartments: 8,
         occupancy_rate: 80.0,
-        total_revenue: 8000.0 + index * 1000,
+        total_revenue: 8008.0 + index * 1000,
       }))
     );
   }),
@@ -595,7 +598,9 @@ const personHandlers = [
   http.post(`${API_BASE}/persons/`, async ({ request }) => {
     await delay(100);
     const data = (await request.json()) as Record<string, unknown>;
-    const newPerson = createMockPerson({ ...data, id: persons.length + 1 } as Partial<(typeof persons)[0]>);
+    const newPerson = createMockPerson({ ...data, id: persons.length + 1 } as Partial<
+      (typeof persons)[0]
+    >);
     persons.push(newPerson);
     return HttpResponse.json(newPerson, { status: 201 });
   }),
@@ -646,7 +651,9 @@ const expenseHandlers = [
   http.post(`${API_BASE}/expenses/`, async ({ request }) => {
     await delay(100);
     const data = (await request.json()) as Record<string, unknown>;
-    const newExpense = createMockExpense({ ...data, id: expenses.length + 1 } as Partial<(typeof expenses)[0]>);
+    const newExpense = createMockExpense({ ...data, id: expenses.length + 1 } as Partial<
+      (typeof expenses)[0]
+    >);
     expenses.push(newExpense);
     return HttpResponse.json(newExpense, { status: 201 });
   }),
@@ -753,8 +760,26 @@ const financialDashboardHandlers = [
   http.get(`${API_BASE}/financial-dashboard/debt_by_person/`, async () => {
     await delay(50);
     return HttpResponse.json([
-      { person_id: 1, person_name: 'Rodrigo Souza', card_debt: 1000.0, loan_debt: 500.0, total_debt: 1500.0, monthly_card: 200.0, monthly_loan: 100.0, cards_count: 2 },
-      { person_id: 3, person_name: 'Alvaro Souza', card_debt: 800.0, loan_debt: 0, total_debt: 800.0, monthly_card: 150.0, monthly_loan: 0, cards_count: 3 },
+      {
+        person_id: 1,
+        person_name: 'Rodrigo Souza',
+        card_debt: 1000.0,
+        loan_debt: 500.0,
+        total_debt: 1500.0,
+        monthly_card: 200.0,
+        monthly_loan: 100.0,
+        cards_count: 2,
+      },
+      {
+        person_id: 3,
+        person_name: 'Alvaro Souza',
+        card_debt: 800.0,
+        loan_debt: 0,
+        total_debt: 800.0,
+        monthly_card: 150.0,
+        monthly_loan: 0,
+        cards_count: 3,
+      },
     ]);
   }),
 
@@ -797,9 +822,30 @@ const financialDashboardHandlers = [
   http.get(`${API_BASE}/financial-dashboard/category_breakdown/`, async () => {
     await delay(50);
     return HttpResponse.json([
-      { category_id: 1, category_name: 'Pessoal', color: '#3b82f6', total: 2500.0, percentage: 48.1, count: 5 },
-      { category_id: 2, category_name: 'Kitnets', color: '#10b981', total: 1700.0, percentage: 32.7, count: 3 },
-      { category_id: 3, category_name: 'Carros', color: '#f59e0b', total: 1000.0, percentage: 19.2, count: 2 },
+      {
+        category_id: 1,
+        category_name: 'Pessoal',
+        color: '#3b82f6',
+        total: 2500.0,
+        percentage: 48.1,
+        count: 5,
+      },
+      {
+        category_id: 2,
+        category_name: 'Kitnets',
+        color: '#10b981',
+        total: 1700.0,
+        percentage: 32.7,
+        count: 3,
+      },
+      {
+        category_id: 3,
+        category_name: 'Carros',
+        color: '#f59e0b',
+        total: 1000.0,
+        percentage: 19.2,
+        count: 2,
+      },
     ]);
   }),
 
@@ -869,7 +915,15 @@ const cashFlowHandlers = [
       income: {
         rent_income: 10000.0,
         rent_details: [
-          { apartment_id: 1, apartment_number: '101', building_name: '836', tenant_name: 'João Silva', rental_value: 1300.0, is_paid: true, payment_date: '2026-03-05' },
+          {
+            apartment_id: 1,
+            apartment_number: '101',
+            building_name: '836',
+            tenant_name: 'João Silva',
+            rental_value: 1300.0,
+            is_paid: true,
+            payment_date: '2026-03-05',
+          },
         ],
         extra_income: 2000.0,
         extra_income_details: [],
@@ -895,9 +949,33 @@ const cashFlowHandlers = [
   http.get(`${API_BASE}/cash-flow/projection/`, async () => {
     await delay(50);
     return HttpResponse.json([
-      { year: 2026, month: 3, income_total: 12000.0, expenses_total: 5200.0, balance: 6800.0, cumulative_balance: 16800.0, is_projected: false },
-      { year: 2026, month: 4, income_total: 12000.0, expenses_total: 5100.0, balance: 6900.0, cumulative_balance: 23700.0, is_projected: true },
-      { year: 2026, month: 5, income_total: 12000.0, expenses_total: 5000.0, balance: 7000.0, cumulative_balance: 30700.0, is_projected: true },
+      {
+        year: 2026,
+        month: 3,
+        income_total: 12000.0,
+        expenses_total: 5200.0,
+        balance: 6800.0,
+        cumulative_balance: 16800.0,
+        is_projected: false,
+      },
+      {
+        year: 2026,
+        month: 4,
+        income_total: 12000.0,
+        expenses_total: 5100.0,
+        balance: 6900.0,
+        cumulative_balance: 23700.0,
+        is_projected: true,
+      },
+      {
+        year: 2026,
+        month: 5,
+        income_total: 12000.0,
+        expenses_total: 5000.0,
+        balance: 7000.0,
+        cumulative_balance: 30700.0,
+        is_projected: true,
+      },
     ]);
   }),
 
@@ -907,13 +985,30 @@ const cashFlowHandlers = [
       person_id: 1,
       person_name: 'Rodrigo Souza',
       receives: 1100.0,
-      receives_details: [{ description: 'Estipêndio fixo', amount: 1100.0, source: 'fixed_stipend' }],
+      receives_details: [
+        { description: 'Estipêndio fixo', amount: 1100.0, source: 'fixed_stipend' },
+      ],
       card_total: 300.0,
-      card_details: [{ description: 'Supermercado', card_name: 'Trigg', installment: '2/3', amount: 150.0, due_date: '2026-03-10' }],
+      card_details: [
+        {
+          description: 'Supermercado',
+          card_name: 'Trigg',
+          installment: '2/3',
+          amount: 150.0,
+          due_date: '2026-03-10',
+        },
+      ],
       loan_total: 0,
       loan_details: [],
       offset_total: 100.0,
-      offset_details: [{ description: 'Presente sogra', installment: '1/2', amount: 100.0, due_date: '2026-03-15' }],
+      offset_details: [
+        {
+          description: 'Presente sogra',
+          installment: '1/2',
+          amount: 100.0,
+          due_date: '2026-03-15',
+        },
+      ],
       fixed_total: 0,
       fixed_details: [],
       net_amount: 900.0,
@@ -929,7 +1024,7 @@ const cashFlowHandlers = [
       year: 2026,
       month: 4,
       income_total: 12000.0,
-      expenses_total: 8000.0,
+      expenses_total: 8008.0,
       balance: 4000.0,
       cumulative_balance: 4000.0,
       is_projected: true,
@@ -977,7 +1072,16 @@ const incomeHandlers = [
         description: 'Aluguel extra escritório',
         amount: 2000,
         income_date: '2026-03-01',
-        person: { id: 3, name: 'Alvaro Souza', relationship: 'Proprietário', phone: '', email: '', is_owner: true, is_employee: false, notes: '' },
+        person: {
+          id: 3,
+          name: 'Alvaro Souza',
+          relationship: 'Proprietário',
+          phone: '',
+          email: '',
+          is_owner: true,
+          is_employee: false,
+          notes: '',
+        },
         person_id: 3,
         building: null,
         building_id: null,
@@ -1008,7 +1112,16 @@ const employeePaymentHandlers = [
     return HttpResponse.json([
       {
         id: 1,
-        person: { id: 2, name: 'Maria Funcionária', relationship: 'Funcionária', phone: '', email: '', is_owner: false, is_employee: true, notes: '' },
+        person: {
+          id: 2,
+          name: 'Maria Funcionária',
+          relationship: 'Funcionária',
+          phone: '',
+          email: '',
+          is_owner: false,
+          is_employee: true,
+          notes: '',
+        },
         person_id: 2,
         reference_month: '2026-03-01',
         base_salary: 1320,
@@ -1029,7 +1142,16 @@ const employeePaymentHandlers = [
     const id = Number(params.id);
     return HttpResponse.json({
       id,
-      person: { id: 2, name: 'Maria Funcionária', relationship: 'Funcionária', phone: '', email: '', is_owner: false, is_employee: true, notes: '' },
+      person: {
+        id: 2,
+        name: 'Maria Funcionária',
+        relationship: 'Funcionária',
+        phone: '',
+        email: '',
+        is_owner: false,
+        is_employee: true,
+        notes: '',
+      },
       person_id: 2,
       reference_month: '2026-03-01',
       base_salary: 1320,
@@ -1056,7 +1178,10 @@ const personPaymentHandlers = [
   http.post(`${API_BASE}/person-payments/`, async ({ request }) => {
     await delay(100);
     const data = (await request.json()) as Record<string, unknown>;
-    const newPayment = createMockPersonPayment({ ...data, id: personPayments.length + 1 } as Partial<(typeof personPayments)[0]>);
+    const newPayment = createMockPersonPayment({
+      ...data,
+      id: personPayments.length + 1,
+    } as Partial<(typeof personPayments)[0]>);
     personPayments.push(newPayment);
     return HttpResponse.json(newPayment, { status: 201 });
   }),
@@ -1093,9 +1218,30 @@ const contractRuleHandlers = [
     const url = new URL(request.url);
     const activeOnly = url.searchParams.get('is_active');
     const mockRules = [
-      { id: 1, content: 'O inquilino deve pagar até o dia 5.', order: 1, is_active: true, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' },
-      { id: 2, content: 'É proibido animais sem autorização.', order: 2, is_active: true, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' },
-      { id: 3, content: 'Regra inativa para testes.', order: 3, is_active: false, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' },
+      {
+        id: 1,
+        content: 'O inquilino deve pagar até o dia 5.',
+        order: 1,
+        is_active: true,
+        created_at: '2026-01-01T00:00:00Z',
+        updated_at: '2026-01-01T00:00:00Z',
+      },
+      {
+        id: 2,
+        content: 'É proibido animais sem autorização.',
+        order: 2,
+        is_active: true,
+        created_at: '2026-01-01T00:00:00Z',
+        updated_at: '2026-01-01T00:00:00Z',
+      },
+      {
+        id: 3,
+        content: 'Regra inativa para testes.',
+        order: 3,
+        is_active: false,
+        created_at: '2026-01-01T00:00:00Z',
+        updated_at: '2026-01-01T00:00:00Z',
+      },
     ];
     if (activeOnly === 'true') {
       return HttpResponse.json(mockRules.filter((r) => r.is_active));
@@ -1106,7 +1252,14 @@ const contractRuleHandlers = [
   http.get(`${API_BASE}/rules/:id/`, ({ params }) => {
     const id = Number(params.id);
     const mockRules = [
-      { id: 1, content: 'O inquilino deve pagar até o dia 5.', order: 1, is_active: true, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' },
+      {
+        id: 1,
+        content: 'O inquilino deve pagar até o dia 5.',
+        order: 1,
+        is_active: true,
+        created_at: '2026-01-01T00:00:00Z',
+        updated_at: '2026-01-01T00:00:00Z',
+      },
     ];
     const rule = mockRules.find((r) => r.id === id);
     if (!rule) return new HttpResponse(null, { status: 404 });
@@ -1116,14 +1269,32 @@ const contractRuleHandlers = [
   http.post(`${API_BASE}/rules/`, async ({ request }) => {
     await delay(100);
     const data = (await request.json()) as Record<string, unknown>;
-    return HttpResponse.json({ id: 10, order: 10, is_active: true, ...data, created_at: '2026-03-24T00:00:00Z', updated_at: '2026-03-24T00:00:00Z' }, { status: 201 });
+    return HttpResponse.json(
+      {
+        id: 10,
+        order: 10,
+        is_active: true,
+        ...data,
+        created_at: '2026-03-24T00:00:00Z',
+        updated_at: '2026-03-24T00:00:00Z',
+      },
+      { status: 201 }
+    );
   }),
 
   http.patch(`${API_BASE}/rules/:id/`, async ({ params, request }) => {
     await delay(100);
     const id = Number(params.id);
     const data = (await request.json()) as Record<string, unknown>;
-    return HttpResponse.json({ id, content: 'Default content', order: 1, is_active: true, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-03-24T00:00:00Z', ...data });
+    return HttpResponse.json({
+      id,
+      content: 'Default content',
+      order: 1,
+      is_active: true,
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-03-24T00:00:00Z',
+      ...data,
+    });
   }),
 
   http.delete(`${API_BASE}/rules/:id/`, ({ params }) => {
@@ -1145,15 +1316,75 @@ const contractRuleHandlers = [
 const creditCardHandlers = [
   http.get(`${API_BASE}/credit-cards/`, () => {
     return HttpResponse.json([
-      { id: 1, person: { id: 1, name: 'Rodrigo Souza', relationship: 'Filho', phone: '', email: '', is_owner: false, is_employee: false, notes: '' }, person_id: 1, nickname: 'Nubank Rodrigo', last_four_digits: '1234', closing_day: 10, due_day: 17, is_active: true, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' },
-      { id: 2, person: { id: 3, name: 'Alvaro Souza', relationship: 'Proprietário', phone: '', email: '', is_owner: true, is_employee: false, notes: '' }, person_id: 3, nickname: 'Trigg', last_four_digits: '5678', closing_day: 5, due_day: 12, is_active: true, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' },
+      {
+        id: 1,
+        person: {
+          id: 1,
+          name: 'Rodrigo Souza',
+          relationship: 'Filho',
+          phone: '',
+          email: '',
+          is_owner: false,
+          is_employee: false,
+          notes: '',
+        },
+        person_id: 1,
+        nickname: 'Nubank Rodrigo',
+        last_four_digits: '1234',
+        closing_day: 10,
+        due_day: 17,
+        is_active: true,
+        created_at: '2026-01-01T00:00:00Z',
+        updated_at: '2026-01-01T00:00:00Z',
+      },
+      {
+        id: 2,
+        person: {
+          id: 3,
+          name: 'Alvaro Souza',
+          relationship: 'Proprietário',
+          phone: '',
+          email: '',
+          is_owner: true,
+          is_employee: false,
+          notes: '',
+        },
+        person_id: 3,
+        nickname: 'Trigg',
+        last_four_digits: '5678',
+        closing_day: 5,
+        due_day: 12,
+        is_active: true,
+        created_at: '2026-01-01T00:00:00Z',
+        updated_at: '2026-01-01T00:00:00Z',
+      },
     ]);
   }),
 
   http.get(`${API_BASE}/credit-cards/:id/`, ({ params }) => {
     const id = Number(params.id);
     const cards = [
-      { id: 1, person: { id: 1, name: 'Rodrigo Souza', relationship: 'Filho', phone: '', email: '', is_owner: false, is_employee: false, notes: '' }, person_id: 1, nickname: 'Nubank Rodrigo', last_four_digits: '1234', closing_day: 10, due_day: 17, is_active: true, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' },
+      {
+        id: 1,
+        person: {
+          id: 1,
+          name: 'Rodrigo Souza',
+          relationship: 'Filho',
+          phone: '',
+          email: '',
+          is_owner: false,
+          is_employee: false,
+          notes: '',
+        },
+        person_id: 1,
+        nickname: 'Nubank Rodrigo',
+        last_four_digits: '1234',
+        closing_day: 10,
+        due_day: 17,
+        is_active: true,
+        created_at: '2026-01-01T00:00:00Z',
+        updated_at: '2026-01-01T00:00:00Z',
+      },
     ];
     const card = cards.find((c) => c.id === id);
     if (!card) return new HttpResponse(null, { status: 404 });
@@ -1163,14 +1394,24 @@ const creditCardHandlers = [
   http.post(`${API_BASE}/credit-cards/`, async ({ request }) => {
     await delay(100);
     const data = (await request.json()) as Record<string, unknown>;
-    return HttpResponse.json({ id: 10, ...data, created_at: '2026-03-24T00:00:00Z', updated_at: '2026-03-24T00:00:00Z' }, { status: 201 });
+    return HttpResponse.json(
+      { id: 10, ...data, created_at: '2026-03-24T00:00:00Z', updated_at: '2026-03-24T00:00:00Z' },
+      { status: 201 }
+    );
   }),
 
   http.put(`${API_BASE}/credit-cards/:id/`, async ({ params, request }) => {
     await delay(100);
     const id = Number(params.id);
     const data = (await request.json()) as Record<string, unknown>;
-    return HttpResponse.json({ id, nickname: 'Default', closing_day: 10, due_day: 17, is_active: true, ...data });
+    return HttpResponse.json({
+      id,
+      nickname: 'Default',
+      closing_day: 10,
+      due_day: 17,
+      is_active: true,
+      ...data,
+    });
   }),
 
   http.delete(`${API_BASE}/credit-cards/:id/`, ({ params }) => {
@@ -1189,8 +1430,26 @@ const dailyControlHandlers = [
       {
         date: '2026-03-01',
         day_of_week: 'Domingo',
-        entries: [{ type: 'rent', description: 'Aluguel Apto 101', amount: 1300, expected: true, paid: true, payment_date: '2026-03-01' }],
-        exits: [{ type: 'fixed_expense', id: 1, description: 'Internet', amount: 120, due: false, paid: false }],
+        entries: [
+          {
+            type: 'rent',
+            description: 'Aluguel Apto 101',
+            amount: 1300,
+            expected: true,
+            paid: true,
+            payment_date: '2026-03-01',
+          },
+        ],
+        exits: [
+          {
+            type: 'fixed_expense',
+            id: 1,
+            description: 'Internet',
+            amount: 120,
+            due: false,
+            paid: false,
+          },
+        ],
         total_entries: 1300,
         total_exits: 120,
         day_balance: 1180,
@@ -1216,7 +1475,11 @@ const dailyControlHandlers = [
 
   http.post(`${API_BASE}/daily-control/mark_paid/`, async ({ request }) => {
     await delay(100);
-    const data = (await request.json()) as { item_type: string; item_id: number; payment_date: string };
+    const data = (await request.json()) as {
+      item_type: string;
+      item_id: number;
+      payment_date: string;
+    };
     return HttpResponse.json({ success: true, item_type: data.item_type, item_id: data.item_id });
   }),
 ];
@@ -1230,7 +1493,16 @@ const employeePaymentExtendedHandlers = [
     if (id === 9999) return new HttpResponse(null, { status: 404 });
     return HttpResponse.json({
       id,
-      person: { id: 2, name: 'Maria Funcionária', relationship: 'Funcionária', phone: '', email: '', is_owner: false, is_employee: true, notes: '' },
+      person: {
+        id: 2,
+        name: 'Maria Funcionária',
+        relationship: 'Funcionária',
+        phone: '',
+        email: '',
+        is_owner: false,
+        is_employee: true,
+        notes: '',
+      },
       person_id: 2,
       reference_month: '2026-03-01',
       base_salary: 1320,
@@ -1249,14 +1521,32 @@ const employeePaymentExtendedHandlers = [
   http.post(`${API_BASE}/employee-payments/`, async ({ request }) => {
     await delay(100);
     const data = (await request.json()) as Record<string, unknown>;
-    return HttpResponse.json({ id: 10, ...data, total_paid: 0, created_at: '2026-03-24T00:00:00Z', updated_at: '2026-03-24T00:00:00Z' }, { status: 201 });
+    return HttpResponse.json(
+      {
+        id: 10,
+        ...data,
+        total_paid: 0,
+        created_at: '2026-03-24T00:00:00Z',
+        updated_at: '2026-03-24T00:00:00Z',
+      },
+      { status: 201 }
+    );
   }),
 
   http.put(`${API_BASE}/employee-payments/:id/`, async ({ params, request }) => {
     await delay(100);
     const id = Number(params.id);
     const data = (await request.json()) as Record<string, unknown>;
-    return HttpResponse.json({ id, base_salary: 1320, variable_amount: 0, rent_offset: 0, cleaning_count: 10, is_paid: false, reference_month: '2026-03-01', ...data });
+    return HttpResponse.json({
+      id,
+      base_salary: 1320,
+      variable_amount: 0,
+      rent_offset: 0,
+      cleaning_count: 10,
+      is_paid: false,
+      reference_month: '2026-03-01',
+      ...data,
+    });
   }),
 
   http.delete(`${API_BASE}/employee-payments/:id/`, ({ params }) => {
@@ -1272,21 +1562,68 @@ const employeePaymentExtendedHandlers = [
 const expenseCategoryHandlers = [
   http.get(`${API_BASE}/expense-categories/`, () => {
     return HttpResponse.json([
-      { id: 1, name: 'Pessoal', description: 'Gastos pessoais', color: '#3b82f6', parent: null, parent_id: null, subcategories: [{ id: 4, name: 'Cartão', description: '', color: '#6B7280', parent: 1, parent_id: 1, subcategories: [] }], created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' },
-      { id: 2, name: 'Kitnets', description: 'Gastos das kitnets', color: '#10b981', parent: null, parent_id: null, subcategories: [], created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' },
+      {
+        id: 1,
+        name: 'Pessoal',
+        description: 'Gastos pessoais',
+        color: '#3b82f6',
+        parent: null,
+        parent_id: null,
+        subcategories: [
+          {
+            id: 4,
+            name: 'Cartão',
+            description: '',
+            color: '#6B7280',
+            parent: 1,
+            parent_id: 1,
+            subcategories: [],
+          },
+        ],
+        created_at: '2026-01-01T00:00:00Z',
+        updated_at: '2026-01-01T00:00:00Z',
+      },
+      {
+        id: 2,
+        name: 'Kitnets',
+        description: 'Gastos das kitnets',
+        color: '#10b981',
+        parent: null,
+        parent_id: null,
+        subcategories: [],
+        created_at: '2026-01-01T00:00:00Z',
+        updated_at: '2026-01-01T00:00:00Z',
+      },
     ]);
   }),
 
   http.get(`${API_BASE}/expense-categories/:id/`, ({ params }) => {
     const id = Number(params.id);
     if (id === 9999) return new HttpResponse(null, { status: 404 });
-    return HttpResponse.json({ id, name: 'Pessoal', description: 'Gastos pessoais', color: '#3b82f6', parent: null, parent_id: null, subcategories: [] });
+    return HttpResponse.json({
+      id,
+      name: 'Pessoal',
+      description: 'Gastos pessoais',
+      color: '#3b82f6',
+      parent: null,
+      parent_id: null,
+      subcategories: [],
+    });
   }),
 
   http.post(`${API_BASE}/expense-categories/`, async ({ request }) => {
     await delay(100);
     const data = (await request.json()) as Record<string, unknown>;
-    return HttpResponse.json({ id: 10, ...data, subcategories: [], created_at: '2026-03-24T00:00:00Z', updated_at: '2026-03-24T00:00:00Z' }, { status: 201 });
+    return HttpResponse.json(
+      {
+        id: 10,
+        ...data,
+        subcategories: [],
+        created_at: '2026-03-24T00:00:00Z',
+        updated_at: '2026-03-24T00:00:00Z',
+      },
+      { status: 201 }
+    );
   }),
 
   http.put(`${API_BASE}/expense-categories/:id/`, async ({ params, request }) => {
@@ -1316,7 +1653,16 @@ const incomeExtendedHandlers = [
       description: 'Aluguel extra escritório',
       amount: 2000,
       income_date: '2026-03-01',
-      person: { id: 3, name: 'Alvaro Souza', relationship: 'Proprietário', phone: '', email: '', is_owner: true, is_employee: false, notes: '' },
+      person: {
+        id: 3,
+        name: 'Alvaro Souza',
+        relationship: 'Proprietário',
+        phone: '',
+        email: '',
+        is_owner: true,
+        is_employee: false,
+        notes: '',
+      },
       person_id: 3,
       building: null,
       building_id: null,
@@ -1335,7 +1681,10 @@ const incomeExtendedHandlers = [
   http.post(`${API_BASE}/incomes/`, async ({ request }) => {
     await delay(100);
     const data = (await request.json()) as Record<string, unknown>;
-    return HttpResponse.json({ id: 10, ...data, created_at: '2026-03-24T00:00:00Z', updated_at: '2026-03-24T00:00:00Z' }, { status: 201 });
+    return HttpResponse.json(
+      { id: 10, ...data, created_at: '2026-03-24T00:00:00Z', updated_at: '2026-03-24T00:00:00Z' },
+      { status: 201 }
+    );
   }),
 
   http.put(`${API_BASE}/incomes/:id/`, async ({ params, request }) => {
@@ -1343,7 +1692,16 @@ const incomeExtendedHandlers = [
     const id = Number(params.id);
     const data = (await request.json()) as Record<string, unknown>;
     if (id === 9999) return new HttpResponse(null, { status: 404 });
-    return HttpResponse.json({ id, description: 'Default', amount: 1000, income_date: '2026-03-01', is_received: false, is_recurring: false, notes: '', ...data });
+    return HttpResponse.json({
+      id,
+      description: 'Default',
+      amount: 1000,
+      income_date: '2026-03-01',
+      is_received: false,
+      is_recurring: false,
+      notes: '',
+      ...data,
+    });
   }),
 
   http.delete(`${API_BASE}/incomes/:id/`, ({ params }) => {
@@ -1371,7 +1729,14 @@ const financialSettingsHandlers = [
   http.put(`${API_BASE}/financial-settings/current/`, async ({ request }) => {
     await delay(100);
     const data = (await request.json()) as Record<string, unknown>;
-    return HttpResponse.json({ id: 1, initial_balance: 10000, initial_balance_date: '2026-01-01', notes: '', ...data, updated_at: '2026-03-24T00:00:00Z' });
+    return HttpResponse.json({
+      id: 1,
+      initial_balance: 10000,
+      initial_balance_date: '2026-01-01',
+      notes: '',
+      ...data,
+      updated_at: '2026-03-24T00:00:00Z',
+    });
   }),
 ];
 
@@ -1436,7 +1801,19 @@ const rentPaymentHandlers = [
     return HttpResponse.json([
       {
         id: 1,
-        lease: { id: 1, apartment_id: 1, responsible_tenant_id: 1, start_date: '2024-01-01', validity_months: 12, tag_fee: 50, deposit_amount: null, cleaning_fee_paid: true, tag_deposit_paid: true, contract_generated: true, pdf_path: null },
+        lease: {
+          id: 1,
+          apartment_id: 1,
+          responsible_tenant_id: 1,
+          start_date: '2024-01-01',
+          validity_months: 12,
+          tag_fee: 50,
+          deposit_amount: null,
+          cleaning_fee_paid: true,
+          tag_deposit_paid: true,
+          contract_generated: true,
+          pdf_path: null,
+        },
         lease_id: 1,
         reference_month: '2026-03-01',
         amount_paid: 1300,
@@ -1453,7 +1830,19 @@ const rentPaymentHandlers = [
     if (id === 9999) return new HttpResponse(null, { status: 404 });
     return HttpResponse.json({
       id,
-      lease: { id: 1, apartment_id: 1, responsible_tenant_id: 1, start_date: '2024-01-01', validity_months: 12, tag_fee: 50, deposit_amount: null, cleaning_fee_paid: true, tag_deposit_paid: true, contract_generated: true, pdf_path: null },
+      lease: {
+        id: 1,
+        apartment_id: 1,
+        responsible_tenant_id: 1,
+        start_date: '2024-01-01',
+        validity_months: 12,
+        tag_fee: 50,
+        deposit_amount: null,
+        cleaning_fee_paid: true,
+        tag_deposit_paid: true,
+        contract_generated: true,
+        pdf_path: null,
+      },
       lease_id: 1,
       reference_month: '2026-03-01',
       amount_paid: 1300,
@@ -1467,7 +1856,10 @@ const rentPaymentHandlers = [
   http.post(`${API_BASE}/rent-payments/`, async ({ request }) => {
     await delay(100);
     const data = (await request.json()) as Record<string, unknown>;
-    return HttpResponse.json({ id: 10, ...data, created_at: '2026-03-24T00:00:00Z', updated_at: '2026-03-24T00:00:00Z' }, { status: 201 });
+    return HttpResponse.json(
+      { id: 10, ...data, created_at: '2026-03-24T00:00:00Z', updated_at: '2026-03-24T00:00:00Z' },
+      { status: 201 }
+    );
   }),
 
   http.put(`${API_BASE}/rent-payments/:id/`, async ({ params, request }) => {
@@ -1475,7 +1867,14 @@ const rentPaymentHandlers = [
     const id = Number(params.id);
     const data = (await request.json()) as Record<string, unknown>;
     if (id === 9999) return new HttpResponse(null, { status: 404 });
-    return HttpResponse.json({ id, reference_month: '2026-03-01', amount_paid: 1300, payment_date: '2026-03-05', notes: '', ...data });
+    return HttpResponse.json({
+      id,
+      reference_month: '2026-03-01',
+      amount_paid: 1300,
+      payment_date: '2026-03-05',
+      notes: '',
+      ...data,
+    });
   }),
 
   http.delete(`${API_BASE}/rent-payments/:id/`, ({ params }) => {
@@ -1494,7 +1893,16 @@ const personIncomeHandlers = [
     return HttpResponse.json([
       {
         id: 1,
-        person: { id: 1, name: 'Rodrigo Souza', relationship: 'Filho', phone: '', email: '', is_owner: false, is_employee: false, notes: '' },
+        person: {
+          id: 1,
+          name: 'Rodrigo Souza',
+          relationship: 'Filho',
+          phone: '',
+          email: '',
+          is_owner: false,
+          is_employee: false,
+          notes: '',
+        },
         person_id: 1,
         income_type: 'fixed_stipend',
         apartment: null,

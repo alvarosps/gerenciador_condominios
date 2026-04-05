@@ -31,7 +31,7 @@ class AdminNotificationViewSet(ViewSet):
         return paginator.get_paginated_response(serializer.data)
 
     @action(detail=True, methods=["patch"], url_path="read")
-    def mark_read(self, request: Request, pk: int = None) -> Response:
+    def mark_read(self, request: Request, pk: int | None = None) -> Response:
         try:
             notif = Notification.objects.get(pk=pk, recipient=request.user)
         except Notification.DoesNotExist:

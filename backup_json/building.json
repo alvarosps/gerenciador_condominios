@@ -1,0 +1,86 @@
+[
+{
+  "model": "core.building",
+  "pk": 1,
+  "fields": {
+    "created_at": "2025-12-21T16:19:51.387Z",
+    "updated_at": "2025-12-21T16:19:51.439Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "street_number": 836,
+    "name": "Condomínio Steinmetz",
+    "address": "Av. Circular 836"
+  }
+},
+{
+  "model": "core.building",
+  "pk": 2,
+  "fields": {
+    "created_at": "2025-12-21T16:19:51.387Z",
+    "updated_at": "2025-12-21T16:19:51.439Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "street_number": 850,
+    "name": "Condomínio Bielavicius",
+    "address": "Av. Circular 850"
+  }
+},
+{
+  "model": "core.building",
+  "pk": 3,
+  "fields": {
+    "created_at": "2026-03-26T16:44:22.338Z",
+    "updated_at": "2026-03-26T16:44:22.338Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": true,
+    "deleted_at": "2026-03-27T13:41:56.449Z",
+    "deleted_by": null,
+    "street_number": 7777,
+    "name": "Test",
+    "address": "Test"
+  }
+},
+{
+  "model": "core.building",
+  "pk": 4,
+  "fields": {
+    "created_at": "2026-03-26T17:14:15.187Z",
+    "updated_at": "2026-03-26T17:14:15.187Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": true,
+    "deleted_at": "2026-03-26T21:12:06.388Z",
+    "deleted_by": null,
+    "street_number": 99999,
+    "name": "Teste 99999",
+    "address": "Endereço teste 99999"
+  }
+},
+{
+  "model": "core.building",
+  "pk": 5,
+  "fields": {
+    "created_at": "2026-03-26T17:19:13.866Z",
+    "updated_at": "2026-03-26T17:19:13.866Z",
+    "created_by": [
+      "admin_test_debug"
+    ],
+    "updated_by": [
+      "admin_test_debug"
+    ],
+    "is_deleted": true,
+    "deleted_at": "2026-03-27T13:41:58.672Z",
+    "deleted_by": null,
+    "street_number": 19999,
+    "name": "Debug Bld",
+    "address": "Debug Addr"
+  }
+}
+]

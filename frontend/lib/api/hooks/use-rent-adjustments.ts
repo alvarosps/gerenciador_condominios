@@ -14,12 +14,14 @@ export function useApplyRentAdjustment() {
       leaseId: number;
       percentage: number;
       update_apartment_prices: boolean;
+      renewal_date?: string;
     }) => {
       const { data } = await apiClient.post<
         RentAdjustment & { warning: { type: string; last_date: string } | null }
       >(`/leases/${String(params.leaseId)}/adjust_rent/`, {
         percentage: params.percentage,
         update_apartment_prices: params.update_apartment_prices,
+        renewal_date: params.renewal_date,
       });
       return data;
     },
@@ -46,14 +48,24 @@ export function useRentAdjustments(leaseId: number | null) {
   });
 }
 
+interface RentAdjustmentAlertsResponse {
+  alerts: RentAdjustmentAlert[];
+  ipca_latest_month: string | null;
+  fallback_percentage: string;
+}
+
 export function useRentAdjustmentAlerts() {
   return useQuery({
     queryKey: ['rent-adjustment-alerts'],
     queryFn: async () => {
-      const { data } = await apiClient.get<{ alerts: RentAdjustmentAlert[] }>(
+      const { data } = await apiClient.get<RentAdjustmentAlertsResponse>(
         '/dashboard/rent_adjustment_alerts/',
       );
-      return data.alerts.map((alert) => rentAdjustmentAlertSchema.parse(alert));
+      return {
+        alerts: data.alerts.map((alert) => rentAdjustmentAlertSchema.parse(alert)),
+        ipcaLatestMonth: data.ipca_latest_month,
+        fallbackPercentage: Number(data.fallback_percentage),
+      };
     },
   });
 }

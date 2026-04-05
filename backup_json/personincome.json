@@ -1,0 +1,128 @@
+[
+{
+  "model": "core.personincome",
+  "pk": 1,
+  "fields": {
+    "created_at": "2026-03-23T01:48:04.300Z",
+    "updated_at": "2026-03-23T01:48:04.300Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "person": 2,
+    "income_type": "apartment_rent",
+    "apartment": 15,
+    "fixed_amount": null,
+    "start_date": "2026-01-01",
+    "end_date": null,
+    "is_active": true,
+    "notes": "Proprietário"
+  }
+},
+{
+  "model": "core.personincome",
+  "pk": 2,
+  "fields": {
+    "created_at": "2026-03-23T01:48:04.304Z",
+    "updated_at": "2026-03-23T01:48:04.304Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "person": 2,
+    "income_type": "apartment_rent",
+    "apartment": 17,
+    "fixed_amount": null,
+    "start_date": "2026-01-01",
+    "end_date": null,
+    "is_active": true,
+    "notes": "Proprietário"
+  }
+},
+{
+  "model": "core.personincome",
+  "pk": 3,
+  "fields": {
+    "created_at": "2026-03-23T01:48:04.306Z",
+    "updated_at": "2026-03-23T01:48:04.306Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "person": 3,
+    "income_type": "apartment_rent",
+    "apartment": 29,
+    "fixed_amount": null,
+    "start_date": "2026-01-01",
+    "end_date": null,
+    "is_active": true,
+    "notes": "Proprietário"
+  }
+},
+{
+  "model": "core.personincome",
+  "pk": 4,
+  "fields": {
+    "created_at": "2026-03-23T01:48:04.308Z",
+    "updated_at": "2026-03-23T01:48:04.308Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "person": 3,
+    "income_type": "apartment_rent",
+    "apartment": 32,
+    "fixed_amount": null,
+    "start_date": "2026-01-01",
+    "end_date": null,
+    "is_active": true,
+    "notes": "Proprietário"
+  }
+},
+{
+  "model": "core.personincome",
+  "pk": 5,
+  "fields": {
+    "created_at": "2026-03-23T01:48:04.310Z",
+    "updated_at": "2026-03-23T01:48:04.310Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "person": 1,
+    "income_type": "fixed_stipend",
+    "apartment": null,
+    "fixed_amount": "1100.00",
+    "start_date": "2026-01-01",
+    "end_date": null,
+    "is_active": true,
+    "notes": "Equivalente a 1 kitnet"
+  }
+},
+{
+  "model": "core.personincome",
+  "pk": 6,
+  "fields": {
+    "created_at": "2026-03-23T01:48:04.312Z",
+    "updated_at": "2026-03-23T01:48:04.312Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "person": 4,
+    "income_type": "fixed_stipend",
+    "apartment": null,
+    "fixed_amount": "1100.00",
+    "start_date": "2026-01-01",
+    "end_date": null,
+    "is_active": true,
+    "notes": "Equivalente a 1 kitnet"
+  }
+}
+]

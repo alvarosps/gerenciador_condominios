@@ -7,6 +7,7 @@ This package contains business logic services separated from the HTTP layer:
 - ContractService: Contract generation and PDF creation
 - DashboardService: Financial metrics and operational statistics (Phase 7)
 - TemplateManagementService: Contract template CRUD operations (Phase 6)
+- MonthAdvanceService: Month advancement orchestration (validate, snapshot, prepare next month)
 """
 
 from .base import BaseService
@@ -14,6 +15,7 @@ from .contract_service import ContractService
 from .dashboard_service import DashboardService
 from .date_calculator import DateCalculatorService
 from .fee_calculator import FeeCalculatorService
+from .month_advance_service import MonthAdvanceService
 from .template_management_service import TemplateManagementService
 
 __all__ = [
@@ -22,5 +24,6 @@ __all__ = [
     "DashboardService",
     "DateCalculatorService",
     "FeeCalculatorService",
+    "MonthAdvanceService",
     "TemplateManagementService",
 ]

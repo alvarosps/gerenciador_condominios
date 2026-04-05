@@ -23,6 +23,12 @@ export const landlordSchema = z.object({
   state: z.string().min(1, 'Estado é obrigatório'),
   zip_code: z.string().min(1, 'CEP é obrigatório'),
   country: z.string().default('Brasil'),
+  rent_adjustment_percentage: z
+    .string()
+    .or(z.number())
+    .transform((val) => Number(val))
+    .optional()
+    .default(0),
   is_active: z.boolean().default(true),
   full_address: z.string().optional(),
   created_at: z.string().optional(),
@@ -51,6 +57,7 @@ export const landlordFormSchema = z.object({
   state: z.string().min(1, 'Estado é obrigatório'),
   zip_code: z.string().min(1, 'CEP é obrigatório'),
   country: z.string().min(1, 'País é obrigatório'),
+  rent_adjustment_percentage: z.number().min(0, 'Percentual deve ser positivo'),
   is_active: z.boolean(),
 });
 

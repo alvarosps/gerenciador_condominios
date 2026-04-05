@@ -5,7 +5,7 @@ import { http, HttpResponse } from 'msw';
 import { useSimulation } from '../use-simulation';
 import { createWrapper } from '@/tests/test-utils';
 
-const API_BASE = 'http://localhost:8000/api';
+const API_BASE = 'http://localhost:8008/api';
 
 describe('useSimulation', () => {
   it('sends scenarios and returns comparison result', async () => {

@@ -13,12 +13,18 @@ function SubAccordion({
   total,
   onEdit,
   onDelete,
+  readonly = false,
+  onMarkPaid,
+  isMarkingPaid = false,
 }: {
   title: string;
   items: ExpenseDetailItem[];
   total: number;
   onEdit: (item: ExpenseDetailItem) => void;
   onDelete: (item: ExpenseDetailItem) => void;
+  readonly?: boolean;
+  onMarkPaid?: (item: ExpenseDetailItem) => void;
+  isMarkingPaid?: boolean;
 }) {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -43,7 +49,7 @@ function SubAccordion({
 
       {isOpen && (
         <div className="px-3 pb-3">
-          <ExpenseDetailTable items={items} onEdit={onEdit} onDelete={onDelete} />
+          <ExpenseDetailTable items={items} onEdit={onEdit} onDelete={onDelete} readonly={readonly} onMarkPaid={onMarkPaid} isMarkingPaid={isMarkingPaid} />
         </div>
       )}
     </div>
@@ -82,6 +88,9 @@ export function ExpenseAccordion({
   onDelete,
   defaultOpen = false,
   groupBy,
+  readonly = false,
+  onMarkPaid,
+  isMarkingPaid = false,
 }: {
   title: string;
   color: string;
@@ -91,6 +100,9 @@ export function ExpenseAccordion({
   onDelete: (item: ExpenseDetailItem) => void;
   defaultOpen?: boolean;
   groupBy?: keyof ExpenseDetailItem;
+  readonly?: boolean;
+  onMarkPaid?: (item: ExpenseDetailItem) => void;
+  isMarkingPaid?: boolean;
 }) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
 
@@ -128,10 +140,13 @@ export function ExpenseAccordion({
                 total={group.total}
                 onEdit={onEdit}
                 onDelete={onDelete}
+                readonly={readonly}
+                onMarkPaid={onMarkPaid}
+                isMarkingPaid={isMarkingPaid}
               />
             ))
           ) : (
-            <ExpenseDetailTable items={items} onEdit={onEdit} onDelete={onDelete} />
+            <ExpenseDetailTable items={items} onEdit={onEdit} onDelete={onDelete} readonly={readonly} onMarkPaid={onMarkPaid} isMarkingPaid={isMarkingPaid} />
           )}
         </div>
       )}

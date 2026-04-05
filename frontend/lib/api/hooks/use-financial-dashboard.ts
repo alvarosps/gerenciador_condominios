@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '../client';
+import { queryKeys } from '../query-keys';
 
 export interface FinancialOverview {
   current_month_balance: number;
@@ -149,6 +150,9 @@ export interface ExpenseDetailItem {
   notes?: string | null;
   amount: number;
   due_date?: string | null;
+  days_overdue?: number | null;
+  is_paid?: boolean | null;
+  building_name?: string | null;
 }
 
 export interface ExpenseDetailResponse {
@@ -174,6 +178,8 @@ export interface ExpenseDetailResponse {
   by_building?: UtilityBuildingEntry[];
   details?: ExpenseDetailItem[];
   label?: string;
+  overdue?: ExpenseDetailItem[];
+  overdue_total?: number;
 }
 
 export interface DashboardSummary {
@@ -218,7 +224,7 @@ const REFETCH_INTERVAL = 1000 * 60 * 5;
 
 export function useFinancialOverview() {
   return useQuery({
-    queryKey: ['financial-dashboard', 'overview'],
+    queryKey: queryKeys.financialDashboard.overview(),
     queryFn: async () => {
       const { data } = await apiClient.get<FinancialOverview>('/financial-dashboard/overview/');
       return data;
@@ -230,7 +236,7 @@ export function useFinancialOverview() {
 
 export function useDebtByPerson() {
   return useQuery({
-    queryKey: ['financial-dashboard', 'debt_by_person'],
+    queryKey: queryKeys.financialDashboard.debtByPerson(),
     queryFn: async () => {
       const { data } = await apiClient.get<DebtByPerson[]>('/financial-dashboard/debt_by_person/');
       return data;
@@ -242,7 +248,7 @@ export function useDebtByPerson() {
 
 export function useDebtByType() {
   return useQuery({
-    queryKey: ['financial-dashboard', 'debt_by_type'],
+    queryKey: queryKeys.financialDashboard.debtByType(),
     queryFn: async () => {
       const { data } = await apiClient.get<DebtByType[]>('/financial-dashboard/debt_by_type/');
       return data;
@@ -254,7 +260,7 @@ export function useDebtByType() {
 
 export function useUpcomingInstallments(days?: number) {
   return useQuery({
-    queryKey: ['financial-dashboard', 'upcoming_installments', days],
+    queryKey: queryKeys.financialDashboard.upcomingInstallments(days),
     queryFn: async () => {
       const { data } = await apiClient.get<Record<string, unknown>[]>(
         '/financial-dashboard/upcoming_installments/',
@@ -272,7 +278,7 @@ export function useUpcomingInstallments(days?: number) {
 
 export function useOverdueInstallments() {
   return useQuery({
-    queryKey: ['financial-dashboard', 'overdue_installments'],
+    queryKey: queryKeys.financialDashboard.overdueInstallments(),
     queryFn: async () => {
       const { data } = await apiClient.get<Record<string, unknown>[]>(
         '/financial-dashboard/overdue_installments/',
@@ -289,7 +295,7 @@ export function useOverdueInstallments() {
 
 export function useCategoryBreakdown(year: number, month: number) {
   return useQuery({
-    queryKey: ['financial-dashboard', 'category_breakdown', year, month],
+    queryKey: queryKeys.financialDashboard.categoryBreakdown(year, month),
     queryFn: async () => {
       const { data } = await apiClient.get<CategoryBreakdown[]>(
         '/financial-dashboard/category_breakdown/',
@@ -304,7 +310,7 @@ export function useCategoryBreakdown(year: number, month: number) {
 
 export function useDashboardSummary(year: number, month: number) {
   return useQuery({
-    queryKey: ['financial-dashboard', 'dashboard_summary', year, month],
+    queryKey: queryKeys.financialDashboard.dashboardSummary(year, month),
     queryFn: async () => {
       const { data } = await apiClient.get<DashboardSummary>(
         '/financial-dashboard/dashboard_summary/',
@@ -319,7 +325,7 @@ export function useDashboardSummary(year: number, month: number) {
 
 export function useExpenseDetail(type: string, id: number | null, year: number, month: number) {
   return useQuery({
-    queryKey: ['financial-dashboard', 'expense_detail', type, id, year, month],
+    queryKey: queryKeys.financialDashboard.expenseDetail(type, id, year, month),
     queryFn: async () => {
       const params: Record<string, string | number> = { type, year, month };
       if (id !== null) params.id = id;

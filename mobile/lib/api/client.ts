@@ -1,6 +1,6 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from "axios";
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:8000/api";
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:8008/api";
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,

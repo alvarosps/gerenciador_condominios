@@ -68,7 +68,7 @@ export function Header() {
       <div className="flex items-center gap-2 md:gap-4">
         <ThemeToggle />
         {/* Notifications Badge */}
-        <Button variant="ghost" size="icon" className="relative">
+        <Button variant="ghost" size="icon" className="relative" aria-label="Notificações">
           <Bell className="h-5 w-5" />
           {/* Uncomment when implementing notifications
           <Badge

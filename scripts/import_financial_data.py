@@ -30,10 +30,9 @@ django.setup()
 
 from django.db import transaction
 
-from core.models import Apartment, Building, Lease
-
-# Financial models — importados após django.setup()
 from core.models import (
+    Apartment,
+    Building,
     CreditCard,
     EmployeePayment,
     Expense,
@@ -41,6 +40,7 @@ from core.models import (
     ExpenseInstallment,
     FinancialSettings,
     Income,
+    Lease,
     Person,
     PersonIncome,
     PersonPayment,
@@ -75,28 +75,32 @@ class FinancialDataImporter:
         print(f"\n{prefix}Iniciando importação de dados financeiros...")
         print("=" * 60)
 
-        self._cache_buildings()
-        self._import_settings()
-        self._import_categories()
-        self._import_persons()
-        self._import_credit_cards()
-        self._import_person_incomes()
-        self._import_apartment_owners()
-        self._import_vacant_apartments()
-        self._import_lease_specials()
-        self._import_card_purchases()
-        self._import_bank_loans()
-        self._import_personal_loans()
-        self._import_offsets()
-        self._import_utility_bills()
-        self._import_debt_installments()
-        self._import_iptu()
-        self._import_fixed_expenses()
-        self._import_one_time_expenses()
-        self._import_extra_incomes()
-        self._import_rent_payments()
-        self._import_employee_payments()
-        self._import_person_payments()
+        with transaction.atomic():
+            self._cache_buildings()
+            self._import_settings()
+            self._import_categories()
+            self._import_persons()
+            self._import_credit_cards()
+            self._import_person_incomes()
+            self._import_apartment_owners()
+            self._import_vacant_apartments()
+            self._import_lease_specials()
+            self._import_card_purchases()
+            self._import_bank_loans()
+            self._import_personal_loans()
+            self._import_offsets()
+            self._import_utility_bills()
+            self._import_debt_installments()
+            self._import_iptu()
+            self._import_fixed_expenses()
+            self._import_one_time_expenses()
+            self._import_extra_incomes()
+            self._import_rent_payments()
+            self._import_employee_payments()
+            self._import_person_payments()
+
+            if self.dry_run:
+                transaction.set_rollback(True)
 
         print("\n" + "=" * 60)
         print(f"{prefix}Importação concluída!")
@@ -127,11 +131,15 @@ class FinancialDataImporter:
         try:
             return Lease.objects.get(apartment=apt)
         except Lease.DoesNotExist:
-            raise ValueError(f"Lease não encontrado para apartamento {apt_number} do prédio {street_number}.")
+            raise ValueError(
+                f"Lease não encontrado para apartamento {apt_number} do prédio {street_number}."
+            )
 
     def _get_person(self, nome: str) -> Person:
         if nome not in self.persons:
-            raise ValueError(f"Pessoa '{nome}' não encontrada. Verifique se está definida em 'pessoas'.")
+            raise ValueError(
+                f"Pessoa '{nome}' não encontrada. Verifique se está definida em 'pessoas'."
+            )
         return self.persons[nome]
 
     def _get_card(self, pessoa: str, apelido: str) -> CreditCard:
@@ -144,7 +152,9 @@ class FinancialDataImporter:
         if not nome:
             return None
         if nome not in self.categories:
-            raise ValueError(f"Categoria '{nome}' não encontrada. Verifique se está definida em 'categorias'.")
+            raise ValueError(
+                f"Categoria '{nome}' não encontrada. Verifique se está definida em 'categorias'."
+            )
         return self.categories[nome]
 
     def _parse_date(self, date_str: str | None) -> date | None:
@@ -308,14 +318,18 @@ class FinancialDataImporter:
                     income_type="apartment_rent",
                     apartment=apt,
                     defaults={
-                        "start_date": self._require_date(item["data_inicio"], "data_inicio", f"recebimento {item['pessoa']}"),
+                        "start_date": self._require_date(
+                            item["data_inicio"], "data_inicio", f"recebimento {item['pessoa']}"
+                        ),
                         "end_date": self._parse_date(item.get("data_fim")),
                         "is_active": True,
                         "notes": item.get("notas", ""),
                     },
                 )
             self.stats["person_incomes"] += 1
-            print(f"  + {item['pessoa']} <- apto {item['apartamento_number']}/{item['predio_street_number']}")
+            print(
+                f"  + {item['pessoa']} <- apto {item['apartamento_number']}/{item['predio_street_number']}"
+            )
 
         for item in stipend_items:
             person = self._get_person(item["pessoa"])
@@ -325,7 +339,9 @@ class FinancialDataImporter:
                     income_type="fixed_stipend",
                     defaults={
                         "fixed_amount": Decimal(str(item["valor"])),
-                        "start_date": self._require_date(item["data_inicio"], "data_inicio", f"estipêndio {item['pessoa']}"),
+                        "start_date": self._require_date(
+                            item["data_inicio"], "data_inicio", f"estipêndio {item['pessoa']}"
+                        ),
                         "end_date": self._parse_date(item.get("data_fim")),
                         "is_active": True,
                         "notes": item.get("notas", ""),
@@ -348,7 +364,9 @@ class FinancialDataImporter:
                 apt.owner = person
                 apt.save(update_fields=["owner"])
             self.stats["apartment_owners"] += 1
-            print(f"  + Apto {item['apartamento_number']}/{item['predio_street_number']} -> {item['pessoa']}")
+            print(
+                f"  + Apto {item['apartamento_number']}/{item['predio_street_number']} -> {item['pessoa']}"
+            )
 
     def _import_vacant_apartments(self):
         section = self.data.get("kitnets_desalugados", {})
@@ -366,11 +384,17 @@ class FinancialDataImporter:
                 try:
                     lease = Lease.objects.get(apartment=apt)
                     lease.delete()
-                    print(f"  - Apto {item['apartamento_number']}/{item['predio_street_number']}: is_rented=False, lease removido")
+                    print(
+                        f"  - Apto {item['apartamento_number']}/{item['predio_street_number']}: is_rented=False, lease removido"
+                    )
                 except Lease.DoesNotExist:
-                    print(f"  - Apto {item['apartamento_number']}/{item['predio_street_number']}: is_rented=False (sem lease)")
+                    print(
+                        f"  - Apto {item['apartamento_number']}/{item['predio_street_number']}: is_rented=False (sem lease)"
+                    )
             else:
-                print(f"  - Apto {item['apartamento_number']}/{item['predio_street_number']}: is_rented=False")
+                print(
+                    f"  - Apto {item['apartamento_number']}/{item['predio_street_number']}: is_rented=False"
+                )
 
     def _import_lease_specials(self):
         section = self.data.get("leases_especiais", {})
@@ -388,7 +412,9 @@ class FinancialDataImporter:
                 lease.prepaid_until = self._parse_date(item["prepaid_until"])
                 lease.save(update_fields=["prepaid_until"])
             self.stats["lease_updates"] += 1
-            print(f"  + Apto {item['apartamento_number']}/{item['predio_street_number']} prepaid até {item['prepaid_until']}")
+            print(
+                f"  + Apto {item['apartamento_number']}/{item['predio_street_number']} prepaid até {item['prepaid_until']}"
+            )
 
         for item in salary:
             lease = self._get_lease(item["predio_street_number"], item["apartamento_number"])
@@ -396,7 +422,9 @@ class FinancialDataImporter:
                 lease.is_salary_offset = True
                 lease.save(update_fields=["is_salary_offset"])
             self.stats["lease_updates"] += 1
-            print(f"  + Apto {item['apartamento_number']}/{item['predio_street_number']} salary_offset=True")
+            print(
+                f"  + Apto {item['apartamento_number']}/{item['predio_street_number']} salary_offset=True"
+            )
 
     def _create_expense_with_installments(
         self,
@@ -535,8 +563,23 @@ class FinancialDataImporter:
         month = source_date.month - 1 + months
         year = source_date.year + month // 12
         month = month % 12 + 1
-        day = min(source_date.day, [31, 29 if year % 4 == 0 and (year % 100 != 0 or year % 400 == 0) else 28,
-                                     31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1])
+        day = min(
+            source_date.day,
+            [
+                31,
+                29 if year % 4 == 0 and (year % 100 != 0 or year % 400 == 0) else 28,
+                31,
+                30,
+                31,
+                30,
+                31,
+                31,
+                30,
+                31,
+                30,
+                31,
+            ][month - 1],
+        )
         return date(year, month, day)
 
     def _import_card_purchases(self):
@@ -561,7 +604,9 @@ class FinancialDataImporter:
             if not expense_date and next_date:
                 expense_date = self._add_months(next_date, -(item["parcela_atual"]))
             elif not expense_date:
-                raise ValueError(f"Compra '{item['descricao']}': informe data_compra ou data_proxima_parcela.")
+                raise ValueError(
+                    f"Compra '{item['descricao']}': informe data_compra ou data_proxima_parcela."
+                )
 
             expenses, installments = self._create_expense_with_installments(
                 description=item["descricao"],
@@ -581,8 +626,14 @@ class FinancialDataImporter:
             self.stats["expenses"] += expenses
             self.stats["installments"] += installments
 
-            parcela_info = f"{item['parcela_atual']}/{item['total_parcelas']}" if item["total_parcelas"] > 1 else "à vista"
-            print(f"  + {item['descricao']} ({item['cartao']}) R$ {item['valor_parcela']} x {parcela_info}")
+            parcela_info = (
+                f"{item['parcela_atual']}/{item['total_parcelas']}"
+                if item["total_parcelas"] > 1
+                else "à vista"
+            )
+            print(
+                f"  + {item['descricao']} ({item['cartao']}) R$ {item['valor_parcela']} x {parcela_info}"
+            )
 
     def _import_bank_loans(self):
         section = self.data.get("emprestimos_bancarios", {})
@@ -601,7 +652,9 @@ class FinancialDataImporter:
             if not expense_date and next_date:
                 expense_date = self._add_months(next_date, -(item["parcela_atual"]))
             elif not expense_date:
-                raise ValueError(f"Empréstimo '{item['descricao']}': informe data_inicio ou data_proxima_parcela.")
+                raise ValueError(
+                    f"Empréstimo '{item['descricao']}': informe data_inicio ou data_proxima_parcela."
+                )
 
             expenses, installments = self._create_expense_with_installments(
                 description=item["descricao"],
@@ -623,7 +676,9 @@ class FinancialDataImporter:
             self.stats["installments"] += installments
 
             parcela_info = f"{item['parcela_atual']}/{item['total_parcelas']}"
-            print(f"  + {item['descricao']} ({item['pessoa']}) R$ {item['valor_parcela']} x {parcela_info}")
+            print(
+                f"  + {item['descricao']} ({item['pessoa']}) R$ {item['valor_parcela']} x {parcela_info}"
+            )
 
     def _import_personal_loans(self):
         section = self.data.get("emprestimos_pessoais", {})
@@ -643,7 +698,9 @@ class FinancialDataImporter:
             if not expense_date and next_date:
                 expense_date = self._add_months(next_date, -(item["parcela_atual"]))
             elif not expense_date:
-                raise ValueError(f"Empréstimo '{item['descricao']}': informe data_inicio ou data_proxima_parcela.")
+                raise ValueError(
+                    f"Empréstimo '{item['descricao']}': informe data_inicio ou data_proxima_parcela."
+                )
 
             expenses, installments = self._create_expense_with_installments(
                 description=item["descricao"],
@@ -662,8 +719,14 @@ class FinancialDataImporter:
             self.stats["expenses"] += expenses
             self.stats["installments"] += installments
 
-            parcela_info = f"{item['parcela_atual']}/{item['total_parcelas']}" if item["total_parcelas"] > 1 else "único"
-            print(f"  + {item['descricao']} ({item['pessoa']}) R$ {item['valor_parcela']} x {parcela_info}")
+            parcela_info = (
+                f"{item['parcela_atual']}/{item['total_parcelas']}"
+                if item["total_parcelas"] > 1
+                else "único"
+            )
+            print(
+                f"  + {item['descricao']} ({item['pessoa']}) R$ {item['valor_parcela']} x {parcela_info}"
+            )
 
     def _import_offsets(self):
         section = self.data.get("descontos", {})
@@ -682,7 +745,9 @@ class FinancialDataImporter:
             if not expense_date and next_date:
                 expense_date = self._add_months(next_date, -(item["parcela_atual"]))
             elif not expense_date:
-                raise ValueError(f"Desconto '{item['descricao']}': informe data_inicio ou data_proxima_parcela.")
+                raise ValueError(
+                    f"Desconto '{item['descricao']}': informe data_inicio ou data_proxima_parcela."
+                )
 
             if not self.dry_run:
                 expense = Expense.objects.create(
@@ -693,7 +758,9 @@ class FinancialDataImporter:
                     person=person,
                     category=category,
                     is_installment=item["total_parcelas"] > 1,
-                    total_installments=item["total_parcelas"] if item["total_parcelas"] > 1 else None,
+                    total_installments=item["total_parcelas"]
+                    if item["total_parcelas"] > 1
+                    else None,
                     is_offset=True,
                     is_paid=False,
                     notes=item.get("notas", ""),
@@ -707,7 +774,9 @@ class FinancialDataImporter:
                         months_back = item["parcela_atual"] - 1
                         first_due = self._add_months(next_date, -months_back)
                     else:
-                        first_due = self._calculate_first_due_date(expense_date, item["dia_vencimento"])
+                        first_due = self._calculate_first_due_date(
+                            expense_date, item["dia_vencimento"]
+                        )
 
                     for i in range(1, item["total_parcelas"] + 1):
                         due_date = self._add_months(first_due, i - 1)
@@ -724,8 +793,14 @@ class FinancialDataImporter:
                         self.stats["installments"] += 1
 
             self.stats["expenses"] += 1
-            parcela_info = f"{item['parcela_atual']}/{item['total_parcelas']}" if item["total_parcelas"] > 1 else "único"
-            print(f"  - [DESCONTO] {item['descricao']} ({item['pessoa']}) R$ {item['valor_parcela']} x {parcela_info}")
+            parcela_info = (
+                f"{item['parcela_atual']}/{item['total_parcelas']}"
+                if item["total_parcelas"] > 1
+                else "único"
+            )
+            print(
+                f"  - [DESCONTO] {item['descricao']} ({item['pessoa']}) R$ {item['valor_parcela']} x {parcela_info}"
+            )
 
     def _import_utility_bills(self):
         section = self.data.get("contas_consumo", {})
@@ -737,10 +812,15 @@ class FinancialDataImporter:
 
         print(f"\n[11/15] Contas de consumo ({total} prédios)...")
 
-        for bill_type, items, type_name in [("water_bill", agua, "Água"), ("electricity_bill", luz, "Luz")]:
+        for bill_type, items, type_name in [
+            ("water_bill", agua, "Água"),
+            ("electricity_bill", luz, "Luz"),
+        ]:
             for item in items:
                 if item.get("suspensa"):
-                    print(f"  ~ {type_name} - Prédio {item['predio_street_number']}: SUSPENSA (ignorada)")
+                    print(
+                        f"  ~ {type_name} - Prédio {item['predio_street_number']}: SUSPENSA (ignorada)"
+                    )
                     continue
 
                 building = self._get_building(item["predio_street_number"])
@@ -761,7 +841,11 @@ class FinancialDataImporter:
                             description=f"{label} - {entry['mes'][:7]}",
                             expense_type=bill_type,
                             total_amount=Decimal(str(entry["valor"])),
-                            expense_date=self._require_date(entry["mes"], "mes", f"{type_name} prédio {item['predio_street_number']}"),
+                            expense_date=self._require_date(
+                                entry["mes"],
+                                "mes",
+                                f"{type_name} prédio {item['predio_street_number']}",
+                            ),
                             building=building,
                             is_installment=False,
                             is_paid=entry.get("pago", False),
@@ -770,8 +854,12 @@ class FinancialDataImporter:
                         )
                     self.stats["expenses"] += 1
 
-                parcelamento_info = f" (inclui parcelamento: {parcelamento_ref})" if parcelamento_ref else ""
-                print(f"  + {type_name} - Prédio {item['predio_street_number']}: {len(historico)} meses{parcelamento_info}")
+                parcelamento_info = (
+                    f" (inclui parcelamento: {parcelamento_ref})" if parcelamento_ref else ""
+                )
+                print(
+                    f"  + {type_name} - Prédio {item['predio_street_number']}: {len(historico)} meses{parcelamento_info}"
+                )
 
     def _import_debt_installments(self):
         section = self.data.get("parcelamentos_divida", {})
@@ -786,8 +874,16 @@ class FinancialDataImporter:
             parcelas_det = item.get("parcelas_detalhadas")
 
             if parcelas_det:
-                total_amount = Decimal(str(item.get("saldo") or item.get("valor_total_divida") or sum(p["valor"] for p in parcelas_det)))
-                expense_date = self._parse_date(item.get("data_inicio")) or date.fromisoformat(parcelas_det[0]["vencimento"])
+                total_amount = Decimal(
+                    str(
+                        item.get("saldo")
+                        or item.get("valor_total_divida")
+                        or sum(p["valor"] for p in parcelas_det)
+                    )
+                )
+                expense_date = self._parse_date(item.get("data_inicio")) or date.fromisoformat(
+                    parcelas_det[0]["vencimento"]
+                )
                 real_total = max(p["numero"] for p in parcelas_det)
 
                 if not self.dry_run:
@@ -813,25 +909,37 @@ class FinancialDataImporter:
                             amount=Decimal(str(p["valor"])),
                             due_date=date.fromisoformat(p["vencimento"]),
                             is_paid=p.get("pago", False),
-                            paid_date=date.fromisoformat(p["data_pagamento"]) if p.get("data_pagamento") else None,
+                            paid_date=date.fromisoformat(p["data_pagamento"])
+                            if p.get("data_pagamento")
+                            else None,
                         )
                         self.stats["installments"] += 1
 
                 self.stats["expenses"] += 1
                 pagas = sum(1 for p in parcelas_det if p.get("pago"))
-                print(f"  + {item['descricao']} {len(parcelas_det)} parcelas variáveis ({pagas} pagas)")
+                print(
+                    f"  + {item['descricao']} {len(parcelas_det)} parcelas variáveis ({pagas} pagas)"
+                )
             else:
                 next_date = self._parse_date(item.get("data_proxima_parcela"))
                 expense_date = self._parse_date(item.get("data_inicio"))
                 if not expense_date and next_date:
                     expense_date = self._add_months(next_date, -(item["parcela_atual"]))
                 elif not expense_date:
-                    raise ValueError(f"Parcelamento '{item['descricao']}': informe data_inicio ou data_proxima_parcela.")
+                    raise ValueError(
+                        f"Parcelamento '{item['descricao']}': informe data_inicio ou data_proxima_parcela."
+                    )
 
                 expenses, installments = self._create_expense_with_installments(
                     description=item["descricao"],
                     expense_type=item["tipo"],
-                    total_amount=Decimal(str(item.get("saldo") or item.get("valor_total_divida") or item["valor_parcela"] * item["total_parcelas"])),
+                    total_amount=Decimal(
+                        str(
+                            item.get("saldo")
+                            or item.get("valor_total_divida")
+                            or item["valor_parcela"] * item["total_parcelas"]
+                        )
+                    ),
                     installment_amount=Decimal(str(item["valor_parcela"])),
                     current_installment=item["parcela_atual"],
                     total_installments=item["total_parcelas"],
@@ -865,7 +973,9 @@ class FinancialDataImporter:
             expenses, installments = self._create_expense_with_installments(
                 description=item["descricao"],
                 expense_type="property_tax",
-                total_amount=Decimal(str(item.get("valor_total") or item["valor_parcela"] * item["total_parcelas"])),
+                total_amount=Decimal(
+                    str(item.get("valor_total") or item["valor_parcela"] * item["total_parcelas"])
+                ),
                 installment_amount=Decimal(str(item["valor_parcela"])),
                 current_installment=item["parcela_atual"],
                 total_installments=item["total_parcelas"],
@@ -893,8 +1003,16 @@ class FinancialDataImporter:
 
             if parcelas_det:
                 # Parcelas com valores variáveis — criar manualmente
-                total_amount = Decimal(str(item.get("saldo") or item.get("valor_total_divida") or sum(p["valor"] for p in parcelas_det)))
-                expense_date = self._require_date(item["data_inicio"], "data_inicio", item["descricao"])
+                total_amount = Decimal(
+                    str(
+                        item.get("saldo")
+                        or item.get("valor_total_divida")
+                        or sum(p["valor"] for p in parcelas_det)
+                    )
+                )
+                expense_date = self._require_date(
+                    item["data_inicio"], "data_inicio", item["descricao"]
+                )
                 real_total = max(p["numero"] for p in parcelas_det)
 
                 if not self.dry_run:
@@ -920,23 +1038,35 @@ class FinancialDataImporter:
                             amount=Decimal(str(p["valor"])),
                             due_date=date.fromisoformat(p["vencimento"]),
                             is_paid=p.get("pago", False),
-                            paid_date=date.fromisoformat(p["data_pagamento"]) if p.get("data_pagamento") else None,
+                            paid_date=date.fromisoformat(p["data_pagamento"])
+                            if p.get("data_pagamento")
+                            else None,
                         )
                         self.stats["installments"] += 1
 
                 self.stats["expenses"] += 1
                 pagas = sum(1 for p in parcelas_det if p.get("pago"))
-                print(f"  + {item['descricao']} (dívida) {len(parcelas_det)} parcelas variáveis ({pagas} pagas)")
+                print(
+                    f"  + {item['descricao']} (dívida) {len(parcelas_det)} parcelas variáveis ({pagas} pagas)"
+                )
             else:
                 # Parcelas com valor fixo — usar método padrão
                 expenses, installments = self._create_expense_with_installments(
                     description=item["descricao"],
                     expense_type="property_tax",
-                    total_amount=Decimal(str(item.get("saldo") or item.get("valor_total_divida") or item["valor_parcela"] * item["total_parcelas"])),
+                    total_amount=Decimal(
+                        str(
+                            item.get("saldo")
+                            or item.get("valor_total_divida")
+                            or item["valor_parcela"] * item["total_parcelas"]
+                        )
+                    ),
                     installment_amount=Decimal(str(item["valor_parcela"])),
                     current_installment=item["parcela_atual"],
                     total_installments=item["total_parcelas"],
-                    expense_date=self._require_date(item["data_inicio"], "data_inicio", item["descricao"]),
+                    expense_date=self._require_date(
+                        item["data_inicio"], "data_inicio", item["descricao"]
+                    ),
                     due_day=item["dia_vencimento"],
                     building=building,
                     category=category,
@@ -947,7 +1077,9 @@ class FinancialDataImporter:
                 self.stats["installments"] += installments
 
                 parcela_info = f"{item['parcela_atual']}/{item['total_parcelas']}"
-                print(f"  + {item['descricao']} (dívida) R$ {item['valor_parcela']} x {parcela_info}")
+                print(
+                    f"  + {item['descricao']} (dívida) R$ {item['valor_parcela']} x {parcela_info}"
+                )
 
     def _import_fixed_expenses(self):
         section = self.data.get("gastos_fixos", {})
@@ -957,7 +1089,11 @@ class FinancialDataImporter:
 
         print(f"\n[14/15] Gastos fixos recorrentes ({len(items)})...")
         for item in items:
-            building = self._get_building(item["predio_street_number"]) if item.get("predio_street_number") else None
+            building = (
+                self._get_building(item["predio_street_number"])
+                if item.get("predio_street_number")
+                else None
+            )
             category = self._get_category(item.get("categoria"))
             person = self._get_person(item["pessoa"]) if item.get("pessoa") else None
 
@@ -966,7 +1102,9 @@ class FinancialDataImporter:
                     description=item["descricao"],
                     expense_type="fixed_expense",
                     total_amount=Decimal(str(item["valor_mensal"])),
-                    expense_date=self._require_date(item["data_inicio"], "data_inicio", item["descricao"]),
+                    expense_date=self._require_date(
+                        item["data_inicio"], "data_inicio", item["descricao"]
+                    ),
                     person=person,
                     building=building,
                     category=category,
@@ -979,7 +1117,11 @@ class FinancialDataImporter:
                 )
             self.stats["expenses"] += 1
 
-            local = f" - Prédio {item['predio_street_number']}" if item.get("predio_street_number") else ""
+            local = (
+                f" - Prédio {item['predio_street_number']}"
+                if item.get("predio_street_number")
+                else ""
+            )
             print(f"  + {item['descricao']}{local} R$ {item['valor_mensal']}/mês")
 
     def _import_one_time_expenses(self):
@@ -991,8 +1133,16 @@ class FinancialDataImporter:
         print(f"\n[15a/15] Gastos únicos ({len(items)})...")
         for item in items:
             person = self._get_person(item["pessoa"]) if item.get("pessoa") else None
-            card = self._get_card(item["pessoa"], item["cartao"]) if item.get("pessoa") and item.get("cartao") else None
-            building = self._get_building(item["predio_street_number"]) if item.get("predio_street_number") else None
+            card = (
+                self._get_card(item["pessoa"], item["cartao"])
+                if item.get("pessoa") and item.get("cartao")
+                else None
+            )
+            building = (
+                self._get_building(item["predio_street_number"])
+                if item.get("predio_street_number")
+                else None
+            )
             category = self._get_category(item.get("categoria"))
 
             if not self.dry_run:
@@ -1029,7 +1179,9 @@ class FinancialDataImporter:
                 Income.objects.create(
                     description=item["descricao"],
                     amount=Decimal(str(item["valor_mensal"])),
-                    income_date=self._require_date(item["data_inicio"], "data_inicio", item["descricao"]),
+                    income_date=self._require_date(
+                        item["data_inicio"], "data_inicio", item["descricao"]
+                    ),
                     person=person,
                     is_recurring=True,
                     expected_monthly_amount=Decimal(str(item["valor_mensal"])),
@@ -1041,7 +1193,11 @@ class FinancialDataImporter:
 
         for item in avulsas:
             person = self._get_person(item["pessoa"]) if item.get("pessoa") else None
-            building = self._get_building(item["predio_street_number"]) if item.get("predio_street_number") else None
+            building = (
+                self._get_building(item["predio_street_number"])
+                if item.get("predio_street_number")
+                else None
+            )
             if not self.dry_run:
                 Income.objects.create(
                     description=item["descricao"],
@@ -1069,15 +1225,25 @@ class FinancialDataImporter:
             if not self.dry_run:
                 RentPayment.objects.update_or_create(
                     lease=lease,
-                    reference_month=self._require_date(item["mes_referencia"], "mes_referencia", f"aluguel apto {item['apartamento_number']}"),
+                    reference_month=self._require_date(
+                        item["mes_referencia"],
+                        "mes_referencia",
+                        f"aluguel apto {item['apartamento_number']}",
+                    ),
                     defaults={
                         "amount_paid": Decimal(str(item["valor_pago"])),
-                        "payment_date": self._require_date(item["data_pagamento"], "data_pagamento", f"aluguel apto {item['apartamento_number']}"),
+                        "payment_date": self._require_date(
+                            item["data_pagamento"],
+                            "data_pagamento",
+                            f"aluguel apto {item['apartamento_number']}",
+                        ),
                         "notes": item.get("notas", ""),
                     },
                 )
             self.stats["rent_payments"] += 1
-            print(f"  + Apto {item['apartamento_number']}/{item['predio_street_number']} - {item['mes_referencia'][:7]} R$ {item['valor_pago']}")
+            print(
+                f"  + Apto {item['apartamento_number']}/{item['predio_street_number']} - {item['mes_referencia'][:7]} R$ {item['valor_pago']}"
+            )
 
     def _import_employee_payments(self):
         section = self.data.get("pagamentos_funcionaria", {})
@@ -1091,7 +1257,9 @@ class FinancialDataImporter:
             if not self.dry_run:
                 EmployeePayment.objects.update_or_create(
                     person=person,
-                    reference_month=self._require_date(item["mes_referencia"], "mes_referencia", f"pagamento {item['pessoa']}"),
+                    reference_month=self._require_date(
+                        item["mes_referencia"], "mes_referencia", f"pagamento {item['pessoa']}"
+                    ),
                     defaults={
                         "base_salary": Decimal(str(item["salario_base"])),
                         "variable_amount": Decimal(str(item.get("valor_variavel", 0))),
@@ -1170,9 +1338,13 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(description="Importa dados financeiros a partir de JSON.")
-    parser.add_argument("file", nargs="?", default="scripts/data/financial_data.json", help="Arquivo JSON de dados")
+    parser.add_argument(
+        "file", nargs="?", default="scripts/data/financial_data.json", help="Arquivo JSON de dados"
+    )
     parser.add_argument("--dry-run", action="store_true", help="Simula sem gravar no banco")
-    parser.add_argument("--clear-first", action="store_true", help="Limpa dados financeiros antes de importar")
+    parser.add_argument(
+        "--clear-first", action="store_true", help="Limpa dados financeiros antes de importar"
+    )
     args = parser.parse_args()
 
     # Resolve path relativo ao projeto

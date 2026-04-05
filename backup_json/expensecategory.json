@@ -1,0 +1,312 @@
+[
+{
+  "model": "core.expensecategory",
+  "pk": 1,
+  "fields": {
+    "created_at": "2026-03-23T01:48:04.230Z",
+    "updated_at": "2026-03-23T01:48:04.230Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "name": "Pessoal",
+    "description": "Gastos pessoais dos sogros",
+    "color": "#EC4899",
+    "parent": null
+  }
+},
+{
+  "model": "core.expensecategory",
+  "pk": 2,
+  "fields": {
+    "created_at": "2026-03-23T01:48:04.234Z",
+    "updated_at": "2026-03-23T01:48:04.234Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "name": "Carros",
+    "description": "Gastos com veículos",
+    "color": "#8B5CF6",
+    "parent": null
+  }
+},
+{
+  "model": "core.expensecategory",
+  "pk": 3,
+  "fields": {
+    "created_at": "2026-03-23T01:48:04.236Z",
+    "updated_at": "2026-03-30T18:58:34.935Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "name": "Condomínio",
+    "description": "Gastos com os prédios",
+    "color": "#F97316",
+    "parent": null
+  }
+},
+{
+  "model": "core.expensecategory",
+  "pk": 4,
+  "fields": {
+    "created_at": "2026-03-23T01:48:04.237Z",
+    "updated_at": "2026-03-23T01:48:04.237Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "name": "Camila",
+    "description": "Gastos relacionados à Camila",
+    "color": "#06B6D4",
+    "parent": null
+  }
+},
+{
+  "model": "core.expensecategory",
+  "pk": 5,
+  "fields": {
+    "created_at": "2026-03-23T01:48:04.238Z",
+    "updated_at": "2026-03-23T01:48:04.238Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "name": "Ajuda",
+    "description": "Valores emprestados/adiantados pelos filhos cobrados em parcelas",
+    "color": "#22C55E",
+    "parent": null
+  }
+},
+{
+  "model": "core.expensecategory",
+  "pk": 6,
+  "fields": {
+    "created_at": "2026-03-23T01:48:04.240Z",
+    "updated_at": "2026-03-23T01:48:04.240Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "name": "Saúde",
+    "description": "Consultas, exames, plano de saúde",
+    "color": "#EC4899",
+    "parent": 1
+  }
+},
+{
+  "model": "core.expensecategory",
+  "pk": 7,
+  "fields": {
+    "created_at": "2026-03-23T01:48:04.241Z",
+    "updated_at": "2026-03-23T01:48:04.241Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "name": "Mercado",
+    "description": "Supermercado, feira, fruteira",
+    "color": "#EC4899",
+    "parent": 1
+  }
+},
+{
+  "model": "core.expensecategory",
+  "pk": 8,
+  "fields": {
+    "created_at": "2026-03-23T01:48:04.242Z",
+    "updated_at": "2026-03-23T01:48:04.242Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "name": "Farmácia",
+    "description": "Medicamentos e produtos de farmácia",
+    "color": "#EC4899",
+    "parent": 1
+  }
+},
+{
+  "model": "core.expensecategory",
+  "pk": 9,
+  "fields": {
+    "created_at": "2026-03-23T01:48:04.244Z",
+    "updated_at": "2026-03-23T01:48:04.244Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "name": "Vestuário",
+    "description": "Roupas e calçados",
+    "color": "#EC4899",
+    "parent": 1
+  }
+},
+{
+  "model": "core.expensecategory",
+  "pk": 10,
+  "fields": {
+    "created_at": "2026-03-23T01:48:04.245Z",
+    "updated_at": "2026-03-23T01:48:04.245Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "name": "Gasolina",
+    "description": "Combustível",
+    "color": "#8B5CF6",
+    "parent": 2
+  }
+},
+{
+  "model": "core.expensecategory",
+  "pk": 11,
+  "fields": {
+    "created_at": "2026-03-23T01:48:04.246Z",
+    "updated_at": "2026-03-23T01:48:04.246Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "name": "Pedágio",
+    "description": "Pedágios",
+    "color": "#8B5CF6",
+    "parent": 2
+  }
+},
+{
+  "model": "core.expensecategory",
+  "pk": 12,
+  "fields": {
+    "created_at": "2026-03-23T01:48:04.248Z",
+    "updated_at": "2026-03-23T01:48:04.248Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "name": "Manutenção Veículo",
+    "description": "Peças, oficina, revisão",
+    "color": "#8B5CF6",
+    "parent": 2
+  }
+},
+{
+  "model": "core.expensecategory",
+  "pk": 13,
+  "fields": {
+    "created_at": "2026-03-23T01:48:04.249Z",
+    "updated_at": "2026-03-23T01:48:04.249Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "name": "Manutenção",
+    "description": "Reparos e manutenção dos prédios",
+    "color": "#F97316",
+    "parent": 3
+  }
+},
+{
+  "model": "core.expensecategory",
+  "pk": 14,
+  "fields": {
+    "created_at": "2026-03-23T01:48:04.250Z",
+    "updated_at": "2026-03-23T01:48:04.250Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "name": "Material de Construção",
+    "description": "Cimento, tinta, ferragens",
+    "color": "#F97316",
+    "parent": 3
+  }
+},
+{
+  "model": "core.expensecategory",
+  "pk": 15,
+  "fields": {
+    "created_at": "2026-03-23T01:48:04.252Z",
+    "updated_at": "2026-03-23T01:48:04.252Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "name": "Internet",
+    "description": "Planos de internet dos prédios",
+    "color": "#F97316",
+    "parent": 3
+  }
+},
+{
+  "model": "core.expensecategory",
+  "pk": 16,
+  "fields": {
+    "created_at": "2026-03-23T01:48:04.253Z",
+    "updated_at": "2026-03-23T01:48:04.253Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "name": "Faxinas",
+    "description": "Faxinas nos kitnets desocupados",
+    "color": "#F97316",
+    "parent": 3
+  }
+},
+{
+  "model": "core.expensecategory",
+  "pk": 17,
+  "fields": {
+    "created_at": "2026-03-23T20:12:06.827Z",
+    "updated_at": "2026-03-23T20:12:06.827Z",
+    "created_by": [
+      "admin"
+    ],
+    "updated_by": [
+      "admin"
+    ],
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "name": "Presentes",
+    "description": "Presentes e lembranças",
+    "color": "#F472B6",
+    "parent": 1
+  }
+},
+{
+  "model": "core.expensecategory",
+  "pk": 18,
+  "fields": {
+    "created_at": "2026-03-30T18:58:24.940Z",
+    "updated_at": "2026-03-30T18:58:24.940Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "name": "Móveis",
+    "description": "",
+    "color": "#F97316",
+    "parent": 3
+  }
+}
+]

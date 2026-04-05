@@ -5,7 +5,7 @@ import { useLandlord, useUpdateLandlord } from '../use-landlord';
 import { createWrapper, createTestQueryClient } from '@/tests/test-utils';
 import { server } from '@/tests/mocks/server';
 
-const API_BASE = 'http://localhost:8000/api';
+const API_BASE = 'http://localhost:8008/api';
 
 describe('useLandlord', () => {
   describe('useLandlord (query)', () => {
@@ -76,6 +76,7 @@ describe('useLandlord', () => {
         state: 'SP',
         zip_code: '01310-100',
         country: 'Brasil',
+        rent_adjustment_percentage: 0,
         is_active: true,
       });
 
@@ -109,6 +110,7 @@ describe('useLandlord', () => {
         state: 'SP',
         zip_code: '01310-100',
         country: 'Brasil',
+        rent_adjustment_percentage: 0,
         is_active: true,
       });
 

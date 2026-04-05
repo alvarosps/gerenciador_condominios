@@ -184,7 +184,7 @@ This will be addressed in Phase 2 when we implement actual features. Options:
 
 The frontend is configured to connect to the Django backend:
 
-- **Development:** `http://localhost:8000/api`
+- **Development:** `http://localhost:8008/api`
 - **Production:** Configure via `NEXT_PUBLIC_API_URL` environment variable
 
 API routes are proxied through Next.js rewrites (see `next.config.js`).
@@ -217,7 +217,7 @@ Create a `.env.local` file:
 
 ```bash
 # API Configuration
-NEXT_PUBLIC_API_URL=http://localhost:8000/api
+NEXT_PUBLIC_API_URL=http://localhost:8008/api
 ```
 
 ## Contributing

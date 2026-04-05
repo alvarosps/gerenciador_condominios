@@ -368,3 +368,45 @@ def pytest_collection_modifyitems(config, items):
         if "pdf" in item.nodeid.lower():
             item.add_marker(pytest.mark.pdf)
             item.add_marker(pytest.mark.slow)
+
+
+@pytest.fixture
+def building_with_apartment(admin_user, sample_building_data, sample_apartment_data):
+    """Pre-built building + apartment for integration tests."""
+    from core.models import Apartment, Building
+
+    building = Building.objects.create(
+        **sample_building_data,
+        created_by=admin_user,
+        updated_by=admin_user,
+    )
+    apt_data = {**sample_apartment_data, "building": building}
+    apartment = Apartment.objects.create(
+        **apt_data,
+        created_by=admin_user,
+        updated_by=admin_user,
+    )
+    return building, apartment
+
+
+@pytest.fixture
+def person_with_credit_card(admin_user):
+    """Pre-built person + credit card for financial tests."""
+    from core.models import CreditCard, Person
+
+    person = Person.objects.create(
+        name="Test Person",
+        relationship="Familiar",
+        created_by=admin_user,
+        updated_by=admin_user,
+    )
+    card = CreditCard.objects.create(
+        person=person,
+        nickname="Test Card",
+        closing_day=15,
+        due_day=22,
+        is_active=True,
+        created_by=admin_user,
+        updated_by=admin_user,
+    )
+    return person, card

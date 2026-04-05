@@ -48,6 +48,7 @@ import { ApartmentFormModal } from './_components/apartment-form-modal';
 import { useApartments, useDeleteApartment } from '@/lib/api/hooks/use-apartments';
 import { useBuildings } from '@/lib/api/hooks/use-buildings';
 import { type Apartment } from '@/lib/schemas/apartment.schema';
+import { format, parseISO } from 'date-fns';
 import { formatCurrency } from '@/lib/utils/formatters';
 import { apartmentExportColumns } from '@/lib/hooks/use-export';
 import { useCrudPage } from '@/lib/hooks/use-crud-page';
@@ -125,8 +126,23 @@ export default function ApartmentsPage() {
       title: 'Valor',
       dataIndex: 'rental_value',
       key: 'rental_value',
-      width: 130,
-      render: (value) => formatCurrency(value as number),
+      width: 160,
+      render: (_, record: Apartment) => {
+        const pending = record.active_lease?.pending_rental_value;
+        const pendingDate = record.active_lease?.pending_rental_value_date;
+
+        if (pending && pendingDate) {
+          return (
+            <div className="space-y-0.5">
+              <div>{formatCurrency(record.rental_value)}</div>
+              <div className="text-xs text-success font-medium">
+                → {formatCurrency(pending)} em {format(parseISO(pendingDate), 'dd/MM')}
+              </div>
+            </div>
+          );
+        }
+        return formatCurrency(record.rental_value);
+      },
       sorter: (a: Apartment, b: Apartment) => a.rental_value - b.rental_value,
     },
     {

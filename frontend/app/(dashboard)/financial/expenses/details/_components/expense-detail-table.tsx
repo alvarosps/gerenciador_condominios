@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Pencil, Trash2 } from 'lucide-react';
+import { CheckCircle, Pencil, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { ExpenseDetailItem } from '@/lib/api/hooks/use-financial-dashboard';
 import { formatCurrency } from '@/lib/utils/formatters';
@@ -12,10 +12,16 @@ export function ExpenseDetailTable({
   items,
   onEdit,
   onDelete,
+  readonly = false,
+  onMarkPaid,
+  isMarkingPaid = false,
 }: {
   items: ExpenseDetailItem[];
   onEdit: (item: ExpenseDetailItem) => void;
   onDelete: (item: ExpenseDetailItem) => void;
+  readonly?: boolean;
+  onMarkPaid?: (item: ExpenseDetailItem) => void;
+  isMarkingPaid?: boolean;
 }) {
   const [showAll, setShowAll] = useState(false);
   const hasMore = items.length > ITEMS_PER_PAGE;
@@ -40,9 +46,11 @@ export function ExpenseDetailTable({
             <th className="py-2 px-2 text-xs font-medium text-muted-foreground text-right">
               Valor
             </th>
-            <th className="py-2 px-2 text-xs font-medium text-muted-foreground text-center">
-              Ações
-            </th>
+            {!readonly && (
+              <th className="py-2 px-2 text-xs font-medium text-muted-foreground text-center">
+                Ações
+              </th>
+            )}
           </tr>
         </thead>
         <tbody>
@@ -83,26 +91,42 @@ export function ExpenseDetailTable({
               <td className="py-2 px-2 text-right font-medium text-destructive">
                 {formatCurrency(item.amount)}
               </td>
-              <td className="py-2 px-2 text-center">
-                <div className="flex items-center justify-center gap-1">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7"
-                    onClick={() => onEdit(item)}
-                  >
-                    <Pencil className="h-3.5 w-3.5" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 text-destructive hover:text-destructive/80"
-                    onClick={() => onDelete(item)}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-              </td>
+              {!readonly && (
+                <td className="py-2 px-2 text-center">
+                  <div className="flex items-center justify-center gap-1">
+                    {onMarkPaid && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-success hover:text-success/80"
+                        onClick={() => onMarkPaid(item)}
+                        disabled={isMarkingPaid}
+                        aria-label="Marcar como paga"
+                      >
+                        <CheckCircle className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={() => onEdit(item)}
+                      aria-label="Editar"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-destructive hover:text-destructive/80"
+                      onClick={() => onDelete(item)}
+                      aria-label="Excluir"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </td>
+              )}
             </tr>
           ))}
         </tbody>

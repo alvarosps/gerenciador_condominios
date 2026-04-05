@@ -1,0 +1,132 @@
+[
+{
+  "model": "core.personpayment",
+  "pk": 1,
+  "fields": {
+    "created_at": "2026-03-23T01:49:56.321Z",
+    "updated_at": "2026-03-23T01:49:56.321Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "person": 2,
+    "reference_month": "2026-03-01",
+    "amount": "1922.90",
+    "payment_date": "2026-03-10",
+    "notes": "Pago integral março"
+  }
+},
+{
+  "model": "core.personpayment",
+  "pk": 2,
+  "fields": {
+    "created_at": "2026-03-23T01:49:56.324Z",
+    "updated_at": "2026-03-23T01:49:56.324Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "person": 1,
+    "reference_month": "2026-03-01",
+    "amount": "5000.00",
+    "payment_date": "2026-03-05",
+    "notes": "Pagamento parcial março"
+  }
+},
+{
+  "model": "core.personpayment",
+  "pk": 3,
+  "fields": {
+    "created_at": "2026-03-23T01:49:56.325Z",
+    "updated_at": "2026-03-23T01:49:56.325Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "person": 4,
+    "reference_month": "2026-03-01",
+    "amount": "767.00",
+    "payment_date": "2026-03-10",
+    "notes": "Pagamento parcial março, falta R$400"
+  }
+},
+{
+  "model": "core.personpayment",
+  "pk": 4,
+  "fields": {
+    "created_at": "2026-03-23T21:03:35.429Z",
+    "updated_at": "2026-03-23T21:03:35.429Z",
+    "created_by": [
+      "admin"
+    ],
+    "updated_by": [
+      "admin"
+    ],
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "person": 2,
+    "reference_month": "2026-03-01",
+    "amount": "600.00",
+    "payment_date": "2026-03-23",
+    "notes": "Pagamento empréstimo adicionado"
+  }
+},
+{
+  "model": "core.personpayment",
+  "pk": 5,
+  "fields": {
+    "created_at": "2026-03-23T22:34:02.488Z",
+    "updated_at": "2026-04-01T17:20:29.433Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "person": 1,
+    "reference_month": "2026-03-01",
+    "amount": "6241.02",
+    "payment_date": "2026-03-23",
+    "notes": ""
+  }
+},
+{
+  "model": "core.personpayment",
+  "pk": 6,
+  "fields": {
+    "created_at": "2026-03-30T16:38:02.095Z",
+    "updated_at": "2026-03-30T16:38:02.095Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": true,
+    "deleted_at": "2026-04-01T17:20:29.416Z",
+    "deleted_by": null,
+    "person": 1,
+    "reference_month": "2026-03-01",
+    "amount": "1100.00",
+    "payment_date": "2026-03-30",
+    "notes": ""
+  }
+},
+{
+  "model": "core.personpayment",
+  "pk": 7,
+  "fields": {
+    "created_at": "2026-04-01T18:30:52.423Z",
+    "updated_at": "2026-04-01T18:30:52.423Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "person": 1,
+    "reference_month": "2026-04-01",
+    "amount": "1207.00",
+    "payment_date": "2026-04-01",
+    "notes": ""
+  }
+}
+]

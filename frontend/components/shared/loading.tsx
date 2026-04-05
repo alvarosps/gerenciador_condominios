@@ -29,14 +29,18 @@ export function Loading({
 
   if (fullScreen) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
+      <div
+        className="flex min-h-screen items-center justify-center bg-background"
+        aria-live="polite"
+        aria-busy={true}
+      >
         {content}
       </div>
     );
   }
 
   return (
-    <div className="flex items-center justify-center p-8">
+    <div className="flex items-center justify-center p-8" aria-live="polite" aria-busy={true}>
       {content}
     </div>
   );

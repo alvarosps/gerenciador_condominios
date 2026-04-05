@@ -46,7 +46,7 @@ Expense.end_date — data fim para gastos fixos recorrentes
 
 ```bash
 # Backend
-python manage.py runserver                    # http://localhost:8000
+python manage.py runserver                    # http://localhost:8008
 python -m pytest                              # Todos os testes (parallel, reuse-db)
 python -m pytest tests/unit/                  # Só unit tests
 python -m pytest --cov=core --cov-report=html # Com coverage
@@ -114,7 +114,7 @@ Financeiro: 0012 (financial module) → 0013 (category parent) → 0014 (is_offs
 ## Env Vars
 
 - Backend `.env`: `SECRET_KEY`, `DEBUG`, `DB_PORT` (default 5432, atualmente 5433), `GOOGLE_CLIENT_ID/SECRET`
-- Frontend `.env.local`: `NEXT_PUBLIC_API_URL=http://localhost:8000/api`
+- Frontend `.env.local`: `NEXT_PUBLIC_API_URL=http://localhost:8008/api`
 - CORS: `localhost:4000`, `localhost:6000`
 
 ## Skills — Plugin vs Projeto

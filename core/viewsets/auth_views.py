@@ -31,6 +31,7 @@ from core.services.whatsapp_service import (
     normalize_phone_to_e164,
     send_verification_code,
 )
+from core.throttles import VerificationRateThrottle
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +51,7 @@ class WhatsAppAuthViewSet(viewsets.ViewSet):
     """
 
     permission_classes = [AllowAny]
+    throttle_classes = [VerificationRateThrottle]
 
     @action(detail=False, methods=["post"], url_path="request")
     def request_code(self, request: Request) -> Response:

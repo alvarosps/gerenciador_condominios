@@ -2,18 +2,20 @@
 import logging
 from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation
-from typing import Any
+from typing import Any, cast
 
-from dateutil.relativedelta import relativedelta
+from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.db import DatabaseError, IntegrityError
-from django.db.models import Count, Q, QuerySet
+from django.db import DatabaseError, IntegrityError, OperationalError, connection
+from django.db.models import Count, DateField, Q, QuerySet
+from django.db.models.expressions import RawSQL
 from rest_framework import status, viewsets
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
 from rest_framework.response import Response
 
-from .models import Apartment, Building, Furniture, Lease, Tenant
+from .models import Apartment, Building, Furniture, Lease, RentPayment, Tenant
 from .permissions import (
     CanGenerateContract,
     CanModifyLease,
@@ -34,6 +36,22 @@ from .services.lease_service import terminate_lease, transfer_lease
 from .services.rent_adjustment_service import RentAdjustmentService
 
 logger = logging.getLogger(__name__)
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def health_check(request: Request) -> Response:
+    """Health check endpoint for load balancers and monitoring."""
+    try:
+        connection.ensure_connection()
+        db_ok = True
+    except OperationalError:
+        db_ok = False
+
+    status_code = status.HTTP_200_OK if db_ok else status.HTTP_503_SERVICE_UNAVAILABLE
+    return Response(
+        {"status": "healthy" if db_ok else "unhealthy", "database": db_ok}, status=status_code
+    )
 
 
 class BuildingViewSet(viewsets.ModelViewSet):
@@ -252,38 +270,34 @@ class LeaseViewSet(viewsets.ModelViewSet):
     def _apply_lease_status_filters(
         self, queryset: QuerySet[Lease], params: Any
     ) -> QuerySet[Lease]:
-        """Apply computed date-based filters to a lease queryset."""
+        """Apply computed date-based filters to a lease queryset using database-level date arithmetic."""
+        is_active = params.get("is_active")
+        is_expired = params.get("is_expired")
+        expiring_soon = params.get("expiring_soon")
+
+        if not any(v and v.lower() == "true" for v in [is_active, is_expired, expiring_soon]):
+            return queryset
+
         today = date.today()
 
-        is_active = params.get("is_active")
+        # Annotate end_date using PostgreSQL interval arithmetic to avoid loading all leases into Python
+        queryset = queryset.annotate(
+            _end_date=RawSQL(
+                "(start_date + (validity_months || ' months')::interval)::date",
+                [],
+                output_field=DateField(),
+            )
+        )
+
         if is_active and is_active.lower() == "true":
-            lease_ids = [
-                lease.id
-                for lease in queryset
-                if lease.start_date + relativedelta(months=lease.validity_months) >= today
-            ]
-            queryset = queryset.filter(id__in=lease_ids)
+            queryset = queryset.filter(_end_date__gte=today)
 
-        is_expired = params.get("is_expired")
         if is_expired and is_expired.lower() == "true":
-            lease_ids = [
-                lease.id
-                for lease in queryset
-                if lease.start_date + relativedelta(months=lease.validity_months) < today
-            ]
-            queryset = queryset.filter(id__in=lease_ids)
+            queryset = queryset.filter(_end_date__lt=today)
 
-        expiring_soon = params.get("expiring_soon")
         if expiring_soon and expiring_soon.lower() == "true":
             threshold = today + timedelta(days=30)
-            lease_ids = [
-                lease.id
-                for lease in queryset
-                if today
-                <= lease.start_date + relativedelta(months=lease.validity_months)
-                <= threshold
-            ]
-            queryset = queryset.filter(id__in=lease_ids)
+            queryset = queryset.filter(_end_date__gte=today, _end_date__lte=threshold)
 
         return queryset
 
@@ -521,6 +535,7 @@ class LeaseViewSet(viewsets.ModelViewSet):
         lease = self.get_object()
         percentage = request.data.get("percentage")
         update_apartment_prices = request.data.get("update_apartment_prices", False)
+        renewal_date_str = request.data.get("renewal_date")
 
         if percentage is None:
             return Response(
@@ -532,11 +547,21 @@ class LeaseViewSet(viewsets.ModelViewSet):
         except (InvalidOperation, ValueError):
             return Response({"error": "Percentual inválido."}, status=status.HTTP_400_BAD_REQUEST)
 
+        renewal_date = None
+        if renewal_date_str:
+            try:
+                renewal_date = date.fromisoformat(str(renewal_date_str))
+            except ValueError:
+                return Response(
+                    {"error": "Data de renovação inválida."}, status=status.HTTP_400_BAD_REQUEST
+                )
+
         try:
             adjustment, warning = RentAdjustmentService.apply_adjustment(
                 lease=lease,
                 percentage=percentage,
                 update_apartment_prices=bool(update_apartment_prices),
+                renewal_date=renewal_date,
             )
         except ValidationError as e:
             error: Any = e.message_dict if hasattr(e, "message_dict") else str(e)
@@ -605,6 +630,9 @@ class DashboardViewSet(viewsets.ViewSet):
                 "revenue_per_apartment": "1000.00"
             }
         """
+        # Activate any pending rent adjustments whose month has arrived
+        RentAdjustmentService.activate_pending_adjustments()
+
         summary = DashboardService.get_financial_summary()
         return Response(summary, status=status.HTTP_200_OK)
 
@@ -645,7 +673,7 @@ class DashboardViewSet(viewsets.ViewSet):
                     "rented_apartments": 8,
                     "vacant_apartments": 2,
                     "occupancy_rate": 80.0,
-                    "total_revenue": "8000.00"
+                    "total_revenue": "8008.00"
                 },
                 ...
             ]
@@ -707,6 +735,61 @@ class DashboardViewSet(viewsets.ViewSet):
         statistics = DashboardService.get_tenant_statistics()
         return Response(statistics, status=status.HTTP_200_OK)
 
+    @action(detail=False, methods=["post"], url_path="mark_rent_paid")
+    def mark_rent_paid(self, request: Request) -> Response:
+        """
+        Mark rent as paid for a lease in the current month.
+
+        POST /api/dashboard/mark_rent_paid/
+
+        Body:
+            {
+                "lease_id": 1,
+                "amount_paid": "1500.00"  (optional, defaults to rental_value)
+            }
+        """
+        lease_id = request.data.get("lease_id")
+        if not lease_id:
+            return Response({"error": "lease_id é obrigatório"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            lease = Lease.objects.select_related("apartment", "apartment__building").get(
+                id=lease_id
+            )
+        except Lease.DoesNotExist:
+            return Response({"error": "Locação não encontrada"}, status=status.HTTP_404_NOT_FOUND)
+
+        today = date.today()
+        reference_month = today.replace(day=1)
+
+        # Check if already paid
+        if RentPayment.objects.filter(lease=lease, reference_month=reference_month).exists():
+            return Response(
+                {"error": "Aluguel deste mês já foi registrado como pago"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        amount_str = request.data.get("amount_paid")
+        try:
+            amount_paid = Decimal(amount_str) if amount_str else lease.rental_value
+        except (InvalidOperation, TypeError):
+            return Response({"error": "Valor inválido"}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = cast(User, request.user)
+        RentPayment.objects.create(
+            lease=lease,
+            reference_month=reference_month,
+            amount_paid=amount_paid,
+            payment_date=today,
+            created_by=user,
+            updated_by=user,
+        )
+
+        return Response(
+            {"message": f"Aluguel do Apto {lease.apartment.number} marcado como pago"},
+            status=status.HTTP_201_CREATED,
+        )
+
     @action(detail=False, methods=["get"])
     def rent_adjustment_alerts(self, request: Request) -> Response:
         """
@@ -717,5 +800,8 @@ class DashboardViewSet(viewsets.ViewSet):
         Returns leases whose 12-month adjustment window falls within the next
         2 months or is already overdue.
         """
-        alerts = RentAdjustmentService.get_eligible_leases()
-        return Response({"alerts": alerts}, status=status.HTTP_200_OK)
+        data = RentAdjustmentService.get_eligible_leases()
+        return Response(
+            data,
+            status=status.HTTP_200_OK,
+        )

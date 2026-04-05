@@ -64,6 +64,7 @@ export function ScenarioCard({ scenario, onRemove }: ScenarioCardProps) {
             variant="ghost"
             size="icon"
             className="h-6 w-6 shrink-0"
+            aria-label="Remover cenário"
             onClick={() => onRemove(scenario.id)}
           >
             <X className="h-3 w-3" />

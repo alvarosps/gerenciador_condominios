@@ -13,6 +13,7 @@
 **Depends on:** Plan 1 (Backend API) — all backend endpoints must be deployed
 
 **Related plans:**
+
 - Plan 1: Backend API (COMPLETE)
 - Plan 3: Mobile Tenant Experience (next)
 - Plan 4: Mobile Admin Experience
@@ -56,6 +57,7 @@ mobile/
 ## Task 1: Scaffold Expo Project
 
 **Files:**
+
 - Create: `mobile/` directory with Expo project
 
 - [ ] **Step 1: Create Expo project**
@@ -100,10 +102,7 @@ Replace `mobile/app.json`:
       },
       "package": "com.condominios.manager"
     },
-    "plugins": [
-      "expo-router",
-      "expo-secure-store"
-    ],
+    "plugins": ["expo-router", "expo-secure-store"],
     "experiments": {
       "typedRoutes": true
     }
@@ -138,16 +137,16 @@ Create `mobile/.eslintrc.json`:
 
 ```json
 {
-  "extends": [
-    "expo",
-    "plugin:@typescript-eslint/strict-type-checked"
-  ],
+  "extends": ["expo", "plugin:@typescript-eslint/strict-type-checked"],
   "parser": "@typescript-eslint/parser",
   "parserOptions": {
     "project": "./tsconfig.json"
   },
   "rules": {
-    "@typescript-eslint/consistent-type-imports": ["error", { "prefer": "type-imports", "fixStyle": "inline-type-imports" }],
+    "@typescript-eslint/consistent-type-imports": [
+      "error",
+      { "prefer": "type-imports", "fixStyle": "inline-type-imports" }
+    ],
     "@typescript-eslint/no-explicit-any": "error",
     "no-console": ["warn", { "allow": ["error", "warn"] }],
     "prefer-const": "error",
@@ -225,6 +224,7 @@ git commit -m "feat(mobile): scaffold Expo project with TypeScript and dependenc
 ## Task 2: Secure Store Wrapper
 
 **Files:**
+
 - Create: `mobile/lib/secure-store.ts`
 
 - [ ] **Step 1: Create secure-store wrapper**
@@ -271,6 +271,7 @@ git commit -m "feat(mobile): add secure-store wrapper for JWT token persistence"
 ## Task 3: Zustand Auth Store
 
 **Files:**
+
 - Create: `mobile/store/auth-store.ts`
 
 - [ ] **Step 1: Create auth store**
@@ -294,7 +295,11 @@ interface AuthState {
 }
 
 interface AuthActions {
-  setAuth: (user: User, accessToken: string, refreshToken: string) => Promise<void>;
+  setAuth: (
+    user: User,
+    accessToken: string,
+    refreshToken: string,
+  ) => Promise<void>;
   clearAuth: () => Promise<void>;
   setLoading: (loading: boolean) => void;
   hydrateFromStorage: () => Promise<void>;
@@ -309,7 +314,8 @@ export const useAuthStore = create<AuthStore>((set) => ({
   role: null,
 
   setAuth: async (user, accessToken, refreshToken) => {
-    const { setAccessToken, setRefreshToken } = await import("@/lib/secure-store");
+    const { setAccessToken, setRefreshToken } =
+      await import("@/lib/secure-store");
     await setAccessToken(accessToken);
     await setRefreshToken(refreshToken);
     set({
@@ -373,6 +379,7 @@ git commit -m "feat(mobile): add Zustand auth store with role detection and hydr
 ## Task 4: API Client with JWT Interceptors
 
 **Files:**
+
 - Create: `mobile/lib/api/client.ts`
 - Create: `mobile/lib/query-client.ts`
 
@@ -383,7 +390,8 @@ Create `mobile/lib/api/client.ts`:
 ```typescript
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from "axios";
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:8000/api";
+const API_BASE_URL =
+  process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:8008/api";
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -394,14 +402,16 @@ export const apiClient = axios.create({
 });
 
 // Request interceptor — attach JWT token
-apiClient.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
-  const { getAccessToken } = await import("@/lib/secure-store");
-  const token = await getAccessToken();
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
+apiClient.interceptors.request.use(
+  async (config: InternalAxiosRequestConfig) => {
+    const { getAccessToken } = await import("@/lib/secure-store");
+    const token = await getAccessToken();
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+);
 
 // Response interceptor — handle 401 with token refresh
 let isRefreshing = false;
@@ -448,7 +458,8 @@ apiClient.interceptors.response.use(
     isRefreshing = true;
 
     try {
-      const { getRefreshToken, setAccessToken } = await import("@/lib/secure-store");
+      const { getRefreshToken, setAccessToken } =
+        await import("@/lib/secure-store");
       const refreshToken = await getRefreshToken();
       if (!refreshToken) {
         throw new Error("No refresh token");
@@ -511,6 +522,7 @@ git commit -m "feat(mobile): add API client with JWT interceptors and TanStack Q
 ## Task 5: Root Layout with Auth Guard
 
 **Files:**
+
 - Create: `mobile/app/_layout.tsx`
 - Create: `mobile/components/ui/loading-screen.tsx`
 
@@ -600,6 +612,7 @@ git commit -m "feat(mobile): add root layout with auth guard and providers"
 ## Task 6: Placeholder Tab Layouts
 
 **Files:**
+
 - Create: `mobile/app/(tenant)/_layout.tsx`
 - Create: `mobile/app/(tenant)/index.tsx`
 - Create: `mobile/app/(admin)/_layout.tsx`
@@ -781,6 +794,7 @@ git commit -m "feat(mobile): add placeholder tab layouts for tenant and admin"
 ## Task 7: Login Screen
 
 **Files:**
+
 - Create: `mobile/app/login.tsx`
 
 - [ ] **Step 1: Create unified login screen**
@@ -1055,6 +1069,7 @@ git commit -m "feat(mobile): add unified login screen with admin and tenant auth
 ## Task 8: Environment Configuration
 
 **Files:**
+
 - Create: `mobile/.env`
 - Create: `mobile/.env.example`
 
@@ -1063,13 +1078,13 @@ git commit -m "feat(mobile): add unified login screen with admin and tenant auth
 Create `mobile/.env.example`:
 
 ```
-EXPO_PUBLIC_API_URL=http://localhost:8000/api
+EXPO_PUBLIC_API_URL=http://localhost:8008/api
 ```
 
 Create `mobile/.env` (gitignored):
 
 ```
-EXPO_PUBLIC_API_URL=http://localhost:8000/api
+EXPO_PUBLIC_API_URL=http://localhost:8008/api
 ```
 
 - [ ] **Step 2: Add .env to .gitignore**
@@ -1093,6 +1108,7 @@ git commit -m "chore(mobile): add environment configuration"
 ## Self-Review Checklist
 
 ### Spec Coverage
+
 - [x] Expo project scaffold with TypeScript — Task 1
 - [x] expo-secure-store wrapper — Task 2
 - [x] Zustand auth store with role detection — Task 3
@@ -1107,6 +1123,7 @@ git commit -m "chore(mobile): add environment configuration"
 - [x] TanStack Query client — Task 4
 
 ### Not in this plan (deferred to Plans 3-5)
+
 - Tenant screens (home, payments, PIX, contract, profile) — Plan 3
 - Admin screens (dashboard, properties, financial, actions, notifications) — Plan 4
 - Push notifications (expo-notifications, deep linking) — Plan 5

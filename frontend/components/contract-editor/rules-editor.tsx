@@ -262,6 +262,7 @@ export function RulesEditor() {
                   <Button
                     variant="ghost"
                     size="icon"
+                    aria-label="Editar regra"
                     onClick={() => setEditingRule(rule)}
                     className="h-8 w-8"
                   >
@@ -272,6 +273,7 @@ export function RulesEditor() {
                   <Button
                     variant="ghost"
                     size="icon"
+                    aria-label="Excluir regra"
                     onClick={() => handleDeleteClick(rule.id)}
                     className="h-8 w-8 text-destructive hover:text-destructive"
                   >

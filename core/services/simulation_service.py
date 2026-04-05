@@ -116,6 +116,10 @@ def _recalculate_totals(projection: list[dict[str, Any]]) -> None:
     first_past_found = False
 
     for entry in projection:
+        if entry.get("is_snapshot"):
+            cumulative = Decimal(str(entry["cumulative_balance"]))
+            continue
+
         if not entry.get("is_projected", True) and not first_past_found:
             first_past_found = True
             cumulative = entry["cumulative_balance"]
@@ -221,6 +225,8 @@ def _db_pay_off_early(projection: list[dict[str, Any]], scenario: dict[str, Any]
         key = (inst["due_date"].year, inst["due_date"].month)
         relief[key] = relief.get(key, Decimal("0.00")) + inst["amount"]
     for entry in projection:
+        if entry.get("is_snapshot"):
+            continue
         saving = relief.get((entry["year"], entry["month"]), Decimal("0.00"))
         if saving > Decimal("0.00"):
             entry["expenses_total"] -= saving
@@ -237,6 +243,8 @@ def _db_change_rent(projection: list[dict[str, Any]], scenario: dict[str, Any]) 
     current_value = lease.rental_value
     delta = new_value - current_value
     for entry in projection:
+        if entry.get("is_snapshot"):
+            continue
         entry["income_total"] += delta
         entry["balance"] = entry["income_total"] - entry["expenses_total"]
 
@@ -248,6 +256,8 @@ def _db_new_loan(projection: list[dict[str, Any]], scenario: dict[str, Any]) -> 
     start_month = str(scenario["start_month"])
     loan_months = _build_loan_months(start_month, installments)
     for entry in projection:
+        if entry.get("is_snapshot"):
+            continue
         if (entry["year"], entry["month"]) in loan_months:
             entry["expenses_total"] += amount
             entry["balance"] = entry["income_total"] - entry["expenses_total"]
@@ -261,6 +271,8 @@ def _db_remove_tenant(projection: list[dict[str, Any]], scenario: dict[str, Any]
         return
     rental_value = lease.rental_value
     for entry in projection:
+        if entry.get("is_snapshot"):
+            continue
         entry["income_total"] -= rental_value
         entry["balance"] = entry["income_total"] - entry["expenses_total"]
 
@@ -269,6 +281,8 @@ def _db_add_fixed_expense(projection: list[dict[str, Any]], scenario: dict[str, 
     """Add a fixed monthly expense to every month."""
     amount = Decimal(str(scenario["amount"]))
     for entry in projection:
+        if entry.get("is_snapshot"):
+            continue
         entry["expenses_total"] += amount
         entry["balance"] = entry["income_total"] - entry["expenses_total"]
 
@@ -284,6 +298,8 @@ def _db_remove_fixed_expense(projection: list[dict[str, Any]], scenario: dict[st
     if monthly_amount == Decimal("0.00"):
         return
     for entry in projection:
+        if entry.get("is_snapshot"):
+            continue
         entry["expenses_total"] -= monthly_amount
         entry["balance"] = entry["income_total"] - entry["expenses_total"]
 
@@ -302,6 +318,9 @@ def _recalculate_cumulative(projection: list[dict[str, Any]]) -> None:
     """Recalculate cumulative_balance across all entries."""
     cumulative = Decimal("0.00")
     for i, entry in enumerate(projection):
+        if entry.get("is_snapshot"):
+            cumulative = Decimal(str(entry["cumulative_balance"]))
+            continue
         if i == 0 and not entry.get("is_projected", True):
             cumulative = entry.get("cumulative_balance", Decimal("0.00"))
             continue
@@ -335,7 +354,9 @@ class SimulationService:
         projection = copy.deepcopy(base_projection)
 
         for scenario in scenarios:
-            future_entries = [e for e in projection if e.get("is_projected", True)]
+            future_entries = [
+                e for e in projection if e.get("is_projected", True) and not e.get("is_snapshot")
+            ]
             handler = _PURE_SCENARIO_HANDLERS.get(scenario["type"])
             if handler:
                 handler(future_entries, scenario)

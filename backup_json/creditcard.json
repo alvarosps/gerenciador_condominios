@@ -1,0 +1,173 @@
+[
+{
+  "model": "core.creditcard",
+  "pk": 1,
+  "fields": {
+    "created_at": "2026-03-23T01:48:04.274Z",
+    "updated_at": "2026-03-23T01:48:04.274Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "person": 1,
+    "nickname": "Itau Azul Rodrigo",
+    "last_four_digits": "7160",
+    "closing_day": 1,
+    "due_day": 9,
+    "is_active": true
+  }
+},
+{
+  "model": "core.creditcard",
+  "pk": 2,
+  "fields": {
+    "created_at": "2026-03-23T01:48:04.277Z",
+    "updated_at": "2026-03-23T01:48:04.277Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "person": 1,
+    "nickname": "Itau Visa Rodrigo",
+    "last_four_digits": "9608",
+    "closing_day": 27,
+    "due_day": 3,
+    "is_active": true
+  }
+},
+{
+  "model": "core.creditcard",
+  "pk": 3,
+  "fields": {
+    "created_at": "2026-03-23T01:48:04.279Z",
+    "updated_at": "2026-03-23T01:48:04.279Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "person": 1,
+    "nickname": "Caixa Rodrigo",
+    "last_four_digits": "5443",
+    "closing_day": 27,
+    "due_day": 7,
+    "is_active": true
+  }
+},
+{
+  "model": "core.creditcard",
+  "pk": 4,
+  "fields": {
+    "created_at": "2026-03-23T01:48:04.281Z",
+    "updated_at": "2026-03-23T01:48:04.281Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "person": 3,
+    "nickname": "Trigg Alvaro",
+    "last_four_digits": "",
+    "closing_day": 1,
+    "due_day": 10,
+    "is_active": true
+  }
+},
+{
+  "model": "core.creditcard",
+  "pk": 5,
+  "fields": {
+    "created_at": "2026-03-23T01:48:04.282Z",
+    "updated_at": "2026-03-23T01:48:04.282Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "person": 3,
+    "nickname": "Players Alvaro",
+    "last_four_digits": "",
+    "closing_day": 1,
+    "due_day": 10,
+    "is_active": true
+  }
+},
+{
+  "model": "core.creditcard",
+  "pk": 6,
+  "fields": {
+    "created_at": "2026-03-23T01:48:04.284Z",
+    "updated_at": "2026-03-23T01:48:04.284Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "person": 3,
+    "nickname": "Samsung Alvaro",
+    "last_four_digits": "",
+    "closing_day": 1,
+    "due_day": 10,
+    "is_active": true
+  }
+},
+{
+  "model": "core.creditcard",
+  "pk": 7,
+  "fields": {
+    "created_at": "2026-03-23T01:48:04.285Z",
+    "updated_at": "2026-03-23T01:48:04.285Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "person": 6,
+    "nickname": "Nubank Camila",
+    "last_four_digits": "7957",
+    "closing_day": 8,
+    "due_day": 16,
+    "is_active": true
+  }
+},
+{
+  "model": "core.creditcard",
+  "pk": 8,
+  "fields": {
+    "created_at": "2026-03-23T01:48:04.287Z",
+    "updated_at": "2026-03-23T01:48:04.287Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "person": 6,
+    "nickname": "Renner Camila",
+    "last_four_digits": "2581",
+    "closing_day": 9,
+    "due_day": 25,
+    "is_active": true
+  }
+},
+{
+  "model": "core.creditcard",
+  "pk": 9,
+  "fields": {
+    "created_at": "2026-03-23T01:48:04.288Z",
+    "updated_at": "2026-03-23T01:48:04.288Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "person": 6,
+    "nickname": "Mercado Pago Camila",
+    "last_four_digits": "4609",
+    "closing_day": 15,
+    "due_day": 20,
+    "is_active": true
+  }
+}
+]
