@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
+import { queryKeys } from '@/lib/api/query-keys';
 
 interface TemplateResponse {
   content: string;
@@ -33,7 +34,7 @@ interface RestoreResponse {
  */
 export function useContractTemplate() {
   return useQuery({
-    queryKey: ['contract-template'],
+    queryKey: queryKeys.contractTemplate.all,
     queryFn: async () => {
       const { data } = await apiClient.get<TemplateResponse>(
         '/templates/current/'
@@ -60,7 +61,7 @@ export function useSaveContractTemplate() {
     },
     onSuccess: () => {
       // Invalidate template cache to fetch new content
-      void queryClient.invalidateQueries({ queryKey: ['contract-template'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.contractTemplate.all });
     },
   });
 }
@@ -85,7 +86,7 @@ export function usePreviewContractTemplate() {
  */
 export function useTemplateBackups() {
   return useQuery({
-    queryKey: ['template-backups'],
+    queryKey: queryKeys.templateBackups.all,
     queryFn: async () => {
       const { data } = await apiClient.get<Backup[]>(
         '/templates/backups/'
@@ -112,8 +113,8 @@ export function useRestoreTemplateBackup() {
     },
     onSuccess: () => {
       // Invalidate template cache to fetch restored content
-      void queryClient.invalidateQueries({ queryKey: ['contract-template'] });
-      void queryClient.invalidateQueries({ queryKey: ['template-backups'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.contractTemplate.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.templateBackups.all });
     },
   });
 }

@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
 import { type EmployeePayment, employeePaymentSchema } from '@/lib/schemas/employee-payment.schema';
 import { type PaginatedResponse, extractResults } from '@/lib/types/api';
+import { queryKeys } from '@/lib/api/query-keys';
 
 export interface EmployeePaymentFilters {
   person_id?: number;
@@ -15,7 +16,7 @@ export function useEmployeePayments(filters?: EmployeePaymentFilters) {
     : {};
 
   return useQuery({
-    queryKey: ['employee-payments', cleanFilters],
+    queryKey: queryKeys.employeePayments.list(cleanFilters),
     queryFn: async () => {
       const { data } = await apiClient.get<PaginatedResponse<EmployeePayment> | EmployeePayment[]>(
         '/employee-payments/',
@@ -29,7 +30,7 @@ export function useEmployeePayments(filters?: EmployeePaymentFilters) {
 
 export function useEmployeePayment(id: number | null) {
   return useQuery({
-    queryKey: ['employee-payments', id],
+    queryKey: queryKeys.employeePayments.detail(id ?? 0),
     queryFn: async () => {
       if (!id) throw new Error('EmployeePayment ID is required');
       const { data } = await apiClient.get<EmployeePayment>(`/employee-payments/${id}/`);
@@ -48,9 +49,9 @@ export function useCreateEmployeePayment() {
       return response.data;
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['employee-payments'] });
-      void queryClient.invalidateQueries({ queryKey: ['financial-dashboard'] });
-      void queryClient.invalidateQueries({ queryKey: ['cash-flow'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.employeePayments.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.financialDashboard.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.cashFlow.all });
     },
   });
 }
@@ -66,10 +67,12 @@ export function useUpdateEmployeePayment() {
       return response.data;
     },
     onSuccess: (data) => {
-      void queryClient.invalidateQueries({ queryKey: ['employee-payments'] });
-      void queryClient.invalidateQueries({ queryKey: ['employee-payments', data.id] });
-      void queryClient.invalidateQueries({ queryKey: ['financial-dashboard'] });
-      void queryClient.invalidateQueries({ queryKey: ['cash-flow'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.employeePayments.all });
+      if (data.id !== undefined) {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.employeePayments.detail(data.id) });
+      }
+      void queryClient.invalidateQueries({ queryKey: queryKeys.financialDashboard.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.cashFlow.all });
     },
   });
 }
@@ -82,9 +85,9 @@ export function useDeleteEmployeePayment() {
       await apiClient.delete(`/employee-payments/${id}/`);
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['employee-payments'] });
-      void queryClient.invalidateQueries({ queryKey: ['financial-dashboard'] });
-      void queryClient.invalidateQueries({ queryKey: ['cash-flow'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.employeePayments.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.financialDashboard.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.cashFlow.all });
     },
   });
 }
@@ -98,9 +101,9 @@ export function useMarkEmployeePaymentPaid() {
       return data;
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['employee-payments'] });
-      void queryClient.invalidateQueries({ queryKey: ['financial-dashboard'] });
-      void queryClient.invalidateQueries({ queryKey: ['cash-flow'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.employeePayments.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.financialDashboard.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.cashFlow.all });
     },
   });
 }

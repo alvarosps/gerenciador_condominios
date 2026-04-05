@@ -6,6 +6,7 @@ import {
   type RentAdjustmentAlert,
   rentAdjustmentAlertSchema,
 } from '@/lib/schemas/rent-adjustment.schema';
+import { queryKeys } from '@/lib/api/query-keys';
 
 export function useApplyRentAdjustment() {
   const queryClient = useQueryClient();
@@ -26,17 +27,17 @@ export function useApplyRentAdjustment() {
       return data;
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['leases'] });
-      void queryClient.invalidateQueries({ queryKey: ['apartments'] });
-      void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
-      void queryClient.invalidateQueries({ queryKey: ['rent-adjustment-alerts'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.leases.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.apartments.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.rentAdjustmentAlerts.all });
     },
   });
 }
 
 export function useRentAdjustments(leaseId: number | null) {
   return useQuery({
-    queryKey: ['rent-adjustments', leaseId],
+    queryKey: queryKeys.rentAdjustments.byLease(leaseId),
     queryFn: async () => {
       if (!leaseId) throw new Error('Lease ID is required');
       const { data } = await apiClient.get<RentAdjustment[]>(
@@ -56,7 +57,7 @@ interface RentAdjustmentAlertsResponse {
 
 export function useRentAdjustmentAlerts() {
   return useQuery({
-    queryKey: ['rent-adjustment-alerts'],
+    queryKey: queryKeys.rentAdjustmentAlerts.all,
     queryFn: async () => {
       const { data } = await apiClient.get<RentAdjustmentAlertsResponse>(
         '/dashboard/rent_adjustment_alerts/',

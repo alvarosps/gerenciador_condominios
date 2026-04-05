@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '../client';
+import { queryKeys } from '@/lib/api/query-keys';
 
 export interface MonthlyPurchaseItem {
   description: string;
@@ -46,7 +47,7 @@ export interface MonthlyPurchasesResponse {
 
 export function useMonthlyPurchases(year: number, month: number) {
   return useQuery({
-    queryKey: ['monthly-purchases', year, month],
+    queryKey: queryKeys.monthlyPurchases.byMonth(year, month),
     queryFn: async () => {
       const { data } = await apiClient.get<MonthlyPurchasesResponse>(
         '/financial-dashboard/monthly_purchases/',

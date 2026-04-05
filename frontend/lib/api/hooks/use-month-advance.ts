@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { apiClient } from '../client';
 import { getErrorMessage } from '@/lib/utils/error-handler';
+import { queryKeys } from '@/lib/api/query-keys';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -129,7 +130,7 @@ const STALE_TIME = 1000 * 60 * 2;
 
 export function useMonthStatus(year: number, month: number) {
   return useQuery({
-    queryKey: ['month-advance', 'status', year, month],
+    queryKey: queryKeys.monthAdvance.status(year, month),
     queryFn: async () => {
       const { data } = await apiClient.get<MonthStatus>('/month-advance/get_status/', {
         params: { year, month },
@@ -142,7 +143,7 @@ export function useMonthStatus(year: number, month: number) {
 
 export function useMonthSnapshots(year?: number) {
   return useQuery({
-    queryKey: ['month-advance', 'snapshots', year],
+    queryKey: queryKeys.monthAdvance.snapshots(year),
     queryFn: async () => {
       const { data } = await apiClient.get<MonthSnapshotSummary[]>('/month-advance/snapshots/', {
         params: year !== undefined ? { year } : undefined,
@@ -155,7 +156,7 @@ export function useMonthSnapshots(year?: number) {
 
 export function useMonthSnapshotDetail(year: number, month: number) {
   return useQuery({
-    queryKey: ['month-advance', 'snapshot-detail', year, month],
+    queryKey: queryKeys.monthAdvance.snapshotDetail(year, month),
     queryFn: async () => {
       const { data } = await apiClient.get<MonthSnapshotDetail>(
         `/month-advance/snapshots/${String(year)}/${String(month)}/`,
@@ -168,7 +169,7 @@ export function useMonthSnapshotDetail(year: number, month: number) {
 
 export function useMonthPreview(year: number, month: number) {
   return useQuery({
-    queryKey: ['month-advance', 'preview', year, month],
+    queryKey: queryKeys.monthAdvance.preview(year, month),
     queryFn: async () => {
       const { data } = await apiClient.get<NextMonthPreview>('/month-advance/preview/', {
         params: { year, month },
@@ -193,9 +194,9 @@ export function useAdvanceMonth() {
       return data;
     },
     onSuccess: (_, variables) => {
-      void queryClient.invalidateQueries({ queryKey: ['month-advance'] });
-      void queryClient.invalidateQueries({ queryKey: ['financial-dashboard'] });
-      void queryClient.invalidateQueries({ queryKey: ['cash-flow'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.monthAdvance.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.financialDashboard.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.cashFlow.all });
       const monthLabel = `${String(variables.month).padStart(2, '0')}/${String(variables.year)}`;
       toast.success(`Mês ${monthLabel} finalizado com sucesso!`);
     },
@@ -217,9 +218,9 @@ export function useRollbackMonth() {
       return data;
     },
     onSuccess: (_, variables) => {
-      void queryClient.invalidateQueries({ queryKey: ['month-advance'] });
-      void queryClient.invalidateQueries({ queryKey: ['financial-dashboard'] });
-      void queryClient.invalidateQueries({ queryKey: ['cash-flow'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.monthAdvance.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.financialDashboard.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.cashFlow.all });
       const monthLabel = `${String(variables.month).padStart(2, '0')}/${String(variables.year)}`;
       toast.success(`Mês ${monthLabel} revertido com sucesso.`);
     },

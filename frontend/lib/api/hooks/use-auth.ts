@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
 import { useAuthStore, type User } from '@/store/auth-store';
+import { queryKeys } from '@/lib/api/query-keys';
 
 /**
  * Login credentials interface
@@ -163,7 +164,7 @@ export function useCurrentUser() {
   const setUser = useAuthStore((state) => state.setUser);
 
   return useQuery({
-    queryKey: ['current-user'],
+    queryKey: queryKeys.currentUser.all,
     queryFn: async () => {
       const { data } = await apiClient.get<User>('/auth/me/');
       setUser(data);

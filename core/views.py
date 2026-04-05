@@ -9,6 +9,7 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import DatabaseError, IntegrityError, OperationalError, connection
 from django.db.models import Count, DateField, Q, QuerySet
 from django.db.models.expressions import RawSQL
+from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.permissions import AllowAny
@@ -278,7 +279,7 @@ class LeaseViewSet(viewsets.ModelViewSet):
         if not any(v and v.lower() == "true" for v in [is_active, is_expired, expiring_soon]):
             return queryset
 
-        today = date.today()
+        today = timezone.now().date()
 
         # Annotate end_date using PostgreSQL interval arithmetic to avoid loading all leases into Python
         queryset = queryset.annotate(
@@ -410,7 +411,7 @@ class LeaseViewSet(viewsets.ModelViewSet):
         result = FeeCalculatorService.calculate_late_fee(
             rental_value=lease.rental_value,
             due_day=lease.responsible_tenant.due_day,
-            current_date=date.today(),
+            current_date=timezone.now().date(),
         )
 
         # Return appropriate response
@@ -759,7 +760,7 @@ class DashboardViewSet(viewsets.ViewSet):
         except Lease.DoesNotExist:
             return Response({"error": "Locação não encontrada"}, status=status.HTTP_404_NOT_FOUND)
 
-        today = date.today()
+        today = timezone.now().date()
         reference_month = today.replace(day=1)
 
         # Check if already paid

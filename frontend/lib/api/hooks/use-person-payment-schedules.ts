@@ -8,6 +8,7 @@ import {
   personMonthTotalSchema,
 } from '@/lib/schemas/person-payment-schedule.schema';
 import { type PaginatedResponse, extractResults } from '@/lib/types/api';
+import { queryKeys } from '@/lib/api/query-keys';
 
 export interface PersonPaymentScheduleFilters {
   person_id?: number;
@@ -20,7 +21,7 @@ export function usePersonPaymentSchedules(filters?: PersonPaymentScheduleFilters
     : {};
 
   return useQuery({
-    queryKey: ['person-payment-schedules', cleanFilters],
+    queryKey: queryKeys.personPaymentSchedules.list(cleanFilters),
     queryFn: async () => {
       const { data } = await apiClient.get<
         PaginatedResponse<PersonPaymentSchedule> | PersonPaymentSchedule[]
@@ -35,7 +36,7 @@ export function usePersonPaymentSchedules(filters?: PersonPaymentScheduleFilters
 
 export function usePersonMonthTotal(personId: number | undefined, referenceMonth: string | undefined) {
   return useQuery({
-    queryKey: ['person-payment-schedules', 'person_month_total', personId, referenceMonth],
+    queryKey: queryKeys.personPaymentSchedules.personMonthTotal(personId, referenceMonth),
     queryFn: async () => {
       const { data } = await apiClient.get<PersonMonthTotal>(
         '/person-payment-schedules/person_month_total/',
@@ -59,8 +60,8 @@ export function useBulkConfigureSchedule() {
       return response.data;
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['person-payment-schedules'] });
-      void queryClient.invalidateQueries({ queryKey: ['daily-control'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.personPaymentSchedules.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.dailyControl.all });
     },
   });
 }
@@ -73,8 +74,8 @@ export function useDeletePersonPaymentSchedule() {
       await apiClient.delete(`/person-payment-schedules/${id}/`);
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['person-payment-schedules'] });
-      void queryClient.invalidateQueries({ queryKey: ['daily-control'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.personPaymentSchedules.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.dailyControl.all });
     },
   });
 }

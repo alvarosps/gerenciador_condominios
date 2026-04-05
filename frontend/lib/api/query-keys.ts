@@ -167,6 +167,12 @@ export const queryKeys = {
   },
   furniture: {
     all: ['furniture'] as const,
+    list: () => [...queryKeys.furniture.all] as const,
+    detail: (id: number) => [...queryKeys.furniture.all, id] as const,
+  },
+  financialSettings: {
+    all: ['financial-settings'] as const,
+    current: () => [...queryKeys.financialSettings.all, 'current'] as const,
   },
   currentUser: {
     all: ['current-user'] as const,

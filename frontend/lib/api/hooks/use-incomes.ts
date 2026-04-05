@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
 import { type Income, incomeSchema } from '@/lib/schemas/income.schema';
 import { type PaginatedResponse, extractResults } from '@/lib/types/api';
+import { queryKeys } from '@/lib/api/query-keys';
 
 export interface IncomeFilters {
   person_id?: number;
@@ -16,7 +17,7 @@ export function useIncomes(filters?: IncomeFilters) {
     : {};
 
   return useQuery({
-    queryKey: ['incomes', cleanFilters],
+    queryKey: queryKeys.incomes.list(cleanFilters),
     queryFn: async () => {
       const { data } = await apiClient.get<PaginatedResponse<Income> | Income[]>('/incomes/', {
         params: { page_size: 10000, ...cleanFilters },
@@ -29,7 +30,7 @@ export function useIncomes(filters?: IncomeFilters) {
 
 export function useIncome(id: number | null) {
   return useQuery({
-    queryKey: ['incomes', id],
+    queryKey: queryKeys.incomes.detail(id ?? 0),
     queryFn: async () => {
       if (!id) throw new Error('Income ID is required');
       const { data } = await apiClient.get<Income>(`/incomes/${id}/`);
@@ -48,9 +49,9 @@ export function useCreateIncome() {
       return response.data;
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['incomes'] });
-      void queryClient.invalidateQueries({ queryKey: ['financial-dashboard'] });
-      void queryClient.invalidateQueries({ queryKey: ['cash-flow'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.incomes.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.financialDashboard.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.cashFlow.all });
     },
   });
 }
@@ -66,10 +67,12 @@ export function useUpdateIncome() {
       return response.data;
     },
     onSuccess: (data) => {
-      void queryClient.invalidateQueries({ queryKey: ['incomes'] });
-      void queryClient.invalidateQueries({ queryKey: ['incomes', data.id] });
-      void queryClient.invalidateQueries({ queryKey: ['financial-dashboard'] });
-      void queryClient.invalidateQueries({ queryKey: ['cash-flow'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.incomes.all });
+      if (data.id !== undefined) {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.incomes.detail(data.id) });
+      }
+      void queryClient.invalidateQueries({ queryKey: queryKeys.financialDashboard.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.cashFlow.all });
     },
   });
 }
@@ -82,9 +85,9 @@ export function useDeleteIncome() {
       await apiClient.delete(`/incomes/${id}/`);
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['incomes'] });
-      void queryClient.invalidateQueries({ queryKey: ['financial-dashboard'] });
-      void queryClient.invalidateQueries({ queryKey: ['cash-flow'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.incomes.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.financialDashboard.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.cashFlow.all });
     },
   });
 }
@@ -98,9 +101,9 @@ export function useMarkIncomeReceived() {
       return data;
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['incomes'] });
-      void queryClient.invalidateQueries({ queryKey: ['financial-dashboard'] });
-      void queryClient.invalidateQueries({ queryKey: ['cash-flow'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.incomes.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.financialDashboard.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.cashFlow.all });
     },
   });
 }

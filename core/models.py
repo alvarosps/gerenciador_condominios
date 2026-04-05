@@ -1328,7 +1328,7 @@ class PersonPaymentSchedule(AuditMixin, SoftDeleteMixin, models.Model):
 
     person = models.ForeignKey(
         Person,
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         related_name="payment_schedules",
     )
     reference_month = models.DateField(

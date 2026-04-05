@@ -2,13 +2,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
 import { type Furniture, furnitureSchema } from '@/lib/schemas/furniture.schema';
 import { type PaginatedResponse, extractResults } from '@/lib/types/api';
+import { queryKeys } from '@/lib/api/query-keys';
 
 /**
  * Hook to fetch all furniture items
  */
 export function useFurniture() {
   return useQuery({
-    queryKey: ['furniture'],
+    queryKey: queryKeys.furniture.list(),
     queryFn: async () => {
       const { data } = await apiClient.get<PaginatedResponse<Furniture> | Furniture[]>('/furnitures/', {
         params: { page_size: 10000 },
@@ -26,7 +27,7 @@ export function useFurniture() {
  */
 export function useFurnitureItem(id: number | null) {
   return useQuery({
-    queryKey: ['furniture', id],
+    queryKey: queryKeys.furniture.detail(id ?? 0),
     queryFn: async () => {
       if (!id) throw new Error('Furniture ID is required');
       const { data } = await apiClient.get<Furniture>(`/furnitures/${id}/`);
@@ -50,10 +51,10 @@ export function useCreateFurniture() {
       return response.data;
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['furniture'] });
-      void queryClient.invalidateQueries({ queryKey: ['apartments'] });
-      void queryClient.invalidateQueries({ queryKey: ['tenants'] });
-      void queryClient.invalidateQueries({ queryKey: ['leases'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.furniture.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.apartments.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.tenants.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.leases.all });
     },
   });
 }
@@ -76,11 +77,13 @@ export function useUpdateFurniture() {
       return response.data;
     },
     onSuccess: (data) => {
-      void queryClient.invalidateQueries({ queryKey: ['furniture'] });
-      void queryClient.invalidateQueries({ queryKey: ['furniture', data.id] });
-      void queryClient.invalidateQueries({ queryKey: ['apartments'] });
-      void queryClient.invalidateQueries({ queryKey: ['tenants'] });
-      void queryClient.invalidateQueries({ queryKey: ['leases'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.furniture.all });
+      if (data.id !== undefined) {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.furniture.detail(data.id) });
+      }
+      void queryClient.invalidateQueries({ queryKey: queryKeys.apartments.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.tenants.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.leases.all });
     },
   });
 }
@@ -96,10 +99,10 @@ export function useDeleteFurniture() {
       await apiClient.delete(`/furnitures/${id}/`);
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['furniture'] });
-      void queryClient.invalidateQueries({ queryKey: ['apartments'] });
-      void queryClient.invalidateQueries({ queryKey: ['tenants'] });
-      void queryClient.invalidateQueries({ queryKey: ['leases'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.furniture.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.apartments.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.tenants.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.leases.all });
     },
   });
 }

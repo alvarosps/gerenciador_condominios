@@ -4,10 +4,11 @@ import {
   type FinancialSettings,
   financialSettingsSchema,
 } from '@/lib/schemas/financial-settings.schema';
+import { queryKeys } from '@/lib/api/query-keys';
 
 export function useFinancialSettings() {
   return useQuery({
-    queryKey: ['financial-settings'],
+    queryKey: queryKeys.financialSettings.current(),
     queryFn: async () => {
       const { data } = await apiClient.get<FinancialSettings>('/financial-settings/current/');
       return financialSettingsSchema.parse(data);
@@ -24,7 +25,7 @@ export function useUpdateFinancialSettings() {
       return response.data;
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['financial-settings'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.financialSettings.all });
     },
   });
 }

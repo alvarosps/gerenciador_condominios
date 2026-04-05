@@ -2,10 +2,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
 import { type Person, personSchema } from '@/lib/schemas/person.schema';
 import { type PaginatedResponse, extractResults } from '@/lib/types/api';
+import { queryKeys } from '@/lib/api/query-keys';
 
 export function usePersons() {
   return useQuery({
-    queryKey: ['persons'],
+    queryKey: queryKeys.persons.list(),
     queryFn: async () => {
       const { data } = await apiClient.get<PaginatedResponse<Person> | Person[]>('/persons/', {
         params: { page_size: 10000 },
@@ -18,7 +19,7 @@ export function usePersons() {
 
 export function usePerson(id: number | null) {
   return useQuery({
-    queryKey: ['persons', id],
+    queryKey: queryKeys.persons.detail(id ?? 0),
     queryFn: async () => {
       if (!id) throw new Error('Person ID is required');
       const { data } = await apiClient.get<Person>(`/persons/${id}/`);
@@ -37,7 +38,7 @@ export function useCreatePerson() {
       return response.data;
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['persons'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.persons.all });
     },
   });
 }
@@ -53,8 +54,10 @@ export function useUpdatePerson() {
       return response.data;
     },
     onSuccess: (data) => {
-      void queryClient.invalidateQueries({ queryKey: ['persons'] });
-      void queryClient.invalidateQueries({ queryKey: ['persons', data.id] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.persons.all });
+      if (data.id !== undefined) {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.persons.detail(data.id) });
+      }
     },
   });
 }
@@ -67,7 +70,7 @@ export function useDeletePerson() {
       await apiClient.delete(`/persons/${id}/`);
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['persons'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.persons.all });
     },
   });
 }

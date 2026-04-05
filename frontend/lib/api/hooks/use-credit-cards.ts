@@ -2,10 +2,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
 import { type CreditCard, creditCardSchema } from '@/lib/schemas/credit-card.schema';
 import { type PaginatedResponse, extractResults } from '@/lib/types/api';
+import { queryKeys } from '@/lib/api/query-keys';
 
 export function useCreditCards() {
   return useQuery({
-    queryKey: ['credit-cards'],
+    queryKey: queryKeys.creditCards.list(),
     queryFn: async () => {
       const { data } = await apiClient.get<PaginatedResponse<CreditCard> | CreditCard[]>('/credit-cards/', {
         params: { page_size: 10000 },
@@ -18,7 +19,7 @@ export function useCreditCards() {
 
 export function useCreditCard(id: number | null) {
   return useQuery({
-    queryKey: ['credit-cards', id],
+    queryKey: queryKeys.creditCards.detail(id ?? 0),
     queryFn: async () => {
       if (!id) throw new Error('CreditCard ID is required');
       const { data } = await apiClient.get<CreditCard>(`/credit-cards/${id}/`);
@@ -37,8 +38,8 @@ export function useCreateCreditCard() {
       return response.data;
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['credit-cards'] });
-      void queryClient.invalidateQueries({ queryKey: ['persons'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.creditCards.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.persons.all });
     },
   });
 }
@@ -54,9 +55,11 @@ export function useUpdateCreditCard() {
       return response.data;
     },
     onSuccess: (data) => {
-      void queryClient.invalidateQueries({ queryKey: ['credit-cards'] });
-      void queryClient.invalidateQueries({ queryKey: ['credit-cards', data.id] });
-      void queryClient.invalidateQueries({ queryKey: ['persons'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.creditCards.all });
+      if (data.id !== undefined) {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.creditCards.detail(data.id) });
+      }
+      void queryClient.invalidateQueries({ queryKey: queryKeys.persons.all });
     },
   });
 }
@@ -69,8 +72,8 @@ export function useDeleteCreditCard() {
       await apiClient.delete(`/credit-cards/${id}/`);
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['credit-cards'] });
-      void queryClient.invalidateQueries({ queryKey: ['persons'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.creditCards.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.persons.all });
     },
   });
 }
