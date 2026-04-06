@@ -88,8 +88,9 @@ export function useLogout() {
 
   return useMutation({
     mutationFn: async () => {
-      // Call backend logout endpoint
-      await apiClient.post('/auth/logout/');
+      const refreshToken =
+        typeof window !== 'undefined' ? localStorage.getItem('refresh_token') : null;
+      await apiClient.post('/auth/logout/', { refresh: refreshToken ?? '' });
     },
     onSuccess: () => {
       // Clear auth state
