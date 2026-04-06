@@ -220,7 +220,6 @@ export interface DashboardSummary {
 }
 
 const STALE_TIME = 1000 * 60 * 5;
-const REFETCH_INTERVAL = 1000 * 60 * 5;
 
 export function useFinancialOverview() {
   return useQuery({
@@ -230,7 +229,6 @@ export function useFinancialOverview() {
       return data;
     },
     staleTime: STALE_TIME,
-    refetchInterval: REFETCH_INTERVAL,
   });
 }
 
@@ -242,7 +240,6 @@ export function useDebtByPerson() {
       return data;
     },
     staleTime: STALE_TIME,
-    refetchInterval: REFETCH_INTERVAL,
   });
 }
 
@@ -254,7 +251,6 @@ export function useDebtByType() {
       return data;
     },
     staleTime: STALE_TIME,
-    refetchInterval: REFETCH_INTERVAL,
   });
 }
 
@@ -272,7 +268,6 @@ export function useUpcomingInstallments(days?: number) {
       })) as UpcomingInstallment[];
     },
     staleTime: STALE_TIME,
-    refetchInterval: REFETCH_INTERVAL,
   });
 }
 
@@ -289,7 +284,6 @@ export function useOverdueInstallments() {
       })) as UpcomingInstallment[];
     },
     staleTime: STALE_TIME,
-    refetchInterval: REFETCH_INTERVAL,
   });
 }
 
@@ -304,7 +298,6 @@ export function useCategoryBreakdown(year: number, month: number) {
       return data;
     },
     staleTime: STALE_TIME,
-    refetchInterval: REFETCH_INTERVAL,
   });
 }
 
@@ -319,7 +312,6 @@ export function useDashboardSummary(year: number, month: number) {
       return data;
     },
     staleTime: STALE_TIME,
-    refetchInterval: REFETCH_INTERVAL,
   });
 }
 
@@ -336,7 +328,6 @@ export function useExpenseDetail(type: string, id: number | null, year: number, 
       return data;
     },
     staleTime: STALE_TIME,
-    refetchInterval: REFETCH_INTERVAL,
     enabled: Boolean(type),
   });
 }
