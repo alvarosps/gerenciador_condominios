@@ -844,7 +844,6 @@ class FinancialDashboardService:
         return extra_income_total, extra_incomes
 
     @staticmethod
-    @staticmethod
     def _ensure_employee_payments(month_start: date) -> None:
         """Auto-create EmployeePayment for employees missing one this month.
 

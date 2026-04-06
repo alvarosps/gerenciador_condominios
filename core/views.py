@@ -33,7 +33,7 @@ from .serializers import (
     TenantSerializer,
 )
 from .services import ContractService, DashboardService, FeeCalculatorService
-from .services.lease_service import terminate_lease, transfer_lease
+from .services.lease_service import change_tenant_due_day, terminate_lease, transfer_lease
 from .services.rent_adjustment_service import RentAdjustmentService
 
 logger = logging.getLogger(__name__)
@@ -452,9 +452,7 @@ class LeaseViewSet(viewsets.ModelViewSet):
 
             # Update the due date on the tenant (source of truth)
             old_due_day = lease.responsible_tenant.due_day
-            tenant = lease.responsible_tenant
-            tenant.due_day = new_due_day
-            tenant.save(update_fields=["due_day"])
+            change_tenant_due_day(lease.responsible_tenant, new_due_day)
 
             return Response(
                 {

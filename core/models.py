@@ -12,6 +12,7 @@ This module defines the core domain models for property management:
 
 import re
 import uuid
+from datetime import timedelta
 from decimal import Decimal
 from typing import Any
 
@@ -1117,13 +1118,15 @@ class Expense(AuditMixin, SoftDeleteMixin, models.Model):
         return result
 
     def restore(self, restored_by: Any = None) -> None:
+        original_deleted_at = self.deleted_at
         super().restore(restored_by=restored_by)
-        # Cascade restore to child installments
-        self.installments.filter(is_deleted=True).update(
-            is_deleted=False,
-            deleted_at=None,
-            deleted_by=None,
-        )
+        if original_deleted_at:
+            window = timedelta(seconds=2)
+            self.installments.filter(
+                is_deleted=True,
+                deleted_at__gte=original_deleted_at - window,
+                deleted_at__lte=original_deleted_at + window,
+            ).update(is_deleted=False, deleted_at=None, deleted_by=None)
 
 
 class ExpenseInstallment(AuditMixin, SoftDeleteMixin, models.Model):

@@ -1,4 +1,4 @@
-"""Lease lifecycle services: terminate and transfer."""
+"""Lease lifecycle services: terminate, transfer, and due-date change."""
 
 from decimal import Decimal
 from typing import Any
@@ -91,3 +91,11 @@ def transfer_lease(lease_id: int, payload: dict[str, Any], user: Any) -> Lease:
         new_lease.tenants.set(tenant_ids)
 
     return new_lease
+
+
+def change_tenant_due_day(tenant: Tenant, new_due_day: int) -> None:
+    """Update a tenant's rent due day with validation."""
+    tenant.due_day = new_due_day
+    tenant.full_clean()
+    tenant.updated_at = timezone.now()
+    tenant.save(update_fields=["due_day", "updated_at"])

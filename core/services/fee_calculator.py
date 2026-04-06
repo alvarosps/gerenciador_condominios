@@ -74,7 +74,7 @@ class FeeCalculatorService:
             >>> result["late_days"]
             5
             >>> result["late_fee"]
-            Decimal('375.00')  # (1500/30) × 5 × 1.05
+            Decimal('12.50')  # (1500/30) × 5 × 0.05
         """
         if rental_value < Decimal(0):
             msg = "rental_value must be non-negative"
