@@ -278,17 +278,6 @@ def sample_lease_data() -> dict[str, Any]:
 
 
 @pytest.fixture
-def cleanup_test_contracts():
-    """
-    Cleans up any test contract files created during tests.
-    Runs after test completion.
-    """
-    return
-    # Cleanup logic would go here if needed
-    # Currently handled by tmp_path fixture
-
-
-@pytest.fixture
 def freeze_time():
     """
     Provides freezegun's freeze_time for time-dependent tests.

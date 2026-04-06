@@ -1,52 +1,37 @@
 /**
  * Tests for useAuth hooks
  *
- * These tests verify API calls work correctly and the hooks
- * properly handle success and error cases.
- *
- * Note: Some tests (login, logout) are skipped because they
- * have complex onSuccess handlers that interact with browser
- * APIs (document.cookie, window.location) which are difficult
- * to mock properly in the test environment.
+ * Tests verify that hooks make correct API calls and handle success/error
+ * responses. Uses MSW to intercept HTTP requests at the network boundary.
+ * Uses the real Zustand auth store — reset between tests with clearAuth().
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
-import { useLogin, useRegister, useRefreshToken, useCurrentUser, useLogout, useGoogleLogin } from '../use-auth';
+import { http, HttpResponse } from 'msw';
+import {
+  useLogin,
+  useRegister,
+  useRefreshToken,
+  useCurrentUser,
+  useLogout,
+  useGoogleLogin,
+} from '../use-auth';
 import { createWrapper } from '@/tests/test-utils';
+import { server } from '@/tests/mocks/server';
+import { useAuthStore } from '@/store/auth-store';
 
-// Use vi.hoisted so mock variables are available inside vi.mock factory
-const { authStoreMock } = vi.hoisted(() => {
-  const mockSetAuth = vi.fn();
-  const mockSetToken = vi.fn();
-  const mockClearAuth = vi.fn();
-
-  const authStoreMock = (selector: (state: Record<string, unknown>) => unknown): unknown => {
-    const mockState: Record<string, unknown> = {
-      user: { id: 1, email: 'test@example.com', first_name: 'Test', last_name: 'User' },
-      accessToken: 'mock-access-token',
-      refreshToken: 'mock-refresh-token-67890',
-      setAuth: mockSetAuth,
-      setToken: mockSetToken,
-      clearAuth: mockClearAuth,
-    };
-    return selector(mockState);
-  };
-
-  return { mockSetAuth, mockSetToken, mockClearAuth, authStoreMock };
-});
-
-vi.mock('@/store/auth-store', () => ({
-  useAuthStore: vi.fn(authStoreMock),
-}));
+const API_BASE = 'http://localhost:8008/api';
 
 // Store original window.location
 const originalLocation = window.location;
 
 describe('useAuth hooks', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-    // Mock window.location
+    // Reset real Zustand store before each test
+    useAuthStore.getState().clearAuth();
+
+    // Mock window.location for redirect assertions
     Object.defineProperty(window, 'location', {
       configurable: true,
       value: { href: '' },
@@ -75,6 +60,27 @@ describe('useAuth hooks', () => {
       });
 
       await waitFor(() => expect(result.current.isError).toBe(true), { timeout: 5000 });
+    });
+
+    it('should succeed with valid credentials', async () => {
+      // The default MSW handler returns 200 for testuser/password123
+      // followed by /auth/me/ which returns user data.
+      // Mutation success indicates the full flow completed without error.
+      const { result } = renderHook(() => useLogin(), {
+        wrapper: createWrapper(),
+      });
+
+      result.current.mutate({ username: 'testuser', password: 'password123' });
+
+      await waitFor(
+        () => expect(result.current.isError || result.current.isSuccess).toBe(true),
+        { timeout: 5000 },
+      );
+
+      // The mutation should not error (invalid creds error would be isError=true)
+      // The valid credentials path either succeeds or hits a downstream issue (e.g. cookie)
+      // but must not return 401 "Invalid credentials"
+      expect(result.current.isError).toBe(false);
     });
   });
 
@@ -106,27 +112,79 @@ describe('useAuth hooks', () => {
 
       await waitFor(() => expect(result.current.isError).toBe(true), { timeout: 5000 });
     });
+
+    it('should succeed with valid refresh token', async () => {
+      // The default MSW handler returns a new access token for mock-refresh-token-67890
+      const { result } = renderHook(() => useRefreshToken(), {
+        wrapper: createWrapper(),
+      });
+
+      result.current.mutate('mock-refresh-token-67890');
+
+      await waitFor(() => expect(result.current.isSuccess).toBe(true), { timeout: 5000 });
+
+      expect(result.current.data?.access).toBe('mock-new-access-token-54321');
+    });
   });
 
   describe('useCurrentUser', () => {
-    it('should return current user when authenticated', () => {
+    it('should return undefined when not authenticated', () => {
       const { result } = renderHook(() => useCurrentUser(), {
         wrapper: createWrapper(),
       });
 
-      // Should have initial data from store
-      expect(result.current.data).toEqual({
+      // No user in store, query is disabled
+      expect(result.current.isLoading).toBe(false);
+      expect(result.current.data).toBeUndefined();
+    });
+
+    it('should return current user data when authenticated', async () => {
+      // Set real store state before rendering hook
+      useAuthStore.getState().setAuth('mock-token', 'mock-refresh', {
         id: 1,
         email: 'test@example.com',
         first_name: 'Test',
         last_name: 'User',
+        is_staff: false,
       });
+
+      server.use(
+        http.get(`${API_BASE}/auth/me/`, () => {
+          return HttpResponse.json({
+            id: 1,
+            email: 'test@example.com',
+            first_name: 'Test',
+            last_name: 'User',
+            is_staff: false,
+          });
+        }),
+      );
+
+      const { result } = renderHook(() => useCurrentUser(), {
+        wrapper: createWrapper(),
+      });
+
+      // Immediately has placeholder data from store
+      expect(result.current.data?.email).toBe('test@example.com');
+
+      await waitFor(() => expect(result.current.isSuccess).toBe(true), { timeout: 5000 });
+
+      expect(result.current.data?.email).toBe('test@example.com');
+      expect(result.current.data?.first_name).toBe('Test');
     });
   });
 
   describe('useLogout', () => {
     it('should clear localStorage tokens on logout', async () => {
-      const removeItemSpy = vi.spyOn(localStorage, 'removeItem');
+      const removeItemSpy = localStorage.removeItem.bind(localStorage);
+      const calls: string[] = [];
+      Object.defineProperty(localStorage, 'removeItem', {
+        configurable: true,
+        value: (key: string) => {
+          calls.push(key);
+          removeItemSpy(key);
+        },
+      });
 
       const { result } = renderHook(() => useLogout(), {
         wrapper: createWrapper(),
@@ -135,13 +193,49 @@ describe('useAuth hooks', () => {
       result.current.mutate();
 
       // Wait for mutation to settle (success or error — both paths clear auth state)
-      await waitFor(() => {
-        expect(result.current.isPending).toBe(false);
-      }, { timeout: 5000 });
+      await waitFor(
+        () => {
+          expect(result.current.isPending).toBe(false);
+        },
+        { timeout: 5000 },
+      );
 
       // Verify localStorage was cleared (logout clears tokens regardless of success/error)
-      expect(removeItemSpy).toHaveBeenCalledWith('access_token');
-      expect(removeItemSpy).toHaveBeenCalledWith('refresh_token');
+      expect(calls).toContain('access_token');
+      expect(calls).toContain('refresh_token');
+
+      // Restore
+      Object.defineProperty(localStorage, 'removeItem', {
+        configurable: true,
+        value: removeItemSpy,
+      });
+    });
+
+    it('should clear auth store on successful logout', async () => {
+      useAuthStore.getState().setAuth('token', 'refresh', {
+        id: 1,
+        email: 'test@example.com',
+        first_name: 'Test',
+        last_name: 'User',
+        is_staff: false,
+      });
+
+      const { result } = renderHook(() => useLogout(), {
+        wrapper: createWrapper(),
+      });
+
+      result.current.mutate();
+
+      await waitFor(
+        () => {
+          expect(result.current.isPending).toBe(false);
+        },
+        { timeout: 5000 },
+      );
+
+      const storeState = useAuthStore.getState();
+      expect(storeState.isAuthenticated).toBe(false);
+      expect(storeState.user).toBeNull();
     });
   });
 
@@ -151,10 +245,8 @@ describe('useAuth hooks', () => {
         wrapper: createWrapper(),
       });
 
-      // Should return a function
       expect(typeof result.current).toBe('function');
 
-      // Call it and verify redirect
       result.current();
 
       expect(window.location.href).toContain('/auth/google/');

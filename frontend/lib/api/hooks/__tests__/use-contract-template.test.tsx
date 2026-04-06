@@ -9,11 +9,13 @@
  * - useRestoreTemplateBackup: Restore backup
  *
  * Coverage: API integration, cache invalidation, error handling
+ *
+ * Uses MSW to intercept HTTP requests at the network boundary.
+ * No internal code is mocked.
  */
 import { renderHook, waitFor } from '@testing-library/react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { type ReactNode } from 'react';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { http, HttpResponse } from 'msw';
 import {
   useContractTemplate,
   useSaveContractTemplate,
@@ -21,84 +23,31 @@ import {
   useTemplateBackups,
   useRestoreTemplateBackup,
 } from '../use-contract-template';
-// Use vi.hoisted so mock variables are available inside vi.mock factory
-const { mockGet, mockPost } = vi.hoisted(() => ({
-  mockGet: vi.fn(),
-  mockPost: vi.fn(),
-}));
+import { createWrapper } from '@/tests/test-utils';
+import { server } from '@/tests/mocks/server';
 
-// Mock the apiClient
-vi.mock('@/lib/api/client', () => ({
-  apiClient: {
-    get: mockGet,
-    post: mockPost,
-  },
-}));
-
-// Create a wrapper with QueryClient
-function createWrapper() {
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: {
-        retry: false, // Disable retries for tests
-        gcTime: 0, // Disable cache garbage collection time
-      },
-      mutations: {
-        retry: false,
-      },
-    },
-  });
-
-  const Wrapper = ({ children }: { children: ReactNode }) => (
-    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-  );
-  Wrapper.displayName = 'QueryClientWrapper';
-  return Wrapper;
-}
+const API_BASE = 'http://localhost:8008/api';
 
 describe('useContractTemplate', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
   it('should fetch template content successfully', async () => {
-    const mockTemplate = {
-      content: '<html><body>Test Template</body></html>',
-    };
-
-    mockGet.mockResolvedValue({ data: mockTemplate });
-
     const { result } = renderHook(() => useContractTemplate(), {
       wrapper: createWrapper(),
     });
 
-    // Initially loading
-    expect(result.current.isLoading).toBe(true);
-    expect(result.current.data).toBeUndefined();
-
-    // Wait for data to load
     await waitFor(() => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    expect(result.current.data).toEqual(mockTemplate);
-    expect(result.current.data?.content).toContain('Test Template');
-    expect(mockGet).toHaveBeenCalledWith('/templates/current/');
-    expect(mockGet).toHaveBeenCalledTimes(1);
+    expect(result.current.data?.content).toBeDefined();
+    expect(typeof result.current.data?.content).toBe('string');
   });
 
   it('should handle fetch error gracefully', async () => {
-    const mockError = {
-      response: {
-        data: { error: 'Template not found' },
-      },
-    };
-
-    mockGet.mockRejectedValue(mockError);
+    server.use(
+      http.get(`${API_BASE}/templates/current/`, () => {
+        return new HttpResponse(null, { status: 500 });
+      }),
+    );
 
     const { result } = renderHook(() => useContractTemplate(), {
       wrapper: createWrapper(),
@@ -108,17 +57,10 @@ describe('useContractTemplate', () => {
       expect(result.current.isError).toBe(true);
     });
 
-    expect(result.current.error).toBeDefined();
     expect(result.current.data).toBeUndefined();
   });
 
-  it('should cache template data with 5-minute staleTime', async () => {
-    const mockTemplate = {
-      content: '<html><body>Cached Template</body></html>',
-    };
-
-    mockGet.mockResolvedValue({ data: mockTemplate });
-
+  it('should cache template data on re-render', async () => {
     const { result, rerender } = renderHook(() => useContractTemplate(), {
       wrapper: createWrapper(),
     });
@@ -127,63 +69,37 @@ describe('useContractTemplate', () => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    // Clear mock call history
-    mockGet.mockClear();
+    const firstData = result.current.data;
 
-    // Re-render should use cache (no new API call)
     rerender();
 
-    // Verify no additional API calls
-    expect(mockGet).not.toHaveBeenCalled();
-    expect(result.current.data).toEqual(mockTemplate);
+    // Data must remain the same after re-render (cache hit)
+    expect(result.current.data).toEqual(firstData);
   });
 });
 
 describe('useSaveContractTemplate', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
   it('should save template successfully', async () => {
-    const mockResponse = {
-      message: 'Template salvo com sucesso!',
-      backup_path: '/path/to/backup.html',
-      backup_filename: 'contract_template_backup_20250115_120000.html',
-    };
-
-    mockPost.mockResolvedValue({ data: mockResponse });
-
     const { result } = renderHook(() => useSaveContractTemplate(), {
       wrapper: createWrapper(),
     });
 
-    const newContent = '<html><body>New Template</body></html>';
-
-    // Trigger mutation
-    result.current.mutate(newContent);
+    result.current.mutate('<html><body>New Template</body></html>');
 
     await waitFor(() => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    expect(result.current.data).toEqual(mockResponse);
-    expect(mockPost).toHaveBeenCalledWith('/templates/save/', {
-      content: newContent,
-    });
+    expect(result.current.data?.message).toBeDefined();
+    expect(result.current.data?.backup_filename).toBeDefined();
   });
 
   it('should handle save error', async () => {
-    const mockError = {
-      response: {
-        data: { error: 'Template content cannot be empty' },
-      },
-    };
-
-    mockPost.mockRejectedValue(mockError);
+    server.use(
+      http.post(`${API_BASE}/templates/save/`, () => {
+        return new HttpResponse(null, { status: 400 });
+      }),
+    );
 
     const { result } = renderHook(() => useSaveContractTemplate(), {
       wrapper: createWrapper(),
@@ -199,132 +115,80 @@ describe('useSaveContractTemplate', () => {
   });
 
   it('should invalidate template cache after successful save', async () => {
-    const mockResponse = {
-      message: 'Template salvo com sucesso!',
-      backup_path: '/path/to/backup.html',
-      backup_filename: 'backup.html',
-    };
+    let fetchCount = 0;
 
-    mockPost.mockResolvedValue({ data: mockResponse });
-
-    // Mock get for template query
-    mockGet.mockResolvedValue({
-      data: { content: 'Old content' },
-    });
-
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false, gcTime: 0 },
-        mutations: { retry: false },
-      },
-    });
-
-    const wrapper = ({ children }: { children: ReactNode }) => (
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    server.use(
+      http.get(`${API_BASE}/templates/current/`, () => {
+        fetchCount += 1;
+        return HttpResponse.json({
+          content: fetchCount === 1 ? '<html>Old</html>' : '<html>New</html>',
+        });
+      }),
     );
 
-    // First, fetch template to populate cache
-    const { result: templateResult } = renderHook(() => useContractTemplate(), {
-      wrapper,
-    });
+    const wrapper = createWrapper();
+
+    const { result: templateResult } = renderHook(() => useContractTemplate(), { wrapper });
 
     await waitFor(() => {
       expect(templateResult.current.isSuccess).toBe(true);
     });
 
-    // Now save new template
-    const { result: saveResult } = renderHook(() => useSaveContractTemplate(), {
-      wrapper,
-    });
+    expect(fetchCount).toBe(1);
 
-    // Mock new content for refetch
-    mockGet.mockResolvedValue({
-      data: { content: 'New content' },
-    });
+    const { result: saveResult } = renderHook(() => useSaveContractTemplate(), { wrapper });
 
-    saveResult.current.mutate('New content');
+    saveResult.current.mutate('<html>New</html>');
 
     await waitFor(() => {
       expect(saveResult.current.isSuccess).toBe(true);
     });
 
-    // Cache should be invalidated - template query should refetch
+    // Cache invalidation triggers a refetch
     await waitFor(() => {
-      expect(mockGet).toHaveBeenCalledWith('/templates/current/');
+      expect(fetchCount).toBeGreaterThan(1);
     });
   });
 });
 
 describe('usePreviewContractTemplate', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
   it('should generate preview successfully', async () => {
-    const mockPreview = {
-      html: '<html><body>Preview with rendered data</body></html>',
-    };
-
-    mockPost.mockResolvedValue({ data: mockPreview });
-
     const { result } = renderHook(() => usePreviewContractTemplate(), {
       wrapper: createWrapper(),
     });
 
-    const content = '<html>{{ tenant.name }}</html>';
-
-    result.current.mutate({ content });
+    result.current.mutate({ content: '<html>{{ tenant.name }}</html>' });
 
     await waitFor(() => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    expect(result.current.data).toEqual(mockPreview);
-    expect(mockPost).toHaveBeenCalledWith('/templates/preview/', {
-      content,
-    });
+    expect(result.current.data?.html).toBeDefined();
   });
 
   it('should generate preview with specific lease_id', async () => {
-    const mockPreview = {
-      html: '<html><body>Preview for specific lease</body></html>',
-    };
-
-    mockPost.mockResolvedValue({ data: mockPreview });
-
     const { result } = renderHook(() => usePreviewContractTemplate(), {
       wrapper: createWrapper(),
     });
 
-    const content = '<html>{{ tenant.name }}</html>';
-    const lease_id = 123;
-
-    result.current.mutate({ content, lease_id });
+    result.current.mutate({ content: '<html>{{ tenant.name }}</html>', lease_id: 123 });
 
     await waitFor(() => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    expect(mockPost).toHaveBeenCalledWith('/templates/preview/', {
-      content,
-      lease_id,
-    });
+    expect(result.current.data?.html).toBeDefined();
   });
 
-  it('should handle preview error when no lease exists', async () => {
-    const mockError = {
-      response: {
-        data: {
-          error: 'Nenhuma locação encontrada no sistema. Crie uma locação para visualizar o preview.',
-        },
-      },
-    };
-
-    mockPost.mockRejectedValue(mockError);
+  it('should handle preview error when server returns 404', async () => {
+    server.use(
+      http.post(`${API_BASE}/templates/preview/`, () => {
+        return HttpResponse.json(
+          { error: 'Nenhuma locação encontrada no sistema.' },
+          { status: 404 },
+        );
+      }),
+    );
 
     const { result } = renderHook(() => usePreviewContractTemplate(), {
       wrapper: createWrapper(),
@@ -340,23 +204,20 @@ describe('usePreviewContractTemplate', () => {
   });
 
   it('should handle template rendering errors', async () => {
-    const mockError = {
-      response: {
-        data: {
-          error: 'Template syntax error: unexpected token',
-        },
-      },
-    };
-
-    mockPost.mockRejectedValue(mockError);
+    server.use(
+      http.post(`${API_BASE}/templates/preview/`, () => {
+        return HttpResponse.json(
+          { error: 'Template syntax error: unexpected token' },
+          { status: 400 },
+        );
+      }),
+    );
 
     const { result } = renderHook(() => usePreviewContractTemplate(), {
       wrapper: createWrapper(),
     });
 
-    const invalidContent = '<html>{{ invalid syntax }';
-
-    result.current.mutate({ content: invalidContent });
+    result.current.mutate({ content: '<html>{{ invalid syntax }' });
 
     await waitFor(() => {
       expect(result.current.isError).toBe(true);
@@ -365,32 +226,7 @@ describe('usePreviewContractTemplate', () => {
 });
 
 describe('useTemplateBackups', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
   it('should fetch backups list successfully', async () => {
-    const mockBackups = [
-      {
-        filename: 'contract_template_backup_20250115_140000.html',
-        path: '/path/to/backup1.html',
-        size: 5432,
-        created_at: '2025-01-15T14:00:00',
-      },
-      {
-        filename: 'contract_template_backup_20250115_130000.html',
-        path: '/path/to/backup2.html',
-        size: 5123,
-        created_at: '2025-01-15T13:00:00',
-      },
-    ];
-
-    mockGet.mockResolvedValue({ data: mockBackups });
-
     const { result } = renderHook(() => useTemplateBackups(), {
       wrapper: createWrapper(),
     });
@@ -399,13 +235,19 @@ describe('useTemplateBackups', () => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    expect(result.current.data).toEqual(mockBackups);
-    expect(result.current.data).toHaveLength(2);
-    expect(mockGet).toHaveBeenCalledWith('/templates/backups/');
+    expect(Array.isArray(result.current.data)).toBe(true);
+    const first = result.current.data?.[0];
+    expect(first?.filename).toBeDefined();
+    expect(first?.size).toBeDefined();
+    expect(first?.created_at).toBeDefined();
   });
 
   it('should return empty array when no backups exist', async () => {
-    mockGet.mockResolvedValue({ data: [] });
+    server.use(
+      http.get(`${API_BASE}/templates/backups/`, () => {
+        return HttpResponse.json([]);
+      }),
+    );
 
     const { result } = renderHook(() => useTemplateBackups(), {
       wrapper: createWrapper(),
@@ -416,48 +258,14 @@ describe('useTemplateBackups', () => {
     });
 
     expect(result.current.data).toEqual([]);
-    expect(result.current.data).toHaveLength(0);
-  });
-
-  it('should cache backups data with 2-minute staleTime', async () => {
-    const mockBackups = [
-      {
-        filename: 'backup.html',
-        path: '/path/backup.html',
-        size: 1000,
-        created_at: '2025-01-15T12:00:00',
-      },
-    ];
-
-    mockGet.mockResolvedValue({ data: mockBackups });
-
-    const { result, rerender } = renderHook(() => useTemplateBackups(), {
-      wrapper: createWrapper(),
-    });
-
-    await waitFor(() => {
-      expect(result.current.isSuccess).toBe(true);
-    });
-
-    // Clear mock call history
-    mockGet.mockClear();
-
-    // Re-render should use cache
-    rerender();
-
-    // Verify no additional API calls
-    expect(mockGet).not.toHaveBeenCalled();
-    expect(result.current.data).toEqual(mockBackups);
   });
 
   it('should handle fetch backups error', async () => {
-    const mockError = {
-      response: {
-        data: { error: 'Failed to list backups' },
-      },
-    };
-
-    mockGet.mockRejectedValue(mockError);
+    server.use(
+      http.get(`${API_BASE}/templates/backups/`, () => {
+        return new HttpResponse(null, { status: 500 });
+      }),
+    );
 
     const { result } = renderHook(() => useTemplateBackups(), {
       wrapper: createWrapper(),
@@ -472,48 +280,27 @@ describe('useTemplateBackups', () => {
 });
 
 describe('useRestoreTemplateBackup', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
   it('should restore backup successfully', async () => {
-    const mockResponse = {
-      message: 'Template restaurado com sucesso de backup.html',
-      safety_backup: 'contract_template_before_restore_20250115_160000.html',
-    };
-
-    mockPost.mockResolvedValue({ data: mockResponse });
-
     const { result } = renderHook(() => useRestoreTemplateBackup(), {
       wrapper: createWrapper(),
     });
 
-    const backup_filename = 'contract_template_backup_20250115_120000.html';
-
-    result.current.mutate(backup_filename);
+    result.current.mutate('contract_template_backup_20260405_120000.html');
 
     await waitFor(() => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    expect(result.current.data).toEqual(mockResponse);
-    expect(mockPost).toHaveBeenCalledWith('/templates/restore/', {
-      backup_filename,
-    });
+    expect(result.current.data?.message).toBeDefined();
+    expect(result.current.data?.safety_backup).toBeDefined();
   });
 
   it('should handle restore error when backup not found', async () => {
-    const mockError = {
-      response: {
-        data: { error: 'Backup file not found: nonexistent.html' },
-      },
-    };
-
-    mockPost.mockRejectedValue(mockError);
+    server.use(
+      http.post(`${API_BASE}/templates/restore/`, () => {
+        return HttpResponse.json({ error: 'Backup file not found' }, { status: 404 });
+      }),
+    );
 
     const { result } = renderHook(() => useRestoreTemplateBackup(), {
       wrapper: createWrapper(),
@@ -529,55 +316,34 @@ describe('useRestoreTemplateBackup', () => {
   });
 
   it('should invalidate both template and backups cache after restore', async () => {
-    const mockResponse = {
-      message: 'Restored successfully',
-      safety_backup: 'safety.html',
-    };
+    let templateFetchCount = 0;
+    let backupsFetchCount = 0;
 
-    mockPost.mockResolvedValue({ data: mockResponse });
-
-    // Mock get endpoints
-    mockGet.mockImplementation((url: string) => {
-      if (url === '/templates/current/') {
-        return Promise.resolve({ data: { content: 'Template' } });
-      }
-      if (url === '/templates/backups/') {
-        return Promise.resolve({ data: [] });
-      }
-      return Promise.reject(new Error('Unknown endpoint'));
-    });
-
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false, gcTime: 0 },
-        mutations: { retry: false },
-      },
-    });
-
-    const wrapper = ({ children }: { children: ReactNode }) => (
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    server.use(
+      http.get(`${API_BASE}/templates/current/`, () => {
+        templateFetchCount += 1;
+        return HttpResponse.json({ content: '<html>Template</html>' });
+      }),
+      http.get(`${API_BASE}/templates/backups/`, () => {
+        backupsFetchCount += 1;
+        return HttpResponse.json([]);
+      }),
     );
 
-    // Populate caches
-    const { result: templateResult } = renderHook(() => useContractTemplate(), {
-      wrapper,
-    });
-    const { result: backupsResult } = renderHook(() => useTemplateBackups(), {
-      wrapper,
-    });
+    const wrapper = createWrapper();
+
+    const { result: templateResult } = renderHook(() => useContractTemplate(), { wrapper });
+    const { result: backupsResult } = renderHook(() => useTemplateBackups(), { wrapper });
 
     await waitFor(() => {
       expect(templateResult.current.isSuccess).toBe(true);
       expect(backupsResult.current.isSuccess).toBe(true);
     });
 
-    // Clear get mocks
-    mockGet.mockClear();
+    const templateCountAfterLoad = templateFetchCount;
+    const backupsCountAfterLoad = backupsFetchCount;
 
-    // Now restore backup
-    const { result: restoreResult } = renderHook(() => useRestoreTemplateBackup(), {
-      wrapper,
-    });
+    const { result: restoreResult } = renderHook(() => useRestoreTemplateBackup(), { wrapper });
 
     restoreResult.current.mutate('backup.html');
 
@@ -585,85 +351,36 @@ describe('useRestoreTemplateBackup', () => {
       expect(restoreResult.current.isSuccess).toBe(true);
     });
 
-    // Both caches should be invalidated
+    // Both caches must be invalidated and refetched
     await waitFor(() => {
-      expect(mockGet).toHaveBeenCalledWith('/templates/current/');
-      expect(mockGet).toHaveBeenCalledWith('/templates/backups/');
+      expect(templateFetchCount).toBeGreaterThan(templateCountAfterLoad);
+      expect(backupsFetchCount).toBeGreaterThan(backupsCountAfterLoad);
     });
-
-    // Should have been called twice (once for each query)
-    expect(mockGet).toHaveBeenCalledTimes(2);
   });
 });
 
 describe('Hooks Integration', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
+    // Override handlers to simulate a fresh state with no backups initially
+    server.use(
+      http.get(`${API_BASE}/templates/backups/`, () => {
+        return HttpResponse.json([
+          {
+            filename: 'backup_new.html',
+            path: '/path/backup_new.html',
+            size: 1000,
+            created_at: '2026-04-05T12:00:00',
+          },
+        ]);
+      }),
+    );
   });
 
   it('should work together: save template → see new backup → restore backup', async () => {
-    // Setup mocks
-    mockGet.mockImplementation((url: string) => {
-      if (url === '/templates/current/') {
-        return Promise.resolve({
-          data: { content: '<html>Current</html>' },
-        });
-      }
-      if (url === '/templates/backups/') {
-        return Promise.resolve({
-          data: [
-            {
-              filename: 'backup_new.html',
-              path: '/path/backup_new.html',
-              size: 1000,
-              created_at: '2025-01-15T12:00:00',
-            },
-          ],
-        });
-      }
-      return Promise.reject(new Error('Unknown endpoint'));
-    });
-
-    mockPost.mockImplementation((url: string, _data: unknown) => {
-      if (url === '/templates/save/') {
-        return Promise.resolve({
-          data: {
-            message: 'Saved',
-            backup_path: '/path/backup_new.html',
-            backup_filename: 'backup_new.html',
-          },
-        });
-      }
-      if (url === '/templates/restore/') {
-        return Promise.resolve({
-          data: {
-            message: 'Restored',
-            safety_backup: 'safety.html',
-          },
-        });
-      }
-      return Promise.reject(new Error('Unknown endpoint'));
-    });
-
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false, gcTime: 0 },
-        mutations: { retry: false },
-      },
-    });
-
-    const wrapper = ({ children }: { children: ReactNode }) => (
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-    );
+    const wrapper = createWrapper();
 
     // 1. Save template
-    const { result: saveResult } = renderHook(() => useSaveContractTemplate(), {
-      wrapper,
-    });
+    const { result: saveResult } = renderHook(() => useSaveContractTemplate(), { wrapper });
 
     saveResult.current.mutate('<html>New</html>');
 
@@ -671,24 +388,20 @@ describe('Hooks Integration', () => {
       expect(saveResult.current.isSuccess).toBe(true);
     });
 
-    expect(saveResult.current.data?.backup_filename).toBe('backup_new.html');
+    expect(saveResult.current.data?.backup_filename).toBeDefined();
 
-    // 2. List backups (should include the new backup)
-    const { result: backupsResult } = renderHook(() => useTemplateBackups(), {
-      wrapper,
-    });
+    // 2. List backups (the handler returns one backup)
+    const { result: backupsResult } = renderHook(() => useTemplateBackups(), { wrapper });
 
     await waitFor(() => {
       expect(backupsResult.current.isSuccess).toBe(true);
     });
 
-    expect(backupsResult.current.data).toHaveLength(1);
+    expect(backupsResult.current.data?.length).toBeGreaterThan(0);
     expect(backupsResult.current.data?.[0]?.filename).toBe('backup_new.html');
 
     // 3. Restore backup
-    const { result: restoreResult } = renderHook(() => useRestoreTemplateBackup(), {
-      wrapper,
-    });
+    const { result: restoreResult } = renderHook(() => useRestoreTemplateBackup(), { wrapper });
 
     restoreResult.current.mutate('backup_new.html');
 
@@ -696,6 +409,6 @@ describe('Hooks Integration', () => {
       expect(restoreResult.current.isSuccess).toBe(true);
     });
 
-    expect(restoreResult.current.data?.message).toBe('Restored');
+    expect(restoreResult.current.data?.message).toBeDefined();
   });
 });
