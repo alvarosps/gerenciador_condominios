@@ -7,8 +7,6 @@ Handles all business logic related to contract template management including:
 - Rendering template preview with sample data
 """
 
-from __future__ import annotations
-
 import datetime as dt
 import logging
 import shutil

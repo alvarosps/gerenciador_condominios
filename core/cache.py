@@ -29,19 +29,11 @@ from typing import Any, TypeVar, cast
 from django.conf import settings
 from django.core.cache import cache
 from django.db.models import Model
-
-try:
-    from django_redis import get_redis_connection
-
-    HAS_DJANGO_REDIS = True
-except ImportError:
-    HAS_DJANGO_REDIS = False
+from django_redis import get_redis_connection
 
 
 def _is_redis_backend() -> bool:
     """Check if the default cache backend is Redis (not LocMemCache or other)."""
-    if not HAS_DJANGO_REDIS:
-        return False
     backend = settings.CACHES.get("default", {}).get("BACKEND", "")
     return "redis" in backend.lower()
 

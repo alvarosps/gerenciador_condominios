@@ -166,7 +166,8 @@ class SoftDeleteMixin(models.Model):
         self.deleted_at = timezone.now()
         if deleted_by:
             self.deleted_by = deleted_by
-        self.save(update_fields=["is_deleted", "deleted_at", "deleted_by"])
+        self.updated_at = timezone.now()
+        self.save(update_fields=["is_deleted", "deleted_at", "deleted_by", "updated_at"])
         return 0, {}
 
     def restore(self, restored_by: Any = None) -> None:
@@ -181,7 +182,10 @@ class SoftDeleteMixin(models.Model):
         self.deleted_by = None
         if restored_by:
             self.updated_by = restored_by
-        self.save(update_fields=["is_deleted", "deleted_at", "deleted_by", "updated_by"])
+        self.updated_at = timezone.now()
+        self.save(
+            update_fields=["is_deleted", "deleted_at", "deleted_by", "updated_by", "updated_at"]
+        )
 
 
 # =============================================================================
@@ -468,7 +472,8 @@ class Tenant(AuditMixin, SoftDeleteMixin, models.Model):
 
     def save(self, *args: Any, **kwargs: Any) -> None:
         """Override save to enforce validation before persisting."""
-        self.full_clean()
+        if not kwargs.get("update_fields"):
+            self.full_clean()
         super().save(*args, **kwargs)
 
     def clean(self) -> None:
@@ -666,7 +671,8 @@ class Lease(AuditMixin, SoftDeleteMixin, models.Model):
 
     def save(self, *args: Any, **kwargs: Any) -> None:
         """Override save to enforce validation before persisting."""
-        self.full_clean()
+        if not kwargs.get("update_fields"):
+            self.full_clean()
         super().save(*args, **kwargs)
 
     def clean(self) -> None:
@@ -1074,8 +1080,8 @@ class Expense(AuditMixin, SoftDeleteMixin, models.Model):
         ]
         constraints = [
             models.CheckConstraint(
-                check=models.Q(total_amount__gte=0),
-                name="expense_total_amount_non_negative",
+                check=models.Q(total_amount__gt=0),
+                name="expense_total_amount_positive",
             ),
         ]
 
@@ -1287,7 +1293,7 @@ class EmployeePayment(AuditMixin, SoftDeleteMixin, models.Model):
 
     @property
     def total_paid(self) -> Decimal:
-        return self.base_salary + self.variable_amount
+        return self.base_salary + self.variable_amount - self.rent_offset
 
 
 class PersonPayment(AuditMixin, SoftDeleteMixin, models.Model):
