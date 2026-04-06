@@ -1079,6 +1079,18 @@ class Expense(AuditMixin, SoftDeleteMixin, models.Model):
             models.Index(fields=["is_paid", "-expense_date"], name="expense_paid_date_idx"),
             models.Index(fields=["person", "expense_type"], name="exp_person_type_idx"),
             models.Index(fields=["person", "expense_date"], name="exp_person_date_idx"),
+            models.Index(
+                fields=["is_recurring", "expense_date"],
+                name="idx_expense_recurring_date",
+            ),
+            models.Index(
+                fields=["category", "expense_date"],
+                name="idx_expense_category_date",
+            ),
+            models.Index(
+                fields=["person", "is_paid", "expense_date"],
+                name="idx_expense_person_paid_date",
+            ),
         ]
         constraints = [
             models.CheckConstraint(
