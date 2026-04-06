@@ -31,6 +31,7 @@ from core.auth import (
 )
 from core.throttles import AuthRateThrottle
 from core.views import task_status
+from core.viewsets.auth_views_registration import LogoutView, RegisterView
 
 
 class ThrottledTokenObtainPairView(TokenObtainPairView):
@@ -52,6 +53,9 @@ urlpatterns = [
     path("api/auth/token/blacklist/", TokenBlacklistView.as_view(), name="token_blacklist"),
     # Current user profile
     path("api/auth/me/", current_user, name="current_user"),
+    # Registration and logout
+    path("api/auth/register/", RegisterView.as_view(), name="auth_register"),
+    path("api/auth/logout/", LogoutView.as_view(), name="auth_logout"),
     # Custom OAuth endpoints
     path("api/auth/oauth/google/callback/", google_oauth_callback, name="google_oauth_callback"),
     path("api/auth/oauth/exchange/", exchange_oauth_code, name="exchange_oauth_code"),
