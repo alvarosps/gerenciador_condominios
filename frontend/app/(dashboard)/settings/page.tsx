@@ -14,24 +14,61 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
+import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Loader2, Save, User, MapPin, Phone, TrendingUp } from 'lucide-react';
+import { Separator } from '@/components/ui/separator';
+import { Loader2, Save, User, MapPin, Phone, TrendingUp, KeyRound } from 'lucide-react';
 import { toast } from 'sonner';
 import { useLandlord, useUpdateLandlord } from '@/lib/api/hooks/use-landlord';
+import { useUpdateProfile, useChangePassword } from '@/lib/api/hooks/use-settings';
 import {
   landlordFormSchema,
   type LandlordFormData,
 } from '@/lib/schemas/landlord.schema';
+import {
+  profileFormSchema,
+  changePasswordFormSchema,
+  type ProfileFormValues,
+  type ChangePasswordFormValues,
+} from '@/lib/schemas/settings';
+import { useAuthStore } from '@/store/auth-store';
 import { MARITAL_STATUS_OPTIONS } from '@/lib/utils/constants';
 
 export default function SettingsPage() {
+  const { user, setUser } = useAuthStore();
   const { data: landlord, isLoading, error } = useLandlord();
   const updateMutation = useUpdateLandlord();
+  const updateProfileMutation = useUpdateProfile();
+  const changePasswordMutation = useChangePassword();
+
+  const profileForm = useForm<ProfileFormValues>({
+    resolver: zodResolver(profileFormSchema),
+    defaultValues: {
+      first_name: '',
+      last_name: '',
+    },
+  });
+
+  const passwordForm = useForm<ChangePasswordFormValues>({
+    resolver: zodResolver(changePasswordFormSchema),
+    defaultValues: {
+      old_password: '',
+      new_password: '',
+      confirm_password: '',
+    },
+  });
 
   const form = useForm<LandlordFormData>({
     resolver: zodResolver(landlordFormSchema),
@@ -57,6 +94,15 @@ export default function SettingsPage() {
   });
 
   useEffect(() => {
+    if (user) {
+      profileForm.reset({
+        first_name: user.first_name,
+        last_name: user.last_name,
+      });
+    }
+  }, [user, profileForm]);
+
+  useEffect(() => {
     if (landlord) {
       form.reset({
         name: landlord.name ?? '',
@@ -79,6 +125,29 @@ export default function SettingsPage() {
       });
     }
   }, [landlord, form]);
+
+  const onProfileSubmit = async (values: ProfileFormValues) => {
+    try {
+      const updated = await updateProfileMutation.mutateAsync(values);
+      setUser(updated);
+      toast.success('Perfil atualizado com sucesso');
+    } catch {
+      toast.error('Erro ao atualizar perfil');
+    }
+  };
+
+  const onPasswordSubmit = async (values: ChangePasswordFormValues) => {
+    try {
+      await changePasswordMutation.mutateAsync({
+        old_password: values.old_password,
+        new_password: values.new_password,
+      });
+      toast.success('Senha alterada com sucesso');
+      passwordForm.reset();
+    } catch {
+      toast.error('Erro ao alterar senha. Verifique sua senha atual.');
+    }
+  };
 
   const onSubmit = async (data: LandlordFormData) => {
     try {
@@ -104,15 +173,162 @@ export default function SettingsPage() {
       <div className="mb-6">
         <h1 className="text-2xl font-bold">Configurações</h1>
         <p className="text-muted-foreground mt-1">
-          Configure as informações do locador para os contratos
+          Gerencie seu perfil e as informações do locador
         </p>
       </div>
+
+      {/* Account section */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <User className="h-5 w-5" />
+            Minha Conta
+          </CardTitle>
+          <CardDescription>Atualize seu nome de exibição</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Form {...profileForm}>
+            <form onSubmit={profileForm.handleSubmit(onProfileSubmit)} className="space-y-4">
+              <div>
+                <Label>Email</Label>
+                <Input value={user?.email ?? ''} disabled className="mt-1" />
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <FormField
+                  control={profileForm.control}
+                  name="first_name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Nome *</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Seu nome"
+                          {...field}
+                          disabled={updateProfileMutation.isPending}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={profileForm.control}
+                  name="last_name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Sobrenome *</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Seu sobrenome"
+                          {...field}
+                          disabled={updateProfileMutation.isPending}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <Button type="submit" disabled={updateProfileMutation.isPending}>
+                {updateProfileMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4 mr-2" />
+                )}
+                Salvar Perfil
+              </Button>
+            </form>
+          </Form>
+        </CardContent>
+      </Card>
+
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <KeyRound className="h-5 w-5" />
+            Alterar Senha
+          </CardTitle>
+          <CardDescription>Defina uma nova senha de acesso</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Form {...passwordForm}>
+            <form
+              onSubmit={passwordForm.handleSubmit(onPasswordSubmit)}
+              className="space-y-4 max-w-sm"
+            >
+              <FormField
+                control={passwordForm.control}
+                name="old_password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Senha Atual *</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="password"
+                        placeholder="••••••••"
+                        {...field}
+                        disabled={changePasswordMutation.isPending}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={passwordForm.control}
+                name="new_password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nova Senha *</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="password"
+                        placeholder="••••••••"
+                        {...field}
+                        disabled={changePasswordMutation.isPending}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={passwordForm.control}
+                name="confirm_password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Confirmar Nova Senha *</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="password"
+                        placeholder="••••••••"
+                        {...field}
+                        disabled={changePasswordMutation.isPending}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <Button type="submit" disabled={changePasswordMutation.isPending}>
+                {changePasswordMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <KeyRound className="h-4 w-4 mr-2" />
+                )}
+                Alterar Senha
+              </Button>
+            </form>
+          </Form>
+        </CardContent>
+      </Card>
+
+      <Separator className="my-8" />
 
       {isNewLandlord && (
         <div className="mb-6 p-4 bg-primary/5 border border-primary/20 rounded-md">
           <p className="text-primary">
-            Nenhum locador configurado. Preencha os dados abaixo para criar o
-            primeiro registro.
+            Nenhum locador configurado. Preencha os dados abaixo para criar o primeiro registro.
           </p>
         </div>
       )}
@@ -159,11 +375,7 @@ export default function SettingsPage() {
 
             <div>
               <Label htmlFor="rg">RG</Label>
-              <Input
-                id="rg"
-                {...form.register('rg')}
-                placeholder="Opcional"
-              />
+              <Input id="rg" {...form.register('rg')} placeholder="Opcional" />
             </div>
 
             <div>
@@ -207,11 +419,7 @@ export default function SettingsPage() {
           <CardContent className="grid gap-4 md:grid-cols-2">
             <div>
               <Label htmlFor="phone">Telefone *</Label>
-              <Input
-                id="phone"
-                {...form.register('phone')}
-                placeholder="(00) 00000-0000"
-              />
+              <Input id="phone" {...form.register('phone')} placeholder="(00) 00000-0000" />
               {form.formState.errors.phone && (
                 <p className="text-sm text-destructive mt-1">
                   {form.formState.errors.phone.message}
@@ -246,11 +454,7 @@ export default function SettingsPage() {
           <CardContent className="grid gap-4 md:grid-cols-2">
             <div className="md:col-span-2">
               <Label htmlFor="street">Rua/Avenida *</Label>
-              <Input
-                id="street"
-                {...form.register('street')}
-                placeholder="Av. Circular"
-              />
+              <Input id="street" {...form.register('street')} placeholder="Av. Circular" />
               {form.formState.errors.street && (
                 <p className="text-sm text-destructive mt-1">
                   {form.formState.errors.street.message}
@@ -260,11 +464,7 @@ export default function SettingsPage() {
 
             <div>
               <Label htmlFor="street_number">Número *</Label>
-              <Input
-                id="street_number"
-                {...form.register('street_number')}
-                placeholder="850"
-              />
+              <Input id="street_number" {...form.register('street_number')} placeholder="850" />
               {form.formState.errors.street_number && (
                 <p className="text-sm text-destructive mt-1">
                   {form.formState.errors.street_number.message}
@@ -297,11 +497,7 @@ export default function SettingsPage() {
 
             <div>
               <Label htmlFor="zip_code">CEP *</Label>
-              <Input
-                id="zip_code"
-                {...form.register('zip_code')}
-                placeholder="00000-000"
-              />
+              <Input id="zip_code" {...form.register('zip_code')} placeholder="00000-000" />
               {form.formState.errors.zip_code && (
                 <p className="text-sm text-destructive mt-1">
                   {form.formState.errors.zip_code.message}
@@ -311,11 +507,7 @@ export default function SettingsPage() {
 
             <div>
               <Label htmlFor="city">Cidade *</Label>
-              <Input
-                id="city"
-                {...form.register('city')}
-                placeholder="Porto Alegre"
-              />
+              <Input id="city" {...form.register('city')} placeholder="Porto Alegre" />
               {form.formState.errors.city && (
                 <p className="text-sm text-destructive mt-1">
                   {form.formState.errors.city.message}
@@ -325,11 +517,7 @@ export default function SettingsPage() {
 
             <div>
               <Label htmlFor="state">Estado *</Label>
-              <Input
-                id="state"
-                {...form.register('state')}
-                placeholder="Rio Grande do Sul"
-              />
+              <Input id="state" {...form.register('state')} placeholder="Rio Grande do Sul" />
               {form.formState.errors.state && (
                 <p className="text-sm text-destructive mt-1">
                   {form.formState.errors.state.message}

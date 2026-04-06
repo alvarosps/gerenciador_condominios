@@ -33,6 +33,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   Plus,
   Trash2,
@@ -40,6 +41,7 @@ import {
   FileText,
   FileSpreadsheet,
   Loader2,
+  AlertCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { DataTable } from '@/components/tables/data-table';
@@ -302,6 +304,16 @@ export default function LeasesPage() {
           </Button>
         </div>
       </div>
+
+      {error && !leases && (
+        <Alert variant="destructive" className="mb-4">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Erro</AlertTitle>
+          <AlertDescription>
+            Erro ao carregar dados. Verifique sua conexão e tente novamente.
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Bulk Selection Banner */}
       {crud.bulkOps.hasSelection && (

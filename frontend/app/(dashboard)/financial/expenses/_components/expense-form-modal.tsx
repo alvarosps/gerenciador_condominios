@@ -46,7 +46,7 @@ import { useCreditCards } from '@/lib/api/hooks/use-credit-cards';
 import { useBuildings } from '@/lib/api/hooks/use-buildings';
 import { useExpenseCategories } from '@/lib/api/hooks/use-expense-categories';
 import { type Expense, validateExpenseRules } from '@/lib/schemas/expense.schema';
-import { ROUTES } from '@/lib/utils/constants';
+import { EXPENSE_TYPE_OPTIONS, ROUTES } from '@/lib/utils/constants';
 
 interface Props {
   open: boolean;
@@ -56,17 +56,6 @@ interface Props {
   onSuccess?: () => void;
 }
 
-const EXPENSE_TYPES = [
-  { value: 'card_purchase', label: 'Compra no Cart\u00e3o' },
-  { value: 'bank_loan', label: 'Empr\u00e9stimo Banc\u00e1rio' },
-  { value: 'personal_loan', label: 'Empr\u00e9stimo Pessoal' },
-  { value: 'water_bill', label: 'Conta de \u00c1gua' },
-  { value: 'electricity_bill', label: 'Conta de Luz' },
-  { value: 'property_tax', label: 'IPTU' },
-  { value: 'fixed_expense', label: 'Gasto Fixo Mensal' },
-  { value: 'one_time_expense', label: 'Gasto \u00danico' },
-  { value: 'employee_salary', label: 'Sal\u00e1rio Funcion\u00e1rio' },
-];
 
 const expenseFormSchema = z
   .object({
@@ -303,7 +292,7 @@ export function ExpenseFormModal({ open, expense, defaultExpenseDate, onClose, o
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {EXPENSE_TYPES.map((t) => (
+                        {EXPENSE_TYPE_OPTIONS.map((t) => (
                           <SelectItem key={t.value} value={t.value}>
                             {t.label}
                           </SelectItem>

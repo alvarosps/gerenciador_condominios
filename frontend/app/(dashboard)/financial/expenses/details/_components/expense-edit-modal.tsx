@@ -45,19 +45,24 @@ import { useExpenseCategories } from '@/lib/api/hooks/use-expense-categories';
 import { useCreditCards } from '@/lib/api/hooks/use-credit-cards';
 import { useBuildings } from '@/lib/api/hooks/use-buildings';
 import { getDefaultExpenseDate } from '@/lib/utils/formatters';
+import { EXPENSE_TYPE_OPTIONS, type ExpenseTypeOption } from '@/lib/utils/constants';
 import { apiClient } from '@/lib/api/client';
 import type { ExpenseDetailItem } from '@/lib/api/hooks/use-financial-dashboard';
 
-const EXPENSE_TYPE_OPTIONS = [
-  { value: 'card_purchase', label: 'Compra no Cartão' },
-  { value: 'bank_loan', label: 'Empréstimo Bancário' },
-  { value: 'personal_loan', label: 'Empréstimo Pessoal' },
-  { value: 'fixed_expense', label: 'Despesa Fixa' },
-  { value: 'one_time_expense', label: 'Gasto Único' },
-  { value: 'water_bill', label: 'Conta de Água' },
-  { value: 'electricity_bill', label: 'Conta de Luz' },
-  { value: 'property_tax', label: 'IPTU' },
-] as const;
+const EDIT_EXPENSE_TYPE_VALUES = new Set<string>([
+  'card_purchase',
+  'bank_loan',
+  'personal_loan',
+  'fixed_expense',
+  'one_time_expense',
+  'water_bill',
+  'electricity_bill',
+  'property_tax',
+]);
+
+const FILTERED_EXPENSE_TYPE_OPTIONS: ExpenseTypeOption[] = EXPENSE_TYPE_OPTIONS.filter((t) =>
+  EDIT_EXPENSE_TYPE_VALUES.has(t.value),
+);
 
 const INSTALLMENT_TYPES = ['card_purchase', 'bank_loan', 'personal_loan'];
 
@@ -347,7 +352,7 @@ export function ExpenseEditModal({ mode, item, personId, detailType, defaultExpe
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {EXPENSE_TYPE_OPTIONS.map((opt) => (
+                          {FILTERED_EXPENSE_TYPE_OPTIONS.map((opt) => (
                             <SelectItem key={opt.value} value={opt.value}>
                               {opt.label}
                             </SelectItem>
