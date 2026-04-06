@@ -11,6 +11,7 @@ This module defines the core domain models for property management:
 """
 
 import re
+import uuid
 from decimal import Decimal
 from typing import Any
 
@@ -1644,3 +1645,31 @@ class Notification(AuditMixin, models.Model):
 
     def __str__(self) -> str:
         return f"{self.type} → {self.recipient} ({self.sent_at:%Y-%m-%d})"
+
+
+class OAuthExchangeCode(models.Model):
+    """One-time code for OAuth token exchange. Expires in 60 seconds."""
+
+    TTL_SECONDS = 60
+
+    code = models.UUIDField(default=uuid.uuid4, unique=True, db_index=True)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="oauth_exchange_codes"
+    )
+    access_token = models.TextField()
+    refresh_token = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_used = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "core_oauth_exchange_code"
+
+    def __str__(self) -> str:
+        return f"OAuthExchange({self.code}) for user {self.user_id}"
+
+    def is_valid(self) -> bool:
+        """Check if the code is unused and not expired."""
+        if self.is_used:
+            return False
+        elapsed = (timezone.now() - self.created_at).total_seconds()
+        return elapsed <= self.TTL_SECONDS

@@ -150,6 +150,8 @@ max-complexity = 12
 # base.py uses _default_manager as the only mypy-compatible way to access the manager
 # on a generic TypeVar-bound Model class without triggering attr-defined errors
 "core/services/base.py" = ["SLF001"]
+# auth.py uses local imports to avoid circular dependency (core.auth ↔ core.models)
+"core/auth.py" = ["PLC0415"]
 
 [tool.ruff.lint.pylint]
 max-args = 8

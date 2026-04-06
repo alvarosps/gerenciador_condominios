@@ -1207,6 +1207,17 @@ class PaymentProofSerializer(serializers.ModelSerializer):
             "created_at",
         ]
 
+    def validate_file(self, value: Any) -> Any:
+        max_size = 10 * 1024 * 1024  # 10MB
+        allowed_types = {"image/jpeg", "image/png", "application/pdf"}
+        if value.size > max_size:
+            msg = "Arquivo excede o tamanho máximo de 10MB."
+            raise serializers.ValidationError(msg)
+        if value.content_type not in allowed_types:
+            msg = "Tipo de arquivo não permitido. Use JPEG, PNG ou PDF."
+            raise serializers.ValidationError(msg)
+        return value
+
 
 class NotificationSerializer(serializers.ModelSerializer):
     class Meta:

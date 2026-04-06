@@ -51,7 +51,7 @@ export function useLogin() {
       if (typeof window !== 'undefined') {
         localStorage.setItem('access_token', tokens.access);
         localStorage.setItem('refresh_token', tokens.refresh);
-        document.cookie = `access_token=${tokens.access}; path=/; max-age=3600; SameSite=Lax`;
+        document.cookie = 'is_authenticated=1; path=/; max-age=3600; SameSite=Lax';
       }
 
       // Fetch user profile with the new token
@@ -101,7 +101,7 @@ export function useLogout() {
         localStorage.removeItem('refresh_token');
 
         // Clear cookie by setting expired date
-        document.cookie = 'access_token=; path=/; max-age=0; SameSite=Lax';
+        document.cookie = 'is_authenticated=; path=/; max-age=0; SameSite=Lax';
       }
 
       // Clear all cached queries
@@ -119,7 +119,7 @@ export function useLogout() {
         localStorage.removeItem('refresh_token');
 
         // Clear cookie by setting expired date
-        document.cookie = 'access_token=; path=/; max-age=0; SameSite=Lax';
+        document.cookie = 'is_authenticated=; path=/; max-age=0; SameSite=Lax';
       }
 
       queryClient.clear();
@@ -150,7 +150,7 @@ export function useRefreshToken() {
         localStorage.setItem('access_token', data.access);
 
         // Update cookie for middleware auth check (24 hour expiry)
-        document.cookie = `access_token=${data.access}; path=/; max-age=3600; SameSite=Lax`;
+        document.cookie = 'is_authenticated=1; path=/; max-age=3600; SameSite=Lax';
       }
     },
   });

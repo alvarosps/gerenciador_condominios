@@ -24,6 +24,7 @@ from rest_framework_simplejwt.views import TokenBlacklistView, TokenObtainPairVi
 
 from core.auth import (
     current_user,
+    exchange_oauth_code,
     google_oauth_callback,
     link_oauth_account,
     oauth_status,
@@ -46,12 +47,11 @@ urlpatterns = [
     path("api/auth/token/", ThrottledTokenObtainPairView.as_view(), name="token_obtain_pair"),
     path("api/auth/token/refresh/", ThrottledTokenRefreshView.as_view(), name="token_refresh"),
     path("api/auth/token/blacklist/", TokenBlacklistView.as_view(), name="token_blacklist"),
-    # API Documentation (Phase 8: OpenAPI/Swagger)
-    path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
     # Current user profile
     path("api/auth/me/", current_user, name="current_user"),
     # Custom OAuth endpoints
     path("api/auth/oauth/google/callback/", google_oauth_callback, name="google_oauth_callback"),
+    path("api/auth/oauth/exchange/", exchange_oauth_code, name="exchange_oauth_code"),
     path("api/auth/oauth/link/", link_oauth_account, name="link_oauth_account"),
     path("api/auth/oauth/status/", oauth_status, name="oauth_status"),
     # Django-allauth OAuth endpoints (Google OAuth)
@@ -60,9 +60,10 @@ urlpatterns = [
     path("", include("core.urls")),
 ]
 
-# Swagger UI and Redoc only in development
+# API docs and schema only in development
 if settings.DEBUG:
     urlpatterns += [
+        path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
         path(
             "api/schema/swagger-ui/",
             SpectacularSwaggerView.as_view(url_name="schema"),
