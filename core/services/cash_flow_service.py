@@ -13,6 +13,7 @@ from django.db.models import Avg, Max, Q, Sum
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 
+from core.cache import cache_result
 from core.models import (
     Apartment,
     EmployeePayment,
@@ -505,6 +506,7 @@ class CashFlowService:
         }
 
     @staticmethod
+    @cache_result(timeout=300, key_prefix="cash-flow-projection")
     def get_cash_flow_projection(
         months: int = 12,
         *,

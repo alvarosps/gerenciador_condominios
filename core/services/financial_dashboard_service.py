@@ -413,6 +413,7 @@ class FinancialDashboardService:
         current_year: int,
         current_month: int,
         lookback_months: int = 6,
+        financial_settings: FinancialSettings | None = None,
     ) -> dict[str, dict[str, Any]]:
         """Calculate payment allocation using waterfall: oldest debt first.
 
@@ -420,7 +421,7 @@ class FinancialDashboardService:
         Only considers months from FinancialSettings.initial_balance_date onwards.
         """
         # Determine start date from FinancialSettings
-        settings = FinancialSettings.objects.first()
+        settings = financial_settings
         start_date = (
             settings.initial_balance_date if settings else date(current_year, current_month, 1)
         )
@@ -619,6 +620,9 @@ class FinancialDashboardService:
         overdue: list[dict[str, Any]] = []
         current_month_start = date(current_year, current_month, 1)
 
+        # Fetch once to avoid N+1 in the person loop below
+        financial_settings = FinancialSettings.objects.first()
+
         # Person overdue via waterfall allocation
         persons = Person.objects.filter(is_employee=False).order_by("name")
         for person in persons:
@@ -631,7 +635,7 @@ class FinancialDashboardService:
                 continue
 
             waterfall = FinancialDashboardService._get_person_waterfall(
-                person, current_year, current_month, lookback_months
+                person, current_year, current_month, lookback_months, financial_settings
             )
 
             # Only show previous months with pending > 0
