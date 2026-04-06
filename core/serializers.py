@@ -195,7 +195,9 @@ class ApartmentSerializer(serializers.ModelSerializer):
     def create(self, validated_data: dict[str, Any]) -> Apartment:
         """Create apartment with furniture relationships."""
         furniture_ids = validated_data.pop("furniture_ids", [])
-        apartment = Apartment.objects.create(**validated_data)
+        apartment = Apartment(**validated_data)
+        apartment.full_clean()
+        apartment.save()
         if furniture_ids:
             apartment.furnitures.set(furniture_ids)
         return apartment
@@ -206,6 +208,7 @@ class ApartmentSerializer(serializers.ModelSerializer):
 
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
+        instance.full_clean()
         instance.save()
 
         if furniture_ids is not None:
@@ -295,7 +298,9 @@ class TenantSerializer(serializers.ModelSerializer):
     def create(self, validated_data: dict[str, Any]) -> Tenant:
         dependents_data = validated_data.pop("dependents", [])
         furniture_ids = validated_data.pop("furniture_ids", [])
-        tenant = Tenant.objects.create(**validated_data)
+        tenant = Tenant(**validated_data)
+        tenant.full_clean()
+        tenant.save()
         if furniture_ids:
             tenant.furnitures.set(furniture_ids)
         for dep_data in dependents_data:
@@ -307,6 +312,7 @@ class TenantSerializer(serializers.ModelSerializer):
         furniture_ids = validated_data.pop("furniture_ids", None)
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
+        instance.full_clean()
         instance.save()
 
         if furniture_ids is not None:
@@ -472,7 +478,9 @@ class LeaseSerializer(serializers.ModelSerializer):
         if "last_rent_increase_date" not in validated_data:
             validated_data["last_rent_increase_date"] = validated_data["start_date"]
 
-        lease = Lease.objects.create(**validated_data)
+        lease = Lease(**validated_data)
+        lease.full_clean()
+        lease.save()
         if tenants:
             lease.tenants.set(tenants)
 
@@ -490,6 +498,7 @@ class LeaseSerializer(serializers.ModelSerializer):
 
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
+        instance.full_clean()
         instance.save()
 
         if tenants is not None:
