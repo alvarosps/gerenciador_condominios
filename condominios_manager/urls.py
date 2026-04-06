@@ -22,7 +22,12 @@ from django.urls import include, path
 from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerView
 from rest_framework_simplejwt.views import TokenBlacklistView, TokenObtainPairView, TokenRefreshView
 
-from core.auth import current_user, google_oauth_callback, link_oauth_account, oauth_status
+from core.auth import (
+    current_user,
+    google_oauth_callback,
+    link_oauth_account,
+    oauth_status,
+)
 from core.throttles import AuthRateThrottle
 
 
