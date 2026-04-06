@@ -20,6 +20,7 @@ from django.db.models import Count, Q, Sum
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 
+from core.cache import cache_result
 from core.models import Apartment, Building, Dependent, Lease, RentPayment, Tenant
 
 from .fee_calculator import FeeCalculatorService
@@ -48,6 +49,7 @@ class DashboardService:
     """
 
     @staticmethod
+    @cache_result(timeout=120, key_prefix="dashboard-financial-summary")
     def get_financial_summary() -> dict[str, Any]:
         """
         Calculate financial summary across all properties.
@@ -128,6 +130,7 @@ class DashboardService:
         return summary
 
     @staticmethod
+    @cache_result(timeout=120, key_prefix="dashboard-lease-metrics")
     def get_lease_metrics() -> dict[str, Any]:
         """
         Calculate lease statistics and metrics.
@@ -210,6 +213,7 @@ class DashboardService:
         return metrics
 
     @staticmethod
+    @cache_result(timeout=300, key_prefix="dashboard-building-stats")
     def get_building_statistics() -> list[dict[str, Any]]:
         """
         Get per-building statistics and occupancy.
@@ -276,6 +280,7 @@ class DashboardService:
         return building_stats
 
     @staticmethod
+    @cache_result(timeout=120, key_prefix="dashboard-late-payment")
     def get_late_payment_summary() -> dict[str, Any]:
         """
         Calculate late payment statistics across all active leases.
@@ -382,6 +387,7 @@ class DashboardService:
         return summary
 
     @staticmethod
+    @cache_result(timeout=300, key_prefix="dashboard-tenant-stats")
     def get_tenant_statistics() -> dict[str, Any]:
         """
         Calculate tenant statistics and demographics.
