@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useCallback, useMemo } from 'react';
-import { Editor } from '@tiptap/react';
+import { type Editor } from '@tiptap/react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -183,7 +183,7 @@ const TEMPLATE_VARIABLES: VariableDefinition[] = [
     category: 'locacao',
   },
   {
-    name: 'lease.due_day',
+    name: 'tenant.due_day',
     label: 'Dia de Vencimento',
     description: 'Dia do mês',
     category: 'locacao',
@@ -219,8 +219,9 @@ export const VariableInserter: React.FC<VariableInserterProps> = React.memo(
     const groupedVariables = useMemo(() => {
       const groups: Record<string, VariableDefinition[]> = {};
       filteredVariables.forEach((v) => {
-        if (!groups[v.category]) groups[v.category] = [];
-        groups[v.category].push(v);
+        groups[v.category] ??= [];
+        const group = groups[v.category];
+        if (group) group.push(v);
       });
       return groups;
     }, [filteredVariables]);

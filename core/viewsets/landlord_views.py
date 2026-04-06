@@ -12,6 +12,7 @@ import logging
 
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
+from rest_framework.request import Request
 from rest_framework.response import Response
 
 from ..models import Landlord
@@ -39,7 +40,7 @@ class LandlordViewSet(viewsets.ViewSet):
     permission_classes = [IsAdminUser]
 
     @action(detail=False, methods=["get", "put", "patch"], url_path="current")
-    def current(self, request):
+    def current(self, request: Request) -> Response:
         """
         Get or update the currently active landlord.
 

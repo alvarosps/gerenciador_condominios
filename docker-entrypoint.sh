@@ -16,22 +16,25 @@ echo "✅ PostgreSQL is ready!"
 echo "🔄 Running database migrations..."
 python manage.py migrate --noinput
 
-# Collect static files
-echo "📦 Collecting static files..."
-python manage.py collectstatic --noinput
-
 # Create superuser if it doesn't exist (for development)
 if [ "$DJANGO_SUPERUSER_USERNAME" ] && [ "$DJANGO_SUPERUSER_PASSWORD" ] && [ "$DJANGO_SUPERUSER_EMAIL" ]; then
     echo "👤 Creating superuser..."
-    python manage.py shell <<EOF
+    python -c "
+import os
+import django
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'condominios_manager.settings')
+django.setup()
 from django.contrib.auth import get_user_model
 User = get_user_model()
-if not User.objects.filter(username='$DJANGO_SUPERUSER_USERNAME').exists():
-    User.objects.create_superuser('$DJANGO_SUPERUSER_USERNAME', '$DJANGO_SUPERUSER_EMAIL', '$DJANGO_SUPERUSER_PASSWORD')
-    print('✅ Superuser created!')
+username = os.environ.get('DJANGO_SUPERUSER_USERNAME', '')
+email = os.environ.get('DJANGO_SUPERUSER_EMAIL', '')
+password = os.environ.get('DJANGO_SUPERUSER_PASSWORD', '')
+if username and password and not User.objects.filter(username=username).exists():
+    User.objects.create_superuser(username, email, password)
+    print('Superuser ' + username + ' created successfully')
 else:
-    print('ℹ️  Superuser already exists')
-EOF
+    print('Superuser already exists or credentials not provided')
+"
 fi
 
 echo "✅ Initialization complete!"

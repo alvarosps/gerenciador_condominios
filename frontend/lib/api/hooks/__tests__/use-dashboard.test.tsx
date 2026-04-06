@@ -113,8 +113,9 @@ describe('useDashboard hooks', () => {
 
       await waitFor(() => expect(result.current.isSuccess).toBe(true), { timeout: 5000 });
 
-      // Should be an array
-      expect(Array.isArray(result.current.data)).toBe(true);
+      expect(result.current.data).toHaveProperty('total_late_leases');
+      expect(result.current.data).toHaveProperty('total_late_fees');
+      expect(result.current.data).toHaveProperty('late_leases');
     });
 
     it('should have required fields for late payments', async () => {
@@ -124,11 +125,12 @@ describe('useDashboard hooks', () => {
 
       await waitFor(() => expect(result.current.isSuccess).toBe(true), { timeout: 5000 });
 
-      if (result.current.data && result.current.data.length > 0) {
-        const payment = result.current.data[0];
+      const data = result.current.data;
+      if (data && data.late_leases.length > 0) {
+        const payment = data.late_leases[0];
         expect(payment).toHaveProperty('lease_id');
         expect(payment).toHaveProperty('tenant_name');
-        expect(payment).toHaveProperty('days_late');
+        expect(payment).toHaveProperty('late_days');
         expect(payment).toHaveProperty('late_fee');
       }
     });

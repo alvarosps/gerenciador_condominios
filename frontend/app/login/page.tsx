@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useForm, ControllerRenderProps } from 'react-hook-form';
+import { useForm, type ControllerRenderProps } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Lock, User } from 'lucide-react';
@@ -83,14 +83,14 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-secondary to-accent p-4">
       <Card className="w-full max-w-md shadow-xl">
         <CardContent className="pt-6">
           <div className="text-center mb-8">
             <div className="inline-flex items-center justify-center w-16 h-16 bg-primary rounded-full mb-4">
               <User className="h-8 w-8 text-primary-foreground" />
             </div>
-            <h1 className="text-3xl font-bold text-gray-800">Condomínios Manager</h1>
+            <h1 className="text-3xl font-bold text-foreground">Condomínios Manager</h1>
             <p className="text-muted-foreground mt-2">Sistema de Gestão de Locações</p>
           </div>
 

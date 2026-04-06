@@ -14,6 +14,7 @@ This refactoring plan transforms the Condomínios Manager from a monolithic Djan
 ### Critical ChromaDB Integration Opportunity
 
 **IMPORTANT**: Before implementing advanced search features or document management systems, evaluate ChromaDB for:
+
 - **Semantic search** across contracts, leases, and tenant information
 - **Document indexing** for PDFs and contracts
 - **Knowledge base** for building/apartment specifications and history
@@ -31,30 +32,30 @@ ChromaDB can provide powerful search capabilities without external dependencies.
 
 ### Current State Assessment
 
-| Category | Score | Issues |
-|----------|-------|--------|
-| Architecture | 2/10 | Monolithic, fat views, no layering |
-| SOLID Compliance | 3/10 | Multiple SRP violations, hardcoded dependencies |
-| Code Quality | 4/10 | No type hints, no docstrings, poor error handling |
-| Database Design | 5/10 | Data redundancy, missing audit trail |
-| Testing | 0/10 | Zero test coverage |
-| Security | 3/10 | Exposed credentials, DEBUG=True, AllowAny permissions |
+| Category         | Score | Issues                                                |
+| ---------------- | ----- | ----------------------------------------------------- |
+| Architecture     | 2/10  | Monolithic, fat views, no layering                    |
+| SOLID Compliance | 3/10  | Multiple SRP violations, hardcoded dependencies       |
+| Code Quality     | 4/10  | No type hints, no docstrings, poor error handling     |
+| Database Design  | 5/10  | Data redundancy, missing audit trail                  |
+| Testing          | 0/10  | Zero test coverage                                    |
+| Security         | 3/10  | Exposed credentials, DEBUG=True, AllowAny permissions |
 
 ---
 
 ## Phase Overview
 
-| Phase | Duration | Status | Priority | Risk |
-|-------|----------|--------|----------|------|
-| 0: Pre-Refactoring Setup | 1 week | ⏳ Pending | Critical | Low |
-| 1: Foundation & Testing Infrastructure | 2 weeks | ⏳ Pending | Critical | Low |
-| 2: Service Layer Extraction | 3 weeks | ⏳ Pending | Critical | Medium |
-| 3: Domain Model Refinement | 2 weeks | ⏳ Pending | High | Medium |
-| 4: Infrastructure Improvements | 2 weeks | ⏳ Pending | High | Medium |
-| 5: Database Normalization | 2 weeks | ⏳ Pending | High | High |
-| 6: Security & Configuration | 1 week | ⏳ Pending | High | Low |
-| 7: Advanced Features Foundation | 2 weeks | ⏳ Pending | Medium | Medium |
-| 8: Cleanup & Documentation | 1 week | ⏳ Pending | Medium | Low |
+| Phase                                  | Duration | Status     | Priority | Risk   |
+| -------------------------------------- | -------- | ---------- | -------- | ------ |
+| 0: Pre-Refactoring Setup               | 1 week   | ⏳ Pending | Critical | Low    |
+| 1: Foundation & Testing Infrastructure | 2 weeks  | ⏳ Pending | Critical | Low    |
+| 2: Service Layer Extraction            | 3 weeks  | ⏳ Pending | Critical | Medium |
+| 3: Domain Model Refinement             | 2 weeks  | ⏳ Pending | High     | Medium |
+| 4: Infrastructure Improvements         | 2 weeks  | ⏳ Pending | High     | Medium |
+| 5: Database Normalization              | 2 weeks  | ⏳ Pending | High     | High   |
+| 6: Security & Configuration            | 1 week   | ⏳ Pending | High     | Low    |
+| 7: Advanced Features Foundation        | 2 weeks  | ⏳ Pending | Medium   | Medium |
+| 8: Cleanup & Documentation             | 1 week   | ⏳ Pending | Medium   | Low    |
 
 **Total Estimated Duration:** 16 weeks (4 months)
 
@@ -79,12 +80,14 @@ ChromaDB can provide powerful search capabilities without external dependencies.
 #### Day 1: Version Control & Branching Strategy
 
 **Task 0.1.1: Create Development Branch** (2 hours)
+
 ```bash
 git checkout -b refactoring/phase-0-setup
 git push -u origin refactoring/phase-0-setup
 ```
 
 **Task 0.1.2: Document Branching Strategy** (1 hour)
+
 - Create `.github/CONTRIBUTING.md` or `docs/BRANCHING_STRATEGY.md`
 - Strategy: Feature branching with protected master
   - `master` - production-ready code
@@ -93,6 +96,7 @@ git push -u origin refactoring/phase-0-setup
   - `feature/brief-description` - individual features
 
 **Task 0.1.3: Set Up Git Hooks** (1 hour)
+
 ```bash
 # Install pre-commit framework
 pip install pre-commit
@@ -103,11 +107,13 @@ pip install pre-commit
 #### Day 2: Development Environment Standardization
 
 **Task 0.2.1: Create Environment Configuration** (3 hours)
+
 - Create `.env.example` file
 - Move hardcoded values to environment variables
 - Document all required environment variables
 
 **File: `.env.example`**
+
 ```bash
 # Database Configuration
 DB_ENGINE=django.db.backends.postgresql
@@ -136,6 +142,7 @@ DEFAULT_TAG_FEE_MULTIPLE=80.00
 ```
 
 **Task 0.2.2: Install python-decouple** (1 hour)
+
 ```bash
 pip install python-decouple
 pip freeze > requirements.txt
@@ -144,6 +151,7 @@ pip freeze > requirements.txt
 **Task 0.2.3: Update settings.py** (2 hours)
 
 **File: `C:\Users\alvarosps\git\condominios_manager\condominios_manager\settings.py`** (partial update)
+
 ```python
 from pathlib import Path
 from decouple import config, Csv
@@ -184,6 +192,7 @@ DEFAULT_TAG_FEE_MULTIPLE = config('DEFAULT_TAG_FEE_MULTIPLE', default=80.00, cas
 **Task 0.3.1: Create Backup Script** (2 hours)
 
 **File: `C:\Users\alvarosps\git\condominios_manager\scripts\backup_db.py`**
+
 ```python
 """
 Database backup utility
@@ -240,6 +249,7 @@ if __name__ == '__main__':
 **Task 0.3.2: Create Restore Script** (1 hour)
 
 **File: `C:\Users\alvarosps\git\condominios_manager\scripts\restore_db.py`**
+
 ```python
 """
 Database restore utility
@@ -288,6 +298,7 @@ if __name__ == '__main__':
 ```
 
 **Task 0.3.3: Create Initial Backup** (30 minutes)
+
 ```bash
 python scripts/backup_db.py
 ```
@@ -295,6 +306,7 @@ python scripts/backup_db.py
 #### Day 4: Code Quality Tools Setup
 
 **Task 0.4.1: Install Development Dependencies** (1 hour)
+
 ```bash
 pip install black isort flake8 mypy pylint bandit safety
 pip freeze > requirements-dev.txt
@@ -303,6 +315,7 @@ pip freeze > requirements-dev.txt
 **Task 0.4.2: Configure Code Formatters** (2 hours)
 
 **File: `pyproject.toml`**
+
 ```toml
 [tool.black]
 line-length = 100
@@ -347,6 +360,7 @@ max-line-length = 100
 ```
 
 **File: `.flake8`**
+
 ```ini
 [flake8]
 max-line-length = 100
@@ -364,6 +378,7 @@ max-complexity = 10
 **Task 0.4.3: Configure Pre-commit Hooks** (1 hour)
 
 **File: `.pre-commit-config.yaml`**
+
 ```yaml
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -410,6 +425,7 @@ pre-commit install
 **Task 0.5.1: Generate Code Metrics Baseline** (2 hours)
 
 **File: `C:\Users\alvarosps\git\condominios_manager\scripts\generate_metrics.py`**
+
 ```python
 """
 Generate code quality metrics baseline
@@ -479,31 +495,33 @@ if __name__ == '__main__':
 **Task 0.5.2: Create Current Architecture Diagram** (2 hours)
 
 **File: `docs/architecture/current_state.md`**
+
 ```markdown
 # Current Architecture - Before Refactoring
 
 ## System Overview
-
 ```
+
 ┌─────────────────────────────────────────────────────────────┐
-│                     Django Application                       │
-│                    (Monolithic Architecture)                 │
+│ Django Application │
+│ (Monolithic Architecture) │
 ├─────────────────────────────────────────────────────────────┤
-│                                                               │
-│  ┌─────────────┐      ┌──────────────┐      ┌────────────┐ │
-│  │   ViewSets  │─────▶│ Serializers  │─────▶│   Models   │ │
-│  │ (Business   │      │ (Validation  │      │  (Domain   │ │
-│  │  Logic)     │      │  & Nested    │      │   & Data)  │ │
-│  └─────────────┘      │  Creation)   │      └────────────┘ │
-│         │             └──────────────┘             │        │
-│         │                                          │        │
-│         ▼                                          ▼        │
-│  ┌─────────────┐                           ┌────────────┐  │
-│  │  PDF Gen    │                           │ PostgreSQL │  │
-│  │ (Pyppeteer) │                           │  Database  │  │
-│  └─────────────┘                           └────────────┘  │
-│                                                               │
+│ │
+│ ┌─────────────┐ ┌──────────────┐ ┌────────────┐ │
+│ │ ViewSets │─────▶│ Serializers │─────▶│ Models │ │
+│ │ (Business │ │ (Validation │ │ (Domain │ │
+│ │ Logic) │ │ & Nested │ │ & Data) │ │
+│ └─────────────┘ │ Creation) │ └────────────┘ │
+│ │ └──────────────┘ │ │
+│ │ │ │
+│ ▼ ▼ │
+│ ┌─────────────┐ ┌────────────┐ │
+│ │ PDF Gen │ │ PostgreSQL │ │
+│ │ (Pyppeteer) │ │ Database │ │
+│ └─────────────┘ └────────────┘ │
+│ │
 └─────────────────────────────────────────────────────────────┘
+
 ```
 
 ## Component Responsibilities
@@ -547,10 +565,12 @@ if __name__ == '__main__':
 **Task 0.5.3: Document Current API Contract** (2 hours)
 
 **File: `docs/api/current_endpoints.md`**
-```markdown
+
+````markdown
 # Current API Endpoints - Baseline
 
 ## Buildings
+
 - `GET /api/buildings/` - List all buildings
 - `POST /api/buildings/` - Create building
 - `GET /api/buildings/{id}/` - Retrieve building
@@ -559,6 +579,7 @@ if __name__ == '__main__':
 - `DELETE /api/buildings/{id}/` - Delete building
 
 ## Apartments
+
 - `GET /api/apartments/` - List all apartments
 - `POST /api/apartments/` - Create apartment
 - `GET /api/apartments/{id}/` - Retrieve apartment
@@ -567,6 +588,7 @@ if __name__ == '__main__':
 - `DELETE /api/apartments/{id}/` - Delete apartment
 
 ## Tenants
+
 - `GET /api/tenants/` - List all tenants
 - `POST /api/tenants/` - Create tenant (with dependents)
 - `GET /api/tenants/{id}/` - Retrieve tenant
@@ -575,6 +597,7 @@ if __name__ == '__main__':
 - `DELETE /api/tenants/{id}/` - Delete tenant
 
 ## Leases
+
 - `GET /api/leases/` - List all leases
 - `POST /api/leases/` - Create lease
 - `GET /api/leases/{id}/` - Retrieve lease
@@ -586,6 +609,7 @@ if __name__ == '__main__':
 - `POST /api/leases/{id}/change_due_date/` - Change due date
 
 ## Furnitures
+
 - `GET /api/furnitures/` - List all furnitures
 - `POST /api/furnitures/` - Create furniture
 - `GET /api/furnitures/{id}/` - Retrieve furniture
@@ -596,6 +620,7 @@ if __name__ == '__main__':
 ## Request/Response Examples
 
 ### Create Lease
+
 ```json
 POST /api/leases/
 {
@@ -610,8 +635,10 @@ POST /api/leases/
   "tag_fee": "80.00"
 }
 ```
+````
 
 ### Generate Contract
+
 ```json
 POST /api/leases/1/generate_contract/
 
@@ -623,7 +650,8 @@ Response:
 ```
 
 **CRITICAL**: These endpoints MUST remain functional and backward-compatible throughout refactoring.
-```
+
+````
 
 ### Deliverables
 
@@ -688,11 +716,12 @@ Response:
 pip install pytest pytest-django pytest-cov pytest-mock factory-boy faker freezegun
 pip install pytest-xdist  # For parallel test execution
 pip freeze > requirements-dev.txt
-```
+````
 
 **Task 1.1.2: Configure pytest** (2 hours)
 
 **File: `pytest.ini`**
+
 ```ini
 [pytest]
 DJANGO_SETTINGS_MODULE = condominios_manager.settings
@@ -717,6 +746,7 @@ testpaths = tests
 ```
 
 **File: `conftest.py`**
+
 ```python
 """
 PyTest configuration and shared fixtures
@@ -765,6 +795,7 @@ def cleanup_test_files(tmp_path):
 ```
 
 **Task 1.1.3: Create Test Directory Structure** (1 hour)
+
 ```bash
 mkdir tests
 mkdir tests\unit
@@ -773,6 +804,7 @@ mkdir tests\fixtures
 ```
 
 **File: `tests\__init__.py`**
+
 ```python
 """Test package initialization"""
 ```
@@ -782,6 +814,7 @@ mkdir tests\fixtures
 **Task 1.2.1: Create Model Factories** (4 hours)
 
 **File: `tests\fixtures\factories.py`**
+
 ```python
 """
 Factory classes for creating test data
@@ -923,6 +956,7 @@ class LeaseFactory(DjangoModelFactory):
 **Task 1.2.2: Create Model Unit Tests** (6 hours)
 
 **File: `tests\unit\test_models.py`**
+
 ```python
 """
 Unit tests for Django models
@@ -1089,6 +1123,7 @@ class TestLeaseModel:
 **Task 1.3.1: Create Serializer Tests** (6 hours)
 
 **File: `tests\unit\test_serializers.py`**
+
 ```python
 """
 Unit tests for DRF serializers
@@ -1213,6 +1248,7 @@ class TestLeaseSerializer:
 **Task 1.3.2: Create API View Tests** (6 hours)
 
 **File: `tests\integration\test_api_views.py`**
+
 ```python
 """
 Integration tests for API views
@@ -1339,6 +1375,7 @@ class TestLeaseAPI:
 **Task 1.4.1: Add Type Hints to Models** (4 hours)
 
 **File: `core\models.py`** (partial update with type hints)
+
 ```python
 from django.db import models
 from django.core.validators import MinValueValidator
@@ -1405,6 +1442,7 @@ class Apartment(models.Model):
 **Task 1.4.2: Add Type Hints to Views** (4 hours)
 
 **File: `core\views.py`** (partial update with type hints)
+
 ```python
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
@@ -1450,6 +1488,7 @@ class LeaseViewSet(viewsets.ModelViewSet):
 **Task 1.4.3: Add Type Hints to Utils** (2 hours)
 
 **File: `core\utils.py`** (complete rewrite with type hints)
+
 ```python
 """
 Utility functions for the core application.
@@ -1516,6 +1555,7 @@ def format_currency(value: Union[int, float, Decimal]) -> str:
 **Task 1.5.1: Configure Logging** (3 hours)
 
 **File: `condominios_manager\settings.py`** (add logging configuration)
+
 ```python
 # Logging Configuration
 LOGGING = {
@@ -1594,6 +1634,7 @@ os.makedirs(BASE_DIR / 'logs', exist_ok=True)
 **Task 1.5.2: Add Logging to Views** (3 hours)
 
 **File: `core\views.py`** (add logging)
+
 ```python
 import logging
 
@@ -1629,14 +1670,15 @@ class LeaseViewSet(viewsets.ModelViewSet):
 **Task 1.6.1: Create GitHub Actions Workflow** (4 hours)
 
 **File: `.github\workflows\ci.yml`**
+
 ```yaml
 name: CI/CD Pipeline
 
 on:
   push:
-    branches: [ master, develop, 'refactoring/**' ]
+    branches: [master, develop, "refactoring/**"]
   pull_request:
-    branches: [ master, develop ]
+    branches: [master, develop]
 
 jobs:
   test:
@@ -1658,52 +1700,52 @@ jobs:
           - 5432:5432
 
     steps:
-    - uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
-        cache: 'pip'
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+          cache: "pip"
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install -r requirements-dev.txt
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
 
-    - name: Run linters
-      run: |
-        black --check core
-        isort --check-only core
-        flake8 core
-        pylint core --exit-zero
+      - name: Run linters
+        run: |
+          black --check core
+          isort --check-only core
+          flake8 core
+          pylint core --exit-zero
 
-    - name: Run type checking
-      run: |
-        mypy core --ignore-missing-imports
+      - name: Run type checking
+        run: |
+          mypy core --ignore-missing-imports
 
-    - name: Run security checks
-      run: |
-        bandit -r core -ll
-        safety check
+      - name: Run security checks
+        run: |
+          bandit -r core -ll
+          safety check
 
-    - name: Run tests with coverage
-      env:
-        DB_NAME: condominio_test
-        DB_USER: postgres
-        DB_PASSWORD: postgres
-        DB_HOST: localhost
-        DB_PORT: 5432
-        SECRET_KEY: test-secret-key
-      run: |
-        pytest --cov=core --cov-report=xml --cov-report=html
+      - name: Run tests with coverage
+        env:
+          DB_NAME: condominio_test
+          DB_USER: postgres
+          DB_PASSWORD: postgres
+          DB_HOST: localhost
+          DB_PORT: 5432
+          SECRET_KEY: test-secret-key
+        run: |
+          pytest --cov=core --cov-report=xml --cov-report=html
 
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
-      with:
-        file: ./coverage.xml
-        fail_ci_if_error: false
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.xml
+          fail_ci_if_error: false
 
   build:
     runs-on: ubuntu-latest
@@ -1711,15 +1753,16 @@ jobs:
     if: github.ref == 'refs/heads/master'
 
     steps:
-    - uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
-    - name: Build Docker image (future)
-      run: echo "Docker build will be implemented in Phase 4"
+      - name: Build Docker image (future)
+        run: echo "Docker build will be implemented in Phase 4"
 ```
 
 **Task 1.6.2: Create Docker Development Environment** (4 hours)
 
 **File: `Dockerfile.dev`**
+
 ```dockerfile
 FROM python:3.11-slim
 
@@ -1745,15 +1788,16 @@ RUN pip install --no-cache-dir -r requirements.txt -r requirements-dev.txt
 COPY . .
 
 # Expose port
-EXPOSE 8000
+EXPOSE 8008
 
 # Run migrations and start server
-CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+CMD ["python", "manage.py", "runserver", "0.0.0.0:8008"]
 ```
 
 **File: `docker-compose.yml`**
+
 ```yaml
-version: '3.8'
+version: "3.8"
 
 services:
   db:
@@ -1776,12 +1820,12 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.dev
-    command: python manage.py runserver 0.0.0.0:8000
+    command: python manage.py runserver 0.0.0.0:8008
     volumes:
       - .:/app
       - ./logs:/app/logs
     ports:
-      - "8000:8000"
+      - "8008:8008"
     environment:
       - DB_NAME=condominio
       - DB_USER=postgres
@@ -1821,12 +1865,12 @@ volumes:
 
 ### Risk Assessment
 
-| Risk | Probability | Impact | Mitigation |
-|------|------------|--------|------------|
-| PDF tests failing in CI | High | Medium | Mock pyppeteer, use @pytest.mark.pdf to skip |
-| Low initial coverage | Medium | Low | Incremental improvement, start with 60% target |
-| Type hint errors | Medium | Low | Use gradual typing, ignore missing imports |
-| CI pipeline slow | Medium | Low | Use caching, parallel test execution |
+| Risk                    | Probability | Impact | Mitigation                                     |
+| ----------------------- | ----------- | ------ | ---------------------------------------------- |
+| PDF tests failing in CI | High        | Medium | Mock pyppeteer, use @pytest.mark.pdf to skip   |
+| Low initial coverage    | Medium      | Low    | Incremental improvement, start with 60% target |
+| Type hint errors        | Medium      | Low    | Use gradual typing, ignore missing imports     |
+| CI pipeline slow        | Medium      | Low    | Use caching, parallel test execution           |
 
 ### Rollback Strategy
 
@@ -1863,6 +1907,7 @@ mkdir core\services\__init__.py
 ```
 
 **File: `core\services\__init__.py`**
+
 ```python
 """
 Service layer for business logic.
@@ -1884,6 +1929,7 @@ __all__ = [
 **Task 2.1.2: Create Base Service Class** (2 hours)
 
 **File: `core\services\base.py`**
+
 ```python
 """
 Base service class for common service functionality.
@@ -1993,6 +2039,7 @@ class BaseService(Generic[ModelType]):
 **Task 2.2.1: Create FeeCalculatorService** (6 hours)
 
 **File: `core\services\fee_calculator_service.py`**
+
 ```python
 """
 Service for calculating fees related to leases.
@@ -2199,6 +2246,7 @@ class FeeCalculatorService:
 **Task 2.2.2: Create Tests for FeeCalculatorService** (4 hours)
 
 **File: `tests\unit\test_services\test_fee_calculator_service.py`**
+
 ```python
 """
 Unit tests for FeeCalculatorService
@@ -2290,6 +2338,7 @@ class TestFeeCalculatorService:
 **Task 2.3.1: Create DateCalculatorService** (6 hours)
 
 **File: `core\services\date_calculator_service.py`**
+
 ```python
 """
 Service for date calculations in lease management.
@@ -2448,6 +2497,7 @@ class DateCalculatorService:
 **Task 2.3.2: Create Tests for DateCalculatorService** (4 hours)
 
 **File: `tests\unit\test_services\test_date_calculator_service.py`**
+
 ```python
 """
 Unit tests for DateCalculatorService
@@ -2533,6 +2583,7 @@ class TestDateCalculatorService:
 **Task 2.4.1: Create ContractService** (8 hours)
 
 **File: `core\services\contract_service.py`**
+
 ```python
 """
 Service for contract generation and management.
@@ -2821,6 +2872,7 @@ class ContractService:
 **Task 2.5.1: Refactor LeaseViewSet** (8 hours)
 
 **File: `core\views.py`** (complete rewrite)
+
 ```python
 """
 API views for the core application.
@@ -3031,6 +3083,7 @@ class LeaseViewSet(viewsets.ModelViewSet):
 **Task 2.5.2: Update Tests for Refactored Views** (6 hours)
 
 **File: `tests\integration\test_api_views.py`** (update with service mocking)
+
 ```python
 """
 Integration tests for refactored API views
@@ -3102,6 +3155,7 @@ class TestLeaseAPIWithServices:
 **Task 2.6.1: End-to-End Integration Tests** (6 hours)
 
 **File: `tests\integration\test_lease_workflow.py`**
+
 ```python
 """
 End-to-end integration tests for complete lease workflows
@@ -3191,7 +3245,8 @@ class TestCompleteLeaseWorkflow:
 **Task 2.6.2: Service Layer Documentation** (4 hours)
 
 **File: `docs\architecture\service_layer.md`**
-```markdown
+
+````markdown
 # Service Layer Architecture
 
 ## Overview
@@ -3205,6 +3260,7 @@ The service layer encapsulates business logic, separating it from views and maki
 **Location:** `core/services/fee_calculator_service.py`
 
 **Responsibilities:**
+
 - Calculate daily rental rates
 - Calculate late payment fees
 - Calculate due date change fees
@@ -3212,6 +3268,7 @@ The service layer encapsulates business logic, separating it from views and maki
 - Calculate total initial costs
 
 **Usage Example:**
+
 ```python
 from core.services.fee_calculator_service import FeeCalculatorService
 
@@ -3222,18 +3279,21 @@ result = FeeCalculatorService.calculate_late_fee(
 )
 print(result)  # {'late_days': 5, 'late_fee': Decimal('12.50'), 'is_late': True}
 ```
+````
 
 ### DateCalculatorService
 
 **Location:** `core/services/date_calculator_service.py`
 
 **Responsibilities:**
+
 - Calculate next month dates
 - Calculate lease end dates
 - Handle leap year edge cases
 - Check rent due status
 
 **Usage Example:**
+
 ```python
 from core.services.date_calculator_service import DateCalculatorService
 
@@ -3249,12 +3309,14 @@ print(dates['final_date'])  # 2026-01-15
 **Location:** `core/services/contract_service.py`
 
 **Responsibilities:**
+
 - Generate PDF contracts
 - Render contract templates
 - Calculate contract furniture
 - Manage contract files
 
 **Usage Example:**
+
 ```python
 from core.services.contract_service import ContractService
 
@@ -3277,6 +3339,7 @@ print(f"Contract generated: {pdf_path}")
 - **Dependency Injection**: Views receive service instances, can be mocked
 - **Single Responsibility**: Each service has one clear purpose
 - **Open/Closed**: Services can be extended without modifying existing code
+
 ```
 
 ### Deliverables
@@ -3491,3 +3554,4 @@ This refactoring plan provides a structured, incremental approach to transformin
 The plan prioritizes critical phases (Foundation, Services, Security) while allowing flexibility for lower-priority improvements. **ChromaDB integration** in Phase 4 provides powerful semantic search capabilities without external dependencies.
 
 By following this plan, the team will achieve a modern, scalable Django application ready for future growth.
+```

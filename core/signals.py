@@ -16,15 +16,31 @@ Models and their cache invalidation relationships:
 - Dependent: Invalidates Dependent, Tenant caches
 """
 
-from __future__ import annotations
-
 import logging
+from typing import Any
 
 from django.db.models.signals import m2m_changed, post_delete, post_save
 from django.dispatch import receiver
 
-from .cache import invalidate_related_caches
-from .models import Apartment, Building, Dependent, Furniture, Lease, Tenant
+from .cache import CacheManager, invalidate_related_caches
+from .models import (
+    Apartment,
+    Building,
+    Dependent,
+    DeviceToken,
+    EmployeePayment,
+    Expense,
+    ExpenseInstallment,
+    ExpenseMonthSkip,
+    Furniture,
+    Income,
+    Lease,
+    Notification,
+    PaymentProof,
+    PersonPayment,
+    PersonPaymentSchedule,
+    Tenant,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +51,9 @@ logger = logging.getLogger(__name__)
 
 
 @receiver(post_save, sender=Building)
-def invalidate_building_cache_on_save(sender, instance, created, **kwargs):
+def invalidate_building_cache_on_save(
+    sender: type[Building], instance: Building, created: bool, **kwargs: Any
+) -> None:
     """
     Invalidate Building caches when a Building is created or updated.
 
@@ -48,7 +66,9 @@ def invalidate_building_cache_on_save(sender, instance, created, **kwargs):
 
 
 @receiver(post_delete, sender=Building)
-def invalidate_building_cache_on_delete(sender, instance, **kwargs):
+def invalidate_building_cache_on_delete(
+    sender: type[Building], instance: Building, **kwargs: Any
+) -> None:
     """
     Invalidate Building caches when a Building is deleted.
     """
@@ -62,7 +82,9 @@ def invalidate_building_cache_on_delete(sender, instance, **kwargs):
 
 
 @receiver(post_save, sender=Apartment)
-def invalidate_apartment_cache_on_save(sender, instance, created, **kwargs):
+def invalidate_apartment_cache_on_save(
+    sender: type[Apartment], instance: Apartment, created: bool, **kwargs: Any
+) -> None:
     """
     Invalidate Apartment caches when an Apartment is created or updated.
 
@@ -75,7 +97,9 @@ def invalidate_apartment_cache_on_save(sender, instance, created, **kwargs):
 
 
 @receiver(post_delete, sender=Apartment)
-def invalidate_apartment_cache_on_delete(sender, instance, **kwargs):
+def invalidate_apartment_cache_on_delete(
+    sender: type[Apartment], instance: Apartment, **kwargs: Any
+) -> None:
     """
     Invalidate Apartment caches when an Apartment is deleted.
     """
@@ -84,7 +108,9 @@ def invalidate_apartment_cache_on_delete(sender, instance, **kwargs):
 
 
 @receiver(m2m_changed, sender=Apartment.furnitures.through)
-def invalidate_apartment_furniture_cache(sender, instance, action, **kwargs):
+def invalidate_apartment_furniture_cache(
+    sender: Any, instance: Apartment, action: str, **kwargs: Any
+) -> None:
     """
     Invalidate caches when Apartment-Furniture relationship changes.
     """
@@ -99,7 +125,9 @@ def invalidate_apartment_furniture_cache(sender, instance, action, **kwargs):
 
 
 @receiver(post_save, sender=Tenant)
-def invalidate_tenant_cache_on_save(sender, instance, created, **kwargs):
+def invalidate_tenant_cache_on_save(
+    sender: type[Tenant], instance: Tenant, created: bool, **kwargs: Any
+) -> None:
     """
     Invalidate Tenant caches when a Tenant is created or updated.
 
@@ -112,7 +140,9 @@ def invalidate_tenant_cache_on_save(sender, instance, created, **kwargs):
 
 
 @receiver(post_delete, sender=Tenant)
-def invalidate_tenant_cache_on_delete(sender, instance, **kwargs):
+def invalidate_tenant_cache_on_delete(
+    sender: type[Tenant], instance: Tenant, **kwargs: Any
+) -> None:
     """
     Invalidate Tenant caches when a Tenant is deleted.
     """
@@ -121,7 +151,9 @@ def invalidate_tenant_cache_on_delete(sender, instance, **kwargs):
 
 
 @receiver(m2m_changed, sender=Tenant.furnitures.through)
-def invalidate_tenant_furniture_cache(sender, instance, action, **kwargs):
+def invalidate_tenant_furniture_cache(
+    sender: Any, instance: Tenant, action: str, **kwargs: Any
+) -> None:
     """
     Invalidate caches when Tenant-Furniture relationship changes.
     """
@@ -136,7 +168,23 @@ def invalidate_tenant_furniture_cache(sender, instance, action, **kwargs):
 
 
 @receiver(post_save, sender=Lease)
-def invalidate_lease_cache_on_save(sender, instance, created, **kwargs):
+def sync_apartment_is_rented(sender: type[Lease], instance: Lease, **kwargs: Any) -> None:
+    """Sync apartment.is_rented based on whether any active lease exists."""
+    has_active_lease = Lease.objects.filter(apartment_id=instance.apartment_id).exists()
+    Apartment.objects.filter(pk=instance.apartment_id).update(is_rented=has_active_lease)
+
+
+@receiver(post_delete, sender=Lease)
+def sync_apartment_is_rented_on_delete(sender: type[Lease], instance: Lease, **kwargs: Any) -> None:
+    """Sync apartment.is_rented when lease is hard-deleted."""
+    has_active_lease = Lease.objects.filter(apartment_id=instance.apartment_id).exists()
+    Apartment.objects.filter(pk=instance.apartment_id).update(is_rented=has_active_lease)
+
+
+@receiver(post_save, sender=Lease)
+def invalidate_lease_cache_on_save(
+    sender: type[Lease], instance: Lease, created: bool, **kwargs: Any
+) -> None:
     """
     Invalidate Lease caches when a Lease is created or updated.
 
@@ -149,7 +197,7 @@ def invalidate_lease_cache_on_save(sender, instance, created, **kwargs):
 
 
 @receiver(post_delete, sender=Lease)
-def invalidate_lease_cache_on_delete(sender, instance, **kwargs):
+def invalidate_lease_cache_on_delete(sender: type[Lease], instance: Lease, **kwargs: Any) -> None:
     """
     Invalidate Lease caches when a Lease is deleted.
     """
@@ -158,7 +206,9 @@ def invalidate_lease_cache_on_delete(sender, instance, **kwargs):
 
 
 @receiver(m2m_changed, sender=Lease.tenants.through)
-def invalidate_lease_tenants_cache(sender, instance, action, **kwargs):
+def invalidate_lease_tenants_cache(
+    sender: Any, instance: Lease, action: str, **kwargs: Any
+) -> None:
     """
     Invalidate caches when Lease-Tenant relationship changes.
     """
@@ -173,7 +223,9 @@ def invalidate_lease_tenants_cache(sender, instance, action, **kwargs):
 
 
 @receiver(post_save, sender=Furniture)
-def invalidate_furniture_cache_on_save(sender, instance, created, **kwargs):
+def invalidate_furniture_cache_on_save(
+    sender: type[Furniture], instance: Furniture, created: bool, **kwargs: Any
+) -> None:
     """
     Invalidate Furniture caches when Furniture is created or updated.
 
@@ -186,7 +238,9 @@ def invalidate_furniture_cache_on_save(sender, instance, created, **kwargs):
 
 
 @receiver(post_delete, sender=Furniture)
-def invalidate_furniture_cache_on_delete(sender, instance, **kwargs):
+def invalidate_furniture_cache_on_delete(
+    sender: type[Furniture], instance: Furniture, **kwargs: Any
+) -> None:
     """
     Invalidate Furniture caches when Furniture is deleted.
     """
@@ -200,7 +254,9 @@ def invalidate_furniture_cache_on_delete(sender, instance, **kwargs):
 
 
 @receiver(post_save, sender=Dependent)
-def invalidate_dependent_cache_on_save(sender, instance, created, **kwargs):
+def invalidate_dependent_cache_on_save(
+    sender: type[Dependent], instance: Dependent, created: bool, **kwargs: Any
+) -> None:
     """
     Invalidate Dependent caches when a Dependent is created or updated.
 
@@ -213,7 +269,9 @@ def invalidate_dependent_cache_on_save(sender, instance, created, **kwargs):
 
 
 @receiver(post_delete, sender=Dependent)
-def invalidate_dependent_cache_on_delete(sender, instance, **kwargs):
+def invalidate_dependent_cache_on_delete(
+    sender: type[Dependent], instance: Dependent, **kwargs: Any
+) -> None:
     """
     Invalidate Dependent caches when a Dependent is deleted.
     """
@@ -222,11 +280,201 @@ def invalidate_dependent_cache_on_delete(sender, instance, **kwargs):
 
 
 # =============================================================================
+# Financial Model Signals
+# =============================================================================
+
+
+def _invalidate_financial_caches(model_name: str, pk: int) -> None:
+    """Invalidate all financial dashboard caches affected by financial model changes."""
+    logger.info(f"{model_name} {pk} changed, invalidating financial caches")
+    CacheManager.invalidate_pattern("daily-control:*")
+    CacheManager.invalidate_pattern("cash-flow:*")
+    CacheManager.invalidate_pattern("financial-dashboard:*")
+
+
+@receiver(post_save, sender=PersonPayment)
+def invalidate_person_payment_cache_on_save(
+    sender: type[PersonPayment], instance: PersonPayment, created: bool, **kwargs: Any
+) -> None:
+    action = "created" if created else "updated"
+    logger.info(f"PersonPayment {instance.pk} {action}, invalidating financial caches")
+    _invalidate_financial_caches("PersonPayment", instance.pk)
+
+
+@receiver(post_delete, sender=PersonPayment)
+def invalidate_person_payment_cache_on_delete(
+    sender: type[PersonPayment], instance: PersonPayment, **kwargs: Any
+) -> None:
+    _invalidate_financial_caches("PersonPayment", instance.pk)
+
+
+@receiver(post_save, sender=PersonPaymentSchedule)
+def invalidate_person_payment_schedule_cache_on_save(
+    sender: type[PersonPaymentSchedule],
+    instance: PersonPaymentSchedule,
+    created: bool,
+    **kwargs: Any,
+) -> None:
+    action = "created" if created else "updated"
+    logger.info(f"PersonPaymentSchedule {instance.pk} {action}, invalidating financial caches")
+    _invalidate_financial_caches("PersonPaymentSchedule", instance.pk)
+
+
+@receiver(post_delete, sender=PersonPaymentSchedule)
+def invalidate_person_payment_schedule_cache_on_delete(
+    sender: type[PersonPaymentSchedule], instance: PersonPaymentSchedule, **kwargs: Any
+) -> None:
+    _invalidate_financial_caches("PersonPaymentSchedule", instance.pk)
+
+
+@receiver(post_save, sender=ExpenseMonthSkip)
+def invalidate_expense_month_skip_cache_on_save(
+    sender: type[ExpenseMonthSkip],
+    instance: ExpenseMonthSkip,
+    created: bool,
+    **kwargs: Any,
+) -> None:
+    action = "created" if created else "updated"
+    logger.info(f"ExpenseMonthSkip {instance.pk} {action}, invalidating financial caches")
+    _invalidate_financial_caches("ExpenseMonthSkip", instance.pk)
+
+
+@receiver(post_delete, sender=ExpenseMonthSkip)
+def invalidate_expense_month_skip_cache_on_delete(
+    sender: type[ExpenseMonthSkip], instance: ExpenseMonthSkip, **kwargs: Any
+) -> None:
+    _invalidate_financial_caches("ExpenseMonthSkip", instance.pk)
+
+
+@receiver(post_save, sender=Expense)
+def invalidate_expense_cache_on_save(
+    sender: type[Expense], instance: Expense, created: bool, **kwargs: Any
+) -> None:
+    action = "created" if created else "updated"
+    logger.info(f"Expense {instance.pk} {action}, invalidating financial caches")
+    _invalidate_financial_caches("Expense", instance.pk)
+
+
+@receiver(post_delete, sender=Expense)
+def invalidate_expense_cache_on_delete(
+    sender: type[Expense], instance: Expense, **kwargs: Any
+) -> None:
+    _invalidate_financial_caches("Expense", instance.pk)
+
+
+@receiver(post_save, sender=ExpenseInstallment)
+def invalidate_expense_installment_cache_on_save(
+    sender: type[ExpenseInstallment],
+    instance: ExpenseInstallment,
+    created: bool,
+    **kwargs: Any,
+) -> None:
+    action = "created" if created else "updated"
+    logger.info(f"ExpenseInstallment {instance.pk} {action}, invalidating financial caches")
+    _invalidate_financial_caches("ExpenseInstallment", instance.pk)
+
+
+@receiver(post_delete, sender=ExpenseInstallment)
+def invalidate_expense_installment_cache_on_delete(
+    sender: type[ExpenseInstallment], instance: ExpenseInstallment, **kwargs: Any
+) -> None:
+    _invalidate_financial_caches("ExpenseInstallment", instance.pk)
+
+
+@receiver(post_save, sender=Income)
+def invalidate_income_cache_on_save(
+    sender: type[Income], instance: Income, created: bool, **kwargs: Any
+) -> None:
+    action = "created" if created else "updated"
+    logger.info(f"Income {instance.pk} {action}, invalidating financial caches")
+    _invalidate_financial_caches("Income", instance.pk)
+
+
+@receiver(post_delete, sender=Income)
+def invalidate_income_cache_on_delete(
+    sender: type[Income], instance: Income, **kwargs: Any
+) -> None:
+    _invalidate_financial_caches("Income", instance.pk)
+
+
+@receiver(post_save, sender=EmployeePayment)
+def invalidate_employee_payment_cache_on_save(
+    sender: type[EmployeePayment], instance: EmployeePayment, created: bool, **kwargs: Any
+) -> None:
+    action = "created" if created else "updated"
+    logger.info(f"EmployeePayment {instance.pk} {action}, invalidating financial caches")
+    _invalidate_financial_caches("EmployeePayment", instance.pk)
+
+
+@receiver(post_delete, sender=EmployeePayment)
+def invalidate_employee_payment_cache_on_delete(
+    sender: type[EmployeePayment], instance: EmployeePayment, **kwargs: Any
+) -> None:
+    _invalidate_financial_caches("EmployeePayment", instance.pk)
+
+
+# =============================================================================
+# Mobile Model Signals
+# =============================================================================
+
+
+@receiver(post_save, sender=PaymentProof)
+def invalidate_payment_proof_cache_on_save(
+    sender: type[PaymentProof], instance: PaymentProof, created: bool, **kwargs: Any
+) -> None:
+    action = "created" if created else "updated"
+    logger.info(f"PaymentProof {instance.pk} {action}, invalidating caches")
+    invalidate_related_caches(instance, related_models=["Lease"])
+
+
+@receiver(post_delete, sender=PaymentProof)
+def invalidate_payment_proof_cache_on_delete(
+    sender: type[PaymentProof], instance: PaymentProof, **kwargs: Any
+) -> None:
+    logger.info(f"PaymentProof {instance.pk} deleted, invalidating caches")
+    invalidate_related_caches(instance, related_models=["Lease"])
+
+
+@receiver(post_save, sender=Notification)
+def invalidate_notification_cache_on_save(
+    sender: type[Notification], instance: Notification, created: bool, **kwargs: Any
+) -> None:
+    action = "created" if created else "updated"
+    logger.info(f"Notification {instance.pk} {action}, invalidating caches")
+    CacheManager.invalidate_model("Notification", instance.pk)
+
+
+@receiver(post_delete, sender=Notification)
+def invalidate_notification_cache_on_delete(
+    sender: type[Notification], instance: Notification, **kwargs: Any
+) -> None:
+    logger.info(f"Notification {instance.pk} deleted, invalidating caches")
+    CacheManager.invalidate_model("Notification", instance.pk)
+
+
+@receiver(post_save, sender=DeviceToken)
+def invalidate_device_token_cache_on_save(
+    sender: type[DeviceToken], instance: DeviceToken, created: bool, **kwargs: Any
+) -> None:
+    action = "created" if created else "updated"
+    logger.info(f"DeviceToken {instance.pk} {action}, invalidating caches")
+    CacheManager.invalidate_model("DeviceToken", instance.pk)
+
+
+@receiver(post_delete, sender=DeviceToken)
+def invalidate_device_token_cache_on_delete(
+    sender: type[DeviceToken], instance: DeviceToken, **kwargs: Any
+) -> None:
+    logger.info(f"DeviceToken {instance.pk} deleted, invalidating caches")
+    CacheManager.invalidate_model("DeviceToken", instance.pk)
+
+
+# =============================================================================
 # Utility Functions
 # =============================================================================
 
 
-def connect_all_signals():
+def connect_all_signals() -> None:
     """
     Explicitly connect all signals.
 
@@ -239,7 +487,7 @@ def connect_all_signals():
     logger.info("All cache invalidation signals connected successfully")
 
 
-def disconnect_all_signals():
+def disconnect_all_signals() -> None:
     """
     Disconnect all cache invalidation signals.
 
@@ -247,23 +495,29 @@ def disconnect_all_signals():
 
     Warning: Use with caution! Disabling signals can lead to stale caches.
     """
-    from django.db.models.signals import m2m_changed, post_delete, post_save
-
     # Disconnect all post_save signals
     post_save.disconnect(sender=Building)
     post_save.disconnect(sender=Apartment)
     post_save.disconnect(sender=Tenant)
+    post_save.disconnect(sync_apartment_is_rented, sender=Lease)
     post_save.disconnect(sender=Lease)
     post_save.disconnect(sender=Furniture)
     post_save.disconnect(sender=Dependent)
+    post_save.disconnect(sender=PaymentProof)
+    post_save.disconnect(sender=Notification)
+    post_save.disconnect(sender=DeviceToken)
 
     # Disconnect all post_delete signals
     post_delete.disconnect(sender=Building)
     post_delete.disconnect(sender=Apartment)
     post_delete.disconnect(sender=Tenant)
+    post_delete.disconnect(sync_apartment_is_rented_on_delete, sender=Lease)
     post_delete.disconnect(sender=Lease)
     post_delete.disconnect(sender=Furniture)
     post_delete.disconnect(sender=Dependent)
+    post_delete.disconnect(sender=PaymentProof)
+    post_delete.disconnect(sender=Notification)
+    post_delete.disconnect(sender=DeviceToken)
 
     # Disconnect m2m_changed signals
     m2m_changed.disconnect(sender=Apartment.furnitures.through)

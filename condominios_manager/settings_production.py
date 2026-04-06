@@ -11,8 +11,8 @@ import sentry_sdk
 from decouple import config
 from sentry_sdk.integrations.django import DjangoIntegration
 
-from .settings import *  # noqa: F401,F403
-from .settings import (  # noqa: F401
+from .settings import *  # noqa: F403
+from .settings import (
     ALLOWED_HOSTS,
     BASE_DIR,
     CACHES,
@@ -49,6 +49,7 @@ CSRF_COOKIE_SAMESITE = "Lax"
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_BROWSER_XSS_FILTER = True
 X_FRAME_OPTIONS = "DENY"
+SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
 
 # ============================================================
 # STATIC & MEDIA FILES
@@ -61,7 +62,7 @@ MEDIA_ROOT = BASE_DIR / "media"
 MEDIA_URL = "/media/"
 
 # Use WhiteNoise for static file serving
-MIDDLEWARE.insert(1, "whitenoise.middleware.WhiteNoiseMiddleware")  # noqa
+MIDDLEWARE.insert(1, "whitenoise.middleware.WhiteNoiseMiddleware")
 
 # Storage configuration (Django 4.2+ format)
 # This replaces deprecated STATICFILES_STORAGE and DEFAULT_FILE_STORAGE
@@ -97,9 +98,6 @@ if USE_S3:
 # ============================================================
 # DATABASE CONFIGURATION
 # ============================================================
-
-# Connection pooling with django-db-geventpool (optional)
-# DATABASES['default']['ENGINE'] = 'django_db_geventpool.backends.postgresql_psycopg2'
 
 # Database connection pooling
 DATABASES["default"]["CONN_MAX_AGE"] = 600  # 10 minutes
@@ -140,7 +138,7 @@ LOGGING = {
             "style": "{",
         },
         "json": {
-            "()": "pythonjsonlogger.json.JsonFormatter",
+            "()": "pythonjsonlogger.jsonlogger.JsonFormatter",
             "format": "%(asctime)s %(name)s %(levelname)s %(message)s",
         },
     },

@@ -57,7 +57,7 @@ describe('useApartments', () => {
       expect(result.current.data?.id).toBe(1);
     });
 
-    it('should not fetch when ID is null', async () => {
+    it('should not fetch when ID is null', () => {
       const { result } = renderHook(() => useApartment(null), {
         wrapper: createWrapper(),
       });
@@ -87,6 +87,7 @@ describe('useApartments', () => {
         number: 999,
         building_id: 1,
         rental_value: 1500,
+        rental_value_double: null,
         cleaning_fee: 150,
         max_tenants: 2,
         interfone_configured: false,
@@ -115,12 +116,9 @@ describe('useApartments', () => {
         number: 999,
         building_id: 1,
         rental_value: 1500,
+        rental_value_double: null,
         cleaning_fee: 150,
         max_tenants: 2,
-        interfone_configured: false,
-        contract_generated: false,
-        contract_signed: false,
-        is_rented: false,
         furniture_ids: [],
       });
 
@@ -138,7 +136,7 @@ describe('useApartments', () => {
 
       const updatedApartment = {
         id: 1,
-        number: mockApartments[0].number,
+        number: mockApartments[0]?.number ?? 0,
         has_furniture: false,
       };
 

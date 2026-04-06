@@ -5,7 +5,11 @@ Provides fine-grained access control for API endpoints.
 Defines various permission policies for different user types and operations.
 """
 
+from typing import Any
+
 from rest_framework import permissions
+from rest_framework.request import Request
+from rest_framework.views import APIView
 
 
 class IsAuthenticatedOrReadOnly(permissions.BasePermission):
@@ -16,13 +20,13 @@ class IsAuthenticatedOrReadOnly(permissions.BasePermission):
     Use case: Public data that anyone can view but only authenticated users can modify.
     """
 
-    def has_permission(self, request, view):
+    def has_permission(self, request: Request, view: APIView) -> bool:
         # Read permissions (GET, HEAD, OPTIONS) allowed to anyone
         if request.method in permissions.SAFE_METHODS:
             return True
 
         # Write permissions only allowed to authenticated users
-        return request.user and request.user.is_authenticated
+        return bool(request.user and request.user.is_authenticated)
 
 
 class IsAdminUser(permissions.BasePermission):
@@ -32,8 +36,12 @@ class IsAdminUser(permissions.BasePermission):
     Use case: Admin-only endpoints like bulk operations, system configuration, etc.
     """
 
-    def has_permission(self, request, view):
-        return request.user and request.user.is_authenticated and (request.user.is_staff or request.user.is_superuser)
+    def has_permission(self, request: Request, view: APIView) -> bool:
+        return bool(
+            request.user
+            and request.user.is_authenticated
+            and (request.user.is_staff or request.user.is_superuser)
+        )
 
 
 class IsOwnerOrAdmin(permissions.BasePermission):
@@ -46,18 +54,18 @@ class IsOwnerOrAdmin(permissions.BasePermission):
     Requires the object to have a 'user' field or implement a custom ownership check.
     """
 
-    def has_object_permission(self, request, view, obj):
+    def has_object_permission(self, request: Request, view: APIView, obj: Any) -> bool:
         # Admins can access any object
         if request.user.is_staff or request.user.is_superuser:
             return True
 
         # Check if object has a 'user' attribute
         if hasattr(obj, "user"):
-            return obj.user == request.user
+            return bool(obj.user == request.user)
 
         # Check if object has a 'created_by' attribute
         if hasattr(obj, "created_by"):
-            return obj.created_by == request.user
+            return bool(obj.created_by == request.user)
 
         # If no ownership field found, deny access
         return False
@@ -74,7 +82,9 @@ class IsTenantOrAdmin(permissions.BasePermission):
     When user authentication is fully integrated, update this to check tenant.user.
     """
 
-    def has_object_permission(self, request, view, obj):
+    def has_object_permission(self, request: Request, view: APIView, obj: Any) -> bool:
+        if not request.user or not request.user.is_authenticated:
+            return False
         # Admins can access any lease
         if request.user.is_staff or request.user.is_superuser:
             return True
@@ -89,12 +99,26 @@ class IsTenantOrAdmin(permissions.BasePermission):
                     return True
 
         # Check if user is the responsible tenant
-        if hasattr(obj, "responsible_tenant"):
-            if hasattr(obj.responsible_tenant, "user") and obj.responsible_tenant.user == request.user:
-                return True
+        return hasattr(obj, "responsible_tenant") and (
+            hasattr(obj.responsible_tenant, "user") and obj.responsible_tenant.user == request.user
+        )
 
-        # If no tenant relationship found, deny access
-        return False
+
+class FinancialReadOnly(permissions.BasePermission):
+    """
+    Financial module permission.
+    Read access for any authenticated user.
+    Write (POST, PUT, PATCH, DELETE) only for admin (is_staff).
+    """
+
+    def has_permission(self, request: Request, view: APIView) -> bool:
+        if not (request.user and request.user.is_authenticated):
+            return False
+
+        if request.method in permissions.SAFE_METHODS:
+            return True
+
+        return bool(request.user.is_staff)
 
 
 class ReadOnlyForNonAdmin(permissions.BasePermission):
@@ -106,7 +130,7 @@ class ReadOnlyForNonAdmin(permissions.BasePermission):
     but should not modify.
     """
 
-    def has_permission(self, request, view):
+    def has_permission(self, request: Request, view: APIView) -> bool:
         # Must be authenticated
         if not (request.user and request.user.is_authenticated):
             return False
@@ -116,7 +140,7 @@ class ReadOnlyForNonAdmin(permissions.BasePermission):
             return True
 
         # Write permissions only for admins
-        return request.user.is_staff or request.user.is_superuser
+        return bool(request.user.is_staff or request.user.is_superuser)
 
 
 class CanGenerateContract(permissions.BasePermission):
@@ -126,14 +150,17 @@ class CanGenerateContract(permissions.BasePermission):
     Use case: Contract generation endpoint should be restricted to prevent abuse.
     """
 
-    def has_object_permission(self, request, view, obj):
+    def has_object_permission(self, request: Request, view: APIView, obj: Any) -> bool:
         # Admins can always generate contracts
         if request.user.is_staff or request.user.is_superuser:
             return True
 
         # Responsible tenant can generate contract for their lease
         if hasattr(obj, "responsible_tenant"):
-            return hasattr(obj.responsible_tenant, "user") and obj.responsible_tenant.user == request.user
+            return (
+                hasattr(obj.responsible_tenant, "user")
+                and obj.responsible_tenant.user == request.user
+            )
 
         return False
 
@@ -146,7 +173,7 @@ class CanModifyLease(permissions.BasePermission):
     Use case: Lease terms should not be modifiable by tenants to prevent unauthorized changes.
     """
 
-    def has_permission(self, request, view):
+    def has_permission(self, request: Request, view: APIView) -> bool:
         # Must be authenticated
         if not (request.user and request.user.is_authenticated):
             return False
@@ -156,9 +183,9 @@ class CanModifyLease(permissions.BasePermission):
             return True
 
         # Only admins can modify leases
-        return request.user.is_staff or request.user.is_superuser
+        return bool(request.user.is_staff or request.user.is_superuser)
 
-    def has_object_permission(self, request, view, obj):
+    def has_object_permission(self, request: Request, view: APIView, obj: Any) -> bool:
         # Must be authenticated
         if not (request.user and request.user.is_authenticated):
             return False
@@ -177,7 +204,7 @@ class CanModifyLease(permissions.BasePermission):
             return False
 
         # Only admins can modify leases
-        return request.user.is_staff or request.user.is_superuser
+        return bool(request.user.is_staff or request.user.is_superuser)
 
 
 class IsAuthenticatedAndActive(permissions.BasePermission):
@@ -187,24 +214,49 @@ class IsAuthenticatedAndActive(permissions.BasePermission):
     Use case: All authenticated endpoints should verify user is active.
     """
 
-    def has_permission(self, request, view):
-        return request.user and request.user.is_authenticated and request.user.is_active
+    def has_permission(self, request: Request, view: APIView) -> bool:
+        return bool(request.user and request.user.is_authenticated and request.user.is_active)
+
+
+class IsTenantUser(permissions.BasePermission):
+    """Allows access only to authenticated tenants with a non-deleted record."""
+
+    def has_permission(self, request: Request, view: APIView) -> bool:
+        if not (request.user.is_authenticated and not request.user.is_staff):
+            return False
+        tenant = getattr(request.user, "tenant_profile", None)
+        return tenant is not None and not tenant.is_deleted
+
+
+class HasActiveLease(permissions.BasePermission):
+    """Allows access only to tenants with an active (non-deleted) lease."""
+
+    def has_permission(self, request: Request, view: APIView) -> bool:
+        tenant = getattr(request.user, "tenant_profile", None)
+        if tenant is None:
+            return False
+        return bool(tenant.leases_responsible.filter(is_deleted=False).exists())
 
 
 # Permission class mapping for easy import and documentation
-PERMISSION_CLASSES = {
+PERMISSION_CLASSES: dict[str, list[type[permissions.BasePermission]]] = {
     "public_read": [IsAuthenticatedOrReadOnly],
     "admin_only": [IsAdminUser],
     "owner_or_admin": [IsAuthenticatedAndActive, IsOwnerOrAdmin],
     "tenant_or_admin": [IsAuthenticatedAndActive, IsTenantOrAdmin],
     "read_only_for_non_admin": [ReadOnlyForNonAdmin],
+    "financial_read_only": [FinancialReadOnly],
     "can_generate_contract": [IsAuthenticatedAndActive, CanGenerateContract],
     "can_modify_lease": [CanModifyLease],
     "authenticated": [IsAuthenticatedAndActive],
+    "tenant_user": [IsTenantUser],
+    "tenant_with_lease": [IsTenantUser, HasActiveLease],
 }
 
 
-def get_permission_classes(permission_type="authenticated"):
+def get_permission_classes(
+    permission_type: str = "authenticated",
+) -> list[type[permissions.BasePermission]]:
     """
     Helper function to get permission classes by type.
 

@@ -14,11 +14,11 @@ import { useRouter } from 'next/navigation';
 import { useDebounce } from '@/lib/hooks/use-debounce';
 import { apiClient } from '@/lib/api/client';
 import { formatCurrency, formatCPFOrCNPJ, formatBrazilianPhone } from '@/lib/utils/formatters';
-import { Building } from '@/lib/schemas/building.schema';
-import { Apartment } from '@/lib/schemas/apartment.schema';
-import { Tenant } from '@/lib/schemas/tenant.schema';
-import { Lease } from '@/lib/schemas/lease.schema';
-import { Furniture } from '@/lib/schemas/furniture.schema';
+import { type Building } from '@/lib/schemas/building.schema';
+import { type Apartment } from '@/lib/schemas/apartment.schema';
+import { type Tenant } from '@/lib/schemas/tenant.schema';
+import { type Lease } from '@/lib/schemas/lease.schema';
+import { type Furniture } from '@/lib/schemas/furniture.schema';
 import { Input } from '@/components/ui/input';
 import {
   Dialog,
@@ -67,7 +67,7 @@ export function GlobalSearch() {
       const searchResults: SearchResult[] = [];
 
       // Buildings
-      buildings.data.forEach((item: Building) => {
+      (buildings.data as Building[]).forEach((item: Building) => {
         if (item.id !== undefined) {
           searchResults.push({
             type: 'building',
@@ -81,13 +81,13 @@ export function GlobalSearch() {
       });
 
       // Apartments
-      apartments.data.forEach((item: Apartment) => {
+      (apartments.data as Apartment[]).forEach((item: Apartment) => {
         if (item.id !== undefined) {
           searchResults.push({
             type: 'apartment',
             id: item.id,
             title: `Apartamento ${item.number}`,
-            subtitle: item.building?.name || 'Sem prédio',
+            subtitle: item.building?.name ?? 'Sem prédio',
             metadata: `${formatCurrency(item.rental_value)} - ${item.is_rented ? 'Alugado' : 'Disponível'}`,
             url: '/dashboard/apartments',
           });
@@ -95,7 +95,7 @@ export function GlobalSearch() {
       });
 
       // Tenants
-      tenants.data.forEach((item: Tenant) => {
+      (tenants.data as Tenant[]).forEach((item: Tenant) => {
         if (item.id !== undefined) {
           searchResults.push({
             type: 'tenant',
@@ -109,28 +109,28 @@ export function GlobalSearch() {
       });
 
       // Leases
-      leases.data.forEach((item: Lease) => {
+      (leases.data as Lease[]).forEach((item: Lease) => {
         if (item.id !== undefined) {
           searchResults.push({
             type: 'lease',
             id: item.id,
-            title: `Locação - ${item.responsible_tenant?.name || 'Sem inquilino'}`,
-            subtitle: `${item.apartment?.building?.name || ''} Apto ${item.apartment?.number || ''}`,
-            metadata: `${formatCurrency(item.rental_value)} - Venc. dia ${item.due_day}`,
+            title: `Locação - ${item.responsible_tenant?.name ?? 'Sem inquilino'}`,
+            subtitle: `${item.apartment?.building?.name ?? ''} Apto ${item.apartment?.number ?? ''}`,
+            metadata: `${formatCurrency(item.apartment?.rental_value ?? 0)} - Venc. dia ${item.responsible_tenant?.due_day ?? '-'}`,
             url: '/dashboard/leases',
           });
         }
       });
 
       // Furniture
-      furniture.data.forEach((item: Furniture) => {
+      (furniture.data as Furniture[]).forEach((item: Furniture) => {
         if (item.id !== undefined) {
           searchResults.push({
             type: 'furniture',
             id: item.id,
             title: item.name,
             subtitle: 'Móvel',
-            metadata: item.description || '',
+            metadata: item.description ?? '',
             url: '/dashboard/furniture',
           });
         }
@@ -148,7 +148,7 @@ export function GlobalSearch() {
   // Perform search when debounced term changes
   useEffect(() => {
     if (debouncedSearchTerm && isModalOpen) {
-      performSearch(debouncedSearchTerm);
+      void performSearch(debouncedSearchTerm);
     } else if (!debouncedSearchTerm) {
       setResults([]);
     }
@@ -165,15 +165,15 @@ export function GlobalSearch() {
     const iconClass = 'h-5 w-5';
     switch (type) {
       case 'building':
-        return <Building2 className={cn(iconClass, 'text-blue-500')} />;
+        return <Building2 className={cn(iconClass, 'text-info')} />;
       case 'apartment':
-        return <DoorOpen className={cn(iconClass, 'text-green-500')} />;
+        return <DoorOpen className={cn(iconClass, 'text-success')} />;
       case 'tenant':
-        return <Users className={cn(iconClass, 'text-orange-500')} />;
+        return <Users className={cn(iconClass, 'text-warning')} />;
       case 'lease':
-        return <FileText className={cn(iconClass, 'text-purple-500')} />;
+        return <FileText className={cn(iconClass, 'text-primary')} />;
       case 'furniture':
-        return <Package className={cn(iconClass, 'text-pink-500')} />;
+        return <Package className={cn(iconClass, 'text-destructive')} />;
     }
   };
 

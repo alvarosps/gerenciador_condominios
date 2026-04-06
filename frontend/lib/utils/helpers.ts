@@ -34,7 +34,7 @@ export function calculateDueDateChangeFee(
 export function calculateFinalDate(startDate: string, validityMonths: number): string {
   const date = new Date(startDate);
   date.setMonth(date.getMonth() + validityMonths);
-  return date.toISOString().split('T')[0];
+  return date.toISOString().split('T')[0] ?? '';
 }
 
 /**

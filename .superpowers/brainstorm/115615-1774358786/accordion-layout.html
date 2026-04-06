@@ -1,0 +1,118 @@
+<h2>Layout dos Accordions por Prédio</h2>
+<p class="subtitle">Como organizar as listas de Apartamentos e Locações com um accordion por prédio?</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Accordions independentes — filtros dentro de cada accordion</h3>
+      <p>Cada prédio tem seu accordion com filtros e tabela próprios. Filtros só afetam a lista do prédio correspondente.</p>
+      <div style="margin-top: 12px; background: #1a1a2e; border-radius: 8px; padding: 16px; font-family: monospace; font-size: 13px;">
+        <div style="margin-bottom: 12px;">
+          <!-- Accordion 1 - Open -->
+          <div style="background: #252540; border-radius: 6px; overflow: hidden;">
+            <div style="padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; border-bottom: 1px solid #333;">
+              <span style="color: #e0e0e0; font-weight: bold;">▼ Prédio Rua ABC, 123 <span style="color: #7c9aff; font-size: 11px; margin-left: 8px;">6 apartamentos</span></span>
+            </div>
+            <div style="padding: 12px 16px;">
+              <!-- Filters inside -->
+              <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+                <div style="flex: 1; padding: 6px 10px; background: #1a1a2e; border: 1px solid #333; border-radius: 4px; color: #888; font-size: 11px;">Status: Todos</div>
+                <div style="flex: 1; padding: 6px 10px; background: #1a1a2e; border: 1px solid #333; border-radius: 4px; color: #888; font-size: 11px;">Valor Mín</div>
+                <div style="flex: 1; padding: 6px 10px; background: #1a1a2e; border: 1px solid #333; border-radius: 4px; color: #888; font-size: 11px;">Valor Máx</div>
+              </div>
+              <!-- Table -->
+              <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+                <tr style="border-bottom: 1px solid #333;">
+                  <th style="padding: 6px; text-align: left; color: #aaa;">Apto ▲▼</th>
+                  <th style="padding: 6px; text-align: left; color: #aaa;">Valor ▲▼</th>
+                  <th style="padding: 6px; text-align: left; color: #aaa;">Status ▲▼</th>
+                  <th style="padding: 6px; text-align: right; color: #aaa;">Ações</th>
+                </tr>
+                <tr><td style="padding: 6px; color: #ccc;">101</td><td style="padding: 6px; color: #ccc;">R$ 800</td><td style="padding: 6px;"><span style="background: #1a3a2a; color: #4ade80; padding: 2px 8px; border-radius: 10px; font-size: 11px;">Disponível</span></td><td style="padding: 6px; text-align: right; color: #666;">✏️ 🗑️</td></tr>
+                <tr><td style="padding: 6px; color: #ccc;">102</td><td style="padding: 6px; color: #ccc;">R$ 1.200</td><td style="padding: 6px;"><span style="background: #3a1a1a; color: #f87171; padding: 2px 8px; border-radius: 10px; font-size: 11px;">Alugado</span></td><td style="padding: 6px; text-align: right; color: #666;">✏️ 🗑️</td></tr>
+                <tr><td style="padding: 6px; color: #ccc;">201</td><td style="padding: 6px; color: #ccc;">R$ 1.500</td><td style="padding: 6px;"><span style="background: #1a3a2a; color: #4ade80; padding: 2px 8px; border-radius: 10px; font-size: 11px;">Disponível</span></td><td style="padding: 6px; text-align: right; color: #666;">✏️ 🗑️</td></tr>
+              </table>
+            </div>
+          </div>
+        </div>
+        <div>
+          <!-- Accordion 2 - Closed -->
+          <div style="background: #252540; border-radius: 6px;">
+            <div style="padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; cursor: pointer;">
+              <span style="color: #e0e0e0; font-weight: bold;">▶ Prédio Rua XYZ, 456 <span style="color: #7c9aff; font-size: 11px; margin-left: 8px;">4 apartamentos</span></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Accordions independentes — filtros acima dos accordions (compartilhado)</h3>
+      <p>Um bloco de filtros global no topo da página. Cada accordion mostra apenas a tabela. Filtros afetam ambos os prédios simultaneamente.</p>
+      <div style="margin-top: 12px; background: #1a1a2e; border-radius: 8px; padding: 16px; font-family: monospace; font-size: 13px;">
+        <!-- Global filters -->
+        <div style="background: #252540; border-radius: 6px; padding: 12px 16px; margin-bottom: 12px;">
+          <div style="display: flex; gap: 8px;">
+            <div style="flex: 1; padding: 6px 10px; background: #1a1a2e; border: 1px solid #333; border-radius: 4px; color: #888; font-size: 11px;">Status: Todos</div>
+            <div style="flex: 1; padding: 6px 10px; background: #1a1a2e; border: 1px solid #333; border-radius: 4px; color: #888; font-size: 11px;">Valor Mín</div>
+            <div style="flex: 1; padding: 6px 10px; background: #1a1a2e; border: 1px solid #333; border-radius: 4px; color: #888; font-size: 11px;">Valor Máx</div>
+          </div>
+        </div>
+        <!-- Accordion 1 -->
+        <div style="margin-bottom: 8px;">
+          <div style="background: #252540; border-radius: 6px; overflow: hidden;">
+            <div style="padding: 12px 16px; cursor: pointer; border-bottom: 1px solid #333;">
+              <span style="color: #e0e0e0; font-weight: bold;">▼ Prédio Rua ABC, 123 <span style="color: #7c9aff; font-size: 11px; margin-left: 8px;">6 apartamentos</span></span>
+            </div>
+            <div style="padding: 8px 16px;">
+              <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+                <tr style="border-bottom: 1px solid #333;">
+                  <th style="padding: 6px; text-align: left; color: #aaa;">Apto ▲▼</th>
+                  <th style="padding: 6px; text-align: left; color: #aaa;">Valor ▲▼</th>
+                  <th style="padding: 6px; text-align: left; color: #aaa;">Status ▲▼</th>
+                  <th style="padding: 6px; text-align: right; color: #aaa;">Ações</th>
+                </tr>
+                <tr><td style="padding: 6px; color: #ccc;">101</td><td style="padding: 6px; color: #ccc;">R$ 800</td><td style="padding: 6px;"><span style="background: #1a3a2a; color: #4ade80; padding: 2px 8px; border-radius: 10px; font-size: 11px;">Disponível</span></td><td style="padding: 6px; text-align: right; color: #666;">✏️ 🗑️</td></tr>
+                <tr><td style="padding: 6px; color: #ccc;">102</td><td style="padding: 6px; color: #ccc;">R$ 1.200</td><td style="padding: 6px;"><span style="background: #3a1a1a; color: #f87171; padding: 2px 8px; border-radius: 10px; font-size: 11px;">Alugado</span></td><td style="padding: 6px; text-align: right; color: #666;">✏️ 🗑️</td></tr>
+              </table>
+            </div>
+          </div>
+        </div>
+        <!-- Accordion 2 - Closed -->
+        <div>
+          <div style="background: #252540; border-radius: 6px;">
+            <div style="padding: 12px 16px; cursor: pointer;">
+              <span style="color: #e0e0e0; font-weight: bold;">▶ Prédio Rua XYZ, 456 <span style="color: #7c9aff; font-size: 11px; margin-left: 8px;">4 apartamentos</span></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top: 24px;">
+  <h3>Trade-offs</h3>
+  <div class="pros-cons">
+    <div class="pros">
+      <h4>A — Filtros dentro</h4>
+      <ul>
+        <li>Cada prédio tem filtros independentes</li>
+        <li>Pode filtrar "disponível" em um prédio e "alugado" em outro</li>
+        <li>Sem interferência entre prédios</li>
+      </ul>
+    </div>
+    <div class="cons">
+      <h4>B — Filtros fora</h4>
+      <ul>
+        <li>Menos repetição de UI</li>
+        <li>Filtrar rapidamente em todos os prédios de uma vez</li>
+        <li>Mas os filtros afetam ambos os prédios</li>
+      </ul>
+    </div>
+  </div>
+</div>

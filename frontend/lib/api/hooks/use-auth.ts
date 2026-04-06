@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
 import { useAuthStore, type User } from '@/store/auth-store';
+import { queryKeys } from '@/lib/api/query-keys';
 
 /**
  * Login credentials interface
@@ -40,25 +41,28 @@ export interface RefreshTokenResponse {
  * Hook for user login with JWT
  */
 export function useLogin() {
-  const setTokens = useAuthStore((state) => state.setTokens);
+  const setAuth = useAuthStore((state) => state.setAuth);
 
   return useMutation({
     mutationFn: async (credentials: LoginCredentials) => {
-      const { data } = await apiClient.post<AuthResponse>('/auth/token/', credentials);
-      return data;
-    },
-    onSuccess: (data) => {
-      // Store tokens in Zustand store
-      setTokens(data.access, data.refresh);
+      const { data: tokens } = await apiClient.post<AuthResponse>('/auth/token/', credentials);
 
-      // Also store in localStorage for API client interceptor
+      // Store tokens immediately so the next request is authenticated
       if (typeof window !== 'undefined') {
-        localStorage.setItem('access_token', data.access);
-        localStorage.setItem('refresh_token', data.refresh);
-
-        // Set cookie for middleware auth check (24 hour expiry)
-        document.cookie = `access_token=${data.access}; path=/; max-age=31536000; SameSite=Lax`;
+        localStorage.setItem('access_token', tokens.access);
+        localStorage.setItem('refresh_token', tokens.refresh);
+        document.cookie = `access_token=${tokens.access}; path=/; max-age=3600; SameSite=Lax`;
       }
+
+      // Fetch user profile with the new token
+      const { data: user } = await apiClient.get<User>('/auth/me/', {
+        headers: { Authorization: `Bearer ${tokens.access}` },
+      });
+
+      return { tokens, user };
+    },
+    onSuccess: ({ tokens, user }) => {
+      setAuth(tokens.access, tokens.refresh, user);
     },
   });
 }
@@ -146,7 +150,7 @@ export function useRefreshToken() {
         localStorage.setItem('access_token', data.access);
 
         // Update cookie for middleware auth check (24 hour expiry)
-        document.cookie = `access_token=${data.access}; path=/; max-age=31536000; SameSite=Lax`;
+        document.cookie = `access_token=${data.access}; path=/; max-age=3600; SameSite=Lax`;
       }
     },
   });
@@ -157,15 +161,17 @@ export function useRefreshToken() {
  */
 export function useCurrentUser() {
   const user = useAuthStore((state) => state.user);
+  const setUser = useAuthStore((state) => state.setUser);
 
   return useQuery({
-    queryKey: ['current-user'],
+    queryKey: queryKeys.currentUser.all,
     queryFn: async () => {
-      const { data } = await apiClient.get<User>('/auth/user/');
+      const { data } = await apiClient.get<User>('/auth/me/');
+      setUser(data);
       return data;
     },
-    enabled: !!user,
-    initialData: user || undefined,
+    enabled: Boolean(user),
+    initialData: user ?? undefined,
   });
 }
 
@@ -175,7 +181,7 @@ export function useCurrentUser() {
  */
 export function useGoogleLogin() {
   return () => {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8008/api';
     window.location.href = `${apiUrl}/auth/google/`;
   };
 }

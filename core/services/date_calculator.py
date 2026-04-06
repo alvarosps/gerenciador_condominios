@@ -8,13 +8,16 @@ This service handles all date-related business logic:
 - Days until due calculations
 """
 
-from __future__ import annotations
-
 import logging
 from datetime import date, timedelta
-from typing import Any, Dict
+from typing import Any
 
 from dateutil.relativedelta import relativedelta
+from django.utils import timezone
+
+FEBRUARY = 2
+LEAP_DAY = 29
+LAST_DAY_OF_FEB_NON_LEAP = 28
 
 logger = logging.getLogger(__name__)
 
@@ -79,19 +82,25 @@ class DateCalculatorService:
 
         # Special handling for Feb 29 -> Feb 28 edge case
         # If we started on Feb 29 and ended on Feb 28, move to March 1
-        if start_date.month == 2 and start_date.day == 29:
-            if calculated_final.month == 2 and calculated_final.day == 28:
-                calculated_final = calculated_final + timedelta(days=1)
-                logger.info(
-                    f"Adjusted Feb 28 to March 1 for leap year edge case "
-                    f"(start: {start_date}, original end: {calculated_final - timedelta(days=1)})"
-                )
+        if (
+            start_date.month == FEBRUARY
+            and start_date.day == LEAP_DAY
+            and calculated_final.month == FEBRUARY
+            and calculated_final.day == LAST_DAY_OF_FEB_NON_LEAP
+        ):
+            calculated_final = calculated_final + timedelta(days=1)
+            logger.info(
+                f"Adjusted Feb 28 to March 1 for leap year edge case "
+                f"(start: {start_date}, original end: {calculated_final - timedelta(days=1)})"
+            )
 
-        logger.info(f"Final date calculated: {start_date} + {validity_months} months = {calculated_final}")
+        logger.info(
+            f"Final date calculated: {start_date} + {validity_months} months = {calculated_final}"
+        )
         return calculated_final
 
     @staticmethod
-    def calculate_lease_dates(start_date: date, validity_months: int) -> Dict[str, Any]:
+    def calculate_lease_dates(start_date: date, validity_months: int) -> dict[str, Any]:
         """
         Calculate all relevant dates for a lease.
 
@@ -110,9 +119,7 @@ class DateCalculatorService:
                 - validity_months: Lease duration
 
         Examples:
-            >>> DateCalculatorService.calculate_lease_dates(
-            ...     date(2025, 1, 15), 12
-            ... )
+            >>> DateCalculatorService.calculate_lease_dates(date(2025, 1, 15), 12)
             {
                 'start_date': datetime.date(2025, 1, 15),
                 'next_month_date': datetime.date(2025, 2, 15),
@@ -154,7 +161,7 @@ class DateCalculatorService:
             False  # Current day (15) < due day (20)
         """
         if current_date is None:
-            current_date = date.today()
+            current_date = timezone.now().date()
 
         return current_date.day >= due_day
 
@@ -179,14 +186,13 @@ class DateCalculatorService:
             0  # Past due, next due date is next month
         """
         if current_date is None:
-            current_date = date.today()
+            current_date = timezone.now().date()
 
         if current_date.day < due_day:
             # Due date is later this month
             return due_day - current_date.day
-        else:
-            # Due date was earlier this month or today, already due
-            return 0
+        # Due date was earlier this month or today, already due
+        return 0
 
     @staticmethod
     def format_date_brazilian(date_obj: date) -> str:
@@ -206,7 +212,7 @@ class DateCalculatorService:
         return date_obj.strftime("%d/%m/%Y")
 
     @staticmethod
-    def format_lease_dates_for_contract(start_date: date, validity_months: int) -> Dict[str, str]:
+    def format_lease_dates_for_contract(start_date: date, validity_months: int) -> dict[str, str]:
         """
         Format all lease dates for contract template.
 
@@ -224,9 +230,7 @@ class DateCalculatorService:
                 - final_date_formatted: End date in DD/MM/YYYY
 
         Examples:
-            >>> DateCalculatorService.format_lease_dates_for_contract(
-            ...     date(2025, 1, 15), 12
-            ... )
+            >>> DateCalculatorService.format_lease_dates_for_contract(date(2025, 1, 15), 12)
             {
                 'start_date_formatted': '15/01/2025',
                 'next_month_date_formatted': '15/02/2025',
@@ -236,7 +240,13 @@ class DateCalculatorService:
         dates = DateCalculatorService.calculate_lease_dates(start_date, validity_months)
 
         return {
-            "start_date_formatted": DateCalculatorService.format_date_brazilian(dates["start_date"]),
-            "next_month_date_formatted": DateCalculatorService.format_date_brazilian(dates["next_month_date"]),
-            "final_date_formatted": DateCalculatorService.format_date_brazilian(dates["final_date"]),
+            "start_date_formatted": DateCalculatorService.format_date_brazilian(
+                dates["start_date"]
+            ),
+            "next_month_date_formatted": DateCalculatorService.format_date_brazilian(
+                dates["next_month_date"]
+            ),
+            "final_date_formatted": DateCalculatorService.format_date_brazilian(
+                dates["final_date"]
+            ),
         }

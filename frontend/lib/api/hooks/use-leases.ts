@@ -1,7 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
-import { Lease, leaseSchema } from '@/lib/schemas/lease.schema';
-import { PaginatedResponse, extractResults } from '@/lib/types/api';
+import { queryKeys } from '../query-keys';
+import { type Lease, leaseSchema } from '@/lib/schemas/lease.schema';
+import { type PaginatedResponse, extractResults } from '@/lib/types/api';
 
 /**
  * Hook to fetch all leases with optional filters
@@ -19,7 +20,7 @@ export function useLeases(filters?: {
     : {};
 
   return useQuery({
-    queryKey: ['leases', cleanFilters],
+    queryKey: queryKeys.leases.list(cleanFilters),
     queryFn: async () => {
       const { data } = await apiClient.get<PaginatedResponse<Lease> | Lease[]>('/leases/', {
         params: { ...cleanFilters, page_size: 10000 },
@@ -37,13 +38,13 @@ export function useLeases(filters?: {
  */
 export function useLease(id: number | null) {
   return useQuery({
-    queryKey: ['leases', id],
+    queryKey: id ? queryKeys.leases.detail(id) : queryKeys.leases.all,
     queryFn: async () => {
       if (!id) throw new Error('Lease ID is required');
       const { data } = await apiClient.get<Lease>(`/leases/${id}/`);
       return leaseSchema.parse(data);
     },
-    enabled: !!id,
+    enabled: Boolean(id),
   });
 }
 
@@ -54,15 +55,14 @@ export function useCreateLease() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: Omit<Lease, 'id' | 'apartment' | 'responsible_tenant' | 'tenants' | 'final_date'>) => {
+    mutationFn: async (data: Omit<Lease, 'id' | 'apartment' | 'responsible_tenant' | 'tenants' | 'final_date' | 'rental_value' | 'resident_dependent'>) => {
       const response = await apiClient.post<Lease>('/leases/', data);
       return response.data;
     },
     onSuccess: () => {
-      // Invalidate leases list and related caches
-      queryClient.invalidateQueries({ queryKey: ['leases'] });
-      queryClient.invalidateQueries({ queryKey: ['apartments'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.leases.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.apartments.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all });
     },
   });
 }
@@ -87,11 +87,12 @@ export function useUpdateLease() {
       return response.data;
     },
     onSuccess: (data) => {
-      // Invalidate both list and specific lease cache
-      queryClient.invalidateQueries({ queryKey: ['leases'] });
-      queryClient.invalidateQueries({ queryKey: ['leases', data.id] });
-      queryClient.invalidateQueries({ queryKey: ['apartments'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.leases.all });
+      if (data.id !== undefined) {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.leases.detail(data.id) });
+      }
+      void queryClient.invalidateQueries({ queryKey: queryKeys.apartments.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all });
     },
   });
 }
@@ -107,10 +108,27 @@ export function useDeleteLease() {
       await apiClient.delete(`/leases/${id}/`);
     },
     onSuccess: () => {
-      // Invalidate leases list and related caches
-      queryClient.invalidateQueries({ queryKey: ['leases'] });
-      queryClient.invalidateQueries({ queryKey: ['apartments'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.leases.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.apartments.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all });
+    },
+  });
+}
+
+/**
+ * Hook to partially update a lease (PATCH)
+ */
+export function usePatchLease() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, ...fields }: { id: number } & Record<string, unknown>) => {
+      const response = await apiClient.patch<Lease>(`/leases/${String(id)}/`, fields);
+      return leaseSchema.parse(response.data);
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.leases.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.apartments.all });
     },
   });
 }
@@ -131,10 +149,9 @@ export function useGenerateContract() {
       return data;
     },
     onSuccess: (_, leaseId) => {
-      // Invalidate lease to refresh contract_generated status
-      queryClient.invalidateQueries({ queryKey: ['leases', leaseId] });
-      queryClient.invalidateQueries({ queryKey: ['leases'] });
-      queryClient.invalidateQueries({ queryKey: ['apartments'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.leases.detail(leaseId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.leases.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.apartments.all });
     },
   });
 }
@@ -179,9 +196,12 @@ export function useChangeDueDate() {
       const { data } = await apiClient.post<{
         old_due_day: number;
         new_due_day: number;
+        old_due_date: string;
+        new_due_date: string;
         change_fee: number;
         days_difference: number;
         daily_rate: number;
+        total_due: number;
         message: string;
       }>(`/leases/${params.leaseId}/change_due_date/`, {
         new_due_day: params.new_due_day,
@@ -189,9 +209,9 @@ export function useChangeDueDate() {
       return data;
     },
     onSuccess: (_, params) => {
-      // Invalidate lease to refresh due_day
-      queryClient.invalidateQueries({ queryKey: ['leases', params.leaseId] });
-      queryClient.invalidateQueries({ queryKey: ['leases'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.leases.detail(params.leaseId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.leases.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.tenants.all });
     },
   });
 }
@@ -229,4 +249,40 @@ export function useApartmentLeases(apartmentId: number | null) {
  */
 export function useTenantLeases(tenantId: number | null) {
   return useLeases(tenantId ? { responsible_tenant_id: tenantId } : undefined);
+}
+
+/**
+ * Hook to transfer a tenant to a different apartment (creates a new lease)
+ * Calls POST /leases/{id}/transfer/ which terminates the old lease and creates a new one
+ */
+export function useTransferLease() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ leaseId, ...payload }: { leaseId: number } & Record<string, unknown>) => {
+      const response = await apiClient.post<Lease>(`/leases/${String(leaseId)}/transfer/`, payload);
+      return leaseSchema.parse(response.data);
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.leases.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.apartments.all });
+    },
+  });
+}
+
+/**
+ * Hook to terminate a lease contract
+ * Calls POST /leases/{id}/terminate/ which marks the apartment as available
+ */
+export function useTerminateLease() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (leaseId: number) => {
+      const response = await apiClient.post<{ detail: string }>(`/leases/${String(leaseId)}/terminate/`);
+      return response.data;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.leases.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.apartments.all });
+    },
+  });
 }

@@ -35,7 +35,7 @@ Updated: 2026-01-19 (Added UTF-8 encoding support for Windows)
 import os
 import subprocess
 import sys
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 # Add project root to Python path to import settings
@@ -49,6 +49,10 @@ import django  # noqa: E402
 django.setup()
 
 from django.conf import settings  # noqa: E402
+
+_MIN_ARGS = 2
+_MAX_SHOWN_WARNINGS = 10
+_MAX_SHOWN_BACKUPS = 10
 
 
 def get_psql_env(db_password):
@@ -97,15 +101,83 @@ def list_backup_contents(backup_file, db_password):
 
     try:
         result = subprocess.run(cmd, env=env, check=True, capture_output=True, text=True)
-        print(result.stdout)
-        print("=" * 60)
-        return True
-
     except subprocess.CalledProcessError as e:
         print(f"\n[ERROR] Error listing backup contents: {e}")
         if e.stderr:
             print(f"Details: {e.stderr}")
         return False
+    else:
+        print(result.stdout)
+        print("=" * 60)
+        return True
+
+
+def _terminate_connections(psql_args, db_name, env):
+    """Terminate existing connections to the database."""
+    print("\n[Step 1/3] Terminating existing connections...")
+    terminate_sql = (
+        f"SELECT pg_terminate_backend(pg_stat_activity.pid) "
+        f"FROM pg_stat_activity "
+        f"WHERE pg_stat_activity.datname = '{db_name}' "
+        f"AND pid <> pg_backend_pid();"
+    )
+    try:
+        subprocess.run(
+            [*psql_args, "-c", terminate_sql],
+            env=env,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            check=False,
+        )
+        print("  Existing connections terminated")
+    except OSError:
+        pass  # Ignore errors - database might not exist
+
+
+def _drop_database(psql_args, db_name, env):
+    """Drop the existing database."""
+    print("\n[Step 2/3] Dropping existing database...")
+    drop_sql = f'DROP DATABASE IF EXISTS "{db_name}";'
+    try:
+        result = subprocess.run(
+            [*psql_args, "-c", drop_sql],
+            env=env,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            check=False,
+        )
+        if result.returncode == 0:
+            print("  Database dropped successfully")
+        else:
+            print(f"  Warning: {result.stderr.strip()}")
+    except OSError as e:
+        print(f"  Warning: Could not drop database: {e}")
+
+
+def _create_database(psql_args, db_name, env):
+    """Create the database with UTF-8 encoding. Returns True on success."""
+    print("\n[Step 3/3] Creating database with UTF-8 encoding...")
+    create_sql = f"CREATE DATABASE \"{db_name}\" WITH ENCODING 'UTF8' TEMPLATE template0;"
+    try:
+        result = subprocess.run(
+            [*psql_args, "-c", create_sql],
+            env=env,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            check=False,
+        )
+        if result.returncode != 0:
+            print(f"  Error creating database: {result.stderr.strip()}")
+            return False
+    except OSError as e:
+        print(f"  Error: {e}")
+        return False
+    else:
+        print("  Database created with UTF-8 encoding")
+        return True
 
 
 def drop_and_create_database(db_name, db_user, db_host, db_port, env):
@@ -124,69 +196,9 @@ def drop_and_create_database(db_name, db_user, db_host, db_port, env):
     """
     psql_args = ["psql", "-h", db_host, "-p", str(db_port), "-U", db_user, "-d", "postgres"]
 
-    # Step 1: Terminate existing connections
-    print("\n[Step 1/3] Terminating existing connections...")
-    terminate_sql = f"""
-        SELECT pg_terminate_backend(pg_stat_activity.pid)
-        FROM pg_stat_activity
-        WHERE pg_stat_activity.datname = '{db_name}'
-        AND pid <> pg_backend_pid();
-    """
-    try:
-        subprocess.run(
-            psql_args + ["-c", terminate_sql],
-            env=env,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-        )
-        print("  Existing connections terminated")
-    except Exception:
-        pass  # Ignore errors - database might not exist
-
-    # Step 2: Drop database
-    print("\n[Step 2/3] Dropping existing database...")
-    drop_sql = f'DROP DATABASE IF EXISTS "{db_name}";'
-    try:
-        result = subprocess.run(
-            psql_args + ["-c", drop_sql],
-            env=env,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-        )
-        if result.returncode == 0:
-            print("  Database dropped successfully")
-        else:
-            print(f"  Warning: {result.stderr.strip()}")
-    except Exception as e:
-        print(f"  Warning: Could not drop database: {e}")
-
-    # Step 3: Create database with UTF-8 encoding
-    print("\n[Step 3/3] Creating database with UTF-8 encoding...")
-
-    # Use template0 to allow setting encoding
-    # On Windows, LC_COLLATE/LC_CTYPE might not work, so we use simpler syntax
-    create_sql = f"""CREATE DATABASE "{db_name}"
-        WITH ENCODING 'UTF8'
-        TEMPLATE template0;"""
-
-    try:
-        result = subprocess.run(
-            psql_args + ["-c", create_sql],
-            env=env,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-        )
-        if result.returncode != 0:
-            print(f"  Error creating database: {result.stderr.strip()}")
-            return False
-        print("  Database created with UTF-8 encoding")
-        return True
-    except Exception as e:
-        print(f"  Error: {e}")
-        return False
+    _terminate_connections(psql_args, db_name, env)
+    _drop_database(psql_args, db_name, env)
+    return _create_database(psql_args, db_name, env)
 
 
 def restore_sql_backup(backup_path, db_name, db_user, db_host, db_port, env):
@@ -214,12 +226,18 @@ def restore_sql_backup(backup_path, db_name, db_user, db_host, db_port, env):
     # The file contains \encoding UTF8 at the start which psql will honor
     psql_cmd = [
         "psql",
-        "-h", db_host,
-        "-p", str(db_port),
-        "-U", db_user,
-        "-d", db_name,
-        "-v", "ON_ERROR_STOP=0",  # Continue on non-critical errors
-        "-f", str(backup_path)
+        "-h",
+        db_host,
+        "-p",
+        str(db_port),
+        "-U",
+        db_user,
+        "-d",
+        db_name,
+        "-v",
+        "ON_ERROR_STOP=0",  # Continue on non-critical errors
+        "-f",
+        str(backup_path),
     ]
 
     try:
@@ -229,7 +247,8 @@ def restore_sql_backup(backup_path, db_name, db_user, db_host, db_port, env):
             capture_output=True,
             text=True,
             encoding="utf-8",
-            errors="replace"  # Replace encoding errors instead of failing
+            errors="replace",  # Replace encoding errors instead of failing
+            check=False,
         )
 
         # Check for critical errors
@@ -238,26 +257,28 @@ def restore_sql_backup(backup_path, db_name, db_user, db_host, db_port, env):
             critical_lines = []
             for line in result.stderr.split("\n"):
                 line_lower = line.lower()
-                if (line.strip() and
-                    "notice:" not in line_lower and
-                    "already exists" not in line_lower and
-                    "skipping" not in line_lower):
+                if (
+                    line.strip()
+                    and "notice:" not in line_lower
+                    and "already exists" not in line_lower
+                    and "skipping" not in line_lower
+                ):
                     critical_lines.append(line)
 
             if critical_lines:
                 print("\n  Warnings during restore:")
-                for line in critical_lines[:10]:
+                for line in critical_lines[:_MAX_SHOWN_WARNINGS]:
                     print(f"    {line}")
-                if len(critical_lines) > 10:
-                    print(f"    ... and {len(critical_lines) - 10} more")
-
-        return True
+                if len(critical_lines) > _MAX_SHOWN_WARNINGS:
+                    print(f"    ... and {len(critical_lines) - _MAX_SHOWN_WARNINGS} more")
 
     except subprocess.CalledProcessError as e:
         print(f"\n  Error during restore: {e}")
         if e.stderr:
             print(f"  Details: {e.stderr}")
         return False
+    else:
+        return True
 
 
 def restore_custom_backup(backup_path, db_name, db_user, db_host, db_port, env):
@@ -279,14 +300,18 @@ def restore_custom_backup(backup_path, db_name, db_user, db_host, db_port, env):
 
     cmd = [
         "pg_restore",
-        "-h", db_host,
-        "-p", str(db_port),
-        "-U", db_user,
-        "-d", db_name,
+        "-h",
+        db_host,
+        "-p",
+        str(db_port),
+        "-U",
+        db_user,
+        "-d",
+        db_name,
         "-v",  # Verbose
         "--no-owner",  # Don't set ownership
         "--no-acl",  # Don't restore access privileges
-        str(backup_path)
+        str(backup_path),
     ]
 
     try:
@@ -296,20 +321,21 @@ def restore_custom_backup(backup_path, db_name, db_user, db_host, db_port, env):
             capture_output=True,
             text=True,
             encoding="utf-8",
-            errors="replace"
+            errors="replace",
+            check=False,
         )
 
         # pg_restore returns non-zero for warnings too, so check stderr
         if result.stderr and "error" in result.stderr.lower():
             print(f"\n  Warnings: {result.stderr[:500]}")
 
-        return True
-
     except subprocess.CalledProcessError as e:
         print(f"\n  Error during restore: {e}")
         if e.stderr:
             print(f"  Details: {e.stderr}")
         return False
+    else:
+        return True
 
 
 def restore_database(backup_file, skip_confirmation=False):
@@ -370,7 +396,7 @@ def restore_database(backup_file, skip_confirmation=False):
     # Prompt for confirmation
     if not skip_confirmation:
         response = input("\nDo you want to proceed? (yes/no): ").strip().lower()
-        if response not in ["yes", "y"]:
+        if response not in {"yes", "y"}:
             print("\n[CANCELLED] Restore cancelled by user")
             return False
 
@@ -396,7 +422,7 @@ def restore_database(backup_file, skip_confirmation=False):
         print("=" * 60)
         print(f"Database: {db_name}")
         print(f"Restored from: {backup_path}")
-        print(f"Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        print(f"Timestamp: {datetime.now(tz=UTC).strftime('%Y-%m-%d %H:%M:%S')}")
         print("\nNext steps:")
         print("  1. Run migrations if needed:")
         print("     python manage.py migrate")
@@ -407,17 +433,16 @@ def restore_database(backup_file, skip_confirmation=False):
         print("  3. Test application functionality")
         print("=" * 60)
         return True
-    else:
-        print("\n" + "=" * 60)
-        print("[FAILED] RESTORE FAILED")
-        print("=" * 60)
-        print("\nCommon issues:")
-        print("  1. Database server not running")
-        print("  2. Incorrect database credentials")
-        print("  3. Insufficient permissions")
-        print("  4. Corrupted backup file")
-        print("=" * 60)
-        return False
+    print("\n" + "=" * 60)
+    print("[FAILED] RESTORE FAILED")
+    print("=" * 60)
+    print("\nCommon issues:")
+    print("  1. Database server not running")
+    print("  2. Incorrect database credentials")
+    print("  3. Insufficient permissions")
+    print("  4. Corrupted backup file")
+    print("=" * 60)
+    return False
 
 
 def list_available_backups():
@@ -430,16 +455,18 @@ def list_available_backups():
     # Include both .sql and .backup files
     sql_backups = list(backup_dir.glob("backup_*.sql"))
     custom_backups = list(backup_dir.glob("backup_*.backup"))
-    all_backups = sorted(sql_backups + custom_backups, key=lambda f: f.stat().st_mtime, reverse=True)
+    all_backups = sorted(
+        sql_backups + custom_backups, key=lambda f: f.stat().st_mtime, reverse=True
+    )
 
     if all_backups:
         print(f"\nAvailable backups ({len(all_backups)}):")
-        for i, backup in enumerate(all_backups[:10], 1):
+        for i, backup in enumerate(all_backups[:_MAX_SHOWN_BACKUPS], 1):
             file_size = backup.stat().st_size / (1024 * 1024)
             backup_type = "SQL" if str(backup).endswith(".sql") else "Custom"
             print(f"  {i}. {backup.name} ({file_size:.2f} MB) [{backup_type}]")
-        if len(all_backups) > 10:
-            print(f"  ... and {len(all_backups) - 10} more")
+        if len(all_backups) > _MAX_SHOWN_BACKUPS:
+            print(f"  ... and {len(all_backups) - _MAX_SHOWN_BACKUPS} more")
     else:
         print("\nNo backup files found in 'backups/' directory")
 
@@ -447,7 +474,7 @@ def list_available_backups():
 def main():
     """Main function"""
     # Parse command line arguments
-    if len(sys.argv) < 2:
+    if len(sys.argv) < _MIN_ARGS:
         print("=" * 60)
         print("Database Restore Utility")
         print("=" * 60)

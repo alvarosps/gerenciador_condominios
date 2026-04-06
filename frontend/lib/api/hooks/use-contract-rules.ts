@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
+import { queryKeys } from '@/lib/api/query-keys';
 
 /**
  * Contract Rule type from the API
@@ -35,9 +36,9 @@ interface PaginatedResponse<T> {
 /**
  * Get all contract rules
  */
-export function useContractRules(activeOnly: boolean = false) {
+export function useContractRules(activeOnly = false) {
   return useQuery({
-    queryKey: ['contract-rules', { activeOnly }],
+    queryKey: queryKeys.contractRules.list(activeOnly),
     queryFn: async () => {
       const params = activeOnly ? { is_active: 'true' } : {};
       const { data } = await apiClient.get<PaginatedResponse<ContractRule> | ContractRule[]>('/rules/', { params });
@@ -56,12 +57,12 @@ export function useContractRules(activeOnly: boolean = false) {
  */
 export function useContractRule(id: number) {
   return useQuery({
-    queryKey: ['contract-rules', id],
+    queryKey: queryKeys.contractRules.detail(id),
     queryFn: async () => {
       const { data } = await apiClient.get<ContractRule>(`/rules/${id}/`);
       return data;
     },
-    enabled: !!id,
+    enabled: Boolean(id),
   });
 }
 
@@ -77,7 +78,7 @@ export function useCreateContractRule() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['contract-rules'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.contractRules.all });
     },
   });
 }
@@ -94,7 +95,7 @@ export function useUpdateContractRule() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['contract-rules'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.contractRules.all });
     },
   });
 }
@@ -110,7 +111,7 @@ export function useDeleteContractRule() {
       await apiClient.delete(`/rules/${id}/`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['contract-rules'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.contractRules.all });
     },
   });
 }
@@ -129,7 +130,7 @@ export function useReorderContractRules() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['contract-rules'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.contractRules.all });
     },
   });
 }
@@ -146,7 +147,7 @@ export function useToggleContractRule() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['contract-rules'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.contractRules.all });
     },
   });
 }

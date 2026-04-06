@@ -27,7 +27,7 @@ import {
   useCreateFurniture,
   useUpdateFurniture,
 } from '@/lib/api/hooks/use-furniture';
-import { Furniture } from '@/lib/schemas/furniture.schema';
+import { type Furniture } from '@/lib/schemas/furniture.schema';
 
 interface FurnitureFormModalProps {
   open: boolean;
@@ -49,7 +49,7 @@ export function FurnitureFormModal({
   const createMutation = useCreateFurniture();
   const updateMutation = useUpdateFurniture();
 
-  const isEditing = !!furniture?.id;
+  const isEditing = Boolean(furniture?.id);
   const isLoading = createMutation.isPending || updateMutation.isPending;
 
   const formMethods = useForm<FurnitureFormValues>({

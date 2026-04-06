@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt-BR">
   <head>
     <meta charset="utf-8" />
@@ -26,7 +26,7 @@
       }
 
       body {
-        font-family: 'Times New Roman', Times, Georgia, serif;
+        font-family: "Times New Roman", Times, Georgia, serif;
         font-size: 12pt;
         line-height: 1.4;
         color: #000;
@@ -52,7 +52,8 @@
 
       /* Print/PDF - margins controlled by Pyppeteer */
       @media print {
-        html, body {
+        html,
+        body {
           width: 210mm;
           height: 297mm;
           margin: 0 !important;
@@ -155,7 +156,8 @@
         border: 1px solid #000;
       }
 
-      th, td {
+      th,
+      td {
         border: 1px solid #000;
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
@@ -295,17 +297,16 @@
 
     <p>
       NESTE ATO denomidado(s) LOCADOR(ES): <strong>{{ landlord.name }}</strong>,
-      Nacionalidade: {{ landlord.nationality }},
-      Estado Civil: {{ landlord.marital_status }},
-      CPF: <strong>{{ landlord.cpf_cnpj }}</strong>,
-      Residente e domiciliado na rua {{ landlord.street }} {{ landlord.street_number }},
-      Bairro {{ landlord.neighborhood }}, {{ landlord.city }}, {{ landlord.state }},
-      {{ landlord.country }}. CEP {{ landlord.zip_code }}.
-      Telefone {{ landlord.phone }}
+      Nacionalidade: {{ landlord.nationality }}, Estado Civil: {{
+      landlord.marital_status }}, CPF: <strong>{{ landlord.cpf_cnpj }}</strong>,
+      Residente e domiciliado na rua {{ landlord.street }} {{
+      landlord.street_number }}, Bairro {{ landlord.neighborhood }}, {{
+      landlord.city }}, {{ landlord.state }}, {{ landlord.country }}. CEP {{
+      landlord.zip_code }}. Telefone {{ landlord.phone }}
     </p>
     <p>
-      DE OUTRO LADO, LOCATÁRIO(S): <strong>{{ tenant.name }}</strong>,
-      Estado Civil: <strong>{{ tenant.marital_status }}</strong>, CPF:
+      DE OUTRO LADO, LOCATÁRIO(S): <strong>{{ tenant.name }}</strong>, Estado
+      Civil: <strong>{{ tenant.marital_status }}</strong>, CPF:
       <strong>{{ tenant.cpf_cnpj }}</strong>, RG:
       <strong>{{ tenant.rg or 'N/A' }}</strong>, Profissão:
       <strong>{{ tenant.profession }}</strong>, Celular:
@@ -314,7 +315,10 @@
 
     <p>
       OBJETO DE LOCAÇÃO: Kitnet mobiliado, Situado na
-      <strong>Av. Circular {{ building_number }}, Apartamento {{ apartment_number }}</strong>, Bairro Vila Jardim, Porto Alegre, Rio Grande do Sul, Brasil. CEP
+      <strong
+        >Av. Circular {{ building_number }}, Apartamento {{ apartment_number
+        }}</strong
+      >, Bairro Vila Jardim, Porto Alegre, Rio Grande do Sul, Brasil. CEP
       91320-180.
     </p>
 
@@ -328,7 +332,9 @@
         {% for i in range(0, furnitures|length, 2) %}
         <tr>
           <td>(X) {{ furnitures[i] }}</td>
-          <td>{% if i+1 < furnitures|length %}(X) {{ furnitures[i+1] }}{% endif %}</td>
+          <td>
+            {% if i+1 < furnitures|length %}(X) {{ furnitures[i+1] }}{% endif %}
+          </td>
         </tr>
         {% endfor %}
         <tr>
@@ -346,51 +352,69 @@
       <strong>O PRAZO da locação do imóvel</strong> terá validade de
       <strong>{{ validity }} meses</strong>, iniciando no dia
       <strong>{{ start_date }}</strong>, e
-      <strong>terminando no dia {{ final_date }}</strong>. A partir
-      desta data, tanto LOCADOR como LOCATÁRIO podem pedir o encerramento do
-      contrato de locação, sem multas, com aviso prévio de 30 dias. Caso o
-      LOCATÁRIO não saia do imóvel após os 30 dias, o mesmo será considerado
-      como <strong>inquilino irregular</strong>, e o LOCADOR poderá
-      pedir a <strong>desocupação do imóvel</strong> judicialmente, e o
-      LOCATÁRIO será responsável por todas as despesas judiciais e honorários
-      advocatícios.
+      <strong>terminando no dia {{ final_date }}</strong>. A partir desta data,
+      tanto LOCADOR como LOCATÁRIO podem pedir o encerramento do contrato de
+      locação, sem multas, com aviso prévio de 30 dias. Caso o LOCATÁRIO não
+      saia do imóvel após os 30 dias, o mesmo será considerado como
+      <strong>inquilino irregular</strong>, e o LOCADOR poderá pedir a
+      <strong>desocupação do imóvel</strong> judicialmente, e o LOCATÁRIO será
+      responsável por todas as despesas judiciais e honorários advocatícios.
     </p>
 
     <p>
-      A presente <strong>LOCAÇÃO</strong> destina-se <strong>exclusivamente para fins residenciais</strong>,
-      sendo <strong>proibido uso comercial</strong>. É expressamente proibida a cessão, transferência ou
-      sublocação total ou parcial deste contrato. Considera-se sublocação irregular a hospedagem reiterada
-      de terceiros não constantes deste contrato por período superior a 7 dias consecutivos ou 15 dias
-      intercalados no mês. <strong>É proibido utilizar o endereço do imóvel para registro de empresa (PJ).</strong>
-      A infração constitui motivo para rescisão imediata, com aplicação da multa contratual.
+      A presente <strong>LOCAÇÃO</strong> destina-se
+      <strong>exclusivamente para fins residenciais</strong>, sendo
+      <strong>proibido uso comercial</strong>. É expressamente proibida a
+      cessão, transferência ou sublocação total ou parcial deste contrato.
+      Considera-se sublocação irregular a hospedagem reiterada de terceiros não
+      constantes deste contrato por período superior a 7 dias consecutivos ou 15
+      dias intercalados no mês.
+      <strong
+        >É proibido utilizar o endereço do imóvel para registro de empresa
+        (PJ).</strong
+      >
+      A infração constitui motivo para rescisão imediata, com aplicação da multa
+      contratual.
     </p>
 
     <p>
       O LOCATÁRIO pagará o valor de
       <strong>{{ rental_value | currency }}</strong>
       ({{ rental_value | extenso }} reais),
-      <strong>para moradia de no máximo {{ lease.number_of_tenants }} pessoa(s)</strong>, a ser efetuado diretamente ao LOCADOR, ou por PIX/Depósito bancário.
-      <strong>O pagamento deve ser feito até o dia {{ lease.due_day }} de cada mês</strong>.
+      <strong
+        >para moradia de no máximo {{ lease.number_of_tenants }}
+        pessoa(s)</strong
+      >, a ser efetuado diretamente ao LOCADOR, ou por PIX/Depósito bancário.
+      <strong
+        >O pagamento deve ser feito até o dia {{ lease.due_day }} de cada
+        mês</strong
+      >.
     </p>
 
     <p>
-      <strong>INADIMPLÊNCIA:</strong> O atraso no pagamento do aluguel, a partir do primeiro dia
-      após o vencimento, acarretará:
-      <strong>a)</strong> Multa moratória de 10% (dez por cento) sobre o valor devido;
-      <strong>b)</strong> Juros de mora de 1% (um por cento) ao mês, pro rata die.
-      <strong>Persistindo o atraso por período superior a 5 (cinco) dias corridos</strong>,
-      o LOCADOR poderá considerar rescindido o contrato e ingressar com ação de despejo
-      por falta de pagamento, nos termos do Art. 9º, III da Lei 8.245/91.
+      <strong>INADIMPLÊNCIA:</strong> O atraso no pagamento do aluguel, a partir
+      do primeiro dia após o vencimento, acarretará: <strong>a)</strong> Multa
+      moratória de 10% (dez por cento) sobre o valor devido;
+      <strong>b)</strong> Juros de mora de 1% (um por cento) ao mês, pro rata
+      die.
+      <strong
+        >Persistindo o atraso por período superior a 5 (cinco) dias
+        corridos</strong
+      >, o LOCADOR poderá considerar rescindido o contrato e ingressar com ação
+      de despejo por falta de pagamento, nos termos do Art. 9º, III da Lei
+      8.245/91.
     </p>
 
     <p>
       O pagamento do aluguel é sempre referente ao mês que o LOCATÁRIO estará
-      morando no kitnet. A <strong>data de vencimento</strong> é definida como o dia de início
-      da locação (dia {{ lease.due_day }}), permanecendo fixa mensalmente.
-      <strong>Caso o LOCATÁRIO deseje alterar a data de vencimento</strong>, será calculado
-      o valor proporcional: (aluguel ÷ 30) × dias de diferença entre as datas.
-      O valor proporcional deve ser pago junto com o aluguel vigente na data de vencimento atual,
-      e o próximo pagamento integral ocorrerá na nova data escolhida.
+      morando no kitnet. A <strong>data de vencimento</strong> é definida como o
+      dia de início da locação (dia {{ lease.due_day }}), permanecendo fixa
+      mensalmente.
+      <strong>Caso o LOCATÁRIO deseje alterar a data de vencimento</strong>,
+      será calculado o valor proporcional: (aluguel ÷ 30) × dias de diferença
+      entre as datas. O valor proporcional deve ser pago junto com o aluguel
+      vigente na data de vencimento atual, e o próximo pagamento integral
+      ocorrerá na nova data escolhida.
     </p>
 
     <div class="page-break"></div>
@@ -398,34 +422,39 @@
     <h1 class="contract-title">CONTRATO RESIDENCIAL DE ALUGUEL</h1>
 
     <p>
-      <strong>DEPÓSITO E GARANTIAS:</strong> No ato da assinatura, o LOCATÁRIO entrega:
-      <strong>a)</strong> {{ rental_value | currency }} ({{ rental_value | extenso }} reais)
-      referente ao primeiro mês de aluguel;
-      <strong>b)</strong> {{ valor_tags | currency }} ({{ valor_tags | extenso }} reais)
-      como caução da(s) tag(s) de acesso, a ser devolvido mediante devolução das tags em perfeito estado;
-      <strong>c)</strong> {{ cleaning_fee | currency }} ({{ cleaning_fee | extenso }})
-      referente à taxa de limpeza.
-      Totalizando <strong>{{ valor_total | currency }}</strong> ({{ valor_total | extenso }}).
+      <strong>DEPÓSITO E GARANTIAS:</strong> No ato da assinatura, o LOCATÁRIO
+      entrega: <strong>a)</strong> {{ rental_value | currency }} ({{
+      rental_value | extenso }} reais) referente ao primeiro mês de aluguel;
+      <strong>b)</strong> {{ valor_tags | currency }} ({{ valor_tags | extenso
+      }} reais) como caução da(s) tag(s) de acesso, a ser devolvido mediante
+      devolução das tags em perfeito estado; <strong>c)</strong> {{ cleaning_fee
+      | currency }} ({{ cleaning_fee | extenso }}) referente à taxa de limpeza.
+      Totalizando <strong>{{ valor_total | currency }}</strong> ({{ valor_total
+      | extenso }}).
     </p>
 
     {% if tenant.deposit_amount and tenant.deposit_amount > 0 %}
     <p>
-      O LOCATÁRIO possui caução adicional no valor de <strong>{{ tenant.deposit_amount | currency }}</strong>
-      ({{ tenant.deposit_amount | extenso }} reais), que será devolvido ao término do contrato,
-      podendo ser utilizado exclusivamente para: pagamento de multa por quebra de contrato ou
-      cobertura de danos ao imóvel/mobiliário verificados na vistoria de saída.
-      <strong>Este valor não pode ser usado como pagamento de aluguel mensal.</strong>
+      O LOCATÁRIO possui caução adicional no valor de
+      <strong>{{ tenant.deposit_amount | currency }}</strong>
+      ({{ tenant.deposit_amount | extenso }} reais), que será devolvido ao
+      término do contrato, podendo ser utilizado exclusivamente para: pagamento
+      de multa por quebra de contrato ou cobertura de danos ao imóvel/mobiliário
+      verificados na vistoria de saída.
+      <strong
+        >Este valor não pode ser usado como pagamento de aluguel mensal.</strong
+      >
     </p>
     {% endif %}
 
     <p>
-      As tags de acesso são codificadas com código único. Se uma tag for copiada,
-      o sistema detectará a duplicação e as tags deixarão de funcionar.
+      As tags de acesso são codificadas com código único. Se uma tag for
+      copiada, o sistema detectará a duplicação e as tags deixarão de funcionar.
     </p>
 
     <p>
-      O valor do aluguel será <strong>REAJUSTADO</strong> a cada
-      período de <strong>12 meses</strong>, de acordo com a variação
+      O valor do aluguel será <strong>REAJUSTADO</strong> a cada período de
+      <strong>12 meses</strong>, de acordo com a variação
       <strong>do índice do IGP-M/FGV</strong> ou
       <strong>outro índice</strong>escolhido.
     </p>
@@ -436,119 +465,142 @@
     </p>
 
     <p>
-      COMPROVANTES DE RESIDÊNCIA devem ser solicitados com no mínimo 3 dias
-      de antecedência.
+      COMPROVANTES DE RESIDÊNCIA devem ser solicitados com no mínimo 3 dias de
+      antecedência.
     </p>
 
     <p>
-      <strong>SERVIÇOS INCLUSOS:</strong> O valor do aluguel mensal já contempla: taxa de condomínio,
-      consumo de água (individual e rateio), consumo de energia elétrica do apartamento, IPTU,
-      e internet cortesia (fornecida sem garantia de velocidade ou disponibilidade).
-      O LOCADOR não se responsabiliza por interrupções na internet, cabendo ao LOCATÁRIO
+      <strong>SERVIÇOS INCLUSOS:</strong> O valor do aluguel mensal já
+      contempla: taxa de condomínio, consumo de água (individual e rateio),
+      consumo de energia elétrica do apartamento, IPTU, e internet cortesia
+      (fornecida sem garantia de velocidade ou disponibilidade). O LOCADOR não
+      se responsabiliza por interrupções na internet, cabendo ao LOCATÁRIO
       contratar serviço próprio caso necessite de conexão garantida.
-      <strong>Não é permitido conectar cabos nos roteadores do condomínio.</strong>
-      O LOCATÁRIO responde por consumo excessivo que ultrapasse a média histórica em mais de 50%.
+      <strong
+        >Não é permitido conectar cabos nos roteadores do condomínio.</strong
+      >
+      O LOCATÁRIO responde por consumo excessivo que ultrapasse a média
+      histórica em mais de 50%.
     </p>
 
     <p>
-      <strong>REGRAS DE CONVIVÊNCIA:</strong> O condomínio possui regras na última página deste contrato.
-      O não cumprimento implica em <strong>multa de R$100,00 (cem reais)</strong>, e em caso de
-      reincidência, o LOCADOR <strong>pode pedir a rescisão imediata deste contrato</strong>.
+      <strong>REGRAS DE CONVIVÊNCIA:</strong> O condomínio possui regras na
+      última página deste contrato. O não cumprimento implica em
+      <strong>multa de R$100,00 (cem reais)</strong>, e em caso de reincidência,
+      o LOCADOR <strong>pode pedir a rescisão imediata deste contrato</strong>.
     </p>
 
     <p>
-      <strong>MONITORAMENTO:</strong> As áreas comuns (portaria, corredores, garagem) são monitoradas
-      por câmeras de segurança. As imagens são armazenadas em nuvem por 15 dias, podendo ser utilizadas
-      para apuração de incidentes, investigações mediante requisição judicial, ou comprovação de infrações.
-      Não há monitoramento no interior das unidades. O tratamento segue a Lei 13.709/2018 (LGPD).
+      <strong>MONITORAMENTO:</strong> As áreas comuns (portaria, corredores,
+      garagem) são monitoradas por câmeras de segurança. As imagens são
+      armazenadas em nuvem por 15 dias, podendo ser utilizadas para apuração de
+      incidentes, investigações mediante requisição judicial, ou comprovação de
+      infrações. Não há monitoramento no interior das unidades. O tratamento
+      segue a Lei 13.709/2018 (LGPD).
     </p>
 
     {% if "Botijão de gás" in furnitures %}
     <p>
-      <strong>BOTIJÃO DE GÁS:</strong> Um botijão (casco) é disponibilizado na entrada e deve ser
-      deixado na saída. Se o LOCATÁRIO desejar levar um botijão cheio, deve deixar um casco vazio.
+      <strong>BOTIJÃO DE GÁS:</strong> Um botijão (casco) é disponibilizado na
+      entrada e deve ser deixado na saída. Se o LOCATÁRIO desejar levar um
+      botijão cheio, deve deixar um casco vazio.
     </p>
     {% endif %}
 
     <p>
-      <strong>MODIFICAÇÕES:</strong> É expressamente vedado ao LOCATÁRIO realizar qualquer modificação
-      no imóvel sem autorização prévia e por escrito do LOCADOR, incluindo: pintura, instalação de
-      prateleiras/suportes/ganchos, troca de fechaduras, troca de posição de móveis, como roupeiro e cômoda,
-      alterações elétricas/hidráulicas, e quaisquer furos em paredes.
-      Modificações não autorizadas deverão ser removidas às expensas do LOCATÁRIO.
+      <strong>MODIFICAÇÕES:</strong> É expressamente vedado ao LOCATÁRIO
+      realizar qualquer modificação no imóvel sem autorização prévia e por
+      escrito do LOCADOR, incluindo: pintura, instalação de
+      prateleiras/suportes/ganchos, troca de fechaduras, troca de posição de
+      móveis, como roupeiro e cômoda, alterações elétricas/hidráulicas, e
+      quaisquer furos em paredes. Modificações não autorizadas deverão ser
+      removidas às expensas do LOCATÁRIO.
     </p>
 
     <p>
-      <strong>É TERMINANTEMENTE PROIBIDO</strong> a instalação ou uso de ar condicionado
-      (tanto de parede/split quanto portátil) e de máquinas de secar roupas.
-      A infração configura quebra de contrato, sujeitando o LOCATÁRIO à multa e possível
-      rescisão imediata.
+      <strong>É TERMINANTEMENTE PROIBIDO</strong> a instalação ou uso de ar
+      condicionado (tanto de parede/split quanto portátil) e de máquinas de
+      secar roupas. A infração configura quebra de contrato, sujeitando o
+      LOCATÁRIO à multa e possível rescisão imediata.
     </p>
-    
+
     <div class="page-break"></div>
 
     <h1 class="contract-title">CONTRATO RESIDENCIAL DE ALUGUEL</h1>
 
     <p>
       Em caso de <strong>rescisão antecipada</strong> por parte do LOCATÁRIO,
-      sem motivo legal que justifique a quebra imediata do contrato, este se compromete a:
+      sem motivo legal que justifique a quebra imediata do contrato, este se
+      compromete a:
     </p>
     <ul>
-      <li>Notificar o LOCADOR com antecedência mínima de 30 (trinta) dias, por escrito;</li>
-      <li>Pagar uma multa no valor equivalente a 1 (um) mês de aluguel vigente na data da notificação;</li>
       <li>
-        Caso exista caução no valor correspondente a 1 (um) mês de aluguel,
-        esta poderá ser utilizada para o pagamento da multa,
-        desde que não existam débitos pendentes ou danos ao imóvel;
+        Notificar o LOCADOR com antecedência mínima de 30 (trinta) dias, por
+        escrito;
       </li>
-      <li>No caso de rescisão solicitada pelo LOCADOR, sem que haja infração contratual por parte do LOCATÁRIO,
-        deverá ser concedido aviso prévio mínimo de 30 (trinta) dias, por escrito.
+      <li>
+        Pagar uma multa no valor equivalente a 1 (um) mês de aluguel vigente na
+        data da notificação;
+      </li>
+      <li>
+        Caso exista caução no valor correspondente a 1 (um) mês de aluguel, esta
+        poderá ser utilizada para o pagamento da multa, desde que não existam
+        débitos pendentes ou danos ao imóvel;
+      </li>
+      <li>
+        No caso de rescisão solicitada pelo LOCADOR, sem que haja infração
+        contratual por parte do LOCATÁRIO, deverá ser concedido aviso prévio
+        mínimo de 30 (trinta) dias, por escrito.
       </li>
     </ul>
 
     <p>
       RESCISÃO <strong>imediata</strong> do presente contrato,
-      <strong>sem prejuízo dos numerários previstos neste</strong>,
-      ocorrerá,
-      <strong>caso aconteça qualquer sinistro que venha a impossibilitar o uso do
+      <strong>sem prejuízo dos numerários previstos neste</strong>, ocorrerá,
+      <strong
+        >caso aconteça qualquer sinistro que venha a impossibilitar o uso do
         imóvel, ou em caso de descumprimento excessivo das regras, ou em caso de
-        desapropriação do imóvel</strong>.
+        desapropriação do imóvel</strong
+      >.
     </p>
 
     <p>
-      <strong>VISTORIA DE SAÍDA:</strong> Na desocupação, será verificado o estado dos móveis e
-      eletrodomésticos. Danos que excedam o desgaste natural serão descontados do caução (se existir)
-      ou cobrados diretamente do LOCATÁRIO. A não devolução das chaves/tags também será cobrada.
+      <strong>VISTORIA DE SAÍDA:</strong> Na desocupação, será verificado o
+      estado dos móveis e eletrodomésticos. Danos que excedam o desgaste natural
+      serão descontados do caução (se existir) ou cobrados diretamente do
+      LOCATÁRIO. A não devolução das chaves/tags também será cobrada.
     </p>
 
     <p>
       O LOCATÁRIO irá receber
       <strong>1 cópia da chave do apartamento</strong>, e
       <strong>{{ lease.number_of_tenants }} tag(s)</strong> e
-      <strong>deve devolvê-las</strong> ao final do contrato / saída do
-      kitnet. Caso ocorra <strong>a perda de 1 tag</strong>, será
-      utilizado o valor do caução da tag (se existir), e receberá uma nova. Em
-      <strong>caso de reinscidência de perda da tag, ou de não possuir caução</strong>,
-      será cobrado a multa de R$50,00 ({{ 50 | extenso}} reais) para cada vez que
-      acontecer. O LOCADOR não tem obrigação de possuir chave reserva para o
+      <strong>deve devolvê-las</strong> ao final do contrato / saída do kitnet.
+      Caso ocorra <strong>a perda de 1 tag</strong>, será utilizado o valor do
+      caução da tag (se existir), e receberá uma nova. Em
+      <strong
+        >caso de reinscidência de perda da tag, ou de não possuir caução</strong
+      >, será cobrado a multa de R$50,00 ({{ 50 | extenso}} reais) para cada vez
+      que acontecer. O LOCADOR não tem obrigação de possuir chave reserva para o
       kitnet, caso o LOCATÁRIO perca a chave, e o LOCADOR não possua chaves
       reservas, é de responsabilidade do LOCATÁRIO chamar um chaveiro para abrir
       a porta e fazer uma nova chave. Caso ocorra a
-      <strong>perda da chave</strong>, e o LOCADOR possuir uma chave
-      reserva disponível, será cobrado uma multa de R$50,00 ({{ 50 | extenso}}
-      reais) e será entregue uma chave reserva.
+      <strong>perda da chave</strong>, e o LOCADOR possuir uma chave reserva
+      disponível, será cobrado uma multa de R$50,00 ({{ 50 | extenso}} reais) e
+      será entregue uma chave reserva.
     </p>
 
     <p>
-      O LOCADOR garante a manutenção da geladeira, fogão e máquina de lavar roupas
-      do kitnet, durante toda a locação. Chuveiro elétrico e lâmpadas possuem os 3 primeiros
-      meses de garantia do LOCADOR, após esse período, é de responsabilidade do LOCATÁRIO.
+      O LOCADOR garante a manutenção da geladeira, fogão e máquina de lavar
+      roupas do kitnet, durante toda a locação. Chuveiro elétrico e lâmpadas
+      possuem os 3 primeiros meses de garantia do LOCADOR, após esse período, é
+      de responsabilidade do LOCATÁRIO.
     </p>
 
     <p>
-      O atendimento da manutenção é apenas de segunda
-      a sexta feira, entre 9:00 e 19:00. Atendimentos fora desse horário de atendimento irão
-      ter custos, exceto para casos de emergência.
+      O atendimento da manutenção é apenas de segunda a sexta feira, entre 9:00
+      e 19:00. Atendimentos fora desse horário de atendimento irão ter custos,
+      exceto para casos de emergência.
     </p>
 
     <p>
@@ -558,17 +610,23 @@
     </p>
 
     <p>
-      <strong>OBRIGAÇÕES DO LOCATÁRIO:</strong> Além das previstas em lei, o LOCATÁRIO deve:
-      pagar pontualmente o aluguel; utilizar o imóvel apenas para moradia; manter o imóvel limpo e conservado;
-      comunicar imediatamente danos ou defeitos; permitir vistorias agendadas; respeitar o sossego dos vizinhos;
-      cumprir integralmente o Regulamento Interno do condomínio (que declara conhecer e aceitar);
-      comunicar alterações de contato; e entregar o imóvel nas condições recebidas.
-      <strong>É totalmente proibida a permanência de animais de estimação no imóvel.</strong>
+      <strong>OBRIGAÇÕES DO LOCATÁRIO:</strong> Além das previstas em lei, o
+      LOCATÁRIO deve: pagar pontualmente o aluguel; utilizar o imóvel apenas
+      para moradia; manter o imóvel limpo e conservado; comunicar imediatamente
+      danos ou defeitos; permitir vistorias agendadas; respeitar o sossego dos
+      vizinhos; cumprir integralmente o Regulamento Interno do condomínio (que
+      declara conhecer e aceitar); comunicar alterações de contato; e entregar o
+      imóvel nas condições recebidas.
+      <strong
+        >É totalmente proibida a permanência de animais de estimação no
+        imóvel.</strong
+      >
     </p>
 
     <p>
       Os herdeiros, cessionários ou sucessores das partes vinculadas neste
-      CONTRATO RESIDENCIAL DE ALUGUEL se obrigam desde já ao teor completo deste contrato.
+      CONTRATO RESIDENCIAL DE ALUGUEL se obrigam desde já ao teor completo deste
+      contrato.
     </p>
 
     <p>
@@ -589,14 +647,34 @@
       {% endfor %}
     </ul>
 
-    <p style="text-align: center; font-weight: bold; margin-top: 24pt;">
+    <p style="text-align: center; font-weight: bold; margin-top: 24pt">
       O não cumprimento das regras acima citadas irá implicar em multa e
       possível rescisão imediata do contrato.
     </p>
 
-    <p class="date-line">
-      Porto Alegre, {{ start_date }}
-    </p>
+    <h2 style="margin-top: 18pt; margin-bottom: 10pt">
+      Sobre Manutenções dos Kitnets
+    </h2>
+
+    <ul>
+      <li>
+        As manutenções (geladeiras, máquina de lavar roupas, fogão, encanamentos
+        em geral, tomadas e chuveiro nos 3 primeiros meses) podem ser agendadas
+        em horário comercial, de segunda a sexta-feira, conforme
+        disponibilidade.
+      </li>
+      <li>
+        Para que o reparo possa ser realizado com segurança e eficiência, é
+        necessário que o ambiente esteja organizado, limpo e apto a receber o
+        profissional, permitindo acesso ao local do serviço.
+      </li>
+      <li>
+        Estando tudo em conformidade, avise o LOCADOR para que possamos
+        confirmar a data da manutenção.
+      </li>
+    </ul>
+
+    <p class="date-line">Porto Alegre, {{ start_date }}</p>
 
     <div class="signature-section">
       <div class="row">

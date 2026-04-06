@@ -1,14 +1,15 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
-import { Building, buildingSchema } from '@/lib/schemas/building.schema';
-import { PaginatedResponse } from '@/lib/types/api';
+import { queryKeys } from '../query-keys';
+import { type Building, buildingSchema } from '@/lib/schemas/building.schema';
+import { type PaginatedResponse } from '@/lib/types/api';
 
 /**
  * Hook to fetch all buildings
  */
 export function useBuildings() {
   return useQuery({
-    queryKey: ['buildings'],
+    queryKey: queryKeys.buildings.all,
     queryFn: async () => {
       const { data } = await apiClient.get<PaginatedResponse<Building> | Building[]>('/buildings/', {
         params: { page_size: 10000 },
@@ -26,13 +27,13 @@ export function useBuildings() {
  */
 export function useBuilding(id: number | null) {
   return useQuery({
-    queryKey: ['buildings', id],
+    queryKey: id ? queryKeys.buildings.detail(id) : queryKeys.buildings.all,
     queryFn: async () => {
       if (!id) throw new Error('Building ID is required');
       const { data } = await apiClient.get<Building>(`/buildings/${id}/`);
       return buildingSchema.parse(data);
     },
-    enabled: !!id,
+    enabled: Boolean(id),
   });
 }
 
@@ -50,8 +51,7 @@ export function useCreateBuilding() {
       return response.data;
     },
     onSuccess: () => {
-      // Invalidate buildings list to trigger refetch
-      queryClient.invalidateQueries({ queryKey: ['buildings'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.buildings.all });
     },
   });
 }
@@ -74,9 +74,10 @@ export function useUpdateBuilding() {
       return response.data;
     },
     onSuccess: (data) => {
-      // Invalidate both list and specific building cache
-      queryClient.invalidateQueries({ queryKey: ['buildings'] });
-      queryClient.invalidateQueries({ queryKey: ['buildings', data.id] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.buildings.all });
+      if (data.id !== undefined) {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.buildings.detail(data.id) });
+      }
     },
   });
 }
@@ -92,8 +93,7 @@ export function useDeleteBuilding() {
       await apiClient.delete(`/buildings/${id}/`);
     },
     onSuccess: () => {
-      // Invalidate buildings list to trigger refetch
-      queryClient.invalidateQueries({ queryKey: ['buildings'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.buildings.all });
     },
   });
 }

@@ -28,7 +28,7 @@ import {
   useCreateBuilding,
   useUpdateBuilding,
 } from '@/lib/api/hooks/use-buildings';
-import { Building } from '@/lib/schemas/building.schema';
+import { type Building } from '@/lib/schemas/building.schema';
 
 interface BuildingFormModalProps {
   open: boolean;
@@ -52,7 +52,7 @@ export function BuildingFormModal({
   const createMutation = useCreateBuilding();
   const updateMutation = useUpdateBuilding();
 
-  const isEditing = !!building?.id;
+  const isEditing = Boolean(building?.id);
   const isLoading = createMutation.isPending || updateMutation.isPending;
 
   const formMethods = useForm<BuildingFormValues>({

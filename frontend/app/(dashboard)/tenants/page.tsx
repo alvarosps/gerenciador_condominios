@@ -1,6 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
@@ -36,18 +42,21 @@ import {
   FileSpreadsheet,
   FileText,
   Search,
-  Users,
-  User,
+  ArrowRightLeft,
+  FilePlus,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { cn } from '@/lib/utils';
-import { DataTable, Column } from '@/components/tables/data-table';
+import { DataTable, type Column } from '@/components/tables/data-table';
 import { TenantFormWizard } from './_components/tenant-form-wizard';
+import { TenantLeaseModal } from './_components/tenant-lease-modal';
+import { ContractViewModal } from './_components/contract-view-modal';
 import {
   useTenants,
   useDeleteTenant,
 } from '@/lib/api/hooks/use-tenants';
-import { Tenant } from '@/lib/schemas/tenant.schema';
+import { useLeases, usePatchLease } from '@/lib/api/hooks/use-leases';
+import { type Tenant } from '@/lib/schemas/tenant.schema';
+import { type Lease } from '@/lib/schemas/lease.schema';
 import { formatCPFOrCNPJ, formatBrazilianPhone } from '@/lib/utils/formatters';
 import { tenantExportColumns } from '@/lib/hooks/use-export';
 import { useCrudPage } from '@/lib/hooks/use-crud-page';
@@ -56,13 +65,66 @@ export default function TenantsPage() {
   // Page-specific filters state
   const [filters, setFilters] = useState({
     is_company: undefined as boolean | undefined,
-    has_dependents: undefined as boolean | undefined,
-    has_furniture: undefined as boolean | undefined,
     search: '' as string,
   });
 
   const { data: tenants, isLoading, error } = useTenants(filters);
+  const { data: allLeases, isLoading: leasesLoading } = useLeases();
   const deleteMutation = useDeleteTenant();
+
+  // Tenant-lease modal state
+  const [tenantLeaseMode, setTenantLeaseMode] = useState<'create' | 'transfer' | null>(null);
+  const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
+  const [selectedLease, setSelectedLease] = useState<Lease | null>(null);
+
+  const openTransferModal = (tenant: Tenant, lease: Lease) => {
+    setSelectedTenant(tenant);
+    setSelectedLease(lease);
+    setTenantLeaseMode('transfer');
+  };
+
+  const openCreateLeaseModal = (tenant: Tenant) => {
+    setSelectedTenant(tenant);
+    setSelectedLease(null);
+    setTenantLeaseMode('create');
+  };
+
+  const closeTenantLeaseModal = () => {
+    setTenantLeaseMode(null);
+    setSelectedTenant(null);
+    setSelectedLease(null);
+  };
+
+  // Contract view modal state
+  const [contractViewLease, setContractViewLease] = useState<Lease | null>(null);
+
+  // Toggle confirmation modal state
+  const [toggleConfirm, setToggleConfirm] = useState<{
+    lease: Lease;
+    field: 'contract_signed' | 'interfone_configured';
+  } | null>(null);
+  const patchLease = usePatchLease();
+
+  const handleToggleConfirm = async () => {
+    if (!toggleConfirm) return;
+    const { lease, field } = toggleConfirm;
+    const leaseId = lease.id;
+    if (leaseId === undefined) return;
+    try {
+      await patchLease.mutateAsync({
+        id: leaseId,
+        [field]: !lease[field],
+      });
+      toast.success(
+        field === 'contract_signed'
+          ? (lease.contract_signed ? 'Assinatura revertida' : 'Contrato marcado como assinado')
+          : (lease.interfone_configured ? 'Interfone desconfigurado' : 'Interfone marcado como configurado')
+      );
+    } catch {
+      toast.error('Erro ao atualizar');
+    }
+    setToggleConfirm(null);
+  };
 
   // Use the consolidated CRUD hook for all state management
   const crud = useCrudPage<Tenant>({
@@ -75,11 +137,25 @@ export default function TenantsPage() {
     deleteErrorMessage: 'Erro ao excluir inquilino. Verifique se não há locações vinculadas.',
   });
 
+  // Build tenant → lease map from all non-deleted leases
+  const leaseByTenantId = useMemo(() => {
+    const map = new Map<number, Lease>();
+    allLeases?.forEach((lease) => {
+      if (lease.responsible_tenant?.id !== undefined) {
+        map.set(lease.responsible_tenant.id, lease);
+      }
+      lease.tenants?.forEach((tenant) => {
+        if (tenant.id !== undefined && !map.has(tenant.id)) {
+          map.set(tenant.id, lease);
+        }
+      });
+    });
+    return map;
+  }, [allLeases]);
+
   const clearFilters = () => {
     setFilters({
       is_company: undefined,
-      has_dependents: undefined,
-      has_furniture: undefined,
       search: '',
     });
   };
@@ -94,7 +170,7 @@ export default function TenantsPage() {
       render: (value, record: Tenant) => (
         <div>
           <div className="font-medium">{value as string}</div>
-          <div className="text-xs text-gray-500">
+          <div className="text-xs text-muted-foreground">
             {record.is_company ? 'Empresa' : 'Pessoa Física'}
           </div>
         </div>
@@ -117,125 +193,170 @@ export default function TenantsPage() {
       render: (value) => formatBrazilianPhone(value as string),
     },
     {
-      title: 'Email',
-      dataIndex: 'email',
-      key: 'email',
-      width: 200,
-    },
-    {
-      title: 'Profissão',
-      dataIndex: 'profession',
-      key: 'profession',
-      width: 150,
-    },
-    {
-      title: 'Estado Civil',
-      dataIndex: 'marital_status',
-      key: 'marital_status',
+      title: 'Kitnet',
+      key: 'has_lease',
       width: 120,
-      render: (value) => {
-        const statusVariants: Record<string, string> = {
-          'Solteiro': 'bg-blue-100 text-blue-800 hover:bg-blue-200',
-          'Casado': 'bg-green-100 text-green-800 hover:bg-green-200',
-          'Divorciado': 'bg-orange-100 text-orange-800 hover:bg-orange-200',
-          'Viúvo': 'bg-gray-100 text-gray-800 hover:bg-gray-200',
-        };
+      align: 'center' as const,
+      render: (_: unknown, record: Tenant) => {
+        const lease = record.id !== undefined ? leaseByTenantId.get(record.id) : undefined;
+        if (!lease) {
+          return <span className="text-muted-foreground">—</span>;
+        }
+        const aptNumber = lease.apartment?.number;
+        const buildingNumber = lease.apartment?.building?.street_number;
+        if (aptNumber && buildingNumber) {
+          return (
+            <Badge className="bg-success text-success-foreground">
+              {String(aptNumber)}/{String(buildingNumber)}
+            </Badge>
+          );
+        }
+        return <Badge className="bg-success text-success-foreground">Ativo</Badge>;
+      },
+    },
+    {
+      title: 'Contrato Assinado',
+      key: 'contract_signed',
+      width: 140,
+      align: 'center' as const,
+      render: (_: unknown, record: Tenant) => {
+        const lease = record.id !== undefined ? leaseByTenantId.get(record.id) : undefined;
+        if (!lease) return <span className="text-muted-foreground">—</span>;
         return (
-          <Badge className={cn(statusVariants[value as string] || 'bg-gray-100 text-gray-800')}>
-            {value as string}
+          <Badge
+            className={`cursor-pointer ${
+              lease.contract_signed
+                ? 'bg-info/10 text-info hover:bg-info/20'
+                : 'bg-warning/10 text-warning hover:bg-warning/20'
+            }`}
+            onClick={() => setToggleConfirm({ lease, field: 'contract_signed' })}
+          >
+            {lease.contract_signed ? 'Sim' : 'Não'}
           </Badge>
         );
       },
     },
     {
-      title: 'Dependentes',
-      key: 'dependents',
-      width: 120,
-      align: 'center',
-      render: (_, record: Tenant) => {
-        const count = record.dependents?.length || 0;
+      title: 'Interfone',
+      key: 'interfone',
+      width: 130,
+      align: 'center' as const,
+      render: (_: unknown, record: Tenant) => {
+        const lease = record.id !== undefined ? leaseByTenantId.get(record.id) : undefined;
+        if (!lease) return <span className="text-muted-foreground">—</span>;
         return (
-          <div className="flex items-center gap-2 justify-center">
-            <Users className="h-5 w-5 text-muted-foreground" />
-            <Badge
-              variant={count > 0 ? 'default' : 'secondary'}
-              className={cn(count > 0 ? 'bg-blue-500 hover:bg-blue-600' : '')}
-            >
-              {count}
-            </Badge>
-          </div>
+          <Badge
+            className={`cursor-pointer ${
+              lease.interfone_configured
+                ? 'bg-success/10 text-success hover:bg-success/20'
+                : 'bg-warning/10 text-warning hover:bg-warning/20'
+            }`}
+            onClick={() => setToggleConfirm({ lease, field: 'interfone_configured' })}
+          >
+            {lease.interfone_configured ? 'Configurado' : 'Pendente'}
+          </Badge>
         );
       },
-      sorter: (a: Tenant, b: Tenant) => (a.dependents?.length || 0) - (b.dependents?.length || 0),
     },
     {
-      title: 'Móveis',
-      key: 'furnitures',
+      title: 'Contrato',
+      key: 'contract_action',
       width: 100,
-      align: 'center',
-      render: (_, record: Tenant) => {
-        const count = record.furnitures?.length || 0;
+      align: 'center' as const,
+      render: (_: unknown, record: Tenant) => {
+        const lease = record.id !== undefined ? leaseByTenantId.get(record.id) : undefined;
+        if (!lease) return <span className="text-muted-foreground">—</span>;
         return (
-          <div className="flex items-center gap-2 justify-center">
-            <User className="h-5 w-5 text-muted-foreground" />
-            <Badge
-              variant={count > 0 ? 'default' : 'secondary'}
-              className={cn(count > 0 ? 'bg-green-500 hover:bg-green-600' : '')}
-            >
-              {count}
-            </Badge>
-          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setContractViewLease(lease)}
+          >
+            Ver
+          </Button>
         );
       },
     },
     {
       title: 'Ações',
       key: 'actions',
-      width: 150,
+      width: 220,
       fixed: 'right',
-      render: (_, record: Tenant) => (
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => crud.openEditModal(record)}
-          >
-            <Pencil className="h-4 w-4 mr-1" />
-            Editar
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              crud.setItemToDelete(record);
-              crud.handleDeleteClick(record.id!);
-            }}
-            disabled={crud.isDeleting}
-          >
-            <Trash2 className="h-4 w-4 mr-1" />
-            Excluir
-          </Button>
-        </div>
-      ),
+      render: (_, record: Tenant) => {
+        const lease = record.id !== undefined ? leaseByTenantId.get(record.id) : undefined;
+        return (
+          <div className="flex items-center gap-1">
+            {lease ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => openTransferModal(record, lease)}
+              >
+                <ArrowRightLeft className="h-4 w-4 mr-1" />
+                Trocar
+              </Button>
+            ) : (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => openCreateLeaseModal(record)}
+              >
+                <FilePlus className="h-4 w-4 mr-1" />
+                Contrato
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => crud.openEditModal(record)}
+            >
+              <Pencil className="h-4 w-4 mr-1" />
+              Editar
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                crud.setItemToDelete(record);
+                if (record.id !== undefined) crud.handleDeleteClick(record.id);
+              }}
+              disabled={crud.isDeleting}
+            >
+              <Trash2 className="h-4 w-4 mr-1" />
+              Excluir
+            </Button>
+          </div>
+        );
+      },
     },
   ];
+
+  // Split tenants into active lease / no lease groups
+  const { tenantsWithLease, tenantsWithoutLease } = useMemo(() => {
+    const withLease: Tenant[] = [];
+    const withoutLease: Tenant[] = [];
+    tenants?.forEach((tenant) => {
+      if (tenant.id !== undefined && leaseByTenantId.has(tenant.id)) {
+        withLease.push(tenant);
+      } else {
+        withoutLease.push(tenant);
+      }
+    });
+    return { tenantsWithLease: withLease, tenantsWithoutLease: withoutLease };
+  }, [tenants, leaseByTenantId]);
 
   if (error) {
     toast.error('Erro ao carregar inquilinos');
   }
 
-  const hasActiveFilters =
-    filters.is_company !== undefined ||
-    filters.has_dependents !== undefined ||
-    filters.has_furniture !== undefined ||
-    filters.search !== '';
+  const hasActiveFilters = filters.is_company !== undefined || filters.search !== '';
 
   return (
     <div>
       <div className="mb-4 flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold">Inquilinos</h1>
-          <p className="text-gray-600 mt-1">
+          <p className="text-muted-foreground mt-1">
             Gerencie os inquilinos dos apartamentos
           </p>
         </div>
@@ -251,11 +372,11 @@ export default function TenantsPage() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
-              <DropdownMenuItem onClick={() => crud.handleExport('excel', tenants || [])}>
+              <DropdownMenuItem onClick={() => crud.handleExport('excel', tenants ?? [])}>
                 <FileSpreadsheet className="h-4 w-4 mr-2" />
                 Exportar para Excel
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => crud.handleExport('csv', tenants || [])}>
+              <DropdownMenuItem onClick={() => crud.handleExport('csv', tenants ?? [])}>
                 <FileText className="h-4 w-4 mr-2" />
                 Exportar para CSV
               </DropdownMenuItem>
@@ -269,9 +390,10 @@ export default function TenantsPage() {
       </div>
 
       {crud.bulkOps.hasSelection && (
-        <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded flex justify-between items-center">
-          <span className="text-blue-700 font-medium">
-            {crud.bulkOps.selectionCount} {crud.bulkOps.selectionCount === 1 ? 'inquilino selecionado' : 'inquilinos selecionados'}
+        <div className="mb-4 p-4 bg-primary/5 border border-primary/20 rounded flex justify-between items-center">
+          <span className="text-primary font-medium">
+            {crud.bulkOps.selectionCount}{' '}
+            {crud.bulkOps.selectionCount === 1 ? 'inquilino selecionado' : 'inquilinos selecionados'}
           </span>
           <div className="flex gap-2">
             <Button variant="outline" onClick={crud.bulkOps.clearSelection}>
@@ -292,8 +414,8 @@ export default function TenantsPage() {
       {/* Filters */}
       <Card className="mb-4">
         <CardContent className="pt-6">
-          <div className="flex gap-4 flex-wrap items-end">
-            <div className="flex-1 min-w-[250px]">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div>
               <label className="block text-sm font-medium mb-2">
                 Buscar por Nome ou CPF/CNPJ
               </label>
@@ -308,7 +430,7 @@ export default function TenantsPage() {
               </div>
             </div>
 
-            <div className="flex-1 min-w-[150px]">
+            <div>
               <label className="block text-sm font-medium mb-2">Tipo</label>
               <Select
                 value={filters.is_company === undefined ? 'all' : String(filters.is_company)}
@@ -330,66 +452,69 @@ export default function TenantsPage() {
               </Select>
             </div>
 
-            <div className="flex-1 min-w-[150px]">
-              <label className="block text-sm font-medium mb-2">Dependentes</label>
-              <Select
-                value={filters.has_dependents === undefined ? 'all' : String(filters.has_dependents)}
-                onValueChange={(value) =>
-                  setFilters({
-                    ...filters,
-                    has_dependents: value === 'all' ? undefined : value === 'true',
-                  })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Todos" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  <SelectItem value="true">Com Dependentes</SelectItem>
-                  <SelectItem value="false">Sem Dependentes</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex-1 min-w-[150px]">
-              <label className="block text-sm font-medium mb-2">Móveis</label>
-              <Select
-                value={filters.has_furniture === undefined ? 'all' : String(filters.has_furniture)}
-                onValueChange={(value) =>
-                  setFilters({
-                    ...filters,
-                    has_furniture: value === 'all' ? undefined : value === 'true',
-                  })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Todos" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  <SelectItem value="true">Com Móveis</SelectItem>
-                  <SelectItem value="false">Sem Móveis</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
             {hasActiveFilters && (
-              <Button variant="outline" onClick={clearFilters}>
-                Limpar Filtros
-              </Button>
+              <div className="flex items-end">
+                <Button variant="outline" onClick={clearFilters} className="w-full">
+                  Limpar Filtros
+                </Button>
+              </div>
             )}
           </div>
         </CardContent>
       </Card>
 
-      <DataTable<Tenant>
-        columns={columns}
-        dataSource={tenants}
-        loading={isLoading}
-        rowKey="id"
-        rowSelection={crud.bulkOps.rowSelection}
-      />
+      {isLoading || leasesLoading ? (
+        <div className="flex items-center justify-center p-12 border rounded-md">
+          <div className="flex flex-col items-center gap-2">
+            <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+            <p className="text-sm text-muted-foreground">Carregando inquilinos...</p>
+          </div>
+        </div>
+      ) : (
+        <Accordion type="multiple" defaultValue={['with-lease']} className="space-y-4">
+          <AccordionItem value="with-lease">
+            <AccordionTrigger className="px-4">
+              <div className="flex items-center gap-2">
+                <span>Com Contrato Ativo</span>
+                <Badge variant="secondary">{tenantsWithLease.length} inquilinos</Badge>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="px-4 pb-4">
+              <DataTable<Tenant>
+                columns={columns}
+                dataSource={tenantsWithLease}
+                loading={false}
+                rowKey="id"
+                rowSelection={crud.bulkOps.rowSelection}
+                defaultSortKey="name"
+                defaultSortDirection="asc"
+                pagination={{ pageSize: 50 }}
+              />
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="without-lease">
+            <AccordionTrigger className="px-4">
+              <div className="flex items-center gap-2">
+                <span>Sem Contrato Ativo</span>
+                <Badge variant="secondary">{tenantsWithoutLease.length} inquilinos</Badge>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="px-4 pb-4">
+              <DataTable<Tenant>
+                columns={columns}
+                dataSource={tenantsWithoutLease}
+                loading={false}
+                rowKey="id"
+                rowSelection={crud.bulkOps.rowSelection}
+                defaultSortKey="name"
+                defaultSortDirection="asc"
+                pagination={{ pageSize: 50 }}
+              />
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
+      )}
 
       <TenantFormWizard
         open={crud.isModalOpen}
@@ -397,12 +522,60 @@ export default function TenantsPage() {
         onClose={crud.closeModal}
       />
 
+      {tenantLeaseMode !== null && selectedTenant !== null && (
+        <TenantLeaseModal
+          mode={tenantLeaseMode}
+          tenant={selectedTenant}
+          currentLease={selectedLease}
+          open={tenantLeaseMode !== null}
+          onClose={closeTenantLeaseModal}
+        />
+      )}
+
+      <ContractViewModal
+        open={contractViewLease !== null}
+        lease={contractViewLease}
+        onClose={() => setContractViewLease(null)}
+      />
+
+      <AlertDialog open={toggleConfirm !== null} onOpenChange={() => setToggleConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {toggleConfirm?.field === 'contract_signed'
+                ? (toggleConfirm.lease.contract_signed ? 'Reverter assinatura' : 'Confirmar assinatura')
+                : (toggleConfirm?.lease.interfone_configured ? 'Desconfigurar interfone' : 'Confirmar interfone')}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {toggleConfirm?.field === 'contract_signed'
+                ? (toggleConfirm.lease.contract_signed
+                    ? 'Deseja reverter a assinatura do contrato?'
+                    : 'O contrato foi assinado?')
+                : (toggleConfirm?.lease.interfone_configured
+                    ? 'Deseja desconfigurar o interfone?'
+                    : 'O interfone foi cadastrado?')}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => void handleToggleConfirm()}
+              disabled={patchLease.isPending}
+            >
+              {patchLease.isPending ? 'Salvando...' : 'Confirmar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <AlertDialog open={crud.deleteDialogOpen} onOpenChange={crud.setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir inquilino</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja excluir {crud.itemToDelete?.name ? `"${crud.itemToDelete.name}"` : 'este inquilino'}? Esta ação não pode ser desfeita.
+              Tem certeza que deseja excluir{' '}
+              {crud.itemToDelete?.name ? `"${crud.itemToDelete.name}"` : 'este inquilino'}? Esta
+              ação não pode ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -37,7 +37,7 @@ function StatisticCard({
         {icon && <div className="h-5 w-5 text-muted-foreground">{icon}</div>}
       </CardHeader>
       <CardContent>
-        <div className={cn('text-3xl font-bold', valueColor)}>
+        <div className={cn('text-xl sm:text-2xl md:text-3xl font-bold', valueColor)}>
           {prefix}
           {displayValue}
           {suffix}
@@ -77,20 +77,20 @@ export function FinancialSummaryWidget() {
   if (!data) return null;
 
   const getOccupancyColor = (rate: number): string => {
-    if (rate >= 90) return 'text-green-600';
-    if (rate >= 70) return 'text-blue-600';
-    if (rate >= 50) return 'text-orange-500';
-    return 'text-red-600';
+    if (rate >= 90) return 'text-success';
+    if (rate >= 70) return 'text-info';
+    if (rate >= 50) return 'text-warning';
+    return 'text-destructive';
   };
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+    <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
       <StatisticCard
         title="Receita Total"
         value={data.total_income}
         prefix="R$ "
         icon={<DollarSign />}
-        valueColor="text-green-600"
+        valueColor="text-success"
         description="Soma de aluguéis + taxas"
       />
 
@@ -114,7 +114,7 @@ export function FinancialSummaryWidget() {
         title="Apartamentos Vagos"
         value={data.vacant_apartments}
         icon={<AlertTriangle />}
-        valueColor={data.vacant_apartments > 0 ? 'text-orange-500' : 'text-green-600'}
+        valueColor={data.vacant_apartments > 0 ? 'text-warning' : 'text-success'}
         description="Disponíveis para locação"
       />
     </div>

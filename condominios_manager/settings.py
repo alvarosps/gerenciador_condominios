@@ -11,9 +11,14 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 import os
+import platform
+import shutil
+from datetime import timedelta
 from pathlib import Path
 
 from decouple import Csv, config
+
+from .logging_config import LOGGING
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -23,10 +28,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = config("SECRET_KEY", default="django-insecure-b7ya%t^1&z1v#af1mlzjsm*$l9o^zj!h9a3*)tf@2k&z8b*^)h")
+SECRET_KEY = config("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = config("DEBUG", default=True, cast=bool)
+DEBUG = config("DEBUG", default=False, cast=bool)
 
 ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="localhost,127.0.0.1", cast=Csv())
 
@@ -118,23 +123,35 @@ DATABASES = {
 
 # Cache Configuration (Phase 4: Redis Caching)
 # https://docs.djangoproject.com/en/5.0/topics/cache/
-CACHES = {
-    "default": {
-        "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": config("REDIS_URL", default="redis://127.0.0.1:6379/0"),
-        "OPTIONS": {
-            "CLIENT_CLASS": "django_redis.client.DefaultClient",
-            "CONNECTION_POOL_KWARGS": {
-                "max_connections": 50,
-                "retry_on_timeout": True,
+# Set REDIS_URL="" in .env to disable Redis and use in-memory cache
+_redis_url = config("REDIS_URL", default="redis://127.0.0.1:6379/0")
+
+if _redis_url:
+    CACHES = {
+        "default": {
+            "BACKEND": "django_redis.cache.RedisCache",
+            "LOCATION": _redis_url,
+            "OPTIONS": {
+                "CLIENT_CLASS": "django_redis.client.DefaultClient",
+                "CONNECTION_POOL_KWARGS": {
+                    "max_connections": 50,
+                    "retry_on_timeout": True,
+                },
+                "SOCKET_CONNECT_TIMEOUT": 5,  # seconds
+                "SOCKET_TIMEOUT": 5,  # seconds
             },
-            "SOCKET_CONNECT_TIMEOUT": 5,  # seconds
-            "SOCKET_TIMEOUT": 5,  # seconds
-        },
-        "KEY_PREFIX": "condominios",
-        "TIMEOUT": config("CACHE_TIMEOUT", default=300, cast=int),  # 5 minutes default
+            "KEY_PREFIX": "condominios",
+            "TIMEOUT": config("CACHE_TIMEOUT", default=300, cast=int),  # 5 minutes default
+        }
     }
-}
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "condominios-cache",
+            "TIMEOUT": config("CACHE_TIMEOUT", default=300, cast=int),
+        }
+    }
 
 # Cache key versioning for invalidation
 CACHE_MIDDLEWARE_ALIAS = "default"
@@ -209,6 +226,16 @@ REST_FRAMEWORK = {
     "PAGE_SIZE": config("PAGE_SIZE", default=20, cast=int),
     # OpenAPI/Swagger schema generation (Phase 8)
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "100/hour",
+        "user": "1000/hour",
+        "auth": "10/minute",
+        "verification": "5/minute",
+    },
 }
 
 # DRF-Spectacular Settings (Phase 8: OpenAPI/Swagger Documentation)
@@ -249,8 +276,8 @@ SPECTACULAR_SETTINGS = {
     "COMPONENT_SPLIT_REQUEST": True,
     "SCHEMA_PATH_PREFIX": r"/api/",
     "SERVERS": [
-        {"url": "http://localhost:8000", "description": "Local development server"},
-        {"url": "http://localhost:8000/api", "description": "Local API base"},
+        {"url": "http://localhost:8008", "description": "Local development server"},
+        {"url": "http://localhost:8008/api", "description": "Local API base"},
     ],
     # UI customization
     "SWAGGER_UI_SETTINGS": {
@@ -268,16 +295,16 @@ SPECTACULAR_SETTINGS = {
 }
 
 # JWT Settings (djangorestframework-simplejwt)
-from datetime import timedelta
 
 SIMPLE_JWT = {
-    # Token lifetimes - Set to 1 year (365 days) for long-lived sessions
-    # For development/personal use, effectively "never expires"
-    "ACCESS_TOKEN_LIFETIME": timedelta(days=config("JWT_ACCESS_TOKEN_LIFETIME_DAYS", default=365, cast=int)),
-    "REFRESH_TOKEN_LIFETIME": timedelta(days=config("JWT_REFRESH_TOKEN_LIFETIME_DAYS", default=365, cast=int)),
-    # Token refresh settings - Disable rotation to prevent token invalidation issues
-    "ROTATE_REFRESH_TOKENS": config("JWT_ROTATE_REFRESH_TOKENS", default=False, cast=bool),
-    "BLACKLIST_AFTER_ROTATION": config("JWT_BLACKLIST_AFTER_ROTATION", default=False, cast=bool),
+    "ACCESS_TOKEN_LIFETIME": timedelta(
+        minutes=config("JWT_ACCESS_TOKEN_LIFETIME_MINUTES", default=60, cast=int)
+    ),
+    "REFRESH_TOKEN_LIFETIME": timedelta(
+        days=config("JWT_REFRESH_TOKEN_LIFETIME_DAYS", default=7, cast=int)
+    ),
+    "ROTATE_REFRESH_TOKENS": config("JWT_ROTATE_REFRESH_TOKENS", default=True, cast=bool),
+    "BLACKLIST_AFTER_ROTATION": config("JWT_BLACKLIST_AFTER_ROTATION", default=True, cast=bool),
     # Security settings
     "ALGORITHM": config("JWT_ALGORITHM", default="HS256"),
     "SIGNING_KEY": SECRET_KEY,
@@ -295,10 +322,19 @@ SIMPLE_JWT = {
     "SLIDING_TOKEN_REFRESH_LIFETIME": timedelta(days=1),
 }
 
+# Cookie security (only enforce in non-debug mode)
+if not DEBUG:
+    CSRF_COOKIE_SECURE = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_HTTPONLY = True
+
 # Django-allauth Configuration
 ACCOUNT_AUTHENTICATION_METHOD = "username_email"  # Allow login with username or email
 ACCOUNT_EMAIL_REQUIRED = True  # Email is required
-ACCOUNT_EMAIL_VERIFICATION = "optional"  # Email verification optional (can be 'mandatory' in production)
+ACCOUNT_EMAIL_VERIFICATION = (
+    "optional"  # Email verification optional (can be 'mandatory' in production)
+)
 ACCOUNT_USERNAME_REQUIRED = True  # Username is required (Django default User model requires it)
 
 # Allow auto-linking of social accounts to existing users by email
@@ -362,8 +398,6 @@ def _detect_chrome_executable() -> str:
     Raises:
         FileNotFoundError: If no Chrome/Chromium installation is found
     """
-    import platform
-    import shutil
 
     system = platform.system().lower()
 
@@ -384,7 +418,7 @@ def _detect_chrome_executable() -> str:
             "/usr/local/bin/chromium",
             "/opt/homebrew/bin/chromium",
             # User-installed Chrome
-            os.path.expanduser("~/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"),
+            str(Path("~/Applications/Google Chrome.app/Contents/MacOS/Google Chrome").expanduser()),
         ],
         "linux": [
             "/usr/bin/google-chrome",
@@ -403,11 +437,15 @@ def _detect_chrome_executable() -> str:
 
     # Check each path
     for path in paths:
-        if os.path.isfile(path):
+        if Path(path).is_file():
             return path
 
     # Also check PATH environment
-    chrome_in_path = shutil.which("google-chrome") or shutil.which("chromium") or shutil.which("chromium-browser")
+    chrome_in_path = (
+        shutil.which("google-chrome")
+        or shutil.which("chromium")
+        or shutil.which("chromium-browser")
+    )
     if chrome_in_path:
         return chrome_in_path
 
@@ -422,7 +460,7 @@ def _detect_chrome_executable() -> str:
 
 # Chrome path from environment or auto-detected
 _env_chrome_path = config("CHROME_EXECUTABLE_PATH", default="")
-CHROME_EXECUTABLE_PATH = _env_chrome_path if _env_chrome_path else _detect_chrome_executable()
+CHROME_EXECUTABLE_PATH = _env_chrome_path or _detect_chrome_executable()
 PDF_OUTPUT_DIR = config("PDF_OUTPUT_DIR", default="contracts")
 PDF_GENERATION_TIMEOUT = config("PDF_GENERATION_TIMEOUT", default=30, cast=int)
 
@@ -432,6 +470,10 @@ DEFAULT_TAG_FEE_MULTIPLE = config("DEFAULT_TAG_FEE_MULTIPLE", default=80.00, cas
 LATE_FEE_PERCENTAGE = config("LATE_FEE_PERCENTAGE", default=0.05, cast=float)
 DAYS_PER_MONTH = config("DAYS_PER_MONTH", default=30, cast=int)
 
-# Logging Configuration
-# LOGGING is imported and used automatically by Django when present in settings module
-from .logging_config import LOGGING  # noqa: F401
+# Twilio WhatsApp integration settings
+TWILIO_ACCOUNT_SID = config("TWILIO_ACCOUNT_SID", default="")
+TWILIO_AUTH_TOKEN = config("TWILIO_AUTH_TOKEN", default="")
+TWILIO_WHATSAPP_FROM = config("TWILIO_WHATSAPP_FROM", default="")
+TWILIO_TEMPLATE_VERIFICATION = config("TWILIO_TEMPLATE_VERIFICATION", default="")
+TWILIO_TEMPLATE_RENT_ADJUSTMENT = config("TWILIO_TEMPLATE_RENT_ADJUSTMENT", default="")
+TWILIO_TEMPLATE_GENERIC = config("TWILIO_TEMPLATE_GENERIC", default="")

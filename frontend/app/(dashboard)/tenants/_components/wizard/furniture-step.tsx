@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/form';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useFurniture } from '@/lib/api/hooks/use-furniture';
-import { StepProps } from './types';
+import { type StepProps } from './types';
 
 export function FurnitureStep({ formMethods }: StepProps) {
   const { data: furniture } = useFurniture();
@@ -37,11 +37,11 @@ export function FurnitureStep({ formMethods }: StepProps) {
                     <FormItem className="flex flex-row items-start space-x-3 space-y-0">
                       <FormControl>
                         <Checkbox
-                          checked={field.value?.includes(item.id!)}
+                          checked={item.id !== undefined && field.value?.includes(item.id)}
                           onCheckedChange={(checked) => {
-                            const current = field.value || [];
-                            if (checked) {
-                              field.onChange([...current, item.id!]);
+                            const current = field.value ?? [];
+                            if (checked && item.id !== undefined) {
+                              field.onChange([...current, item.id]);
                             } else {
                               field.onChange(
                                 current.filter((id) => id !== item.id)

@@ -1,0 +1,32 @@
+{
+  "expo": {
+    "name": "Condominios Manager",
+    "slug": "condominios-manager",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "condominios",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.condominios.manager"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.condominios.manager"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-notifications",
+      "expo-image-picker",
+      "expo-document-picker",
+      "expo-file-system"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

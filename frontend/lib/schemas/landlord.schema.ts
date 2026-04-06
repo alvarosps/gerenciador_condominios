@@ -14,7 +14,7 @@ export const landlordSchema = z.object({
   cpf_cnpj: z.string().min(1, 'CPF/CNPJ é obrigatório'),
   rg: z.string().nullable().optional(),
   phone: z.string().min(1, 'Telefone é obrigatório'),
-  email: z.union([z.string().email('Email inválido'), z.literal('')]).nullable().optional(),
+  email: z.union([z.email('Email inválido'), z.literal('')]).nullable().optional(),
   street: z.string().min(1, 'Rua é obrigatória'),
   street_number: z.string().min(1, 'Número é obrigatório'),
   complement: z.string().nullable().optional(),
@@ -23,6 +23,12 @@ export const landlordSchema = z.object({
   state: z.string().min(1, 'Estado é obrigatório'),
   zip_code: z.string().min(1, 'CEP é obrigatório'),
   country: z.string().default('Brasil'),
+  rent_adjustment_percentage: z
+    .string()
+    .or(z.number())
+    .transform((val) => Number(val))
+    .optional()
+    .default(0),
   is_active: z.boolean().default(true),
   full_address: z.string().optional(),
   created_at: z.string().optional(),
@@ -42,7 +48,7 @@ export const landlordFormSchema = z.object({
   cpf_cnpj: z.string().min(1, 'CPF/CNPJ é obrigatório'),
   rg: z.string().nullable().optional(),
   phone: z.string().min(1, 'Telefone é obrigatório'),
-  email: z.union([z.string().email('Email inválido'), z.literal('')]).nullable().optional(),
+  email: z.union([z.email('Email inválido'), z.literal('')]).nullable().optional(),
   street: z.string().min(1, 'Rua é obrigatória'),
   street_number: z.string().min(1, 'Número é obrigatório'),
   complement: z.string().nullable().optional(),
@@ -51,6 +57,7 @@ export const landlordFormSchema = z.object({
   state: z.string().min(1, 'Estado é obrigatório'),
   zip_code: z.string().min(1, 'CEP é obrigatório'),
   country: z.string().min(1, 'País é obrigatório'),
+  rent_adjustment_percentage: z.number().min(0, 'Percentual deve ser positivo'),
   is_active: z.boolean(),
 });
 

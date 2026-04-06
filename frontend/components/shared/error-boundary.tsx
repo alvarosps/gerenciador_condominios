@@ -1,6 +1,6 @@
 'use client';
 
-import { Component, ReactNode } from 'react';
+import { Component, type ReactNode } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { AlertTriangle } from 'lucide-react';
@@ -47,7 +47,7 @@ export class ErrorBoundary extends Component<Props, State> {
                 <p>
                   Desculpe, algo deu errado. Por favor, tente recarregar a página.
                 </p>
-                {this.state.error && (
+                {process.env.NODE_ENV === 'development' && this.state.error && (
                   <pre className="overflow-auto rounded-md bg-muted p-3 text-sm font-mono">
                     {this.state.error.message}
                   </pre>

@@ -1,5 +1,6 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
+import { queryKeys } from '../query-keys';
 
 // Dashboard API Response Types - matching backend DashboardService
 
@@ -23,6 +24,7 @@ interface LeaseMetrics {
   contracts_pending: number;
   expiring_soon: number;
   expired_leases: number;
+  avg_validity_months: number;
 }
 
 interface BuildingStatistic {
@@ -44,6 +46,7 @@ interface LateLeaseInfo {
   due_day: number;
   late_days: number;
   late_fee: string;
+  last_payment_date: string | null;
 }
 
 interface LatePaymentSummary {
@@ -62,8 +65,11 @@ interface TenantStatistics {
   total_tenants: number;
   individual_tenants: number;
   company_tenants: number;
+  person_tenants: number;
   tenants_with_dependents: number;
+  tenants_with_furniture: number;
   total_dependents: number;
+  avg_dependents: number;
   marital_status_distribution: MaritalStatusDistribution[];
 }
 
@@ -73,7 +79,7 @@ interface TenantStatistics {
  */
 export function useDashboardFinancialSummary() {
   return useQuery({
-    queryKey: ['dashboard', 'financial_summary'],
+    queryKey: queryKeys.dashboard.financialSummary(),
     queryFn: async () => {
       const { data } = await apiClient.get<FinancialSummary>(
         '/dashboard/financial_summary/'
@@ -91,7 +97,7 @@ export function useDashboardFinancialSummary() {
  */
 export function useDashboardLeaseMetrics() {
   return useQuery({
-    queryKey: ['dashboard', 'lease_metrics'],
+    queryKey: queryKeys.dashboard.leaseMetrics(),
     queryFn: async () => {
       const { data } = await apiClient.get<LeaseMetrics>('/dashboard/lease_metrics/');
       return data;
@@ -107,7 +113,7 @@ export function useDashboardLeaseMetrics() {
  */
 export function useDashboardBuildingStatistics() {
   return useQuery({
-    queryKey: ['dashboard', 'building_statistics'],
+    queryKey: queryKeys.dashboard.buildingStatistics(),
     queryFn: async () => {
       const { data } = await apiClient.get<BuildingStatistic[]>(
         '/dashboard/building_statistics/'
@@ -121,11 +127,11 @@ export function useDashboardBuildingStatistics() {
 
 /**
  * Hook to fetch late payment summary
- * Returns summary and list of late payments
+ * Returns list of late payment records
  */
 export function useDashboardLatePayments() {
   return useQuery({
-    queryKey: ['dashboard', 'late_payment_summary'],
+    queryKey: queryKeys.dashboard.latePaymentSummary(),
     queryFn: async () => {
       const { data } = await apiClient.get<LatePaymentSummary>(
         '/dashboard/late_payment_summary/'
@@ -137,12 +143,31 @@ export function useDashboardLatePayments() {
 }
 
 /**
+ * Hook to mark rent as paid for a lease in the current month
+ */
+export function useMarkRentPaid() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (leaseId: number) => {
+      const { data } = await apiClient.post<{ message: string }>(
+        '/dashboard/mark_rent_paid/',
+        { lease_id: leaseId }
+      );
+      return data;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.latePaymentSummary() });
+    },
+  });
+}
+
+/**
  * Hook to fetch tenant statistics
  * Returns statistics about tenants (dependents, type, marital status)
  */
 export function useDashboardTenantStatistics() {
   return useQuery({
-    queryKey: ['dashboard', 'tenant_statistics'],
+    queryKey: queryKeys.dashboard.tenantStatistics(),
     queryFn: async () => {
       const { data } = await apiClient.get<TenantStatistics>(
         '/dashboard/tenant_statistics/'
