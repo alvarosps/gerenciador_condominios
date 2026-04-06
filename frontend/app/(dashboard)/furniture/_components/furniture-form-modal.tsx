@@ -28,6 +28,7 @@ import {
   useUpdateFurniture,
 } from '@/lib/api/hooks/use-furniture';
 import { type Furniture } from '@/lib/schemas/furniture.schema';
+import { handleError } from '@/lib/utils/error-handler';
 
 interface FurnitureFormModalProps {
   open: boolean;
@@ -83,7 +84,7 @@ export function FurnitureFormModal({
       formMethods.reset();
     } catch (error) {
       toast.error('Erro ao salvar móvel');
-      console.error('Save error:', error);
+      handleError(error, 'FurnitureFormModal.onSubmit');
     }
   };
 

@@ -13,6 +13,7 @@ import {
   useExpenseDetail,
 } from '@/lib/api/hooks/use-financial-dashboard';
 import type { ExpenseDetailItem } from '@/lib/api/hooks/use-financial-dashboard';
+import { queryKeys } from '@/lib/api/query-keys';
 import { useMarkInstallmentPaid } from '@/lib/api/hooks/use-expense-installments';
 import { useMarkExpensePaid } from '@/lib/api/hooks/use-expenses';
 import { formatMonthYear, getDefaultExpenseDate, MONTH_ABBR } from '@/lib/utils/formatters';
@@ -95,8 +96,8 @@ function ExpenseDetailContent() {
   };
 
   const handleSaved = async () => {
-    await queryClient.invalidateQueries({ queryKey: ['financial-dashboard'] });
-    await queryClient.invalidateQueries({ queryKey: ['expenses'] });
+    await queryClient.invalidateQueries({ queryKey: queryKeys.financialDashboard.all });
+    await queryClient.invalidateQueries({ queryKey: queryKeys.expenses.all });
   };
 
   const handleDelete = async () => {
@@ -108,8 +109,8 @@ function ExpenseDetailContent() {
       toast.error('Erro ao excluir despesa');
     } finally {
       setDeleteTarget(null);
-      await queryClient.invalidateQueries({ queryKey: ['financial-dashboard'] });
-      await queryClient.invalidateQueries({ queryKey: ['expenses'] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.financialDashboard.all });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.expenses.all });
     }
   };
 

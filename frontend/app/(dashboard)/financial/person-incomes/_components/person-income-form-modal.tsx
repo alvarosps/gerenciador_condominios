@@ -40,6 +40,7 @@ import { useApartments } from '@/lib/api/hooks/use-apartments';
 import { useLeases } from '@/lib/api/hooks/use-leases';
 import type { PersonIncome } from '@/lib/schemas/person-income.schema';
 import { formatCurrency } from '@/lib/utils/formatters';
+import { handleError } from '@/lib/utils/error-handler';
 
 interface Props {
   open: boolean;
@@ -150,7 +151,7 @@ export function PersonIncomeFormModal({ open, personIncome, onClose }: Props) {
       form.reset();
     } catch (error) {
       toast.error('Erro ao salvar rendimento');
-      console.error('Save error:', error);
+      handleError(error, 'PersonIncomeFormModal.onSubmit');
     }
   };
 

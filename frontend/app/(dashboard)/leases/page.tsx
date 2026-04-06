@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -258,9 +258,11 @@ export default function LeasesPage() {
     ]
   );
 
-  if (error) {
-    toast.error('Erro ao carregar locações');
-  }
+  useEffect(() => {
+    if (error) {
+      toast.error('Erro ao carregar locações');
+    }
+  }, [error]);
 
   return (
     <div>

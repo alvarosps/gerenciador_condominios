@@ -14,6 +14,7 @@ import {
 import { useDailyBreakdown } from '@/lib/api/hooks/use-daily-control';
 import { usePersons } from '@/lib/api/hooks/use-persons';
 import { useBuildings } from '@/lib/api/hooks/use-buildings';
+import { queryKeys } from '@/lib/api/query-keys';
 import { useAuthStore } from '@/store/auth-store';
 import { getDefaultExpenseDate, MONTH_ABBR, MONTH_NAMES } from '@/lib/utils/formatters';
 import { DailySummaryCards } from './_components/daily-summary-cards';
@@ -41,7 +42,7 @@ export default function DailyControlPage() {
   const nextMonthAbbr = MONTH_ABBR[nextMonth - 1] ?? '';
 
   const handleExpenseSaved = useCallback(() => {
-    void queryClient.invalidateQueries({ queryKey: ['daily-control'] });
+    void queryClient.invalidateQueries({ queryKey: queryKeys.dailyControl.all });
   }, [queryClient]);
 
   const [filters, setFilters] = useState<DailyFilters>({

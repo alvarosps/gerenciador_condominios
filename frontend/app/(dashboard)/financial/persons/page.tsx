@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
@@ -110,9 +111,11 @@ export default function PersonsPage() {
     },
   ];
 
-  if (error) {
-    toast.error('Erro ao carregar pessoas');
-  }
+  useEffect(() => {
+    if (error) {
+      toast.error('Erro ao carregar pessoas');
+    }
+  }, [error]);
 
   return (
     <div>

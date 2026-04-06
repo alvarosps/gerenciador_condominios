@@ -37,6 +37,7 @@ import { useCreateApartment, useUpdateApartment } from '@/lib/api/hooks/use-apar
 import { useBuildings } from '@/lib/api/hooks/use-buildings';
 import { useFurniture } from '@/lib/api/hooks/use-furniture';
 import { type Apartment } from '@/lib/schemas/apartment.schema';
+import { handleError } from '@/lib/utils/error-handler';
 
 interface Props {
   open: boolean;
@@ -122,7 +123,7 @@ export function ApartmentFormModal({ open, apartment, onClose }: Props) {
       formMethods.reset();
     } catch (error) {
       toast.error('Erro ao salvar apartamento');
-      console.error('Save error:', error);
+      handleError(error, 'ApartmentFormModal.onSubmit');
     }
   };
 

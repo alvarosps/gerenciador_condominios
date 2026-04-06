@@ -9,7 +9,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { formatBrazilianPhone } from '@/lib/utils/formatters';
+import { formatPhone } from '@/lib/utils/formatters';
 import { type StepProps } from './types';
 
 export function ContactInfoStep({ formMethods }: StepProps) {
@@ -30,7 +30,7 @@ export function ContactInfoStep({ formMethods }: StepProps) {
                   className="pl-10"
                   {...field}
                   onChange={(e) => {
-                    const formatted = formatBrazilianPhone(e.target.value);
+                    const formatted = formatPhone(e.target.value);
                     field.onChange(formatted);
                   }}
                 />
@@ -56,7 +56,7 @@ export function ContactInfoStep({ formMethods }: StepProps) {
                   className="pl-10"
                   {...field}
                   onChange={(e) => {
-                    const formatted = formatBrazilianPhone(e.target.value);
+                    const formatted = formatPhone(e.target.value);
                     field.onChange(formatted);
                   }}
                 />

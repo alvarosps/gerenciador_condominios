@@ -17,6 +17,7 @@ import { toast } from 'sonner';
 import { useChangeDueDate } from '@/lib/api/hooks/use-leases';
 import { type Lease } from '@/lib/schemas/lease.schema';
 import { formatCurrency, formatDate } from '@/lib/utils/formatters';
+import { handleError } from '@/lib/utils/error-handler';
 
 interface Props {
   open: boolean;
@@ -61,7 +62,7 @@ export function DueDateModal({ open, lease, onClose }: Props) {
       toast.success(data.message || 'Data de vencimento alterada com sucesso!');
     } catch (error) {
       toast.error('Erro ao alterar data de vencimento');
-      console.error('Due date change error:', error);
+      handleError(error, 'DueDateModal.handleChange');
     }
   };
 

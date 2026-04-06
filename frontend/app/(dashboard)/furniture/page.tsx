@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
@@ -97,9 +98,11 @@ export default function FurniturePage() {
     },
   ];
 
-  if (error) {
-    toast.error('Erro ao carregar móveis');
-  }
+  useEffect(() => {
+    if (error) {
+      toast.error('Erro ao carregar móveis');
+    }
+  }, [error]);
 
   return (
     <div>

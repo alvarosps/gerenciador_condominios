@@ -37,6 +37,7 @@ import {
 } from '@/lib/api/hooks/use-persons';
 import { type Person } from '@/lib/schemas/person.schema';
 import { CreditCardSection } from './credit-card-section';
+import { handleError } from '@/lib/utils/error-handler';
 
 interface PersonFormModalProps {
   open: boolean;
@@ -121,7 +122,7 @@ export function PersonFormModal({ open, person, onClose }: PersonFormModalProps)
       formMethods.reset();
     } catch (error) {
       toast.error('Erro ao salvar pessoa');
-      console.error('Save error:', error);
+      handleError(error, 'PersonFormModal.onSubmit');
     }
   };
 

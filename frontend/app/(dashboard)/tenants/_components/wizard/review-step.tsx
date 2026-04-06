@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useFurniture } from '@/lib/api/hooks/use-furniture';
-import { formatCPFOrCNPJ, formatBrazilianPhone } from '@/lib/utils/formatters';
+import { formatCpfCnpj, formatPhone } from '@/lib/utils/formatters';
 import { type StepProps } from './types';
 
 export function ReviewStep({ formMethods }: StepProps) {
@@ -32,7 +32,7 @@ export function ReviewStep({ formMethods }: StepProps) {
               {values.is_company ? 'Pessoa Jurídica' : 'Pessoa Física'}
             </div>
             <div>
-              <strong>CPF/CNPJ:</strong> {formatCPFOrCNPJ(values.cpf_cnpj || '')}
+              <strong>CPF/CNPJ:</strong> {formatCpfCnpj(values.cpf_cnpj || '')}
             </div>
           </div>
         </CardContent>
@@ -45,12 +45,12 @@ export function ReviewStep({ formMethods }: StepProps) {
         <CardContent>
           <div className="space-y-2 text-sm">
             <div>
-              <strong>Telefone:</strong> {formatBrazilianPhone(values.phone || '')}
+              <strong>Telefone:</strong> {formatPhone(values.phone || '')}
             </div>
             {values.phone_alternate && (
               <div>
                 <strong>Tel. Alternativo:</strong>{' '}
-                {formatBrazilianPhone(values.phone_alternate)}
+                {formatPhone(values.phone_alternate)}
               </div>
             )}
             {values.email && (
@@ -94,7 +94,7 @@ export function ReviewStep({ formMethods }: StepProps) {
                       <strong>{dep.name}</strong>
                     </div>
                     <div className="text-muted-foreground">
-                      {formatBrazilianPhone(dep.phone)}
+                      {formatPhone(dep.phone)}
                     </div>
                   </div>
                 )

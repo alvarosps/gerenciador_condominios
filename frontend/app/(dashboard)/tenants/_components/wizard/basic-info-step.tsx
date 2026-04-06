@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { formatCPFOrCNPJ } from '@/lib/utils/formatters';
+import { formatCpfCnpj } from '@/lib/utils/formatters';
 import { type StepProps } from './types';
 
 export function BasicInfoStep({ formMethods }: StepProps) {
@@ -86,7 +86,7 @@ export function BasicInfoStep({ formMethods }: StepProps) {
                 maxLength={18}
                 {...field}
                 onChange={(e) => {
-                  const formatted = formatCPFOrCNPJ(e.target.value);
+                  const formatted = formatCpfCnpj(e.target.value);
                   field.onChange(formatted);
                 }}
               />

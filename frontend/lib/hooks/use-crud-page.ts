@@ -3,6 +3,7 @@ import { type UseMutationResult } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useExport } from './use-export';
 import { useBulkOperations } from './use-bulk-operations';
+import { handleError } from '@/lib/utils/error-handler';
 
 /**
  * Export column definition
@@ -219,7 +220,7 @@ export function useCrudPage<T extends { id?: number }>({
       const message = deleteErrorMessage ?? `Erro ao excluir ${entityName}. Verifique se não há dependências vinculadas.`;
       toast.error(message);
       onDeleteError?.(error as Error);
-      console.error('Delete error:', error);
+      handleError(error, 'useCrudPage.handleDelete');
     }
   }, [deleteId, deleteMutation, entityName, deleteErrorMessage, onDeleteSuccess, onDeleteError]);
 
@@ -235,7 +236,7 @@ export function useCrudPage<T extends { id?: number }>({
       bulkOps.clearSelection();
     } catch (error) {
       toast.error(`Erro ao excluir ${entityNamePlural}`);
-      console.error('Bulk delete error:', error);
+      handleError(error, 'useCrudPage.handleBulkDelete');
     }
   }, [bulkDeleteMutation, bulkOps, entityNamePlural]);
 
@@ -267,7 +268,7 @@ export function useCrudPage<T extends { id?: number }>({
         }
       } catch (error) {
         toast.error('Erro ao exportar arquivo');
-        console.error('Export error:', error);
+        handleError(error, 'useCrudPage.handleExport');
       }
     },
     [exportColumns, exportFilename, exportSheetName, entityNamePlural, exportToExcel, exportToCSV]

@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
@@ -102,9 +103,11 @@ export default function BuildingsPage() {
     },
   ];
 
-  if (error) {
-    toast.error('Erro ao carregar prédios');
-  }
+  useEffect(() => {
+    if (error) {
+      toast.error('Erro ao carregar prédios');
+    }
+  }, [error]);
 
   return (
     <div>
