@@ -117,6 +117,7 @@ DATABASES = {
         "PASSWORD": config("DB_PASSWORD", default="postgres"),
         "HOST": config("DB_HOST", default="localhost"),
         "PORT": config("DB_PORT", default="5432"),
+        "CONN_MAX_AGE": config("DB_CONN_MAX_AGE", default=600, cast=int),
     }
 }
 
@@ -324,10 +325,25 @@ SIMPLE_JWT = {
 
 # Cookie security (only enforce in non-debug mode)
 if not DEBUG:
+    # Cookie security
     CSRF_COOKIE_SECURE = True
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_HTTPONLY = True
     SESSION_COOKIE_HTTPONLY = True
+
+    # HSTS — tell browsers to always use HTTPS (1 year)
+    SECURE_HSTS_SECONDS = 31_536_000
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+
+    # Redirect HTTP → HTTPS
+    SECURE_SSL_REDIRECT = True
+
+    # Prevent MIME type sniffing
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+
+    # Clickjacking protection
+    X_FRAME_OPTIONS = "DENY"
 
 # Django-allauth Configuration
 ACCOUNT_AUTHENTICATION_METHOD = "username_email"  # Allow login with username or email

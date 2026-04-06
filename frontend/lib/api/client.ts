@@ -2,8 +2,11 @@ import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios';
 
 let refreshPromise: Promise<string> | null = null;
 
+const REQUEST_TIMEOUT_MS = 30_000;
+
 export const apiClient = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8008/api',
+  timeout: REQUEST_TIMEOUT_MS,
   headers: {
     'Content-Type': 'application/json',
   },
