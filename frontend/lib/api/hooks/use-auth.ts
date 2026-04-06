@@ -31,6 +31,15 @@ export interface AuthResponse {
 }
 
 /**
+ * Registration response from backend — includes tokens and user profile
+ */
+export interface RegisterResponse {
+  access: string;
+  refresh: string;
+  user: User;
+}
+
+/**
  * Token refresh response
  */
 export interface RefreshTokenResponse {
@@ -68,13 +77,25 @@ export function useLogin() {
 }
 
 /**
- * Hook for user registration
+ * Hook for user registration — creates account and immediately authenticates the user
  */
 export function useRegister() {
+  const setAuth = useAuthStore((state) => state.setAuth);
+
   return useMutation({
     mutationFn: async (registerData: RegisterData) => {
-      const { data } = await apiClient.post<AuthResponse>('/auth/register/', registerData);
+      const { data } = await apiClient.post<RegisterResponse>('/auth/register/', registerData);
+
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('access_token', data.access);
+        localStorage.setItem('refresh_token', data.refresh);
+        document.cookie = 'is_authenticated=1; path=/; max-age=3600; SameSite=Lax';
+      }
+
       return data;
+    },
+    onSuccess: (data) => {
+      setAuth(data.access, data.refresh, data.user);
     },
   });
 }

@@ -439,6 +439,7 @@ const authHandlers = [
           email: data.email,
           first_name: data.first_name,
           last_name: data.last_name,
+          is_staff: false,
         },
       },
       { status: 201 }

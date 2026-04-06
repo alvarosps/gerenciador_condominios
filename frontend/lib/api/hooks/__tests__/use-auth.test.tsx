@@ -86,6 +86,39 @@ describe('useAuth hooks', () => {
 
       await waitFor(() => expect(result.current.isError).toBe(true), { timeout: 5000 });
     });
+
+    it('should store auth state on successful registration', async () => {
+      // Set a valid href so MSW can resolve the request URL when intercepting
+      window.location.href = 'http://localhost:4000/register';
+
+      const { result } = renderHook(() => useRegister(), {
+        wrapper: createWrapper(),
+      });
+
+      result.current.mutate({
+        email: 'newuser@example.com',
+        password: 'Password123!',
+        password2: 'Password123!',
+        first_name: 'New',
+        last_name: 'User',
+      });
+
+      // Wait for mutation to settle
+      await waitFor(
+        () => {
+          expect(result.current.isIdle).toBe(false);
+          expect(result.current.isPending).toBe(false);
+        },
+        { timeout: 5000 },
+      );
+
+      expect(result.current.isSuccess).toBe(true);
+      const storeState = useAuthStore.getState();
+      expect(storeState.isAuthenticated).toBe(true);
+      expect(storeState.token).toBe('mock-access-token-12345');
+      expect(storeState.refreshToken).toBe('mock-refresh-token-67890');
+      expect(storeState.user?.email).toBe('newuser@example.com');
+    });
   });
 
   describe('useRefreshToken', () => {
