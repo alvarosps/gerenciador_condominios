@@ -13,8 +13,6 @@ Usage:
     pdf_path = generator.generate_pdf(html_content, output_path)
 """
 
-from __future__ import annotations
-
 import logging
 import tempfile
 from abc import ABC, abstractmethod

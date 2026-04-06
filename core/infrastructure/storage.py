@@ -20,14 +20,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import cast
 
-# Try to import boto3 for S3 support (optional dependency)
-try:
-    import boto3
-
-    HAS_BOTO3 = True
-except ImportError:
-    boto3 = None
-    HAS_BOTO3 = False
+import boto3
 
 logger = logging.getLogger(__name__)
 
@@ -311,10 +304,6 @@ class S3DocumentStorage(IDocumentStorage):
             aws_access_key_id: AWS access key (optional, uses IAM role if not provided)
             aws_secret_access_key: AWS secret key (optional)
         """
-        if not HAS_BOTO3:
-            msg = "boto3 not installed. Install with: pip install boto3"
-            raise StorageError(msg)
-
         self.bucket_name = bucket_name
         self.region = region
 
