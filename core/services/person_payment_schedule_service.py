@@ -19,15 +19,9 @@ from core.models import (
     PersonPayment,
     PersonPaymentSchedule,
 )
+from core.services.date_calculator import DateCalculatorService
 
-MONTHS_IN_YEAR = 12
 MAX_DAY_OF_MONTH = 31
-
-
-def _next_month_start(year: int, month: int) -> date:
-    if month == MONTHS_IN_YEAR:
-        return date(year + 1, 1, 1)
-    return date(year, month + 1, 1)
 
 
 def _sum_person_expenses(
@@ -88,7 +82,7 @@ class PersonPaymentScheduleService:
     def get_person_month_total(person_id: int, year: int, month: int) -> dict[str, Decimal]:
         """Calculate total due, scheduled, paid, and pending amounts for a person in a month."""
         month_start = date(year, month, 1)
-        next_month_start = _next_month_start(year, month)
+        next_month_start = DateCalculatorService.next_month_start(year, month)
 
         total_due = _sum_person_expenses(person_id, month_start, next_month_start, is_offset=False)
         total_offsets = _sum_person_expenses(

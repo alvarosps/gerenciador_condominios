@@ -31,16 +31,10 @@ from core.models import (
     PersonPayment,
     RentPayment,
 )
+from core.services.date_calculator import DateCalculatorService
 
 MONTHS_IN_YEAR = 12
 UTILITY_LOOKBACK_MONTHS = 3
-
-
-def _next_month_start(year: int, month: int) -> date:
-    """Return the first day of the month following (year, month)."""
-    if month == MONTHS_IN_YEAR:
-        return date(year + 1, 1, 1)
-    return date(year, month + 1, 1)
 
 
 class CashFlowService:
@@ -95,7 +89,7 @@ class CashFlowService:
 
         # Extra income: received in the month + recurring projections
         month_start = date(year, month, 1)
-        next_month = _next_month_start(year, month)
+        next_month = DateCalculatorService.next_month_start(year, month)
 
         # One-time/non-recurring income received this month
         received_income = Income.objects.filter(
@@ -417,7 +411,7 @@ class CashFlowService:
     def get_monthly_expenses(year: int, month: int) -> dict[str, Any]:
         """Calculate expenses for a given month across all 10 categories."""
         month_start = date(year, month, 1)
-        next_month = _next_month_start(year, month)
+        next_month = DateCalculatorService.next_month_start(year, month)
 
         skipped_expense_ids: set[int] = set(
             ExpenseMonthSkip.objects.filter(
@@ -674,7 +668,7 @@ class CashFlowService:
     def _get_projected_expenses(year: int, month: int) -> Decimal:
         """Calculate projected expenses for a future month."""
         month_start = date(year, month, 1)
-        next_month = _next_month_start(year, month)
+        next_month = DateCalculatorService.next_month_start(year, month)
 
         total = Decimal("0.00")
 
@@ -772,7 +766,7 @@ class CashFlowService:
         month_filters = Q()
         for y, m in months_seen:
             m_start = date(y, m, 1)
-            m_end = _next_month_start(y, m)
+            m_end = DateCalculatorService.next_month_start(y, m)
             month_filters |= Q(expense_date__gte=m_start, expense_date__lt=m_end)
 
         monthly_totals: Decimal = (
@@ -797,7 +791,7 @@ class CashFlowService:
         person = Person.objects.get(pk=person_id)
 
         month_start = date(year, month, 1)
-        next_month = _next_month_start(year, month)
+        next_month = DateCalculatorService.next_month_start(year, month)
 
         skipped_expense_ids: set[int] = set(
             ExpenseMonthSkip.objects.filter(

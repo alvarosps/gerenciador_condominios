@@ -33,15 +33,9 @@ from core.models import (
 )
 
 from .cash_flow_service import MONTHS_IN_YEAR, CashFlowService
+from .date_calculator import DateCalculatorService
 
 MAX_BREAK_EVEN_MONTHS = 60
-
-
-def _next_month_start(year: int, month: int) -> date:
-    """Return the first day of the month following (year, month)."""
-    if month == MONTHS_IN_YEAR:
-        return date(year + 1, 1, 1)
-    return date(year, month + 1, 1)
 
 
 def _resolve_building_label(building: Building | None, description: str) -> str:
@@ -81,7 +75,7 @@ class FinancialDashboardService:
 
         # Monthly obligations estimate: installments due this month (unpaid, excluding offsets)
         month_start = date(year, month, 1)
-        next_month = _next_month_start(year, month)
+        next_month = DateCalculatorService.next_month_start(year, month)
 
         total_monthly_obligations = ExpenseInstallment.objects.filter(
             due_date__gte=month_start,
@@ -132,7 +126,7 @@ class FinancialDashboardService:
         """Return debt breakdown per person: card debt, loan debt, monthly amounts."""
         today = timezone.now().date()
         month_start = date(today.year, today.month, 1)
-        next_month = _next_month_start(today.year, today.month)
+        next_month = DateCalculatorService.next_month_start(today.year, today.month)
 
         # Get persons who have expenses with installments
         persons_with_expenses = Person.objects.filter(
@@ -327,7 +321,7 @@ class FinancialDashboardService:
         in the month the payment is actually due rather than when the expense was recorded.
         """
         month_start = date(year, month, 1)
-        next_month = _next_month_start(year, month)
+        next_month = DateCalculatorService.next_month_start(year, month)
 
         # Direct expenses: not installment-based, use expense_date
         direct_expenses = (
@@ -414,7 +408,7 @@ class FinancialDashboardService:
     def get_dashboard_summary(year: int, month: int) -> dict[str, Any]:
         """Return consolidated dashboard summary: income breakdown, expense by person, and balance."""
         month_start = date(year, month, 1)
-        next_month = _next_month_start(year, month)
+        next_month = DateCalculatorService.next_month_start(year, month)
 
         skipped_expense_ids: set[int] = set(
             ExpenseMonthSkip.objects.filter(
@@ -501,7 +495,7 @@ class FinancialDashboardService:
             month_data.append(initial_balance_entry)
         for y, m in months:
             month_start = date(y, m, 1)
-            next_m = _next_month_start(y, m)
+            next_m = DateCalculatorService.next_month_start(y, m)
             expense_total = FinancialDashboardService._calc_person_expense_total(
                 person, month_start, next_m
             )
@@ -848,7 +842,7 @@ class FinancialDashboardService:
         month_start: date,
     ) -> tuple[Decimal, list[dict[str, Any]]]:
         """Collect recurring and one-time extra incomes for the month."""
-        next_month = _next_month_start(month_start.year, month_start.month)
+        next_month = DateCalculatorService.next_month_start(month_start.year, month_start.month)
         extra_incomes: list[dict[str, Any]] = []
         extra_income_total = Decimal("0.00")
 
@@ -1809,7 +1803,7 @@ class FinancialDashboardService:
           "employee"     — employee salary payments
         """
         month_start = date(year, month, 1)
-        next_month = _next_month_start(year, month)
+        next_month = DateCalculatorService.next_month_start(year, month)
 
         dispatch: dict[str, Callable[[], dict[str, Any]]] = {
             "person": lambda: FinancialDashboardService._detail_person(
@@ -2035,7 +2029,7 @@ class FinancialDashboardService:
         fixed_expenses. Also returns aggregation by category with percentages.
         """
         month_start = date(year, month, 1)
-        next_month = _next_month_start(year, month)
+        next_month = DateCalculatorService.next_month_start(year, month)
 
         skipped_expense_ids: set[int] = set(
             ExpenseMonthSkip.objects.filter(
