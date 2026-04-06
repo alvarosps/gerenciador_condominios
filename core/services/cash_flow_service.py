@@ -165,6 +165,8 @@ class CashFlowService:
                 apartment__owner__isnull=False,
             )
             .filter(start_date__lte=month_start)
+            .exclude(prepaid_until__gte=month_start)
+            .exclude(is_salary_offset=True)
             .select_related("apartment", "apartment__owner", "apartment__building")
         )
 
@@ -676,22 +678,31 @@ class CashFlowService:
 
         total = Decimal("0.00")
 
-        # Owner repayments
+        # Owner repayments — exclude prepaid and salary-offset leases
         owner_total = Decimal("0.00")
-        owner_leases = Lease.objects.filter(
-            apartment__is_rented=True,
-            apartment__owner__isnull=False,
+        owner_leases = (
+            Lease.objects.filter(
+                apartment__is_rented=True,
+                apartment__owner__isnull=False,
+            )
+            .exclude(prepaid_until__gte=month_start)
+            .exclude(is_salary_offset=True)
         )
         for lease in owner_leases:
             owner_total += lease.rental_value
         total += owner_total
 
-        # Person stipends
-        stipend_total: Decimal = PersonIncome.objects.filter(
-            income_type=PersonIncomeType.FIXED_STIPEND,
-            is_active=True,
-            fixed_amount__isnull=False,
-        ).aggregate(total=Coalesce(Sum("fixed_amount"), Decimal("0.00")))["total"]
+        # Person stipends — filter to active range only (same logic as _collect_person_stipends)
+        stipend_total: Decimal = (
+            PersonIncome.objects.filter(
+                income_type=PersonIncomeType.FIXED_STIPEND,
+                is_active=True,
+                fixed_amount__isnull=False,
+                start_date__lte=month_start,
+            )
+            .exclude(end_date__lt=month_start)
+            .aggregate(total=Coalesce(Sum("fixed_amount"), Decimal("0.00")))["total"]
+        )
         total += stipend_total
 
         # Known installments (card, loan, debt, property_tax) with due_date in month
@@ -815,12 +826,13 @@ class CashFlowService:
                     }
                 )
 
-        # Receives: fixed stipends
+        # Receives: fixed stipends — filter to active range only
         stipends = PersonIncome.objects.filter(
             person=person,
             income_type=PersonIncomeType.FIXED_STIPEND,
             is_active=True,
-        )
+            start_date__lte=month_start,
+        ).exclude(end_date__lt=month_start)
         for stipend in stipends:
             amount = stipend.fixed_amount or Decimal("0.00")
             receives += amount

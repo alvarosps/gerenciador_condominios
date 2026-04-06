@@ -320,54 +320,94 @@ class FinancialDashboardService:
     @staticmethod
     @cache_result(timeout=120, key_prefix="financial-dashboard-category")
     def get_expense_category_breakdown(year: int, month: int) -> list[dict[str, Any]]:
-        """Return expense totals grouped by category for a given month."""
+        """Return expense totals grouped by category for a given month.
+
+        Direct expenses (not installment-based) are bucketed by expense_date.
+        Installment expenses are bucketed by the installment due_date so they appear
+        in the month the payment is actually due rather than when the expense was recorded.
+        """
         month_start = date(year, month, 1)
         next_month = _next_month_start(year, month)
 
-        expenses_in_month = Expense.objects.filter(
-            expense_date__gte=month_start,
-            expense_date__lt=next_month,
-            is_offset=False,
+        # Direct expenses: not installment-based, use expense_date
+        direct_expenses = (
+            Expense.objects.filter(
+                expense_date__gte=month_start,
+                expense_date__lt=next_month,
+                is_offset=False,
+                is_installment=False,
+            )
+            .values("category__id", "category__name", "category__color")
+            .annotate(
+                total=Coalesce(Sum("total_amount"), Decimal("0.00")),
+                count=Count("id"),
+            )
         )
 
-        # Get grand total for percentage calculation
-        grand_total = expenses_in_month.aggregate(
-            total=Coalesce(Sum("total_amount"), Decimal("0.00"))
-        )["total"]
+        # Installment amounts: use the installment due_date
+        installment_expenses = (
+            ExpenseInstallment.objects.filter(
+                due_date__gte=month_start,
+                due_date__lt=next_month,
+                expense__is_offset=False,
+            )
+            .values(
+                "expense__category__id",
+                "expense__category__name",
+                "expense__category__color",
+            )
+            .annotate(
+                total=Coalesce(Sum("amount"), Decimal("0.00")),
+                count=Count("expense__id", distinct=True),
+            )
+        )
+
+        # Merge both result sets by category key
+        category_map: dict[int | None, dict[str, Any]] = {}
+
+        for item in direct_expenses:
+            key = item["category__id"]
+            category_map[key] = {
+                "category_id": key,
+                "category_name": item["category__name"] or "Sem Categoria",
+                "color": item["category__color"] or "#6B7280",
+                "total": item["total"],
+                "count": item["count"],
+            }
+
+        for item in installment_expenses:
+            key = item["expense__category__id"]
+            if key in category_map:
+                category_map[key]["total"] += item["total"]
+                category_map[key]["count"] += item["count"]
+            else:
+                category_map[key] = {
+                    "category_id": key,
+                    "category_name": item["expense__category__name"] or "Sem Categoria",
+                    "color": item["expense__category__color"] or "#6B7280",
+                    "total": item["total"],
+                    "count": item["count"],
+                }
+
+        if not category_map:
+            return []
+
+        grand_total = sum((entry["total"] for entry in category_map.values()), Decimal("0.00"))
 
         if grand_total == Decimal("0.00"):
             return []
 
-        # Group by category
-        category_data = (
-            expenses_in_month.values("category__id", "category__name", "category__color")
-            .annotate(
-                total=Sum("total_amount"),
-                count=Count("id"),
-            )
-            .order_by("-total")
-        )
-
-        result = []
-        for item in category_data:
-            category_id = item["category__id"]
-            category_name = item["category__name"] or "Sem Categoria"
-            color = item["category__color"] or "#6B7280"
-            total = item["total"]
-            percentage = float(total / grand_total * 100)
-
-            result.append(
-                {
-                    "category_id": category_id,
-                    "category_name": category_name,
-                    "color": color,
-                    "total": total,
-                    "percentage": round(percentage, 2),
-                    "count": item["count"],
-                }
-            )
-
-        return result
+        return [
+            {
+                "category_id": entry["category_id"],
+                "category_name": entry["category_name"],
+                "color": entry["color"],
+                "total": entry["total"],
+                "percentage": round(float(entry["total"] / grand_total * 100), 2),
+                "count": entry["count"],
+            }
+            for entry in sorted(category_map.values(), key=lambda x: x["total"], reverse=True)
+        ]
 
     @staticmethod
     @cache_result(timeout=120, key_prefix="financial-dashboard-summary")
