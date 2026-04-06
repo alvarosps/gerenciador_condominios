@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loading } from '@/components/shared/loading';
 import { useDashboardFinancialSummary } from '@/lib/api/hooks/use-dashboard';
+import { formatCurrency } from '@/lib/utils/formatters';
 import { cn } from '@/lib/utils';
 
 interface StatisticCardProps {
@@ -26,9 +27,7 @@ function StatisticCard({
   valueColor,
   description,
 }: StatisticCardProps) {
-  // Handle both number and string values (backend returns Decimal as string)
-  const numValue = typeof value === 'string' ? parseFloat(value) : value;
-  const displayValue = isNaN(numValue) ? '0.00' : numValue.toFixed(2);
+  const displayValue = typeof value === 'string' ? value : String(value);
 
   return (
     <Card className="hover:shadow-md transition-shadow">
@@ -87,8 +86,7 @@ export function FinancialSummaryWidget() {
     <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
       <StatisticCard
         title="Receita Total"
-        value={data.total_income}
-        prefix="R$ "
+        value={formatCurrency(data.total_income)}
         icon={<DollarSign />}
         valueColor="text-success"
         description="Soma de aluguéis + taxas"
@@ -96,8 +94,7 @@ export function FinancialSummaryWidget() {
 
       <StatisticCard
         title="Receita por Apartamento"
-        value={data.revenue_per_apartment}
-        prefix="R$ "
+        value={formatCurrency(data.revenue_per_apartment)}
         description="Média por apartamento alugado"
       />
 

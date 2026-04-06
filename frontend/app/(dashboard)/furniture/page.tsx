@@ -18,6 +18,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   Plus,
   Pencil,
@@ -25,6 +26,7 @@ import {
   Download,
   FileSpreadsheet,
   FileText,
+  AlertCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { DataTable, type Column } from '@/components/tables/data-table';
@@ -141,6 +143,16 @@ export default function FurniturePage() {
           </Button>
         </div>
       </div>
+
+      {error && !furniture && (
+        <Alert variant="destructive" className="mb-4">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Erro</AlertTitle>
+          <AlertDescription>
+            Erro ao carregar dados. Verifique sua conexão e tente novamente.
+          </AlertDescription>
+        </Alert>
+      )}
 
       {crud.bulkOps.hasSelection && (
         <div className="mb-4 p-4 bg-primary/5 border border-primary/20 rounded flex justify-between items-center">

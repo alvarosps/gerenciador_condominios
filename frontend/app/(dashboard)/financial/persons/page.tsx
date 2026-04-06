@@ -3,7 +3,8 @@
 import { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Plus, Pencil, Trash2, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { DataTable, type Column } from '@/components/tables/data-table';
 import { DeleteConfirmDialog } from '@/components/shared/delete-confirm-dialog';
@@ -129,6 +130,16 @@ export default function PersonsPage() {
           Nova Pessoa
         </Button>
       </div>
+
+      {error && !persons && (
+        <Alert variant="destructive" className="mb-4">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Erro</AlertTitle>
+          <AlertDescription>
+            Erro ao carregar dados. Verifique sua conexão e tente novamente.
+          </AlertDescription>
+        </Alert>
+      )}
 
       <DataTable<Person>
         columns={columns}
