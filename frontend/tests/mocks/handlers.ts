@@ -1939,6 +1939,54 @@ const personIncomeHandlers = [
 ];
 
 /**
+ * Contract template handlers
+ */
+const templateHandlers = [
+  http.get(`${API_BASE}/templates/current/`, async () => {
+    await delay(50);
+    return HttpResponse.json({
+      content: '<html><body>Contrato padrão</body></html>',
+    });
+  }),
+
+  http.post(`${API_BASE}/templates/save/`, async () => {
+    await delay(100);
+    return HttpResponse.json({
+      message: 'Template salvo com sucesso!',
+      backup_path: '/path/to/backup.html',
+      backup_filename: 'contract_template_backup_20260405_120000.html',
+    });
+  }),
+
+  http.get(`${API_BASE}/templates/backups/`, async () => {
+    await delay(50);
+    return HttpResponse.json([
+      {
+        filename: 'contract_template_backup_20260405_120000.html',
+        path: '/path/to/backup.html',
+        size: 5432,
+        created_at: '2026-04-05T12:00:00',
+      },
+    ]);
+  }),
+
+  http.post(`${API_BASE}/templates/restore/`, async () => {
+    await delay(100);
+    return HttpResponse.json({
+      message: 'Template restaurado com sucesso de backup.html',
+      safety_backup: 'contract_template_before_restore_20260405_120000.html',
+    });
+  }),
+
+  http.post(`${API_BASE}/templates/preview/`, async () => {
+    await delay(100);
+    return HttpResponse.json({
+      html: '<html><body>Preview com dados renderizados</body></html>',
+    });
+  }),
+];
+
+/**
  * All handlers combined
  */
 export const handlers = [
@@ -1967,4 +2015,5 @@ export const handlers = [
   ...financialSettingsHandlers,
   ...landlordHandlers,
   ...rentPaymentHandlers,
+  ...templateHandlers,
 ];
