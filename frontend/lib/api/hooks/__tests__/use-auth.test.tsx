@@ -18,7 +18,6 @@ import { createWrapper } from '@/tests/test-utils';
 // Use vi.hoisted so mock variables are available inside vi.mock factory
 const { authStoreMock } = vi.hoisted(() => {
   const mockSetAuth = vi.fn();
-  const mockSetTokens = vi.fn();
   const mockSetToken = vi.fn();
   const mockClearAuth = vi.fn();
 
@@ -28,14 +27,13 @@ const { authStoreMock } = vi.hoisted(() => {
       accessToken: 'mock-access-token',
       refreshToken: 'mock-refresh-token-67890',
       setAuth: mockSetAuth,
-      setTokens: mockSetTokens,
       setToken: mockSetToken,
       clearAuth: mockClearAuth,
     };
     return selector(mockState);
   };
 
-  return { mockSetAuth, mockSetTokens, mockSetToken, mockClearAuth, authStoreMock };
+  return { mockSetAuth, mockSetToken, mockClearAuth, authStoreMock };
 });
 
 vi.mock('@/store/auth-store', () => ({

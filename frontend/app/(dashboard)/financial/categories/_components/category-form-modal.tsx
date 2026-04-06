@@ -36,6 +36,7 @@ import {
   useExpenseCategories,
 } from '@/lib/api/hooks/use-expense-categories';
 import { type ExpenseCategory } from '@/lib/schemas/expense-category.schema';
+import { handleError } from '@/lib/utils/error-handler';
 
 interface CategoryFormModalProps {
   open: boolean;
@@ -124,7 +125,7 @@ export function CategoryFormModal({ open, category, onClose }: CategoryFormModal
       formMethods.reset();
     } catch (error) {
       toast.error('Erro ao salvar categoria');
-      console.error('Save error:', error);
+      handleError(error, 'CategoryFormModal.onSubmit');
     }
   };
 

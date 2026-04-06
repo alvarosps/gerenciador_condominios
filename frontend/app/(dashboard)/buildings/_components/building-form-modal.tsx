@@ -29,6 +29,7 @@ import {
   useUpdateBuilding,
 } from '@/lib/api/hooks/use-buildings';
 import { type Building } from '@/lib/schemas/building.schema';
+import { handleError } from '@/lib/utils/error-handler';
 
 interface BuildingFormModalProps {
   open: boolean;
@@ -90,7 +91,7 @@ export function BuildingFormModal({
       formMethods.reset();
     } catch (error) {
       toast.error('Erro ao salvar prédio');
-      console.error('Save error:', error);
+      handleError(error, 'BuildingFormModal.onSubmit');
     }
   };
 

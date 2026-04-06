@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -218,9 +218,11 @@ export default function ApartmentsPage() {
     },
   ];
 
-  if (error) {
-    toast.error('Erro ao carregar apartamentos');
-  }
+  useEffect(() => {
+    if (error) {
+      toast.error('Erro ao carregar apartamentos');
+    }
+  }, [error]);
 
   return (
     <div>

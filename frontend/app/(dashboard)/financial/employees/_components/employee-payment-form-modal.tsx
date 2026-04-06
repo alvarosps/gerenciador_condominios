@@ -34,6 +34,7 @@ import { useCreateEmployeePayment, useUpdateEmployeePayment } from '@/lib/api/ho
 import { usePersons } from '@/lib/api/hooks/use-persons';
 import { type EmployeePayment } from '@/lib/schemas/employee-payment.schema';
 import { formatCurrency } from '@/lib/utils/formatters';
+import { handleError } from '@/lib/utils/error-handler';
 
 interface Props {
   open: boolean;
@@ -124,7 +125,7 @@ export function EmployeePaymentFormModal({ open, payment, onClose }: Props) {
       form.reset();
     } catch (error) {
       toast.error('Erro ao salvar pagamento');
-      console.error('Save error:', error);
+      handleError(error, 'EmployeePaymentFormModal.onSubmit');
     }
   };
 

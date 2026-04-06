@@ -15,6 +15,7 @@ import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api/client';
+import { queryKeys } from '@/lib/api/query-keys';
 
 export function QuickPaymentModal({
   open,
@@ -53,9 +54,9 @@ export function QuickPaymentModal({
         payment_date: new Date().toISOString().split('T')[0],
       });
       toast.success(`Pagamento de R$ ${value.toFixed(2)} registrado para ${personName}`);
-      await queryClient.invalidateQueries({ queryKey: ['financial-dashboard'] });
-      await queryClient.invalidateQueries({ queryKey: ['person-payments'] });
-      await queryClient.invalidateQueries({ queryKey: ['expenses'] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.financialDashboard.all });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.personPayments.all });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.expenses.all });
       setAmount('');
       onClose();
     } catch {

@@ -161,17 +161,15 @@ export function useRefreshToken() {
  */
 export function useCurrentUser() {
   const user = useAuthStore((state) => state.user);
-  const setUser = useAuthStore((state) => state.setUser);
 
   return useQuery({
     queryKey: queryKeys.currentUser.all,
     queryFn: async () => {
       const { data } = await apiClient.get<User>('/auth/me/');
-      setUser(data);
       return data;
     },
     enabled: Boolean(user),
-    initialData: user ?? undefined,
+    placeholderData: user ?? undefined,
   });
 }
 

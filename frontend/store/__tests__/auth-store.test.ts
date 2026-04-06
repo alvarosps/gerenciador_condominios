@@ -38,24 +38,6 @@ describe('useAuthStore', () => {
     });
   });
 
-  describe('setTokens', () => {
-    it('sets both tokens and marks as authenticated', () => {
-      useAuthStore.getState().setTokens(mockToken, mockRefreshToken);
-
-      const state = useAuthStore.getState();
-      expect(state.token).toBe(mockToken);
-      expect(state.refreshToken).toBe(mockRefreshToken);
-      expect(state.isAuthenticated).toBe(true);
-    });
-
-    it('does not override existing user', () => {
-      useAuthStore.getState().setAuth(mockToken, mockRefreshToken, mockUser);
-      useAuthStore.getState().setTokens('new-token', 'new-refresh');
-
-      expect(useAuthStore.getState().user).toEqual(mockUser);
-    });
-  });
-
   describe('setToken', () => {
     it('updates only the access token', () => {
       useAuthStore.getState().setAuth(mockToken, mockRefreshToken, mockUser);
