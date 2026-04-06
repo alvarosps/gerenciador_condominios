@@ -8,6 +8,7 @@ from .views import (
     DashboardViewSet,
     FurnitureViewSet,
     LeaseViewSet,
+    RentAdjustmentViewSet,
     TenantViewSet,
     health_check,
 )
@@ -73,6 +74,7 @@ router.register(r"month-advance", MonthAdvanceViewSet, basename="month-advance")
 router.register(r"admin/proofs", AdminProofViewSet, basename="admin-proofs")
 router.register(r"admin/notifications", AdminNotificationViewSet, basename="admin-notifications")
 router.register(r"devices", DeviceTokenViewSet, basename="devices")
+router.register(r"rent-adjustments", RentAdjustmentViewSet, basename="rent-adjustments")
 
 _whatsapp_auth = WhatsAppAuthViewSet.as_view({"post": "request_code"})
 _whatsapp_verify = WhatsAppAuthViewSet.as_view({"post": "verify_code"})

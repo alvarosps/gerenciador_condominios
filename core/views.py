@@ -490,26 +490,16 @@ class LeaseViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-    @action(detail=True, methods=["post"], url_path="terminate")
+    @action(detail=True, methods=["post"], url_path="terminate", permission_classes=[IsAdminUser])
     def terminate(self, request: Request, pk: int | None = None) -> Response:
         """Terminate a lease contract."""
-        if not request.user.is_staff:
-            return Response(
-                {"detail": "Apenas administradores podem encerrar contratos."},
-                status=status.HTTP_403_FORBIDDEN,
-            )
         lease = self.get_object()
         terminate_lease(lease.id, request.user)
         return Response({"detail": "Contrato encerrado com sucesso."}, status=status.HTTP_200_OK)
 
-    @action(detail=True, methods=["post"], url_path="transfer")
+    @action(detail=True, methods=["post"], url_path="transfer", permission_classes=[IsAdminUser])
     def transfer(self, request: Request, pk: int | None = None) -> Response:
         """Transfer a lease to a new apartment."""
-        if not request.user.is_staff:
-            return Response(
-                {"detail": "Apenas administradores podem transferir contratos."},
-                status=status.HTTP_403_FORBIDDEN,
-            )
         lease = self.get_object()
         try:
             new_lease = transfer_lease(lease.id, request.data.copy(), request.user)
@@ -631,9 +621,6 @@ class DashboardViewSet(viewsets.ViewSet):
                 "revenue_per_apartment": "1000.00"
             }
         """
-        # Activate any pending rent adjustments whose month has arrived
-        RentAdjustmentService.activate_pending_adjustments()
-
         summary = DashboardService.get_financial_summary()
         return Response(summary, status=status.HTTP_200_OK)
 
@@ -806,3 +793,19 @@ class DashboardViewSet(viewsets.ViewSet):
             data,
             status=status.HTTP_200_OK,
         )
+
+
+class RentAdjustmentViewSet(viewsets.ViewSet):
+    """ViewSet for rent adjustment operations."""
+
+    permission_classes = [IsAdminUser]
+
+    @action(detail=False, methods=["post"], url_path="activate")
+    def activate_pending(self, request: Request) -> Response:
+        """
+        Activate all pending rent adjustments whose month has arrived.
+
+        POST /api/rent-adjustments/activate/
+        """
+        result = RentAdjustmentService.activate_pending_adjustments()
+        return Response(result, status=status.HTTP_200_OK)
