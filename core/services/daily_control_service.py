@@ -277,15 +277,16 @@ def _mark_credit_card_paid(card_id: int, payment_date: date) -> dict[str, Any]:
     month_start = today.replace(day=1)
     next_month = _next_month_start(today.year, today.month)
 
-    unpaid = ExpenseInstallment.objects.filter(
-        expense__credit_card_id=card_id,
-        expense__is_offset=False,
-        due_date__gte=month_start,
-        due_date__lt=next_month,
-        is_paid=False,
-    )
+    with transaction.atomic():
+        unpaid = ExpenseInstallment.objects.select_for_update().filter(
+            expense__credit_card_id=card_id,
+            expense__is_offset=False,
+            due_date__gte=month_start,
+            due_date__lt=next_month,
+            is_paid=False,
+        )
+        count = unpaid.update(is_paid=True, paid_date=payment_date)
 
-    count = unpaid.update(is_paid=True, paid_date=payment_date)
     if count == 0:
         return {"status": "already_paid", "message": "Todas as parcelas do cartão já estão pagas."}
     return {"status": "ok", "message": f"{count} parcelas do cartão marcadas como pagas."}

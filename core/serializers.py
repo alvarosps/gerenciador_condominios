@@ -862,21 +862,36 @@ class ExpenseSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         attrs = super().validate(attrs)
-        expense_type = attrs.get("expense_type", "")
 
-        if expense_type == "card_purchase" and not attrs.get("credit_card"):
+        # For partial updates, fall back to instance values for cross-field validation
+        expense_type = attrs.get("expense_type")
+        if expense_type is None and self.instance:
+            expense_type = self.instance.expense_type
+        expense_type = expense_type or ""
+
+        credit_card = attrs.get("credit_card")
+        if credit_card is None and "credit_card" not in attrs and self.instance:
+            credit_card = self.instance.credit_card
+
+        person = attrs.get("person")
+        if person is None and "person" not in attrs and self.instance:
+            person = self.instance.person
+
+        building = attrs.get("building")
+        if building is None and "building" not in attrs and self.instance:
+            building = self.instance.building
+
+        if expense_type == "card_purchase" and not credit_card:
             raise serializers.ValidationError(
                 {"credit_card_id": "Compra no cartão requer um cartão de crédito."}
             )
 
-        if expense_type == "bank_loan" and not attrs.get("person"):
+        if expense_type == "bank_loan" and not person:
             raise serializers.ValidationError(
                 {"person_id": "Empréstimo bancário requer uma pessoa."}
             )
 
-        if expense_type in ("water_bill", "electricity_bill", "property_tax") and not attrs.get(
-            "building"
-        ):
+        if expense_type in ("water_bill", "electricity_bill", "property_tax") and not building:
             raise serializers.ValidationError(
                 {"building_id": "Conta de utilidade requer um prédio."}
             )
