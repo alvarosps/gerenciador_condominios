@@ -34,8 +34,8 @@ import { Separator } from '@/components/ui/separator';
 import { Stepper } from '@/components/ui/stepper';
 import { toast } from 'sonner';
 import { useCreateTenant, useUpdateTenant } from '@/lib/api/hooks/use-tenants';
-import { Tenant } from '@/lib/schemas/tenant.schema';
-import { tenantFormSchema, TenantFormValues, WIZARD_STEPS } from './types';
+import { type Tenant } from '@/lib/schemas/tenant.schema';
+import { tenantFormSchema, type TenantFormValues, WIZARD_STEPS } from './types';
 import { BasicInfoStep } from './basic-info-step';
 import { ContactInfoStep } from './contact-info-step';
 import { ProfessionalInfoStep } from './professional-info-step';
@@ -77,10 +77,7 @@ export function TenantFormWizard({ open, tenant, onClose }: Props) {
       marital_status: '',
       dependents: [],
       furniture_ids: [],
-      deposit_amount: null,
-      cleaning_fee_paid: false,
-      tag_deposit_paid: false,
-      rent_due_day: 1,
+      due_day: 1,
     },
     mode: 'onChange',
   });
@@ -92,19 +89,16 @@ export function TenantFormWizard({ open, tenant, onClose }: Props) {
         cpf_cnpj: tenant.cpf_cnpj,
         is_company: tenant.is_company,
         phone: tenant.phone,
-        email: tenant.email || '',
-        phone_alternate: tenant.phone_alternate || '',
-        profession: tenant.profession || '',
-        marital_status: tenant.marital_status || '',
-        dependents: tenant.dependents || [],
+        email: tenant.email ?? '',
+        phone_alternate: tenant.phone_alternate ?? '',
+        profession: tenant.profession ?? '',
+        marital_status: tenant.marital_status ?? '',
+        dependents: tenant.dependents ?? [],
         furniture_ids:
           tenant.furnitures
             ?.map((f) => f.id)
-            .filter((id): id is number => id !== undefined) || [],
-        deposit_amount: tenant.deposit_amount,
-        cleaning_fee_paid: tenant.cleaning_fee_paid,
-        tag_deposit_paid: tenant.tag_deposit_paid,
-        rent_due_day: tenant.rent_due_day ?? 1,
+            .filter((id): id is number => id !== undefined) ?? [],
+        due_day: tenant.due_day ?? 1,
       });
     } else if (!tenant && open) {
       formMethods.reset();
@@ -118,7 +112,9 @@ export function TenantFormWizard({ open, tenant, onClose }: Props) {
   }));
 
   const handleNext = async () => {
-    const stepFields = WIZARD_STEPS[currentStep].fields;
+    const currentWizardStep = WIZARD_STEPS[currentStep];
+    if (!currentWizardStep) return;
+    const stepFields = currentWizardStep.fields;
     let isValid = true;
 
     if (stepFields.length > 0) {
@@ -143,16 +139,13 @@ export function TenantFormWizard({ open, tenant, onClose }: Props) {
 
       const cleanedData = {
         ...values,
-        email: values.email || undefined,
-        phone_alternate: values.phone_alternate || undefined,
+        email: values.email !== '' ? values.email : undefined,
+        phone_alternate: values.phone_alternate !== '' ? values.phone_alternate : undefined,
         dependents:
           values.dependents?.filter(
             (d: { name: string; phone: string }) => d.name && d.phone
-          ) || [],
-        deposit_amount: values.deposit_amount || null,
-        cleaning_fee_paid: values.cleaning_fee_paid || false,
-        tag_deposit_paid: values.tag_deposit_paid || false,
-        rent_due_day: values.rent_due_day || 1,
+          ) ?? [],
+        due_day: values.due_day ?? 1,
       };
 
       if (tenant?.id) {
@@ -207,7 +200,7 @@ export function TenantFormWizard({ open, tenant, onClose }: Props) {
 
   return (
     <>
-      <Dialog open={open} onOpenChange={() => {}}>
+      <Dialog open={open} onOpenChange={undefined}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>

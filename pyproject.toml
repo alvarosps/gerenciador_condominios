@@ -1,140 +1,249 @@
-# pyproject.toml - Configuration for Python development tools
-# Condominios Manager - Enterprise Refactoring Project
+# pyproject.toml - Condominios Manager
+# All Python tooling consolidated here (ruff replaces black + isort + flake8 + pylint)
 
-[tool.black]
+[project]
+name = "condominios-manager"
+version = "0.1.0"
+description = "Property management system for rental properties in Brazil"
+readme = "README.md"
+requires-python = ">=3.12"
+license = {text = "MIT"}
+authors = [
+    {name = "Alvaro Souza"}
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Framework :: Django :: 5.2",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+]
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+# =============================================================================
+# RUFF — replaces black, isort, flake8 (+ plugins), pylint
+# =============================================================================
+
+[tool.ruff]
+target-version = "py313"
 line-length = 100
-target-version = ['py311']
-include = '\.pyi?$'
-extend-exclude = '''
-/(
-  # Directories to exclude
-  \.eggs
-  | \.git
-  | \.hg
-  | \.mypy_cache
-  | \.tox
-  | \.venv
-  | venv
-  | ENV
-  | env
-  | _build
-  | buck-out
-  | build
-  | dist
-  | migrations
-  | __pycache__
-  | \.pytest_cache
-  | \.coverage
-  | htmlcov
-  | backups
-  | contracts
-  | metrics
-)/
-'''
+src = ["core", "condominios_manager"]
+extend-exclude = [
+    "migrations",
+    ".venv",
+    "venv",
+    "env",
+    "ENV",
+    "__pycache__",
+    "contracts",
+    "metrics",
+    "backups",
+    "htmlcov",
+    "frontend",
+    "node_modules",
+    ".eggs",
+    "build",
+    "dist",
+]
 
-[tool.isort]
-profile = "black"
-line_length = 100
-multi_line_output = 3
-include_trailing_comma = true
-force_grid_wrap = 0
-use_parentheses = true
-ensure_newline_before_comments = true
-skip_gitignore = true
-skip = ["migrations", ".venv", "venv", "env", "ENV"]
-known_first_party = ["core", "condominios_manager"]
-known_django = ["django", "rest_framework"]
-sections = ["FUTURE", "STDLIB", "DJANGO", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"]
+[tool.ruff.lint]
+select = [
+    # --- Core ---
+    "E",       # pycodestyle errors
+    "W",       # pycodestyle warnings
+    "F",       # pyflakes
+    "I",       # isort
+    "N",       # pep8-naming
+    "UP",      # pyupgrade (auto-modernize syntax)
+    # --- Bugs & correctness ---
+    "B",       # flake8-bugbear
+    "A",       # flake8-builtins (shadowing builtins)
+    "C4",      # flake8-comprehensions
+    "C90",     # mccabe complexity
+    "PIE",     # flake8-pie (misc. lints)
+    "RUF",     # ruff-specific rules
+    "PERF",    # perflint (performance anti-patterns)
+    "FURB",    # refurb (modernize code)
+    # --- Django ---
+    "DJ",      # flake8-django
+    # --- Security ---
+    "S",       # flake8-bandit (security)
+    "T10",     # flake8-debugger (no debugger statements)
+    "T20",     # flake8-print (no print statements)
+    # --- Code style ---
+    "SIM",     # flake8-simplify
+    "RET",     # flake8-return
+    "RSE",     # flake8-raise
+    "BLE",     # flake8-blind-except
+    "ISC",     # flake8-implicit-str-concat
+    "ICN",     # flake8-import-conventions
+    "TID",     # flake8-tidy-imports
+    "INP",     # flake8-no-pep420
+    "PGH",     # pygrep-hooks
+    "ERA",     # eradicate (commented-out code)
+    "SLF",     # flake8-self (private member access)
+    # --- Testing ---
+    "PT",      # flake8-pytest-style
+    # --- Type checking ---
+    # TC (flake8-type-checking) DISABLED: enforces TYPE_CHECKING + `from __future__ import annotations`
+    # pattern which we don't use — Python 3.14 has PEP 649 lazy annotations natively
+    "DTZ",     # flake8-datetimez (timezone-aware datetimes)
+    # --- Pylint subset ---
+    "PL",      # pylint (conventions, errors, refactor, warnings)
+    # --- Error messages ---
+    "EM",      # flake8-errmsg
+    "TRY",     # tryceratops
+    # --- Pathlib ---
+    "PTH",     # flake8-use-pathlib
+    # --- Python 2020+ ---
+    "YTT",     # flake8-2020
+]
+ignore = [
+    # Line length — handled by ruff formatter, not linter
+    "E501",
+    # Django models declare mutable class attributes (default=list, etc.) — this is how Django works
+    "RUF012",
+    # Django uses `id`, `type`, `format` as field names — these are Django ORM conventions, not builtin shadowing
+    "A003",
+    # Django manages timezone via USE_TZ=True in settings — date.today() and datetime.now() are tz-handled by Django
+    "DTZ011",
+    # Relative imports within Django apps are the standard pattern (from .models import X)
+    "TID252",
+    # Portuguese text in docstrings/comments contains valid Unicode characters (ç, ã, é, etc.)
+    "RUF002",
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["core", "condominios_manager"]
+known-third-party = ["django", "rest_framework"]
+section-order = ["future", "standard-library", "third-party", "first-party", "local-folder"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 12
+
+[tool.ruff.lint.per-file-ignores]
+# Tests use assert statements — this is the standard pytest pattern
+# S106: test fixtures use hardcoded passwords intentionally — these are not real credentials
+# PLR2004: magic values in assertions are standard test practice (assert len(result) == 2)
+"tests/**/*.py" = ["S101", "S106", "PLR2004"]
+"conftest.py" = ["S101", "S106", "PLR2004"]
+# Django migrations are auto-generated by makemigrations — never manually edit
+"core/migrations/**/*.py" = ["ALL"]
+# Django settings uses star imports from base settings and hardcoded SECRET_KEY for local dev
+# F401: LOGGING is imported for Django's settings module namespace, not used directly in code
+"condominios_manager/settings.py" = ["F403", "F405", "F401"]
+# Scripts use print for CLI output and subprocess for system commands
+# S602/S603/S607: scripts call trusted system tools (pg_dump, psql, pip) — not user-controlled input
+# S608: SQL strings are built from Django settings (trusted config), not user input
+# PLR0915: CLI scripts have many print statements by design — statement count limit not meaningful here
+"scripts/**/*.py" = ["T20", "INP001", "S602", "S603", "S607", "S608", "PLR0915"]
+# __init__.py re-exports symbols for clean public API
+"__init__.py" = ["F401"]
+# S3DocumentStorage must catch broad exceptions because boto3/botocore exceptions do not inherit
+# from OSError — catching specific botocore errors would require importing the optional dependency
+"core/infrastructure/storage.py" = ["BLE001"]
+# logging_config overrides RotatingFileHandler.doRollover which uses camelCase (stdlib convention)
+"condominios_manager/logging_config.py" = ["N802"]
+# base.py uses _default_manager as the only mypy-compatible way to access the manager
+# on a generic TypeVar-bound Model class without triggering attr-defined errors
+"core/services/base.py" = ["SLF001"]
+
+[tool.ruff.lint.pylint]
+max-args = 8
+max-returns = 8
+max-bool-expr = 5
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
+docstring-code-format = true
+
+# =============================================================================
+# MYPY — strict mode with Django stubs
+# =============================================================================
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.12"
+plugins = [
+    "mypy_django_plugin.main",
+    "mypy_drf_plugin.main",
+]
+
+# Strict mode — enable all strict flags
+strict = true
+
+# Override some strict flags that are too noisy for Django
+disallow_any_generics = false          # Django querysets use Any internally
+disallow_subclassing_any = false       # Django models subclass from dynamic base
+disallow_untyped_decorators = false    # DRF decorators aren't fully typed
+
+# Extra warnings
 warn_return_any = true
 warn_unused_configs = true
-disallow_untyped_defs = false  # Start permissive, will be enabled in Phase 2
-disallow_any_unimported = false
-no_implicit_optional = true
 warn_redundant_casts = true
 warn_unused_ignores = true
 warn_no_return = true
-check_untyped_defs = true
-ignore_missing_imports = true
+warn_unreachable = true
+strict_equality = true
+
+# Output
+show_error_codes = true
+show_error_context = true
+pretty = true
+
+# Exclude generated files
 exclude = [
-    'migrations/',
-    'venv/',
-    '.venv/',
-    'env/',
-    'ENV/',
-    '__pycache__/',
-    '.pytest_cache/',
-    'build/',
-    'dist/',
+    "migrations/",
+    "venv/",
+    ".venv/",
+    "env/",
+    "ENV/",
+    "__pycache__/",
+    "build/",
+    "dist/",
 ]
 
-# Django-specific settings
-plugins = []  # Will add django-stubs in Phase 2
+[tool.django-stubs]
+django_settings_module = "condominios_manager.settings"
+
+# --- Per-module overrides ---
 
 [[tool.mypy.overrides]]
 module = "*.migrations.*"
 ignore_errors = true
 
-[tool.pylint.master]
-ignore = ["migrations", "venv", ".venv", "env", "ENV"]
-jobs = 4
-persistent = true
-suggestion-mode = true
-unsafe-load-any-extension = false
-
-[tool.pylint.messages_control]
-disable = [
-    "C0330",  # Wrong hanging indentation (conflicts with black)
-    "C0326",  # Bad whitespace (conflicts with black)
-    "missing-module-docstring",  # Will be enabled in Phase 2
-    "missing-class-docstring",   # Will be enabled in Phase 2
-    "missing-function-docstring", # Will be enabled in Phase 2
-    "too-few-public-methods",    # Common in Django models
-    "too-many-ancestors",        # Common in Django views
+[[tool.mypy.overrides]]
+module = [
+    "allauth.*",
+    "num2words.*",
+    "playwright.*",
+    "jinja2.*",
+    "dateutil.*",
+    "factory.*",
+    "faker.*",
+    "decouple.*",
+    "reportlab.*",
+    "model_bakery.*",
+    "responses.*",
+    "freezegun.*",
+    "boto3.*",
+    "botocore.*",
+    "django_redis.*",
+    "twilio.*",
 ]
+ignore_missing_imports = true
 
-[tool.pylint.format]
-max-line-length = 100
+# =============================================================================
+# PYTEST — config in pytest.ini (ini format required for env vars)
+# =============================================================================
 
-[tool.pylint.basic]
-good-names = ["i", "j", "k", "ex", "pk", "id", "_", "db"]
-
-[tool.pylint.design]
-max-args = 7
-max-attributes = 10
-max-bool-expr = 5
-max-branches = 15
-max-locals = 20
-max-parents = 7
-max-public-methods = 25
-max-returns = 6
-max-statements = 60
-min-public-methods = 1
-
-[tool.pytest.ini_options]
-DJANGO_SETTINGS_MODULE = "condominios_manager.settings"
-python_files = ["test_*.py", "*_test.py", "tests.py"]
-python_classes = ["Test*"]
-python_functions = ["test_*"]
-testpaths = ["tests"]
-addopts = [
-    "--verbose",
-    "--strict-markers",
-    "--tb=short",
-    "--cov=core",
-    "--cov-report=term-missing",
-    "--cov-report=html",
-    "--cov-report=xml",
-    "--cov-fail-under=0",  # Will increase to 80 in Phase 2
-]
-markers = [
-    "unit: Unit tests (fast, no external dependencies)",
-    "integration: Integration tests (database, external services)",
-    "slow: Tests that take a long time to run",
-    "smoke: Smoke tests for critical functionality",
-]
+# =============================================================================
+# COVERAGE
+# =============================================================================
 
 [tool.coverage.run]
 source = ["core", "condominios_manager"]
@@ -169,6 +278,10 @@ exclude_lines = [
 [tool.coverage.html]
 directory = "htmlcov"
 
+# =============================================================================
+# BANDIT — security scanner (standalone, not replaced by ruff S rules)
+# =============================================================================
+
 [tool.bandit]
 exclude_dirs = [
     "/venv/",
@@ -180,40 +293,5 @@ exclude_dirs = [
     "/__pycache__/",
 ]
 skips = [
-    "B101",  # assert_used - common in tests
-    "B601",  # paramiko_calls - not applicable
+    "B101",   # assert_used — common in tests
 ]
-
-[tool.radon]
-exclude = "*/migrations/*,*/venv/*,*/.venv/*,*/env/*,*/ENV/*"
-show_complexity = true
-min = "B"  # Show functions with complexity B or higher
-max = "F"  # Show all complexity grades
-
-# Build system (for future packaging)
-[build-system]
-requires = ["setuptools>=61.0", "wheel"]
-build-backend = "setuptools.build_meta"
-
-[project]
-name = "condominios-manager"
-version = "0.1.0"
-description = "Property management system for rental properties in Brazil"
-readme = "README.md"
-requires-python = ">=3.11"
-license = {text = "MIT"}
-authors = [
-    {name = "Development Team", email = "dev@condominiosmanager.com"}
-]
-classifiers = [
-    "Development Status :: 3 - Alpha",
-    "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
-    "Programming Language :: Python :: 3.11",
-    "Framework :: Django :: 5.0",
-]
-
-[project.urls]
-Homepage = "https://github.com/yourusername/condominios_manager"
-Documentation = "https://github.com/yourusername/condominios_manager/docs"
-Repository = "https://github.com/yourusername/condominios_manager"

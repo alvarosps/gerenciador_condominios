@@ -26,13 +26,13 @@ import {
   FileText,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { DataTable, Column } from '@/components/tables/data-table';
+import { DataTable, type Column } from '@/components/tables/data-table';
 import { BuildingFormModal } from './_components/building-form-modal';
 import {
   useBuildings,
   useDeleteBuilding,
 } from '@/lib/api/hooks/use-buildings';
-import { Building } from '@/lib/schemas/building.schema';
+import { type Building } from '@/lib/schemas/building.schema';
 import { buildingExportColumns } from '@/lib/hooks/use-export';
 import { useCrudPage } from '@/lib/hooks/use-crud-page';
 
@@ -90,7 +90,7 @@ export default function BuildingsPage() {
             size="sm"
             onClick={() => {
               crud.setItemToDelete(record);
-              crud.handleDeleteClick(record.id!);
+              if (record.id !== undefined) crud.handleDeleteClick(record.id);
             }}
             disabled={crud.isDeleting}
           >
@@ -111,7 +111,7 @@ export default function BuildingsPage() {
       <div className="mb-4 flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold">Prédios</h1>
-          <p className="text-gray-600 mt-1">
+          <p className="text-muted-foreground mt-1">
             Gerencie os prédios do condomínio
           </p>
         </div>
@@ -127,11 +127,11 @@ export default function BuildingsPage() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
-              <DropdownMenuItem onClick={() => crud.handleExport('excel', buildings || [])}>
+              <DropdownMenuItem onClick={() => crud.handleExport('excel', buildings ?? [])}>
                 <FileSpreadsheet className="h-4 w-4 mr-2" />
                 Exportar para Excel
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => crud.handleExport('csv', buildings || [])}>
+              <DropdownMenuItem onClick={() => crud.handleExport('csv', buildings ?? [])}>
                 <FileText className="h-4 w-4 mr-2" />
                 Exportar para CSV
               </DropdownMenuItem>
@@ -145,8 +145,8 @@ export default function BuildingsPage() {
       </div>
 
       {crud.bulkOps.hasSelection && (
-        <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded flex justify-between items-center">
-          <span className="text-blue-700 font-medium">
+        <div className="mb-4 p-4 bg-primary/5 border border-primary/20 rounded flex justify-between items-center">
+          <span className="text-primary font-medium">
             {crud.bulkOps.selectionCount} {crud.bulkOps.selectionCount === 1 ? 'prédio selecionado' : 'prédios selecionados'}
           </span>
           <div className="flex gap-2">

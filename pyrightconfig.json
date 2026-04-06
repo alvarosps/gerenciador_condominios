@@ -1,0 +1,107 @@
+{
+  "pythonVersion": "3.14",
+  "pythonPlatform": "All",
+
+  "include": [
+    "core",
+    "condominios_manager",
+    "scripts",
+    "tests"
+  ],
+  "exclude": [
+    "**/migrations",
+    "**/__pycache__",
+    "**/node_modules",
+    ".venv",
+    "venv",
+    "env",
+    "frontend",
+    "contracts",
+    "htmlcov",
+    "build",
+    "dist"
+  ],
+
+  "typeCheckingMode": "strict",
+
+  "reportMissingImports": true,
+  "reportMissingTypeStubs": false,
+  "reportMissingModuleSource": false,
+  "reportImportCycles": true,
+  "reportUnusedImport": "error",
+  "reportUnusedClass": "error",
+  "reportUnusedFunction": "error",
+  "reportUnusedVariable": "error",
+  "reportDuplicateImport": "error",
+  "reportUntypedFunctionDecorator": false,
+  "reportUntypedClassDecorator": false,
+  "reportUntypedBaseClass": false,
+  "reportGeneralTypeIssues": "error",
+  "reportOptionalMemberAccess": "error",
+  "reportOptionalCall": "error",
+  "reportOptionalIterable": "error",
+  "reportOptionalSubscript": "error",
+  "reportOptionalOperand": "error",
+  "reportUnnecessaryIsInstance": "warning",
+  "reportUnnecessaryCast": "warning",
+  "reportUnnecessaryComparison": "warning",
+  "reportUnnecessaryContains": "warning",
+  "reportUnnecessaryTypeIgnoreComment": "error",
+  "reportPrivateUsage": "error",
+  "reportConstantRedefinition": "error",
+  "reportIncompatibleMethodOverride": "error",
+  "reportIncompatibleVariableOverride": "error",
+  "reportOverlappingOverload": "error",
+  "reportPossiblyUnbound": "error",
+  "reportMissingSuperCall": "warning",
+  "reportPropertyTypeMismatch": "error",
+  "reportUninitializedInstanceVariable": "none",
+  "reportCallInDefaultInitializer": "warning",
+  "reportImplicitStringConcatenation": "warning",
+  "reportUnknownParameterType": false,
+  "reportUnknownArgumentType": false,
+  "reportUnknownLambdaType": false,
+  "reportUnknownVariableType": false,
+  "reportUnknownMemberType": false,
+  "reportMissingParameterType": false,
+  "reportMissingTypeArgument": false,
+  "reportInvalidTypeVarUse": "error",
+  "reportDeprecated": "warning",
+  "reportInconsistentConstructor": "error",
+  "reportMatchNotExhaustive": "error",
+  "reportShadowedImports": "error",
+  "reportImplicitOverride": false,
+
+  "reportAttributeAccessIssue": "error",
+  "reportArgumentType": "error",
+  "reportReturnType": "error",
+  "reportIndexIssue": "error",
+  "reportOperatorIssue": "error",
+  "reportCallIssue": "error",
+  "reportAssignmentType": "error",
+  "reportRedefinedVariable": "warning",
+  "reportAbstractUsage": "error",
+
+  "stubPath": "",
+  "venvPath": ".",
+  "venv": ".venv",
+
+  "executionEnvironments": [
+    {
+      "root": "core",
+      "extraPaths": ["."]
+    },
+    {
+      "root": "condominios_manager",
+      "extraPaths": ["."]
+    },
+    {
+      "root": "scripts",
+      "extraPaths": ["."]
+    },
+    {
+      "root": "tests",
+      "extraPaths": ["."]
+    }
+  ]
+}

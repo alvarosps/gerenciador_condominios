@@ -1,0 +1,1 @@
+INFO 2026-04-02 18:31:37,554 apps 85536 111992 Core app signals registered successfully

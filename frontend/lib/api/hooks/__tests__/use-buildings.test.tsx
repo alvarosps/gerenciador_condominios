@@ -28,7 +28,7 @@ describe('useBuildings', () => {
 
       // Should have fetched buildings
       expect(result.current.data).toHaveLength(mockBuildings.length);
-      expect(result.current.data?.[0].name).toBe(mockBuildings[0].name);
+      expect(result.current.data?.[0]?.name).toBe(mockBuildings[0]?.name);
     });
 
     it('should validate building data with Zod schema', async () => {
@@ -56,10 +56,10 @@ describe('useBuildings', () => {
       await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
       expect(result.current.data?.id).toBe(1);
-      expect(result.current.data?.name).toBe(mockBuildings[0].name);
+      expect(result.current.data?.name).toBe(mockBuildings[0]?.name);
     });
 
-    it('should not fetch when ID is null', async () => {
+    it('should not fetch when ID is null', () => {
       const { result } = renderHook(() => useBuilding(null), {
         wrapper: createWrapper(),
       });
@@ -124,8 +124,11 @@ describe('useBuildings', () => {
         wrapper: createWrapper(),
       });
 
+      const baseBuilding = mockBuildings[0];
+      if (!baseBuilding) throw new Error('Test data missing');
+
       const updatedBuilding = {
-        ...mockBuildings[0],
+        ...baseBuilding,
         name: 'Updated Building Name',
       };
 

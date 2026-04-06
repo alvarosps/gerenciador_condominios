@@ -16,7 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { StepProps, MARITAL_STATUS_OPTIONS } from './types';
+import { type StepProps, MARITAL_STATUS_OPTIONS } from './types';
 
 export function ProfessionalInfoStep({ formMethods }: StepProps) {
   return (

@@ -29,7 +29,7 @@ services:
   redis:
     image: redis:7-alpine
     container_name: condominios_redis_prod
-    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-}
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
     volumes:
       - redis_data_prod:/data
     networks:
@@ -54,7 +54,7 @@ services:
     env_file:
       - .env.production
     environment:
-      - DJANGO_SETTINGS_MODULE=condominios_manager.settings
+      - DJANGO_SETTINGS_MODULE=condominios_manager.settings_production
       - DB_HOST=postgres
       - REDIS_URL=redis://redis:6379/0
     volumes:
@@ -71,7 +71,7 @@ services:
       - condominios_network_prod
     restart: always
     healthcheck:
-      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health/', timeout=2)"]
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8008/health/', timeout=2)"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -103,7 +103,9 @@ services:
       timeout: 10s
       retries: 3
 
-  # Celery Worker (for async tasks - optional but recommended)
+  # Celery worker handles async tasks including PDF generation (requires Chromium).
+  # PDF generation must be moved to a Celery task before chromium can be installed
+  # here instead of in the main web container.
   celery_worker:
     build:
       context: .
@@ -113,7 +115,7 @@ services:
     env_file:
       - .env.production
     environment:
-      - DJANGO_SETTINGS_MODULE=condominios_manager.settings
+      - DJANGO_SETTINGS_MODULE=condominios_manager.settings_production
       - DB_HOST=postgres
       - REDIS_URL=redis://redis:6379/0
     volumes:
@@ -128,7 +130,6 @@ services:
     networks:
       - condominios_network_prod
     restart: always
-    # Uncomment when Celery is configured in the project
 
   # Celery Beat (for scheduled tasks - optional)
   celery_beat:
@@ -140,7 +141,7 @@ services:
     env_file:
       - .env.production
     environment:
-      - DJANGO_SETTINGS_MODULE=condominios_manager.settings
+      - DJANGO_SETTINGS_MODULE=condominios_manager.settings_production
       - DB_HOST=postgres
       - REDIS_URL=redis://redis:6379/0
     volumes:
@@ -153,7 +154,6 @@ services:
     networks:
       - condominios_network_prod
     restart: always
-    # Uncomment when Celery Beat is configured in the project
 
 volumes:
   postgres_data_prod:

@@ -11,23 +11,25 @@ Handles all business logic related to contract generation including:
 - File storage via IDocumentStorage (supports filesystem and cloud)
 """
 
-from __future__ import annotations
-
 import logging
-import os
+import tempfile
 import warnings
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from django.conf import settings
 from django.db import transaction
-
-from asgiref.sync import async_to_sync
-from jinja2 import Environment, FileSystemLoader
+from jinja2 import Environment, FileSystemLoader, select_autoescape
+from playwright.sync_api import sync_playwright
 
 from core.contract_rules import regras_condominio
-from core.infrastructure import FileSystemDocumentStorage, IDocumentStorage, IPDFGenerator, PyppeteerPDFGenerator
-from core.models import ContractRule, Furniture, Lease
+from core.infrastructure import (
+    FileSystemDocumentStorage,
+    IDocumentStorage,
+    IPDFGenerator,
+    PlaywrightPDFGenerator,
+)
+from core.models import ContractRule, Furniture, Landlord, Lease
 from core.utils import format_currency, number_to_words
 
 from .date_calculator import DateCalculatorService
@@ -47,7 +49,7 @@ class ContractService:
     PDF generators and document storage backends.
 
     Attributes:
-        pdf_generator: IPDFGenerator implementation (default: PyppeteerPDFGenerator)
+        pdf_generator: IPDFGenerator implementation (default: PlaywrightPDFGenerator)
         document_storage: IDocumentStorage implementation (default: FileSystemDocumentStorage)
 
     Example usage:
@@ -60,25 +62,25 @@ class ContractService:
         >>> from core.infrastructure import WeasyPrintPDFGenerator, S3DocumentStorage
         >>> service = ContractService(
         ...     pdf_generator=WeasyPrintPDFGenerator(),
-        ...     document_storage=S3DocumentStorage(bucket_name="my-bucket")
+        ...     document_storage=S3DocumentStorage(bucket_name="my-bucket"),
         ... )
         >>> pdf_path = service.generate_contract_instance(lease)
     """
 
     # Class-level default implementations
-    _default_pdf_generator: Optional[IPDFGenerator] = None
-    _default_document_storage: Optional[IDocumentStorage] = None
+    _default_pdf_generator: IPDFGenerator | None = None
+    _default_document_storage: IDocumentStorage | None = None
 
     def __init__(
         self,
-        pdf_generator: Optional[IPDFGenerator] = None,
-        document_storage: Optional[IDocumentStorage] = None,
+        pdf_generator: IPDFGenerator | None = None,
+        document_storage: IDocumentStorage | None = None,
     ):
         """
         Initialize ContractService with custom implementations.
 
         Args:
-            pdf_generator: Custom PDF generator (default: PyppeteerPDFGenerator)
+            pdf_generator: Custom PDF generator (default: PlaywrightPDFGenerator)
             document_storage: Custom document storage (default: FileSystemDocumentStorage)
         """
         self.pdf_generator = pdf_generator or self._get_default_pdf_generator()
@@ -89,8 +91,8 @@ class ContractService:
         """Get or create the default PDF generator."""
         if cls._default_pdf_generator is None:
             chrome_path = getattr(settings, "CHROME_EXECUTABLE_PATH", None)
-            cls._default_pdf_generator = PyppeteerPDFGenerator(chrome_path=chrome_path)
-            logger.info("Initialized default PyppeteerPDFGenerator")
+            cls._default_pdf_generator = PlaywrightPDFGenerator(chrome_path=chrome_path)
+            logger.info("Initialized default PlaywrightPDFGenerator")
         return cls._default_pdf_generator
 
     @classmethod
@@ -103,7 +105,7 @@ class ContractService:
         return cls._default_document_storage
 
     @staticmethod
-    def calculate_lease_furniture(lease: Lease) -> List[Furniture]:
+    def calculate_lease_furniture(lease: Lease) -> list[Furniture]:
         """
         Calculate furniture list for the lease.
 
@@ -124,7 +126,7 @@ class ContractService:
         apt_furniture = set(lease.apartment.furnitures.all())
 
         # Collect furniture from ALL tenants, not just responsible tenant
-        all_tenant_furniture = set()
+        all_tenant_furniture: set[Furniture] = set()
         for tenant in lease.tenants.all():
             all_tenant_furniture.update(tenant.furnitures.all())
 
@@ -138,7 +140,7 @@ class ContractService:
         return lease_furnitures
 
     @staticmethod
-    def prepare_contract_context(lease: Lease) -> Dict[str, Any]:
+    def prepare_contract_context(lease: Lease) -> dict[str, Any]:
         """
         Prepare the context dictionary for contract template rendering.
 
@@ -155,12 +157,10 @@ class ContractService:
         Examples:
             >>> lease = Lease.objects.get(pk=1)
             >>> context = ContractService.prepare_contract_context(lease)
-            >>> print(context['tenant'])  # Responsible tenant
-            >>> print(context['landlord'])  # Active landlord
-            >>> print(context['rental_value'])  # Monthly rent
+            >>> print(context["tenant"])  # Responsible tenant
+            >>> print(context["landlord"])  # Active landlord
+            >>> print(context["rental_value"])  # Monthly rent
         """
-        from core.models import Landlord
-
         start_date = lease.start_date
         validity = lease.validity_months
 
@@ -173,10 +173,12 @@ class ContractService:
         final_date = formatted_dates["final_date_formatted"]
 
         # Use FeeCalculatorService for fee calculations
-        num_tenants = len(lease.tenants.all())
+        num_tenants = lease.number_of_tenants
         valor_tags = FeeCalculatorService.calculate_tag_fee(num_tenants)
         valor_total = FeeCalculatorService.calculate_total_value(
-            rental_value=lease.rental_value, cleaning_fee=lease.cleaning_fee, tag_fee=valor_tags
+            rental_value=lease.rental_value,
+            cleaning_fee=lease.apartment.cleaning_fee,
+            tag_fee=valor_tags,
         )
 
         # Calculate lease furniture
@@ -187,7 +189,7 @@ class ContractService:
 
         # Get rules from database, fallback to hardcoded rules if none exist
         db_rules = ContractRule.get_active_rules()
-        rules = db_rules if db_rules else regras_condominio
+        rules = db_rules or regras_condominio
 
         context = {
             "landlord": landlord,
@@ -201,7 +203,7 @@ class ContractService:
             "rental_value": lease.rental_value,
             "next_month_date": next_month_date,
             "tag_fee": lease.tag_fee,
-            "cleaning_fee": lease.cleaning_fee,
+            "cleaning_fee": lease.apartment.cleaning_fee,
             "valor_total": valor_total,
             "rules": rules,
             "lease": lease,
@@ -258,17 +260,19 @@ class ContractService:
             >>> path = ContractService.get_contract_pdf_path(lease)
             >>> print(path)  # 'C:/path/contracts/836/contract_apto_101_1.pdf'
         """
-        base_dir = settings.BASE_DIR
-        contracts_dir = os.path.join(base_dir, settings.PDF_OUTPUT_DIR, str(lease.apartment.building.street_number))
-        os.makedirs(contracts_dir, exist_ok=True)
+        base_dir = Path(settings.BASE_DIR)
+        contracts_dir = (
+            base_dir / settings.PDF_OUTPUT_DIR / str(lease.apartment.building.street_number)
+        )
+        contracts_dir.mkdir(parents=True, exist_ok=True)
 
-        pdf_path = os.path.join(contracts_dir, f"contract_apto_{lease.apartment.number}_{lease.id}.pdf")
+        pdf_path = contracts_dir / f"contract_apto_{lease.apartment.number}_{lease.id}.pdf"
 
         logger.debug(f"PDF path for lease {lease.id}: {pdf_path}")
-        return pdf_path
+        return str(pdf_path)
 
     @staticmethod
-    def render_contract_template(context: Dict[str, Any]) -> str:
+    def render_contract_template(context: dict[str, Any]) -> str:
         """
         Render the contract HTML template with the given context.
 
@@ -284,10 +288,13 @@ class ContractService:
         Examples:
             >>> context = ContractService.prepare_contract_context(lease)
             >>> html = ContractService.render_contract_template(context)
-            >>> assert '<html>' in html
+            >>> assert "<html>" in html
         """
-        template_path = os.path.join(settings.BASE_DIR, "core", "templates")
-        env = Environment(loader=FileSystemLoader(template_path))
+        template_path = str(Path(settings.BASE_DIR) / "core" / "templates")
+        env = Environment(
+            loader=FileSystemLoader(template_path),
+            autoescape=select_autoescape(["html"]),
+        )
         env.filters["currency"] = format_currency
         env.filters["extenso"] = number_to_words
 
@@ -297,7 +304,7 @@ class ContractService:
         logger.debug("Contract template rendered successfully")
         return html_content
 
-    async def generate_pdf_with_infrastructure(self, html_content: str, relative_path: str) -> str:
+    def generate_pdf_with_infrastructure(self, html_content: str, relative_path: str) -> str:
         """
         Generate PDF using IPDFGenerator and save using IDocumentStorage.
 
@@ -319,15 +326,15 @@ class ContractService:
             >>> html = "<html><body>Contract</body></html>"
             >>> path = await service.generate_pdf_with_infrastructure(html, "836/contract_1.pdf")
         """
-        import tempfile
-
         # Create temporary PDF file
         with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as temp_pdf:
             temp_pdf_path = temp_pdf.name
 
         try:
             # Generate PDF using IPDFGenerator
-            await self.pdf_generator.generate_pdf(html_content=html_content, output_path=temp_pdf_path, options=None)
+            self.pdf_generator.generate_pdf(
+                html_content=html_content, output_path=temp_pdf_path, options=None
+            )
 
             # Read PDF content
             pdf_content = Path(temp_pdf_path).read_bytes()
@@ -346,16 +353,13 @@ class ContractService:
             # Clean up temporary file
             try:
                 Path(temp_pdf_path).unlink(missing_ok=True)
-            except Exception as e:
+            except OSError as e:
                 logger.warning(f"Failed to delete temporary PDF {temp_pdf_path}: {e}")
 
     @staticmethod
-    async def generate_pdf_from_html(html_content: str, pdf_path: str, lease_id: int) -> None:
+    def generate_pdf_from_html(html_content: str, pdf_path: str, lease_id: int) -> None:
         """
-        Generate PDF from HTML content using pyppeteer (backward compatibility).
-
-        DEPRECATED: This method is maintained for backward compatibility.
-        New code should use generate_pdf_with_infrastructure() with IPDFGenerator.
+        Generate PDF from HTML content using Playwright (headless Chromium).
 
         Creates a temporary HTML file, opens it in headless Chrome,
         and generates a PDF. Cleans up the temporary file afterward.
@@ -367,69 +371,52 @@ class ContractService:
 
         Raises:
             Exception: If PDF generation fails
-
-        Examples:
-            >>> html = "<html><body>Contract</body></html>"
-            >>> await ContractService.generate_pdf_from_html(html, "output.pdf", 1)
         """
-        from pyppeteer import launch
 
-        # Calculate contracts directory from pdf_path
-        contracts_dir = os.path.dirname(pdf_path)
-
-        browser = await launch(
-            handleSIGINT=False,
-            handleSIGTERM=False,
-            handleSIGHUP=False,
-            options={
-                "pipe": "true",
-                "executablePath": settings.CHROME_EXECUTABLE_PATH,
-                "headless": True,
-                "args": [
-                    "--headless",
-                    "--full-memory-crash-report",
-                    "--unlimited-storage",
-                    "--no-sandbox",
-                    "--disable-setuid-sandbox",
-                    "--disable-dev-shm-usage",
-                    "--disable-accelerated-2d-canvas",
-                    "--no-first-run",
-                    "--no-zygote",
-                    "--disable-gpu",
-                ],
-            },
-        )
+        contracts_dir = Path(pdf_path).parent
+        temp_html_path = contracts_dir / f"temp_contract_{lease_id}.html"
+        temp_html_path.write_text(html_content, encoding="utf-8")
 
         try:
-            page = await browser.newPage()
+            chrome_path = getattr(settings, "CHROME_EXECUTABLE_PATH", None)
 
-            # Save temporary HTML file
-            temp_html_path = os.path.join(contracts_dir, f"temp_contract_{lease_id}.html")
-            with open(temp_html_path, "w", encoding="utf-8") as f:
-                f.write(html_content)
+            with sync_playwright() as p:
+                launch_args: dict[str, Any] = {
+                    "headless": True,
+                    "args": [
+                        "--no-sandbox",
+                        "--disable-setuid-sandbox",
+                        "--disable-dev-shm-usage",
+                        "--disable-gpu",
+                    ],
+                }
+                if chrome_path:
+                    launch_args["executable_path"] = chrome_path
 
-            # Generate PDF
-            file_url = f"file:///{temp_html_path}"
-            await page.goto(file_url, {"waitUntil": "networkidle2"})
-            await page.pdf({
-                "path": pdf_path,
-                "format": "A4",
-                "printBackground": True,
-                "margin": {
-                    "top": "1cm",
-                    "right": "1.5cm",
-                    "bottom": "1cm",
-                    "left": "1.5cm"
-                },
-                "preferCSSPageSize": False
-            })
-
-            # Clean up temporary file
-            os.remove(temp_html_path)
-
-            logger.info(f"PDF generated successfully for lease {lease_id}: {pdf_path}")
+                browser = p.chromium.launch(**launch_args)
+                try:
+                    page = browser.new_page()
+                    page.goto(
+                        f"file:///{temp_html_path}",
+                        wait_until="networkidle",
+                    )
+                    page.pdf(
+                        path=pdf_path,
+                        format="A4",
+                        print_background=True,
+                        prefer_css_page_size=False,
+                        margin={
+                            "top": "1cm",
+                            "right": "1.5cm",
+                            "bottom": "1cm",
+                            "left": "1.5cm",
+                        },
+                    )
+                    logger.info(f"PDF generated successfully for lease {lease_id}: {pdf_path}")
+                finally:
+                    browser.close()
         finally:
-            await browser.close()
+            temp_html_path.unlink(missing_ok=True)
 
     def generate_contract_with_infrastructure(self, lease: Lease) -> str:
         """
@@ -477,9 +464,8 @@ class ContractService:
         # Calculate relative path
         relative_path = self.get_contract_relative_path(lease)
 
-        # Generate and store PDF (async operation using async_to_sync for ASGI compatibility)
-        generate_pdf_sync = async_to_sync(self.generate_pdf_with_infrastructure)
-        stored_path = generate_pdf_sync(html_content, relative_path)
+        # Generate and store PDF
+        stored_path = self.generate_pdf_with_infrastructure(html_content, relative_path)
 
         # Update lease status atomically
         with transaction.atomic():
@@ -518,7 +504,6 @@ class ContractService:
         Examples:
             >>> lease = Lease.objects.get(pk=1)
             >>> pdf_path = ContractService.generate_contract(lease)
-            >>> assert os.path.exists(pdf_path)
             >>> assert lease.contract_generated is True
         """
         # Emit deprecation warning
@@ -540,9 +525,8 @@ class ContractService:
         # Calculate output path
         pdf_path = ContractService.get_contract_pdf_path(lease)
 
-        # Generate PDF (async operation using async_to_sync for ASGI compatibility)
-        generate_pdf_sync = async_to_sync(ContractService.generate_pdf_from_html)
-        generate_pdf_sync(html_content, pdf_path, lease.id)
+        # Generate PDF
+        ContractService.generate_pdf_from_html(html_content, pdf_path, lease.id)
 
         # Update lease status atomically
         with transaction.atomic():

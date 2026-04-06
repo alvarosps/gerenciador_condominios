@@ -1,0 +1,139 @@
+<h2>Mapa de Navegação do App Mobile</h2>
+<p class="subtitle">Duas experiências baseadas no role do usuário</p>
+
+<div class="split">
+  <div class="mockup">
+    <div class="mockup-header">🏠 Inquilino (Tenant)</div>
+    <div class="mockup-body">
+      <div style="margin-bottom:16px">
+        <div class="label">Tab Bar (bottom navigation)</div>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <div style="flex:1;background:#e8f4e8;border-radius:8px;padding:8px;text-align:center;font-size:13px">
+            🏠<br>Início
+          </div>
+          <div style="flex:1;background:#e8e8f4;border-radius:8px;padding:8px;text-align:center;font-size:13px">
+            💰<br>Pagamentos
+          </div>
+          <div style="flex:1;background:#f4e8e8;border-radius:8px;padding:8px;text-align:center;font-size:13px">
+            📄<br>Contrato
+          </div>
+          <div style="flex:1;background:#f4f4e8;border-radius:8px;padding:8px;text-align:center;font-size:13px">
+            👤<br>Perfil
+          </div>
+        </div>
+      </div>
+
+      <div class="label" style="margin-top:16px">Telas por tab:</div>
+
+      <div style="margin-top:8px">
+        <strong>Início</strong>
+        <ul style="margin:4px 0;padding-left:20px;font-size:13px">
+          <li>Resumo: próximo vencimento, valor, status</li>
+          <li>Alertas: multas, avisos do admin</li>
+          <li>Atalho rápido para pagar</li>
+        </ul>
+      </div>
+
+      <div style="margin-top:8px">
+        <strong>Pagamentos</strong>
+        <ul style="margin:4px 0;padding-left:20px;font-size:13px">
+          <li>Pagar aluguel (gerar PIX + enviar comprovante)</li>
+          <li>Simular troca de vencimento</li>
+          <li>Histórico de pagamentos</li>
+        </ul>
+      </div>
+
+      <div style="margin-top:8px">
+        <strong>Contrato</strong>
+        <ul style="margin:4px 0;padding-left:20px;font-size:13px">
+          <li>Ver contrato (PDF)</li>
+          <li>Data de vencimento do contrato</li>
+          <li>Dados do imóvel</li>
+        </ul>
+      </div>
+
+      <div style="margin-top:8px">
+        <strong>Perfil</strong>
+        <ul style="margin:4px 0;padding-left:20px;font-size:13px">
+          <li>Dados cadastrais (nome, CPF, telefone)</li>
+          <li>Dependentes</li>
+          <li>Configurações de notificação</li>
+          <li>Logout</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="mockup">
+    <div class="mockup-header">⚙️ Admin</div>
+    <div class="mockup-body">
+      <div style="margin-bottom:16px">
+        <div class="label">Tab Bar (bottom navigation)</div>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <div style="flex:1;background:#e8f4e8;border-radius:8px;padding:8px;text-align:center;font-size:13px">
+            📊<br>Dashboard
+          </div>
+          <div style="flex:1;background:#e8e8f4;border-radius:8px;padding:8px;text-align:center;font-size:13px">
+            🏢<br>Imóveis
+          </div>
+          <div style="flex:1;background:#f4e8e8;border-radius:8px;padding:8px;text-align:center;font-size:13px">
+            💰<br>Financeiro
+          </div>
+          <div style="flex:1;background:#f4f4e8;border-radius:8px;padding:8px;text-align:center;font-size:13px">
+            🔔<br>Ações
+          </div>
+        </div>
+      </div>
+
+      <div class="label" style="margin-top:16px">Telas por tab:</div>
+
+      <div style="margin-top:8px">
+        <strong>Dashboard</strong>
+        <ul style="margin:4px 0;padding-left:20px;font-size:13px">
+          <li>Resumo de ocupação</li>
+          <li>Inadimplência</li>
+          <li>Métricas de locação</li>
+          <li>Comprovantes pendentes de aprovação</li>
+        </ul>
+      </div>
+
+      <div style="margin-top:8px">
+        <strong>Imóveis</strong>
+        <ul style="margin:4px 0;padding-left:20px;font-size:13px">
+          <li>Lista de prédios → apartamentos</li>
+          <li>Detalhes do inquilino</li>
+          <li>Gerar contrato</li>
+          <li>Ver locações ativas</li>
+        </ul>
+      </div>
+
+      <div style="margin-top:8px">
+        <strong>Financeiro</strong>
+        <ul style="margin:4px 0;padding-left:20px;font-size:13px">
+          <li>Dashboard financeiro (overview, dívidas, categorias)</li>
+          <li>Parcelas próximas / atrasadas</li>
+          <li>Resumo mensal</li>
+        </ul>
+      </div>
+
+      <div style="margin-top:8px">
+        <strong>Ações</strong>
+        <ul style="margin:4px 0;padding-left:20px;font-size:13px">
+          <li>Marcar aluguel como pago</li>
+          <li>Aprovar comprovantes de inquilinos</li>
+          <li>Enviar notificações manuais</li>
+          <li>Calcular multa por atraso</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div style="margin-top:24px;padding:16px;background:#2a2a3a;border-radius:8px">
+  <div class="label">Fluxo de login</div>
+  <div style="font-size:14px;margin-top:8px;color:#ccc">
+    App abre → Tela de login unificada → <strong>Admin:</strong> email + senha → tabs admin
+    <br>
+    App abre → Tela de login unificada → <strong>Inquilino:</strong> CPF + código WhatsApp → tabs tenant
+  </div>
+</div>

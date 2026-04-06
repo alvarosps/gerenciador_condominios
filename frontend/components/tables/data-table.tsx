@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Table,
   TableBody,
@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { PAGINATION } from '@/lib/utils/constants';
 
 export interface Column<T> {
@@ -26,7 +27,7 @@ export interface Column<T> {
   render?: (value: unknown, record: T, index: number) => React.ReactNode;
   width?: number | string;
   sorter?: (a: T, b: T) => number;
-  filters?: Array<{ text: string; value: unknown }>;
+  filters?: { text: string; value: unknown }[];
   onFilter?: (value: unknown, record: T) => boolean;
   fixed?: 'left' | 'right';
   align?: 'left' | 'center' | 'right';
@@ -49,6 +50,8 @@ interface DataTableProps<T extends Record<string, unknown>> {
   };
   rowKey?: string | ((record: T) => string);
   rowSelection?: RowSelection<T>;
+  defaultSortKey?: string;
+  defaultSortDirection?: 'asc' | 'desc';
 }
 
 export function DataTable<T extends Record<string, unknown>>({
@@ -58,6 +61,8 @@ export function DataTable<T extends Record<string, unknown>>({
   pagination = {},
   rowKey = 'key',
   rowSelection,
+  defaultSortKey,
+  defaultSortDirection,
 }: DataTableProps<T>) {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(
@@ -65,14 +70,26 @@ export function DataTable<T extends Record<string, unknown>>({
       ? pagination.pageSize
       : PAGINATION.DEFAULT_PAGE_SIZE
   );
+  const [sortKey, setSortKey] = useState<string | null>(defaultSortKey ?? null);
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc' | null>(defaultSortDirection ?? null);
 
   const showPagination = pagination !== false;
   const paginationConfig = typeof pagination === 'object' ? pagination : {};
-  const total = paginationConfig.total || dataSource.length;
+
+  const sortedData = useMemo(() => {
+    if (!sortKey || !sortDirection) return dataSource;
+    const sorter = columns.find((c) => c.key === sortKey)?.sorter;
+    if (!sorter) return dataSource;
+    return [...dataSource].sort((a, b) =>
+      sortDirection === 'desc' ? -sorter(a, b) : sorter(a, b)
+    );
+  }, [dataSource, columns, sortKey, sortDirection]);
+
+  const total = paginationConfig.total ?? sortedData.length;
   const totalPages = Math.ceil(total / pageSize);
   const start = (currentPage - 1) * pageSize;
   const end = start + pageSize;
-  const paginatedData = dataSource.slice(start, end);
+  const paginatedData = sortedData.slice(start, end);
 
   // Define getRowKey before it's used
   const getRowKey = (record: T, index: number): string => {
@@ -85,7 +102,7 @@ export function DataTable<T extends Record<string, unknown>>({
     return `row-${index}`;
   };
 
-  const selectedKeys = rowSelection?.selectedRowKeys || [];
+  const selectedKeys = rowSelection?.selectedRowKeys ?? [];
   const allCurrentPageKeys: React.Key[] = paginatedData.map((_record, index) =>
     getRowKey(_record, start + index)
   );
@@ -98,6 +115,17 @@ export function DataTable<T extends Record<string, unknown>>({
   const handlePageChange = (page: number): void => {
     setCurrentPage(page);
     paginationConfig.onChange?.(page, pageSize);
+  };
+
+  const handleSort = (key: string, direction: 'asc' | 'desc'): void => {
+    if (sortKey === key && sortDirection === direction) {
+      setSortKey(null);
+      setSortDirection(null);
+    } else {
+      setSortKey(key);
+      setSortDirection(direction);
+    }
+    setCurrentPage(1);
   };
 
   const handlePageSizeChange = (newSize: string): void => {
@@ -133,8 +161,11 @@ export function DataTable<T extends Record<string, unknown>>({
 
       allCurrentPageKeys.forEach((key, index) => {
         if (!selectedKeys.includes(key)) {
-          newSelectedKeys.push(key);
-          newSelectedRows.push(paginatedData[index]);
+          const row = paginatedData[index];
+          if (row !== undefined) {
+            newSelectedKeys.push(key);
+            newSelectedRows.push(row);
+          }
         }
       });
 
@@ -177,7 +208,11 @@ export function DataTable<T extends Record<string, unknown>>({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center p-8 border rounded-md">
+      <div
+        className="flex items-center justify-center p-8 border rounded-md"
+        aria-live="polite"
+        aria-busy={true}
+      >
         <div className="flex flex-col items-center gap-2">
           <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
           <p className="text-sm text-muted-foreground">Carregando...</p>
@@ -188,7 +223,7 @@ export function DataTable<T extends Record<string, unknown>>({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-md border">
+      <div className="rounded-md border overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
@@ -204,7 +239,41 @@ export function DataTable<T extends Record<string, unknown>>({
               )}
               {columns.map((column) => (
                 <TableHead key={column.key} style={{ width: column.width }}>
-                  {column.title}
+                  {column.sorter ? (
+                    <div className="flex items-center gap-1">
+                      <span>{column.title}</span>
+                      <div className="flex flex-col -space-y-1 ml-1">
+                        <button
+                          type="button"
+                          onClick={() => handleSort(column.key, 'asc')}
+                          className={cn(
+                            'text-[10px] leading-none cursor-pointer hover:text-primary transition-colors',
+                            sortKey === column.key && sortDirection === 'asc'
+                              ? 'text-primary'
+                              : 'text-muted-foreground/30'
+                          )}
+                          aria-label={`Sort ${column.title} ascending`}
+                        >
+                          ▲
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleSort(column.key, 'desc')}
+                          className={cn(
+                            'text-[10px] leading-none cursor-pointer hover:text-primary transition-colors',
+                            sortKey === column.key && sortDirection === 'desc'
+                              ? 'text-primary'
+                              : 'text-muted-foreground/30'
+                          )}
+                          aria-label={`Sort ${column.title} descending`}
+                        >
+                          ▼
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    column.title
+                  )}
                 </TableHead>
               ))}
             </TableRow>
@@ -241,7 +310,7 @@ export function DataTable<T extends Record<string, unknown>>({
                       const value = getCellValue(record, column);
                       const content = column.render
                         ? column.render(value, record, index)
-                        : String(value ?? '');
+                        : value === null || value === undefined ? '' : typeof value === 'object' ? JSON.stringify(value) : String(value as string | number | boolean | bigint);
 
                       return <TableCell key={column.key}>{content}</TableCell>;
                     })}
@@ -254,7 +323,7 @@ export function DataTable<T extends Record<string, unknown>>({
       </div>
 
       {showPagination && dataSource.length > 0 && (
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
           <div className="text-sm text-muted-foreground">
             {start + 1}-{Math.min(end, total)} de {total} itens
           </div>
@@ -277,6 +346,7 @@ export function DataTable<T extends Record<string, unknown>>({
               <Button
                 variant="outline"
                 size="sm"
+                aria-label="Página anterior"
                 onClick={() => handlePageChange(currentPage - 1)}
                 disabled={currentPage === 1}
               >
@@ -290,6 +360,7 @@ export function DataTable<T extends Record<string, unknown>>({
               <Button
                 variant="outline"
                 size="sm"
+                aria-label="Próxima página"
                 onClick={() => handlePageChange(currentPage + 1)}
                 disabled={currentPage === totalPages}
               >

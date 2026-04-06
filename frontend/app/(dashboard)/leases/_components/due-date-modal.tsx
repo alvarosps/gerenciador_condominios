@@ -15,8 +15,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Calendar, AlertTriangle, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { useChangeDueDate } from '@/lib/api/hooks/use-leases';
-import { Lease } from '@/lib/schemas/lease.schema';
-import { formatCurrency } from '@/lib/utils/formatters';
+import { type Lease } from '@/lib/schemas/lease.schema';
+import { formatCurrency, formatDate } from '@/lib/utils/formatters';
 
 interface Props {
   open: boolean;
@@ -27,9 +27,12 @@ interface Props {
 interface ChangeDueDateResult {
   old_due_day: number;
   new_due_day: number;
+  old_due_date: string;
+  new_due_date: string;
   change_fee: number;
   days_difference: number;
   daily_rate: number;
+  total_due: number;
   message: string;
 }
 
@@ -44,7 +47,7 @@ export function DueDateModal({ open, lease, onClose }: Props) {
       return;
     }
 
-    if (newDueDay === lease.due_day) {
+    if (newDueDay === lease.responsible_tenant?.due_day) {
       toast.warning('O novo dia é igual ao dia atual');
       return;
     }
@@ -78,11 +81,11 @@ export function DueDateModal({ open, lease, onClose }: Props) {
         </DialogHeader>
 
         <div className="space-y-4">
-          <Alert className="border-yellow-200 bg-yellow-50">
-            <AlertTriangle className="h-4 w-4 text-yellow-600" />
+          <Alert className="border-warning/20 bg-warning/10">
+            <AlertTriangle className="h-4 w-4 text-warning" />
             <AlertDescription className="ml-2">
-              <p className="font-medium text-yellow-900">Taxa de Alteração de Vencimento</p>
-              <p className="text-sm text-yellow-800">
+              <p className="font-medium text-warning">Taxa de Alteração de Vencimento</p>
+              <p className="text-sm text-warning">
                 A alteração da data de vencimento tem uma taxa calculada com base no valor diário do aluguel multiplicado pela diferença de dias.
               </p>
             </AlertDescription>
@@ -92,27 +95,27 @@ export function DueDateModal({ open, lease, onClose }: Props) {
             <CardContent className="pt-6">
               <dl className="space-y-3">
                 <div className="flex justify-between py-2 border-b">
-                  <dt className="font-medium text-sm text-gray-600">Apartamento</dt>
-                  <dd className="text-sm text-gray-900">
+                  <dt className="font-medium text-sm text-muted-foreground">Apartamento</dt>
+                  <dd className="text-sm text-foreground">
                     {lease.apartment?.building?.name} - Apto {lease.apartment?.number}
                   </dd>
                 </div>
                 <div className="flex justify-between py-2 border-b">
-                  <dt className="font-medium text-sm text-gray-600">Inquilino</dt>
-                  <dd className="text-sm text-gray-900">
+                  <dt className="font-medium text-sm text-muted-foreground">Inquilino</dt>
+                  <dd className="text-sm text-foreground">
                     {lease.responsible_tenant?.name}
                   </dd>
                 </div>
                 <div className="flex justify-between py-2 border-b">
-                  <dt className="font-medium text-sm text-gray-600">Valor do Aluguel</dt>
-                  <dd className="text-sm text-gray-900">
-                    {formatCurrency(lease.rental_value)}
+                  <dt className="font-medium text-sm text-muted-foreground">Valor do Aluguel</dt>
+                  <dd className="text-sm text-foreground">
+                    {formatCurrency(lease.apartment?.rental_value ?? 0)}
                   </dd>
                 </div>
                 <div className="flex justify-between py-2">
-                  <dt className="font-medium text-sm text-gray-600">Vencimento Atual</dt>
-                  <dd className="text-sm font-bold text-gray-900">
-                    Dia {lease.due_day}
+                  <dt className="font-medium text-sm text-muted-foreground">Vencimento Atual</dt>
+                  <dd className="text-sm font-bold text-foreground">
+                    Dia {lease.responsible_tenant?.due_day ?? '-'}
                   </dd>
                 </div>
               </dl>
@@ -139,43 +142,49 @@ export function DueDateModal({ open, lease, onClose }: Props) {
           )}
 
           {result && (
-            <Card className="border-blue-200 bg-blue-50">
+            <Card className="border-info/20 bg-info/10">
               <CardContent className="pt-6">
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Vencimento Anterior:</span>
+                    <span className="text-muted-foreground">Vencimento Anterior:</span>
                     <span className="text-lg font-medium">
-                      Dia {result.old_due_day}
+                      Dia {result.old_due_day} ({formatDate(result.old_due_date)})
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Novo Vencimento:</span>
-                    <span className="text-lg font-bold text-blue-600">
-                      Dia {result.new_due_day}
+                    <span className="text-muted-foreground">Novo Vencimento:</span>
+                    <span className="text-lg font-bold text-info">
+                      Dia {result.new_due_day} ({formatDate(result.new_due_date)})
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Diferença de Dias:</span>
+                    <span className="text-muted-foreground">Diferença de Dias:</span>
                     <span className="text-lg font-medium">
                       {result.days_difference} dias
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Taxa Diária:</span>
+                    <span className="text-muted-foreground">Taxa Diária:</span>
                     <span className="text-lg font-medium">
                       {formatCurrency(result.daily_rate)}
                     </span>
                   </div>
-                  <div className="flex justify-between items-center pt-3 border-t-2 border-blue-300">
-                    <span className="text-gray-900 font-medium">Taxa de Alteração:</span>
-                    <span className="text-2xl font-bold text-blue-600">
+                  <div className="flex justify-between items-center pt-3 border-t">
+                    <span className="text-muted-foreground">Taxa de Alteração:</span>
+                    <span className="text-lg font-medium">
                       {formatCurrency(result.change_fee)}
                     </span>
                   </div>
+                  <div className="flex justify-between items-center pt-3 border-t-2 border-info/30">
+                    <span className="text-foreground font-medium">Total a Pagar:</span>
+                    <span className="text-2xl font-bold text-info">
+                      {formatCurrency(result.total_due)}
+                    </span>
+                  </div>
                   {result.message && (
-                    <Alert className="mt-3 border-green-200 bg-green-50">
-                      <CheckCircle className="h-4 w-4 text-green-600" />
-                      <AlertDescription className="ml-2 text-sm text-green-800">
+                    <Alert className="mt-3 border-success/20 bg-success/10">
+                      <CheckCircle className="h-4 w-4 text-success" />
+                      <AlertDescription className="ml-2 text-sm text-success">
                         {result.message}
                       </AlertDescription>
                     </Alert>

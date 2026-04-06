@@ -1,0 +1,50 @@
+[
+{
+  "model": "core.income",
+  "pk": 1,
+  "fields": {
+    "created_at": "2026-03-23T01:49:56.293Z",
+    "updated_at": "2026-03-23T01:49:56.293Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "description": "Aposentadoria Raul",
+    "amount": "1030.00",
+    "income_date": "2024-01-01",
+    "person": null,
+    "building": null,
+    "category": null,
+    "is_recurring": true,
+    "expected_monthly_amount": "1030.00",
+    "is_received": false,
+    "received_date": null,
+    "notes": ""
+  }
+},
+{
+  "model": "core.income",
+  "pk": 2,
+  "fields": {
+    "created_at": "2026-03-23T23:43:44.722Z",
+    "updated_at": "2026-03-23T23:43:44.722Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "description": "Empréstimo Alessandra",
+    "amount": "5000.00",
+    "income_date": "2026-03-09",
+    "person": 7,
+    "building": null,
+    "category": null,
+    "is_recurring": false,
+    "expected_monthly_amount": null,
+    "is_received": true,
+    "received_date": null,
+    "notes": ""
+  }
+}
+]

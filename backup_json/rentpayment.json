@@ -1,0 +1,658 @@
+[
+{
+  "model": "core.rentpayment",
+  "pk": 1,
+  "fields": {
+    "created_at": "2026-03-23T01:49:56.311Z",
+    "updated_at": "2026-03-23T01:49:56.311Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "lease": 14,
+    "reference_month": "2026-03-01",
+    "amount_paid": "0.00",
+    "payment_date": "2026-03-05",
+    "notes": ""
+  }
+},
+{
+  "model": "core.rentpayment",
+  "pk": 2,
+  "fields": {
+    "created_at": "2026-03-27T14:56:48.039Z",
+    "updated_at": "2026-03-27T14:56:48.039Z",
+    "created_by": [
+      "admin"
+    ],
+    "updated_by": [
+      "admin"
+    ],
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "lease": 41,
+    "reference_month": "2026-03-01",
+    "amount_paid": "1300.00",
+    "payment_date": "2026-03-27",
+    "notes": ""
+  }
+},
+{
+  "model": "core.rentpayment",
+  "pk": 3,
+  "fields": {
+    "created_at": "2026-03-27T14:56:51.312Z",
+    "updated_at": "2026-03-27T14:56:51.312Z",
+    "created_by": [
+      "admin"
+    ],
+    "updated_by": [
+      "admin"
+    ],
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "lease": 4,
+    "reference_month": "2026-03-01",
+    "amount_paid": "750.00",
+    "payment_date": "2026-03-27",
+    "notes": ""
+  }
+},
+{
+  "model": "core.rentpayment",
+  "pk": 4,
+  "fields": {
+    "created_at": "2026-03-27T14:56:52.203Z",
+    "updated_at": "2026-03-27T14:56:52.203Z",
+    "created_by": [
+      "admin"
+    ],
+    "updated_by": [
+      "admin"
+    ],
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "lease": 32,
+    "reference_month": "2026-03-01",
+    "amount_paid": "934.00",
+    "payment_date": "2026-03-27",
+    "notes": ""
+  }
+},
+{
+  "model": "core.rentpayment",
+  "pk": 5,
+  "fields": {
+    "created_at": "2026-03-27T14:56:53.069Z",
+    "updated_at": "2026-03-27T14:56:53.069Z",
+    "created_by": [
+      "admin"
+    ],
+    "updated_by": [
+      "admin"
+    ],
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "lease": 23,
+    "reference_month": "2026-03-01",
+    "amount_paid": "934.00",
+    "payment_date": "2026-03-27",
+    "notes": ""
+  }
+},
+{
+  "model": "core.rentpayment",
+  "pk": 6,
+  "fields": {
+    "created_at": "2026-03-27T14:56:56.748Z",
+    "updated_at": "2026-03-27T14:56:56.748Z",
+    "created_by": [
+      "admin"
+    ],
+    "updated_by": [
+      "admin"
+    ],
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "lease": 6,
+    "reference_month": "2026-03-01",
+    "amount_paid": "1000.00",
+    "payment_date": "2026-03-27",
+    "notes": ""
+  }
+},
+{
+  "model": "core.rentpayment",
+  "pk": 7,
+  "fields": {
+    "created_at": "2026-03-27T14:56:57.266Z",
+    "updated_at": "2026-03-27T14:56:57.266Z",
+    "created_by": [
+      "admin"
+    ],
+    "updated_by": [
+      "admin"
+    ],
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "lease": 19,
+    "reference_month": "2026-03-01",
+    "amount_paid": "745.00",
+    "payment_date": "2026-03-27",
+    "notes": ""
+  }
+},
+{
+  "model": "core.rentpayment",
+  "pk": 8,
+  "fields": {
+    "created_at": "2026-03-27T14:56:57.741Z",
+    "updated_at": "2026-03-27T14:56:57.741Z",
+    "created_by": [
+      "admin"
+    ],
+    "updated_by": [
+      "admin"
+    ],
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "lease": 15,
+    "reference_month": "2026-03-01",
+    "amount_paid": "1200.00",
+    "payment_date": "2026-03-27",
+    "notes": ""
+  }
+},
+{
+  "model": "core.rentpayment",
+  "pk": 9,
+  "fields": {
+    "created_at": "2026-03-27T14:56:58.852Z",
+    "updated_at": "2026-03-27T14:56:58.852Z",
+    "created_by": [
+      "admin"
+    ],
+    "updated_by": [
+      "admin"
+    ],
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "lease": 47,
+    "reference_month": "2026-03-01",
+    "amount_paid": "1000.00",
+    "payment_date": "2026-03-27",
+    "notes": ""
+  }
+},
+{
+  "model": "core.rentpayment",
+  "pk": 10,
+  "fields": {
+    "created_at": "2026-03-27T14:56:59.416Z",
+    "updated_at": "2026-03-27T14:56:59.416Z",
+    "created_by": [
+      "admin"
+    ],
+    "updated_by": [
+      "admin"
+    ],
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "lease": 51,
+    "reference_month": "2026-03-01",
+    "amount_paid": "1400.00",
+    "payment_date": "2026-03-27",
+    "notes": ""
+  }
+},
+{
+  "model": "core.rentpayment",
+  "pk": 11,
+  "fields": {
+    "created_at": "2026-03-27T14:57:01.541Z",
+    "updated_at": "2026-03-27T14:57:01.541Z",
+    "created_by": [
+      "admin"
+    ],
+    "updated_by": [
+      "admin"
+    ],
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "lease": 38,
+    "reference_month": "2026-03-01",
+    "amount_paid": "900.00",
+    "payment_date": "2026-03-27",
+    "notes": ""
+  }
+},
+{
+  "model": "core.rentpayment",
+  "pk": 12,
+  "fields": {
+    "created_at": "2026-03-27T14:57:02.043Z",
+    "updated_at": "2026-03-27T14:57:02.043Z",
+    "created_by": [
+      "admin"
+    ],
+    "updated_by": [
+      "admin"
+    ],
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "lease": 26,
+    "reference_month": "2026-03-01",
+    "amount_paid": "730.00",
+    "payment_date": "2026-03-27",
+    "notes": ""
+  }
+},
+{
+  "model": "core.rentpayment",
+  "pk": 13,
+  "fields": {
+    "created_at": "2026-03-27T14:57:02.434Z",
+    "updated_at": "2026-03-27T14:57:02.434Z",
+    "created_by": [
+      "admin"
+    ],
+    "updated_by": [
+      "admin"
+    ],
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "lease": 35,
+    "reference_month": "2026-03-01",
+    "amount_paid": "860.00",
+    "payment_date": "2026-03-27",
+    "notes": ""
+  }
+},
+{
+  "model": "core.rentpayment",
+  "pk": 14,
+  "fields": {
+    "created_at": "2026-03-27T14:57:03.025Z",
+    "updated_at": "2026-03-27T14:57:03.025Z",
+    "created_by": [
+      "admin"
+    ],
+    "updated_by": [
+      "admin"
+    ],
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "lease": 30,
+    "reference_month": "2026-03-01",
+    "amount_paid": "950.00",
+    "payment_date": "2026-03-27",
+    "notes": ""
+  }
+},
+{
+  "model": "core.rentpayment",
+  "pk": 15,
+  "fields": {
+    "created_at": "2026-03-27T14:57:03.663Z",
+    "updated_at": "2026-03-27T14:57:03.663Z",
+    "created_by": [
+      "admin"
+    ],
+    "updated_by": [
+      "admin"
+    ],
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "lease": 21,
+    "reference_month": "2026-03-01",
+    "amount_paid": "750.00",
+    "payment_date": "2026-03-27",
+    "notes": ""
+  }
+},
+{
+  "model": "core.rentpayment",
+  "pk": 16,
+  "fields": {
+    "created_at": "2026-03-27T14:57:04.783Z",
+    "updated_at": "2026-03-27T14:57:04.783Z",
+    "created_by": [
+      "admin"
+    ],
+    "updated_by": [
+      "admin"
+    ],
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "lease": 39,
+    "reference_month": "2026-03-01",
+    "amount_paid": "860.00",
+    "payment_date": "2026-03-27",
+    "notes": ""
+  }
+},
+{
+  "model": "core.rentpayment",
+  "pk": 17,
+  "fields": {
+    "created_at": "2026-03-27T14:57:05.591Z",
+    "updated_at": "2026-03-27T14:57:05.591Z",
+    "created_by": [
+      "admin"
+    ],
+    "updated_by": [
+      "admin"
+    ],
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "lease": 22,
+    "reference_month": "2026-03-01",
+    "amount_paid": "890.00",
+    "payment_date": "2026-03-27",
+    "notes": ""
+  }
+},
+{
+  "model": "core.rentpayment",
+  "pk": 18,
+  "fields": {
+    "created_at": "2026-03-27T14:57:05.935Z",
+    "updated_at": "2026-03-27T14:57:05.935Z",
+    "created_by": [
+      "admin"
+    ],
+    "updated_by": [
+      "admin"
+    ],
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "lease": 36,
+    "reference_month": "2026-03-01",
+    "amount_paid": "860.00",
+    "payment_date": "2026-03-27",
+    "notes": ""
+  }
+},
+{
+  "model": "core.rentpayment",
+  "pk": 19,
+  "fields": {
+    "created_at": "2026-03-27T14:57:06.316Z",
+    "updated_at": "2026-03-27T14:57:06.316Z",
+    "created_by": [
+      "admin"
+    ],
+    "updated_by": [
+      "admin"
+    ],
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "lease": 33,
+    "reference_month": "2026-03-01",
+    "amount_paid": "750.00",
+    "payment_date": "2026-03-27",
+    "notes": ""
+  }
+},
+{
+  "model": "core.rentpayment",
+  "pk": 20,
+  "fields": {
+    "created_at": "2026-03-27T14:57:06.756Z",
+    "updated_at": "2026-03-27T14:57:06.756Z",
+    "created_by": [
+      "admin"
+    ],
+    "updated_by": [
+      "admin"
+    ],
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "lease": 18,
+    "reference_month": "2026-03-01",
+    "amount_paid": "1100.00",
+    "payment_date": "2026-03-27",
+    "notes": ""
+  }
+},
+{
+  "model": "core.rentpayment",
+  "pk": 21,
+  "fields": {
+    "created_at": "2026-03-27T14:57:07.789Z",
+    "updated_at": "2026-03-27T14:57:07.789Z",
+    "created_by": [
+      "admin"
+    ],
+    "updated_by": [
+      "admin"
+    ],
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "lease": 37,
+    "reference_month": "2026-03-01",
+    "amount_paid": "892.00",
+    "payment_date": "2026-03-27",
+    "notes": ""
+  }
+},
+{
+  "model": "core.rentpayment",
+  "pk": 22,
+  "fields": {
+    "created_at": "2026-03-27T14:57:08.714Z",
+    "updated_at": "2026-03-27T14:57:08.714Z",
+    "created_by": [
+      "admin"
+    ],
+    "updated_by": [
+      "admin"
+    ],
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "lease": 24,
+    "reference_month": "2026-03-01",
+    "amount_paid": "630.00",
+    "payment_date": "2026-03-27",
+    "notes": ""
+  }
+},
+{
+  "model": "core.rentpayment",
+  "pk": 23,
+  "fields": {
+    "created_at": "2026-03-27T14:57:10.355Z",
+    "updated_at": "2026-03-27T14:57:10.355Z",
+    "created_by": [
+      "admin"
+    ],
+    "updated_by": [
+      "admin"
+    ],
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "lease": 29,
+    "reference_month": "2026-03-01",
+    "amount_paid": "1300.00",
+    "payment_date": "2026-03-27",
+    "notes": ""
+  }
+},
+{
+  "model": "core.rentpayment",
+  "pk": 24,
+  "fields": {
+    "created_at": "2026-03-27T14:57:10.817Z",
+    "updated_at": "2026-03-27T14:57:10.817Z",
+    "created_by": [
+      "admin"
+    ],
+    "updated_by": [
+      "admin"
+    ],
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "lease": 11,
+    "reference_month": "2026-03-01",
+    "amount_paid": "934.00",
+    "payment_date": "2026-03-27",
+    "notes": ""
+  }
+},
+{
+  "model": "core.rentpayment",
+  "pk": 25,
+  "fields": {
+    "created_at": "2026-03-27T14:57:11.275Z",
+    "updated_at": "2026-03-27T14:57:11.275Z",
+    "created_by": [
+      "admin"
+    ],
+    "updated_by": [
+      "admin"
+    ],
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "lease": 49,
+    "reference_month": "2026-03-01",
+    "amount_paid": "1400.00",
+    "payment_date": "2026-03-27",
+    "notes": ""
+  }
+},
+{
+  "model": "core.rentpayment",
+  "pk": 26,
+  "fields": {
+    "created_at": "2026-03-27T14:57:12.604Z",
+    "updated_at": "2026-03-27T14:57:12.604Z",
+    "created_by": [
+      "admin"
+    ],
+    "updated_by": [
+      "admin"
+    ],
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "lease": 50,
+    "reference_month": "2026-03-01",
+    "amount_paid": "1250.00",
+    "payment_date": "2026-03-27",
+    "notes": ""
+  }
+},
+{
+  "model": "core.rentpayment",
+  "pk": 27,
+  "fields": {
+    "created_at": "2026-03-27T14:57:13.378Z",
+    "updated_at": "2026-03-27T14:57:13.378Z",
+    "created_by": [
+      "admin"
+    ],
+    "updated_by": [
+      "admin"
+    ],
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "lease": 52,
+    "reference_month": "2026-03-01",
+    "amount_paid": "1250.00",
+    "payment_date": "2026-03-27",
+    "notes": ""
+  }
+},
+{
+  "model": "core.rentpayment",
+  "pk": 28,
+  "fields": {
+    "created_at": "2026-03-27T14:57:14.851Z",
+    "updated_at": "2026-03-27T14:57:14.851Z",
+    "created_by": [
+      "admin"
+    ],
+    "updated_by": [
+      "admin"
+    ],
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "lease": 53,
+    "reference_month": "2026-03-01",
+    "amount_paid": "1400.00",
+    "payment_date": "2026-03-27",
+    "notes": ""
+  }
+},
+{
+  "model": "core.rentpayment",
+  "pk": 29,
+  "fields": {
+    "created_at": "2026-03-30T15:52:21.896Z",
+    "updated_at": "2026-03-30T15:52:21.896Z",
+    "created_by": [
+      "admin"
+    ],
+    "updated_by": [
+      "admin"
+    ],
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "lease": 48,
+    "reference_month": "2026-03-01",
+    "amount_paid": "1300.00",
+    "payment_date": "2026-03-30",
+    "notes": ""
+  }
+},
+{
+  "model": "core.rentpayment",
+  "pk": 30,
+  "fields": {
+    "created_at": "2026-03-30T15:52:29.573Z",
+    "updated_at": "2026-03-30T15:52:29.573Z",
+    "created_by": [
+      "admin"
+    ],
+    "updated_by": [
+      "admin"
+    ],
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "lease": 40,
+    "reference_month": "2026-03-01",
+    "amount_paid": "810.00",
+    "payment_date": "2026-03-30",
+    "notes": ""
+  }
+}
+]

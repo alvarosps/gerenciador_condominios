@@ -1,0 +1,36 @@
+[
+{
+  "model": "core.dependent",
+  "pk": 1,
+  "fields": {
+    "created_at": "2025-12-21T16:19:51.459Z",
+    "updated_at": "2025-12-21T16:19:51.519Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "tenant": 1,
+    "name": "Vanessa Baia",
+    "phone": "(92) 98425-5480",
+    "cpf_cnpj": null
+  }
+},
+{
+  "model": "core.dependent",
+  "pk": 2,
+  "fields": {
+    "created_at": "2025-12-21T16:19:51.459Z",
+    "updated_at": "2025-12-21T16:19:51.519Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "tenant": 28,
+    "name": "Rafael Farias",
+    "phone": "(51) 99142-3261",
+    "cpf_cnpj": null
+  }
+}
+]

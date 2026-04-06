@@ -11,11 +11,15 @@ This module handles all contract rule CRUD operations:
 
 Separated from main views to follow Single Responsibility Principle.
 """
+
 import logging
 
 from django.db import transaction
+from django.db.models import QuerySet
+from rest_framework import serializers as drf_serializers
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
+from rest_framework.request import Request
 from rest_framework.response import Response
 
 from ..models import ContractRule
@@ -48,7 +52,7 @@ class ContractRuleViewSet(viewsets.ModelViewSet):
     serializer_class = ContractRuleSerializer
     permission_classes = [IsAdminUser]
 
-    def get_queryset(self):
+    def get_queryset(self) -> QuerySet[ContractRule]:
         """
         Return rules ordered by order field.
 
@@ -63,7 +67,7 @@ class ContractRuleViewSet(viewsets.ModelViewSet):
 
         return queryset
 
-    def perform_create(self, serializer):
+    def perform_create(self, serializer: drf_serializers.BaseSerializer[ContractRule]) -> None:
         """Set created_by and auto-assign order if not provided."""
         instance = serializer.save(created_by=self.request.user)
 
@@ -78,16 +82,16 @@ class ContractRuleViewSet(viewsets.ModelViewSet):
             instance.order = max_order + 1
             instance.save(update_fields=["order"])
 
-    def perform_update(self, serializer):
+    def perform_update(self, serializer: drf_serializers.BaseSerializer[ContractRule]) -> None:
         """Set updated_by on update."""
         serializer.save(updated_by=self.request.user)
 
-    def perform_destroy(self, instance):
+    def perform_destroy(self, instance: ContractRule) -> None:
         """Soft delete the rule."""
         instance.delete(deleted_by=self.request.user)
 
     @action(detail=False, methods=["post"], url_path="reorder")
-    def reorder(self, request):
+    def reorder(self, request: Request) -> Response:
         """
         Bulk reorder rules by providing ordered list of IDs.
 
@@ -110,9 +114,7 @@ class ContractRuleViewSet(viewsets.ModelViewSet):
             with transaction.atomic():
                 # Verify all IDs exist
                 existing_ids = set(
-                    ContractRule.objects.filter(id__in=rule_ids).values_list(
-                        "id", flat=True
-                    )
+                    ContractRule.objects.filter(id__in=rule_ids).values_list("id", flat=True)
                 )
                 missing_ids = set(rule_ids) - existing_ids
                 if missing_ids:
@@ -140,7 +142,7 @@ class ContractRuleViewSet(viewsets.ModelViewSet):
             )
 
     @action(detail=False, methods=["get"], url_path="active")
-    def active_rules(self, request):
+    def active_rules(self, request: Request) -> Response:
         """
         Get only active rules (for contract generation).
 

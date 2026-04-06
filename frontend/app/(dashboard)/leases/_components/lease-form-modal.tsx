@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -22,6 +22,7 @@ import {
   FormDescription,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Select,
   SelectContent,
@@ -38,6 +39,8 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
 import { CalendarIcon, Info } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -46,8 +49,19 @@ import { toast } from 'sonner';
 import { useCreateLease, useUpdateLease } from '@/lib/api/hooks/use-leases';
 import { useAvailableApartments } from '@/lib/api/hooks/use-apartments';
 import { useTenants } from '@/lib/api/hooks/use-tenants';
-import { Lease } from '@/lib/schemas/lease.schema';
+import { type Lease } from '@/lib/schemas/lease.schema';
+import { type Dependent } from '@/lib/schemas/tenant.schema';
 import { formatCurrency } from '@/lib/utils/formatters';
+import { apiClient } from '@/lib/api/client';
+
+const TAG_FEE_SINGLE = 50;
+const TAG_FEE_DOUBLE = 80;
+
+/** Parse yyyy-MM-dd as local date (avoids UTC timezone shift) */
+function parseLocalDate(dateStr: string): Date {
+  const [year, month, day] = dateStr.split('-').map(Number);
+  return new Date(year ?? 0, (month ?? 1) - 1, day ?? 1);
+}
 
 interface Props {
   open: boolean;
@@ -58,101 +72,253 @@ interface Props {
 const leaseFormSchema = z.object({
   apartment_id: z.number().min(1, 'Selecione um apartamento'),
   responsible_tenant_id: z.number().min(1, 'Selecione o inquilino responsável'),
-  tenant_ids: z.array(z.number()).min(1, 'Selecione pelo menos um inquilino'),
+  number_of_tenants: z.number().min(1).max(2),
+  rental_value: z.number().min(0),
+  resident_dependent_id: z.number().optional().nullable(),
+  due_day: z.number().min(1, 'Dia deve ser entre 1 e 31').max(31, 'Dia deve ser entre 1 e 31'),
+  last_rent_increase_date: z.string().optional().nullable(),
   start_date: z.date(),
   validity_months: z.number()
     .min(1, 'Validade deve ser no mínimo 1 mês')
     .max(60, 'Validade deve ser no máximo 60 meses'),
-  rental_value: z.number().min(0, 'Valor não pode ser negativo'),
-  cleaning_fee: z.number().min(0, 'Valor não pode ser negativo'),
   tag_fee: z.number().min(0, 'Valor não pode ser negativo'),
-  due_day: z.number().min(1, 'Dia deve ser no mínimo 1').max(31, 'Dia deve ser no máximo 31'),
+  deposit_amount: z.number().min(0, 'Valor não pode ser negativo').optional().nullable(),
+  cleaning_fee_paid: z.boolean(),
+  tag_deposit_paid: z.boolean(),
 });
 
 type LeaseFormValues = z.infer<typeof leaseFormSchema>;
 
+interface NewDependentForm {
+  name: string;
+  cpf_cnpj: string;
+  phone: string;
+}
+
 export function LeaseFormModal({ open, lease, onClose }: Props) {
   const createMutation = useCreateLease();
   const updateMutation = useUpdateLease();
-  const { data: apartments, isLoading: apartmentsLoading } = useAvailableApartments();
+  const isEditMode = Boolean(lease);
+  const { data: availableApartments, isLoading: apartmentsLoading } = useAvailableApartments();
+
+  // When editing, show only the lease's apartment; when creating, show available ones
+  const apartments = isEditMode && lease?.apartment
+    ? [lease.apartment]
+    : availableApartments;
   const { data: tenants, isLoading: tenantsLoading } = useTenants();
+
+  const [originalDueDay, setOriginalDueDay] = useState<number | null>(null);
+  const [newDependentForm, setNewDependentForm] = useState<NewDependentForm>({
+    name: '',
+    cpf_cnpj: '',
+    phone: '',
+  });
+  const [showNewDependentForm, setShowNewDependentForm] = useState(false);
 
   const formMethods = useForm<LeaseFormValues>({
     resolver: zodResolver(leaseFormSchema),
     defaultValues: {
       apartment_id: undefined,
       responsible_tenant_id: undefined,
-      tenant_ids: [],
+      number_of_tenants: 1,
+      rental_value: 0,
+      resident_dependent_id: null,
+      due_day: 1,
       start_date: undefined,
       validity_months: 12,
-      rental_value: 0,
-      cleaning_fee: 0,
-      tag_fee: 50,
-      due_day: 10,
+      tag_fee: TAG_FEE_SINGLE,
+      deposit_amount: null,
+      cleaning_fee_paid: false,
+      tag_deposit_paid: false,
     },
   });
 
   const selectedApartmentId = formMethods.watch('apartment_id');
   const selectedApartment = apartments?.find(apt => apt.id === selectedApartmentId);
 
+  const selectedResponsibleTenantId = formMethods.watch('responsible_tenant_id');
+  const selectedResponsibleTenant = tenants?.find(t => t.id === selectedResponsibleTenantId);
+
+  const numberOfTenants = formMethods.watch('number_of_tenants');
+
   useEffect(() => {
     if (lease) {
       formMethods.reset({
         apartment_id: lease.apartment?.id,
         responsible_tenant_id: lease.responsible_tenant?.id,
-        tenant_ids: lease.tenants?.map((t) => t.id!) || [],
-        start_date: new Date(lease.start_date),
+        number_of_tenants: lease.number_of_tenants ?? 1,
+        rental_value: lease.rental_value ?? 0,
+        resident_dependent_id: lease.resident_dependent_id ?? null,
+        due_day: lease.responsible_tenant?.due_day ?? parseLocalDate(lease.start_date).getDate(),
+        last_rent_increase_date: lease.last_rent_increase_date ?? null,
+        start_date: parseLocalDate(lease.start_date),
         validity_months: lease.validity_months,
-        rental_value: lease.rental_value,
-        cleaning_fee: lease.cleaning_fee,
         tag_fee: lease.tag_fee,
-        due_day: lease.due_day,
+        deposit_amount: lease.deposit_amount ?? null,
+        cleaning_fee_paid: lease.cleaning_fee_paid ?? false,
+        tag_deposit_paid: lease.tag_deposit_paid ?? false,
       });
+      setOriginalDueDay(lease.responsible_tenant?.due_day ?? null);
     } else {
       formMethods.reset({
         apartment_id: undefined,
         responsible_tenant_id: undefined,
-        tenant_ids: [],
+        number_of_tenants: 1,
+        rental_value: 0,
+        resident_dependent_id: null,
+        due_day: 1,
+        last_rent_increase_date: null,
         start_date: undefined,
         validity_months: 12,
-        rental_value: 0,
-        cleaning_fee: 0,
-        tag_fee: 50,
-        due_day: 10,
+        tag_fee: TAG_FEE_SINGLE,
+        deposit_amount: null,
+        cleaning_fee_paid: false,
+        tag_deposit_paid: false,
       });
+      setOriginalDueDay(null);
     }
+    setShowNewDependentForm(false);
+    setNewDependentForm({ name: '', cpf_cnpj: '', phone: '' });
   }, [lease, formMethods]);
 
-  // Auto-fill rental value and cleaning fee when apartment changes
+  // Auto-set number_of_tenants=1 and derive values when apartment changes (create mode only)
   useEffect(() => {
-    if (selectedApartment && !lease) {
-      formMethods.setValue('rental_value', selectedApartment.rental_value);
-      formMethods.setValue('cleaning_fee', selectedApartment.cleaning_fee);
-    }
-  }, [selectedApartment, formMethods, lease]);
+    if (isEditMode || !selectedApartment) return;
+    formMethods.setValue('number_of_tenants', 1);
+    formMethods.setValue('rental_value', selectedApartment.rental_value);
+    formMethods.setValue('tag_fee', TAG_FEE_SINGLE);
+    formMethods.setValue('resident_dependent_id', null);
+    setShowNewDependentForm(false);
+    setNewDependentForm({ name: '', cpf_cnpj: '', phone: '' });
+  }, [selectedApartmentId, isEditMode, formMethods, selectedApartment]);
 
-  // Watch responsible_tenant_id to auto-sync with tenant_ids for single-tenant apartments
-  const responsibleTenantId = formMethods.watch('responsible_tenant_id');
-
-  // Auto-select responsible tenant in tenant_ids when apartment only supports 1 person
+  // Clear dependent when responsible tenant changes
   useEffect(() => {
-    if (selectedApartment?.max_tenants === 1 && responsibleTenantId) {
-      formMethods.setValue('tenant_ids', [responsibleTenantId]);
+    formMethods.setValue('resident_dependent_id', null);
+    setShowNewDependentForm(false);
+    setNewDependentForm({ name: '', cpf_cnpj: '', phone: '' });
+  }, [selectedResponsibleTenantId, formMethods]);
+
+  // Auto-derive due_day from start_date (create mode only)
+  const watchedStartDate = formMethods.watch('start_date');
+  useEffect(() => {
+    if (isEditMode || !watchedStartDate) return;
+    formMethods.setValue('due_day', watchedStartDate.getDate());
+  }, [watchedStartDate, isEditMode, formMethods]);
+
+  // Calculate due date change fee preview
+  const watchedDueDay = formMethods.watch('due_day');
+  const dueDayChanged = isEditMode && originalDueDay !== null && watchedDueDay !== originalDueDay;
+  const dueDayChangeFee = dueDayChanged && selectedApartment
+    ? Math.abs(watchedDueDay - (originalDueDay ?? 0)) * ((formMethods.watch('rental_value') ?? 0) / 30)
+    : 0;
+
+  const handleNumberOfTenantsChange = (value: number) => {
+    formMethods.setValue('number_of_tenants', value);
+    formMethods.setValue('resident_dependent_id', null);
+    setShowNewDependentForm(false);
+    setNewDependentForm({ name: '', cpf_cnpj: '', phone: '' });
+
+    if (selectedApartment) {
+      if (value === 2) {
+        formMethods.setValue(
+          'rental_value',
+          selectedApartment.rental_value_double ?? selectedApartment.rental_value
+        );
+        formMethods.setValue('tag_fee', TAG_FEE_DOUBLE);
+      } else {
+        formMethods.setValue('rental_value', selectedApartment.rental_value);
+        formMethods.setValue('tag_fee', TAG_FEE_SINGLE);
+      }
     }
-  }, [selectedApartment?.max_tenants, responsibleTenantId, formMethods]);
+  };
+
+  const handleDependentSelection = (value: string) => {
+    if (value === 'new') {
+      setShowNewDependentForm(true);
+      formMethods.setValue('resident_dependent_id', null);
+    } else {
+      setShowNewDependentForm(false);
+      formMethods.setValue('resident_dependent_id', Number(value));
+    }
+  };
+
+  const createDependentAndGetId = async (tenantId: number): Promise<number> => {
+    const existingTenant = tenants?.find(t => t.id === tenantId);
+    const existingDependents: Dependent[] = existingTenant?.dependents ?? [];
+
+    const updatedDependents = [
+      ...existingDependents.map(d => ({
+        id: d.id,
+        name: d.name,
+        phone: d.phone,
+        cpf_cnpj: d.cpf_cnpj ?? '',
+      })),
+      {
+        name: newDependentForm.name,
+        phone: newDependentForm.phone,
+        cpf_cnpj: newDependentForm.cpf_cnpj,
+      },
+    ];
+
+    const response = await apiClient.patch<{ id: number; dependents: Dependent[] }>(
+      `/tenants/${String(tenantId)}/`,
+      { dependents: updatedDependents }
+    );
+
+    const createdDependents = response.data.dependents;
+    const newDependent = createdDependents.find(
+      d => d.name === newDependentForm.name && d.cpf_cnpj === newDependentForm.cpf_cnpj
+    );
+
+    if (!newDependent?.id) {
+      throw new Error('Falha ao criar dependente');
+    }
+
+    return newDependent.id;
+  };
 
   const handleSubmit = async (values: LeaseFormValues) => {
     try {
+      let residentDependentId = values.resident_dependent_id ?? null;
+
+      if (values.number_of_tenants === 2 && showNewDependentForm) {
+        if (!newDependentForm.name || !newDependentForm.phone) {
+          toast.error('Preencha nome e telefone do dependente');
+          return;
+        }
+        residentDependentId = await createDependentAndGetId(values.responsible_tenant_id);
+      }
+
       const payload = {
-        ...values,
+        apartment_id: values.apartment_id,
+        responsible_tenant_id: values.responsible_tenant_id,
+        tenant_ids: [values.responsible_tenant_id],
+        number_of_tenants: values.number_of_tenants,
+        rental_value: values.rental_value,
+        resident_dependent_id: values.number_of_tenants === 2 ? residentDependentId : null,
         start_date: format(values.start_date, 'yyyy-MM-dd'),
+        validity_months: values.validity_months,
+        tag_fee: values.tag_fee,
+        deposit_amount: values.deposit_amount ?? null,
+        cleaning_fee_paid: values.cleaning_fee_paid,
+        tag_deposit_paid: values.tag_deposit_paid,
       };
 
+      // Update tenant due_day if it changed or if creating
+      const tenantId = values.responsible_tenant_id;
+      const currentTenantDueDay = selectedResponsibleTenant?.due_day;
+      if (values.due_day !== currentTenantDueDay) {
+        await apiClient.patch(`/tenants/${String(tenantId)}/`, { due_day: values.due_day });
+      }
+
       if (lease?.id) {
-        await updateMutation.mutateAsync({
+        const updatePayload = {
           ...payload,
           id: lease.id,
-        });
+          last_rent_increase_date: values.last_rent_increase_date ?? null,
+        };
+        await updateMutation.mutateAsync(updatePayload);
         toast.success('Locação atualizada com sucesso');
       } else {
         await createMutation.mutateAsync(payload);
@@ -170,7 +336,11 @@ export function LeaseFormModal({ open, lease, onClose }: Props) {
   const handleClose = () => {
     onClose();
     formMethods.reset();
+    setShowNewDependentForm(false);
+    setNewDependentForm({ name: '', cpf_cnpj: '', phone: '' });
   };
+
+  const dependents = selectedResponsibleTenant?.dependents ?? [];
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -184,9 +354,18 @@ export function LeaseFormModal({ open, lease, onClose }: Props) {
             <Alert>
               <Info className="h-4 w-4" />
               <AlertDescription>
-                Os valores de aluguel e taxa de limpeza serão preenchidos automaticamente ao selecionar o apartamento.
+                Os valores de aluguel e taxa de limpeza são definidos no cadastro do apartamento. O dia de vencimento é definido no cadastro do inquilino.
               </AlertDescription>
             </Alert>
+
+            {isEditMode && lease?.contract_generated && (
+              <Alert>
+                <Info className="h-4 w-4" />
+                <AlertDescription>
+                  Este contrato já foi gerado. Após editar, será necessário regenerar o contrato.
+                </AlertDescription>
+              </Alert>
+            )}
 
             <Separator />
             <div className="text-sm font-medium">Apartamento e Inquilinos</div>
@@ -201,7 +380,7 @@ export function LeaseFormModal({ open, lease, onClose }: Props) {
                   <Select
                     value={field.value ? String(field.value) : ''}
                     onValueChange={(value) => field.onChange(Number(value))}
-                    disabled={apartmentsLoading}
+                    disabled={apartmentsLoading || isEditMode}
                   >
                     <FormControl>
                       <SelectTrigger>
@@ -240,7 +419,7 @@ export function LeaseFormModal({ open, lease, onClose }: Props) {
                     </FormControl>
                     <SelectContent>
                       {tenants?.map((t) => (
-                        <SelectItem key={t.id} value={String(t.id!)}>
+                        <SelectItem key={t.id} value={String(t.id ?? '')}>
                           {t.name} - {t.cpf_cnpj}
                         </SelectItem>
                       ))}
@@ -254,47 +433,107 @@ export function LeaseFormModal({ open, lease, onClose }: Props) {
               )}
             />
 
-            {/* All Tenants - Only show when apartment supports 2+ tenants */}
-            {selectedApartment && selectedApartment.max_tenants > 1 && (
+            {/* Number of Tenants — only for apartments that support 2 */}
+            {selectedApartment?.max_tenants === 2 && (
               <FormField
                 control={formMethods.control}
-                name="tenant_ids"
+                name="number_of_tenants"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Todos os Inquilinos</FormLabel>
-                    <div className="space-y-2 max-h-[200px] overflow-y-auto border rounded-md p-3">
-                      {tenants?.map((t) => (
-                        <div key={t.id} className="flex items-center space-x-2">
-                          <input
-                            type="checkbox"
-                            id={`tenant-${t.id}`}
-                            checked={field.value?.includes(t.id!)}
-                            onChange={(e) => {
-                              const currentValue = field.value || [];
-                              if (e.target.checked) {
-                                field.onChange([...currentValue, t.id!]);
-                              } else {
-                                field.onChange(currentValue.filter((id) => id !== t.id));
-                              }
-                            }}
-                            className="h-4 w-4 rounded border-gray-300"
-                          />
-                          <label
-                            htmlFor={`tenant-${t.id}`}
-                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                          >
-                            {t.name} - {t.cpf_cnpj}
-                          </label>
+                    <FormLabel>Quantas pessoas?</FormLabel>
+                    <FormControl>
+                      <RadioGroup
+                        value={String(field.value)}
+                        onValueChange={(value) => handleNumberOfTenantsChange(Number(value))}
+                        className="flex gap-6"
+                      >
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="1" id="tenants-1" />
+                          <Label htmlFor="tenants-1">1 pessoa</Label>
                         </div>
-                      ))}
-                    </div>
-                    <FormDescription>
-                      Todos os inquilinos que morarão no apartamento (incluindo o responsável). Máximo: {selectedApartment.max_tenants}
-                    </FormDescription>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="2" id="tenants-2" />
+                          <Label htmlFor="tenants-2">2 pessoas</Label>
+                        </div>
+                      </RadioGroup>
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
+            )}
+
+            {/* Dependent selection — only when 2 tenants selected */}
+            {numberOfTenants === 2 && selectedApartment?.max_tenants === 2 && (
+              <div className="space-y-3 rounded-md border p-4">
+                <div className="text-sm font-medium">Segundo morador</div>
+
+                {dependents.length > 0 && (
+                  <RadioGroup
+                    value={showNewDependentForm ? 'new' : String(formMethods.watch('resident_dependent_id') ?? '')}
+                    onValueChange={handleDependentSelection}
+                    className="space-y-2"
+                  >
+                    {dependents.map((dep) => (
+                      <div key={dep.id} className="flex items-center space-x-2">
+                        <RadioGroupItem value={String(dep.id)} id={`dep-${String(dep.id)}`} />
+                        <Label htmlFor={`dep-${String(dep.id)}`}>
+                          {dep.name}
+                          {dep.cpf_cnpj ? ` — ${dep.cpf_cnpj}` : ''}
+                          {dep.phone ? ` — ${dep.phone}` : ''}
+                        </Label>
+                      </div>
+                    ))}
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="new" id="dep-new" />
+                      <Label htmlFor="dep-new">Cadastrar novo dependente</Label>
+                    </div>
+                  </RadioGroup>
+                )}
+
+                {(dependents.length === 0 || showNewDependentForm) && (
+                  <div className="space-y-3 pt-2">
+                    {dependents.length > 0 && (
+                      <div className="text-sm text-muted-foreground">Novo dependente:</div>
+                    )}
+                    <div className="grid grid-cols-1 gap-3">
+                      <div>
+                        <Label htmlFor="dep-name-new">Nome</Label>
+                        <Input
+                          id="dep-name-new"
+                          placeholder="Nome completo"
+                          value={newDependentForm.name}
+                          onChange={(e) =>
+                            setNewDependentForm((prev) => ({ ...prev, name: e.target.value }))
+                          }
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="dep-cpf-new">CPF</Label>
+                        <Input
+                          id="dep-cpf-new"
+                          placeholder="000.000.000-00"
+                          value={newDependentForm.cpf_cnpj}
+                          onChange={(e) =>
+                            setNewDependentForm((prev) => ({ ...prev, cpf_cnpj: e.target.value }))
+                          }
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="dep-phone-new">Telefone</Label>
+                        <Input
+                          id="dep-phone-new"
+                          placeholder="(00) 00000-0000"
+                          value={newDependentForm.phone}
+                          onChange={(e) =>
+                            setNewDependentForm((prev) => ({ ...prev, phone: e.target.value }))
+                          }
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
 
             <Separator />
@@ -332,10 +571,45 @@ export function LeaseFormModal({ open, lease, onClose }: Props) {
                         selected={field.value}
                         onSelect={field.onChange}
                         locale={ptBR}
-                        initialFocus
+                        autoFocus
                       />
                     </PopoverContent>
                   </Popover>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Due Day */}
+            <FormField
+              control={formMethods.control}
+              name="due_day"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Dia de Vencimento</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={31}
+                      placeholder="Ex: 7"
+                      {...field}
+                      onChange={(e) => field.onChange(Number(e.target.value))}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    Dia do mês para vencimento do aluguel. Derivado automaticamente da data de início.
+                  </FormDescription>
+                  {dueDayChanged && dueDayChangeFee > 0 && (
+                    <Alert className="mt-2">
+                      <Info className="h-4 w-4" />
+                      <AlertDescription>
+                        Alteração de vencimento: taxa proporcional de{' '}
+                        <strong>{formatCurrency(dueDayChangeFee)}</strong>{' '}
+                        ({Math.abs(watchedDueDay - (originalDueDay ?? 0))} dias de diferença)
+                      </AlertDescription>
+                    </Alert>
+                  )}
                   <FormMessage />
                 </FormItem>
               )}
@@ -366,62 +640,6 @@ export function LeaseFormModal({ open, lease, onClose }: Props) {
               )}
             />
 
-            {/* Rental Value */}
-            <FormField
-              control={formMethods.control}
-              name="rental_value"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Valor do Aluguel</FormLabel>
-                  <FormControl>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-sm text-muted-foreground">
-                        R$
-                      </span>
-                      <Input
-                        type="number"
-                        min={0}
-                        step="0.01"
-                        placeholder="0.00"
-                        className="pl-10"
-                        {...field}
-                        onChange={(e) => field.onChange(Number(e.target.value))}
-                      />
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* Cleaning Fee */}
-            <FormField
-              control={formMethods.control}
-              name="cleaning_fee"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Taxa de Limpeza</FormLabel>
-                  <FormControl>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-sm text-muted-foreground">
-                        R$
-                      </span>
-                      <Input
-                        type="number"
-                        min={0}
-                        step="0.01"
-                        placeholder="0.00"
-                        className="pl-10"
-                        {...field}
-                        onChange={(e) => field.onChange(Number(e.target.value))}
-                      />
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
             {/* Tag Fee */}
             <FormField
               control={formMethods.control}
@@ -446,49 +664,175 @@ export function LeaseFormModal({ open, lease, onClose }: Props) {
                     </div>
                   </FormControl>
                   <FormDescription>
-                    R$ 50,00 para 1 inquilino, R$ 80,00 para 2+ inquilinos
+                    R$ 50,00 para 1 pessoa, R$ 80,00 para 2 pessoas
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
             />
 
-            {/* Due Day */}
+            {/* Rental Value */}
             <FormField
               control={formMethods.control}
-              name="due_day"
+              name="rental_value"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Dia de Vencimento</FormLabel>
+                  <FormLabel>Valor do Aluguel</FormLabel>
                   <FormControl>
-                    <Input
-                      type="number"
-                      min={1}
-                      max={31}
-                      placeholder="Ex: 10"
-                      {...field}
-                      onChange={(e) => field.onChange(Number(e.target.value))}
-                    />
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-sm text-muted-foreground">
+                        R$
+                      </span>
+                      <Input
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        placeholder="0.00"
+                        className="pl-10"
+                        {...field}
+                        onChange={(e) => field.onChange(Number(e.target.value))}
+                      />
+                    </div>
                   </FormControl>
                   <FormDescription>
-                    Dia do mês para vencimento do aluguel
+                    Preenchido automaticamente com base no número de moradores. Pode ser editado manualmente.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
             />
 
-            {selectedApartment && (
+            {/* Last Rent Increase Date — edit mode only */}
+            {isEditMode && (
+              <FormField
+                control={formMethods.control}
+                name="last_rent_increase_date"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Data do Último Reajuste</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="date"
+                        {...field}
+                        value={field.value ?? ''}
+                        onChange={(e) => field.onChange(e.target.value || null)}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      Data de referência para o próximo reajuste anual
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+
+            {/* Deposit Amount */}
+            <FormField
+              control={formMethods.control}
+              name="deposit_amount"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Valor do Depósito</FormLabel>
+                  <FormControl>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-sm text-muted-foreground">
+                        R$
+                      </span>
+                      <Input
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        placeholder="0.00"
+                        className="pl-10"
+                        value={field.value ?? ''}
+                        onChange={(e) => field.onChange(e.target.value === '' ? null : Number(e.target.value))}
+                      />
+                    </div>
+                  </FormControl>
+                  <FormDescription>
+                    Valor do depósito caução (opcional)
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <Separator />
+            <div className="text-sm font-medium">Confirmações de Pagamento</div>
+
+            {/* Cleaning Fee Paid */}
+            <FormField
+              control={formMethods.control}
+              name="cleaning_fee_paid"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                  <FormControl>
+                    <Checkbox
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                  <div className="space-y-1 leading-none">
+                    <FormLabel>Taxa de Limpeza Paga</FormLabel>
+                    <FormDescription>
+                      Marque se a taxa de limpeza inicial foi paga pelo inquilino
+                    </FormDescription>
+                  </div>
+                </FormItem>
+              )}
+            />
+
+            {/* Tag Deposit Paid */}
+            <FormField
+              control={formMethods.control}
+              name="tag_deposit_paid"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                  <FormControl>
+                    <Checkbox
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                  <div className="space-y-1 leading-none">
+                    <FormLabel>Depósito de Tag Pago</FormLabel>
+                    <FormDescription>
+                      Marque se o depósito da tag de acesso foi pago pelo inquilino
+                    </FormDescription>
+                  </div>
+                </FormItem>
+              )}
+            />
+
+            {(selectedApartment ?? selectedResponsibleTenant) && (
               <Card>
                 <CardContent className="pt-6">
                   <div className="text-sm space-y-1">
-                    <div className="font-medium mb-2">Resumo do Apartamento Selecionado:</div>
-                    <div>• Prédio: {selectedApartment.building?.name}</div>
-                    <div>• Apartamento: {selectedApartment.number}</div>
-                    <div>• Aluguel: {formatCurrency(selectedApartment.rental_value)}</div>
-                    <div>• Limpeza: {formatCurrency(selectedApartment.cleaning_fee)}</div>
-                    <div>• Máx. Inquilinos: {selectedApartment.max_tenants}</div>
-                    <div>• Móveis incluídos: {selectedApartment.furnitures?.length || 0}</div>
+                    <div className="font-medium mb-2">Resumo do Apartamento e Inquilino Selecionados:</div>
+                    {selectedApartment && (
+                      <>
+                        <div>• Prédio: {selectedApartment.building?.name}</div>
+                        <div>• Apartamento: {selectedApartment.number}</div>
+                        {selectedApartment.max_tenants === 2 ? (
+                          <>
+                            <div>• Aluguel (1 pessoa): {formatCurrency(selectedApartment.rental_value)}</div>
+                            <div>• Aluguel (2 pessoas): {formatCurrency(selectedApartment.rental_value_double ?? selectedApartment.rental_value)}</div>
+                            <div className="font-medium text-primary">
+                              • Valor selecionado: {formatCurrency(formMethods.watch('rental_value'))}
+                            </div>
+                          </>
+                        ) : (
+                          <div>• Aluguel: {formatCurrency(selectedApartment.rental_value)}</div>
+                        )}
+                        <div>• Limpeza: {formatCurrency(selectedApartment.cleaning_fee)}</div>
+                        <div>• Máx. Inquilinos: {selectedApartment.max_tenants}</div>
+                        <div>• Móveis incluídos: {selectedApartment.furnitures?.length ?? 0}</div>
+                      </>
+                    )}
+                    {selectedResponsibleTenant?.due_day !== null && selectedResponsibleTenant?.due_day !== undefined && (
+                      <div>• Dia de Vencimento: Dia {selectedResponsibleTenant.due_day}</div>
+                    )}
                   </div>
                 </CardContent>
               </Card>

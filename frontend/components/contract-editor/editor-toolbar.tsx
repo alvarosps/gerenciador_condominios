@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback } from 'react';
-import { Editor } from '@tiptap/react';
+import { type Editor } from '@tiptap/react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import {
@@ -51,7 +51,7 @@ const ToolbarButton: React.FC<ToolbarButtonProps> = React.memo(
       className={cn('h-8 w-8', isActive && 'bg-muted')}
       onClick={onClick}
       disabled={disabled}
-      title={title}
+      aria-label={title}
     >
       {children}
     </Button>

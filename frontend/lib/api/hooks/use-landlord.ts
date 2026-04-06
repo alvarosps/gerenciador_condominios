@@ -1,7 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
-import { Landlord, LandlordFormData, landlordSchema } from '@/lib/schemas/landlord.schema';
-import { AxiosError } from 'axios';
+import { type Landlord, type LandlordFormData, landlordSchema } from '@/lib/schemas/landlord.schema';
+import { type AxiosError } from 'axios';
+import { queryKeys } from '@/lib/api/query-keys';
 
 /**
  * Hook to fetch the current (active) landlord.
@@ -10,7 +11,7 @@ import { AxiosError } from 'axios';
  */
 export function useLandlord() {
   return useQuery<Landlord, AxiosError>({
-    queryKey: ['landlord', 'current'],
+    queryKey: queryKeys.landlord.current(),
     queryFn: async () => {
       const { data } = await apiClient.get<Landlord>('/landlords/current/');
       return landlordSchema.parse(data);
@@ -40,7 +41,7 @@ export function useUpdateLandlord() {
       return landlordSchema.parse(data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['landlord'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.landlord.all });
     },
   });
 }

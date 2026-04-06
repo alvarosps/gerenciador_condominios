@@ -3,7 +3,7 @@
 import { Node, mergeAttributes } from '@tiptap/core';
 import {
   NodeViewWrapper,
-  NodeViewProps,
+  type NodeViewProps,
   ReactNodeViewRenderer,
 } from '@tiptap/react';
 import React from 'react';
@@ -18,14 +18,14 @@ const PageBreakView: React.FC<NodeViewProps> = () => {
       as="div"
       className={cn(
         'page-break-node',
-        'my-4 py-2 border-t-2 border-dashed border-gray-400',
+        'my-4 py-2 border-t-2 border-dashed border-border',
         'flex items-center justify-center',
         'select-none cursor-default'
       )}
       contentEditable={false}
       data-type="pageBreak"
     >
-      <span className="px-3 py-1 text-xs text-gray-500 bg-gray-100 rounded-full uppercase tracking-wide">
+      <span className="px-3 py-1 text-xs text-muted-foreground bg-muted rounded-full uppercase tracking-wide">
         Quebra de Página
       </span>
     </NodeViewWrapper>

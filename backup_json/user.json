@@ -1,0 +1,87 @@
+[
+{
+  "model": "auth.user",
+  "fields": {
+    "password": "pbkdf2_sha256$1000000$H6lKD2l9ZrxsPMgpFHp0iM$WBI+jfKyzm8PyS4PI6FvEQJeHycyHYQ23uGRafINyQg=",
+    "last_login": "2026-03-09T15:10:47.627Z",
+    "is_superuser": true,
+    "username": "admin",
+    "first_name": "",
+    "last_name": "",
+    "email": "admin@admin.com",
+    "is_staff": true,
+    "is_active": true,
+    "date_joined": "2025-05-22T13:44:13.404Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "auth.user",
+  "fields": {
+    "password": "pbkdf2_sha256$720000$w6bxNKx23C40mBohM77Da7$CFdVkjpZl4iG9WiHFMzXWTucCLCMgulm/YO8hVF2Fw4=",
+    "last_login": null,
+    "is_superuser": true,
+    "username": "alvarosps",
+    "first_name": "",
+    "last_name": "",
+    "email": "alvaro123sps@gmail.com",
+    "is_staff": true,
+    "is_active": true,
+    "date_joined": "2025-12-23T14:34:13.588Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "auth.user",
+  "fields": {
+    "password": "pbkdf2_sha256$1000000$c9zfVy0v0xJH7PR766WGU6$ap/q79one1yzTtEhiSRkxTzD7pGRkygo7HM6+M3RAYg=",
+    "last_login": null,
+    "is_superuser": false,
+    "username": "debug_admin",
+    "first_name": "",
+    "last_name": "",
+    "email": "debug@test.com",
+    "is_staff": true,
+    "is_active": true,
+    "date_joined": "2026-03-24T03:52:59.068Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "auth.user",
+  "fields": {
+    "password": "pbkdf2_sha256$1000000$PVRLm3PIS1v9oohwueDaIe$GsEgTByE5Rqp+cOZxuDaWpxhijruF7hZQSgYkpcdnYU=",
+    "last_login": null,
+    "is_superuser": true,
+    "username": "testadmin2",
+    "first_name": "",
+    "last_name": "",
+    "email": "",
+    "is_staff": true,
+    "is_active": true,
+    "date_joined": "2026-03-24T13:14:25.400Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "auth.user",
+  "fields": {
+    "password": "pbkdf2_sha256$1000000$3CHfY8V4QFqFh6uSvXp5vl$jbB7JWOlkTO6U9ouLMeLWPLnnhLrHJpTEXuvAZhGQNo=",
+    "last_login": null,
+    "is_superuser": true,
+    "username": "admin_test_debug",
+    "first_name": "",
+    "last_name": "",
+    "email": "debug@test.com",
+    "is_staff": true,
+    "is_active": true,
+    "date_joined": "2026-03-26T17:19:13.596Z",
+    "groups": [],
+    "user_permissions": []
+  }
+}
+]

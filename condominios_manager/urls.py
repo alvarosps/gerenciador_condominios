@@ -19,27 +19,32 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
-
 from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerView
 from rest_framework_simplejwt.views import TokenBlacklistView, TokenObtainPairView, TokenRefreshView
 
-from core.auth import google_oauth_callback, link_oauth_account, oauth_status
+from core.auth import current_user, google_oauth_callback, link_oauth_account, oauth_status
+from core.throttles import AuthRateThrottle
+
+
+class ThrottledTokenObtainPairView(TokenObtainPairView):
+    throttle_classes = [AuthRateThrottle]
+
+
+class ThrottledTokenRefreshView(TokenRefreshView):
+    throttle_classes = [AuthRateThrottle]
+
 
 urlpatterns = [
     # Django admin
     path("admin/", admin.site.urls),
     # JWT Authentication endpoints
-    path("api/auth/token/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
-    path("api/auth/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
+    path("api/auth/token/", ThrottledTokenObtainPairView.as_view(), name="token_obtain_pair"),
+    path("api/auth/token/refresh/", ThrottledTokenRefreshView.as_view(), name="token_refresh"),
     path("api/auth/token/blacklist/", TokenBlacklistView.as_view(), name="token_blacklist"),
     # API Documentation (Phase 8: OpenAPI/Swagger)
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
-    path(
-        "api/schema/swagger-ui/",
-        SpectacularSwaggerView.as_view(url_name="schema"),
-        name="swagger-ui",
-    ),
-    path("api/schema/redoc/", SpectacularRedocView.as_view(url_name="schema"), name="redoc"),
+    # Current user profile
+    path("api/auth/me/", current_user, name="current_user"),
     # Custom OAuth endpoints
     path("api/auth/oauth/google/callback/", google_oauth_callback, name="google_oauth_callback"),
     path("api/auth/oauth/link/", link_oauth_account, name="link_oauth_account"),
@@ -49,6 +54,17 @@ urlpatterns = [
     # Core API endpoints
     path("", include("core.urls")),
 ]
+
+# Swagger UI and Redoc only in development
+if settings.DEBUG:
+    urlpatterns += [
+        path(
+            "api/schema/swagger-ui/",
+            SpectacularSwaggerView.as_view(url_name="schema"),
+            name="swagger-ui",
+        ),
+        path("api/schema/redoc/", SpectacularRedocView.as_view(url_name="schema"), name="redoc"),
+    ]
 
 # Serve media files (contracts) in development
 if settings.DEBUG:

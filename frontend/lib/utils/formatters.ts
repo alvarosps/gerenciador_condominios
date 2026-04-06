@@ -73,10 +73,38 @@ export function formatDate(date: string | Date | null | undefined): string {
 }
 
 /**
+ * Format month/year in Portuguese (e.g., "Março/2026")
+ */
+export function formatMonthYear(year: number, month: number): string {
+  const date = new Date(year, month - 1, 1);
+  const formatted = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(date);
+  return formatted.charAt(0).toUpperCase() + formatted.slice(1);
+}
+
+/**
  * Format date to ISO format (YYYY-MM-DD) for API
  */
 export function formatDateISO(date: Date | null | undefined): string {
   if (!date) return '';
   if (isNaN(date.getTime())) return '';
-  return date.toISOString().split('T')[0];
+  return date.toISOString().split('T')[0] ?? '';
+}
+
+export const MONTH_ABBR = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'] as const;
+
+export const MONTH_NAMES = [
+  'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+  'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
+] as const;
+
+/**
+ * Calculate a default expense date for a given target year/month.
+ * Uses today's day number, clamped to the last day of the target month.
+ */
+export function getDefaultExpenseDate(year: number, month: number): string {
+  const today = new Date();
+  const day = today.getDate();
+  const lastDay = new Date(year, month, 0).getDate();
+  const targetDay = Math.min(day, lastDay);
+  return `${String(year)}-${String(month).padStart(2, '0')}-${String(targetDay).padStart(2, '0')}`;
 }

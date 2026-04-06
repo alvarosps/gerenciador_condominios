@@ -129,8 +129,8 @@ npm run dev
 ### 4. Access the Application
 
 - **Frontend**: http://localhost:4000
-- **Backend API**: http://localhost:8000/api/
-- **Django Admin**: http://localhost:8000/admin/
+- **Backend API**: http://localhost:8008/api/
+- **Django Admin**: http://localhost:8008/admin/
 
 ## Environment Variables
 
@@ -154,7 +154,7 @@ REDIS_URL=redis://localhost:6379/0
 ### Frontend (.env.local)
 
 ```env
-NEXT_PUBLIC_API_URL=http://localhost:8000/api
+NEXT_PUBLIC_API_URL=http://localhost:8008/api
 ```
 
 ## Database Management

@@ -1,0 +1,46 @@
+[
+{
+  "model": "core.employeepayment",
+  "pk": 1,
+  "fields": {
+    "created_at": "2026-03-23T01:49:56.318Z",
+    "updated_at": "2026-03-23T22:39:44.402Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "person": 5,
+    "reference_month": "2026-03-01",
+    "base_salary": "800.00",
+    "variable_amount": "400.00",
+    "rent_offset": "0.00",
+    "cleaning_count": 0,
+    "payment_date": "2026-03-05",
+    "is_paid": true,
+    "notes": "Salário fixo R$800 + variável por serviços extras (faxinas, etc). rent_offset = valor do aluguel do kitnet 206/850 (informativo, não sai do caixa)."
+  }
+},
+{
+  "model": "core.employeepayment",
+  "pk": 3,
+  "fields": {
+    "created_at": "2026-04-01T18:35:18.259Z",
+    "updated_at": "2026-04-01T18:35:18.259Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "person": 5,
+    "reference_month": "2026-04-01",
+    "base_salary": "800.00",
+    "variable_amount": "0.00",
+    "rent_offset": "0.00",
+    "cleaning_count": 0,
+    "payment_date": null,
+    "is_paid": false,
+    "notes": ""
+  }
+}
+]

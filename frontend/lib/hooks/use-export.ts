@@ -8,6 +8,14 @@ interface ExportOptions {
   sheetName?: string;
 }
 
+/** Safely convert an unknown value to string, returning '' for objects/arrays */
+function toStr(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  return '';
+}
+
 /**
  * Custom hook for exporting data to Excel
  * Handles formatting, file generation, and download
@@ -15,7 +23,7 @@ interface ExportOptions {
 export function useExport() {
   const [isExporting, setIsExporting] = useState(false);
 
-  const exportToExcel = async <T extends Record<string, unknown>>(
+  const exportToExcel = <T extends Record<string, unknown>>(
     data: T[],
     columns: {
       key: string;
@@ -34,7 +42,7 @@ export function useExport() {
           const value = record[column.key];
           const formattedValue = column.format
             ? column.format(value, record)
-            : String(value ?? '');
+            : toStr(value);
           row[column.label] = formattedValue;
         });
         return row;
@@ -46,7 +54,7 @@ export function useExport() {
       XLSX.utils.book_append_sheet(
         workbook,
         worksheet,
-        options.sheetName || 'Dados'
+        options.sheetName ?? 'Dados'
       );
 
       // Auto-size columns
@@ -55,7 +63,7 @@ export function useExport() {
         const headerLength = column.label.length;
         const maxContentLength = Math.max(
           ...formattedData.map((row) =>
-            String(row[column.label] || '').length
+            String(row[column.label] ?? '').length
           )
         );
         maxWidths[idx] = Math.min(
@@ -83,7 +91,7 @@ export function useExport() {
     }
   };
 
-  const exportToCSV = async <T extends Record<string, unknown>>(
+  const exportToCSV = <T extends Record<string, unknown>>(
     data: T[],
     columns: {
       key: string;
@@ -102,7 +110,7 @@ export function useExport() {
           const value = record[column.key];
           const formattedValue = column.format
             ? column.format(value, record)
-            : String(value ?? '');
+            : toStr(value);
           row[column.label] = formattedValue;
         });
         return row;
@@ -156,7 +164,7 @@ export const buildingExportColumns = [
   {
     key: 'created_at' as const,
     label: 'Data de Cadastro',
-    format: (value: unknown) => format(new Date(String(value ?? '')), 'dd/MM/yyyy HH:mm'),
+    format: (value: unknown) => format(new Date(toStr(value)), 'dd/MM/yyyy HH:mm'),
   },
 ];
 
@@ -197,30 +205,17 @@ export const tenantExportColumns = [
   {
     key: 'cpf_cnpj' as const,
     label: 'CPF / CNPJ',
-    format: (value: unknown) => formatCPFOrCNPJ(String(value ?? '')),
+    format: (value: unknown) => formatCPFOrCNPJ(toStr(value)),
   },
   {
     key: 'phone' as const,
     label: 'Telefone',
-    format: (value: unknown) => formatBrazilianPhone(String(value ?? '')),
+    format: (value: unknown) => formatBrazilianPhone(toStr(value)),
   },
-  { key: 'email' as const, label: 'Email' },
   {
     key: 'is_company' as const,
     label: 'Tipo',
     format: (value: unknown) => (value ? 'Empresa' : 'Pessoa Física'),
-  },
-  { key: 'profession' as const, label: 'Profissão' },
-  { key: 'marital_status' as const, label: 'Estado Civil' },
-  {
-    key: 'dependents' as const,
-    label: 'Dependentes',
-    format: (value: unknown) => (Array.isArray(value) ? value.length : 0),
-  },
-  {
-    key: 'furnitures' as const,
-    label: 'Móveis',
-    format: (value: unknown) => (Array.isArray(value) ? value.length : 0),
   },
 ];
 
@@ -231,7 +226,7 @@ export const leaseExportColumns = [
     format: (value: unknown) => {
       if (value && typeof value === 'object' && 'number' in value) {
         const building = 'building' in value && value.building && typeof value.building === 'object' && 'name' in value.building ? String(value.building.name) : '';
-        return `${building} - Apto ${value.number}`;
+        return `${building} - Apto ${String(value.number)}`;
       }
       return '';
     },
@@ -244,29 +239,40 @@ export const leaseExportColumns = [
   {
     key: 'start_date' as const,
     label: 'Data de Início',
-    format: (value: unknown) => format(new Date(String(value ?? '')), 'dd/MM/yyyy'),
+    format: (value: unknown) => format(new Date(toStr(value)), 'dd/MM/yyyy'),
   },
   {
     key: 'final_date' as const,
     label: 'Data Final',
-    format: (value: unknown) => format(new Date(String(value ?? '')), 'dd/MM/yyyy'),
+    format: (value: unknown) => format(new Date(toStr(value)), 'dd/MM/yyyy'),
   },
   {
     key: 'next_month_date' as const,
     label: 'Próximo Mês',
-    format: (value: unknown) => format(new Date(String(value ?? '')), 'dd/MM/yyyy'),
+    format: (value: unknown) => format(new Date(toStr(value)), 'dd/MM/yyyy'),
   },
   { key: 'validity_months' as const, label: 'Validade (meses)' },
-  { key: 'due_day' as const, label: 'Dia de Vencimento' },
   {
-    key: 'rental_value' as const,
-    label: 'Valor do Aluguel',
-    format: (value: unknown) => formatCurrency(Number(value) || 0),
+    key: 'responsible_tenant' as const,
+    label: 'Dia de Vencimento',
+    format: (value: unknown) => {
+      if (value && typeof value === 'object' && 'due_day' in value) {
+        const day = value.due_day;
+        if (typeof day === 'number') return String(day);
+        if (typeof day === 'string') return day;
+      }
+      return '';
+    },
   },
   {
-    key: 'cleaning_fee' as const,
+    key: 'apartment' as const,
+    label: 'Valor do Aluguel',
+    format: (value: unknown) => (value && typeof value === 'object' && 'rental_value' in value ? formatCurrency(Number(value.rental_value) || 0) : formatCurrency(0)),
+  },
+  {
+    key: 'apartment' as const,
     label: 'Taxa de Limpeza',
-    format: (value: unknown) => formatCurrency(Number(value) || 0),
+    format: (value: unknown) => (value && typeof value === 'object' && 'cleaning_fee' in value ? formatCurrency(Number(value.cleaning_fee) || 0) : formatCurrency(0)),
   },
   {
     key: 'tag_fee' as const,
@@ -286,6 +292,107 @@ export const furnitureExportColumns = [
   {
     key: 'created_at' as const,
     label: 'Data de Cadastro',
-    format: (value: unknown) => format(new Date(String(value ?? '')), 'dd/MM/yyyy HH:mm'),
+    format: (value: unknown) => format(new Date(toStr(value)), 'dd/MM/yyyy HH:mm'),
+  },
+];
+
+export const expenseExportColumns = [
+  { key: 'description' as const, label: 'Descrição' },
+  { key: 'expense_type' as const, label: 'Tipo' },
+  {
+    key: 'total_amount' as const,
+    label: 'Valor',
+    format: (value: unknown) => formatCurrency(Number(value) || 0),
+  },
+  {
+    key: 'person' as const,
+    label: 'Pessoa',
+    format: (value: unknown) => (value && typeof value === 'object' && 'name' in value ? String(value.name) : ''),
+  },
+  {
+    key: 'credit_card' as const,
+    label: 'Cartão',
+    format: (value: unknown) => (value && typeof value === 'object' && 'nickname' in value ? String(value.nickname) : ''),
+  },
+  {
+    key: 'building' as const,
+    label: 'Prédio',
+    format: (value: unknown) => (value && typeof value === 'object' && 'name' in value ? String(value.name) : ''),
+  },
+  {
+    key: 'category' as const,
+    label: 'Categoria',
+    format: (value: unknown) => (value && typeof value === 'object' && 'name' in value ? String(value.name) : ''),
+  },
+  {
+    key: 'expense_date' as const,
+    label: 'Data',
+    format: (value: unknown) => format(new Date(toStr(value)), 'dd/MM/yyyy'),
+  },
+  {
+    key: 'is_paid' as const,
+    label: 'Pago',
+    format: (value: unknown) => (value ? 'Sim' : 'Não'),
+  },
+];
+
+export const incomeExportColumns = [
+  { key: 'description' as const, label: 'Descrição' },
+  {
+    key: 'amount' as const,
+    label: 'Valor',
+    format: (value: unknown) => formatCurrency(Number(value) || 0),
+  },
+  {
+    key: 'income_date' as const,
+    label: 'Data',
+    format: (value: unknown) => format(new Date(toStr(value)), 'dd/MM/yyyy'),
+  },
+  {
+    key: 'person' as const,
+    label: 'Pessoa',
+    format: (value: unknown) => (value && typeof value === 'object' && 'name' in value ? String(value.name) : ''),
+  },
+  {
+    key: 'is_received' as const,
+    label: 'Recebido',
+    format: (value: unknown) => (value ? 'Sim' : 'Não'),
+  },
+];
+
+export const rentPaymentExportColumns = [
+  {
+    key: 'reference_month' as const,
+    label: 'Mês Ref.',
+    format: (value: unknown) => {
+      const str = toStr(value);
+      if (!str) return '';
+      const d = new Date(str + 'T00:00:00');
+      return d.toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' }).replace('.', '');
+    },
+  },
+  {
+    key: 'lease' as const,
+    label: 'Apartamento',
+    format: (value: unknown) => {
+      if (value && typeof value === 'object' && 'apartment' in value) {
+        const apt = (value as Record<string, unknown>).apartment;
+        if (apt && typeof apt === 'object' && 'number' in apt) {
+          const building = 'building' in apt && apt.building && typeof apt.building === 'object' && 'name' in apt.building ? String(apt.building.name) : '';
+          return `${String((apt as Record<string, unknown>).number)} - ${building}`;
+        }
+      }
+      return '';
+    },
+  },
+  {
+    key: 'amount_paid' as const,
+    label: 'Valor',
+    format: (value: unknown) => formatCurrency(Number(value) || 0),
+  },
+  {
+    key: 'payment_date' as const,
+    label: 'Data Pgto',
+    format: (value: unknown) => format(new Date(toStr(value)), 'dd/MM/yyyy'),
   },
 ];

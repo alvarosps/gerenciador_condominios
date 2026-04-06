@@ -101,7 +101,7 @@ export function useBulkOperations(options: BulkOperationsOptions) {
       // Update all selected items in parallel
       await Promise.all(
         selectedItems.map((item) =>
-          updateFn({ id: item.id!, [statusField]: newStatus } as Partial<T> & { id: number })
+          updateFn({ id: item.id ?? 0, [statusField]: newStatus } as Partial<T> & { id: number })
         )
       );
 

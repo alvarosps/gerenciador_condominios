@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import {
@@ -21,6 +21,7 @@ import {
   FormMessage,
   FormDescription,
 } from '@/components/ui/form';
+import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -35,7 +36,7 @@ import { toast } from 'sonner';
 import { useCreateApartment, useUpdateApartment } from '@/lib/api/hooks/use-apartments';
 import { useBuildings } from '@/lib/api/hooks/use-buildings';
 import { useFurniture } from '@/lib/api/hooks/use-furniture';
-import { Apartment } from '@/lib/schemas/apartment.schema';
+import { type Apartment } from '@/lib/schemas/apartment.schema';
 
 interface Props {
   open: boolean;
@@ -47,14 +48,10 @@ const apartmentFormSchema = z.object({
   building_id: z.number().min(1, 'Selecione um prédio'),
   number: z.number().min(1, 'Número deve ser positivo'),
   rental_value: z.number().min(0, 'Valor não pode ser negativo'),
+  rental_value_double: z.number().min(0, 'Valor não pode ser negativo').optional().nullable(),
   cleaning_fee: z.number().min(0, 'Valor não pode ser negativo'),
-  max_tenants: z.number().min(1, 'Deve ter pelo menos 1 inquilino').max(10, 'Máximo 10 inquilinos'),
+  max_tenants: z.number().min(1, 'Deve ter pelo menos 1 inquilino').max(2, 'Máximo 2 inquilinos'),
   furniture_ids: z.array(z.number()).optional(),
-  interfone_configured: z.boolean().optional(),
-  is_rented: z.boolean().optional(),
-  contract_generated: z.boolean().optional(),
-  contract_signed: z.boolean().optional(),
-  lease_date: z.string().optional(),
   last_rent_increase_date: z.string().optional(),
 });
 
@@ -72,33 +69,33 @@ export function ApartmentFormModal({ open, apartment, onClose }: Props) {
       building_id: undefined,
       number: undefined,
       rental_value: undefined,
+      rental_value_double: null,
       cleaning_fee: undefined,
       max_tenants: undefined,
       furniture_ids: [],
-      interfone_configured: false,
-      is_rented: false,
-      contract_generated: false,
-      contract_signed: false,
-      lease_date: '',
       last_rent_increase_date: '',
     },
   });
 
+  const maxTenants = useWatch({ control: formMethods.control, name: 'max_tenants' });
+
+  useEffect(() => {
+    if (maxTenants === 1) {
+      formMethods.setValue('rental_value_double', null);
+    }
+  }, [maxTenants, formMethods]);
+
   useEffect(() => {
     if (apartment) {
       formMethods.reset({
-        building_id: apartment.building_id,
+        building_id: apartment.building?.id,
         number: apartment.number,
-        rental_value: Number(apartment.rental_value),
-        cleaning_fee: Number(apartment.cleaning_fee),
+        rental_value: apartment.rental_value,
+        rental_value_double: apartment.rental_value_double ?? null,
+        cleaning_fee: apartment.cleaning_fee,
         max_tenants: apartment.max_tenants,
-        furniture_ids: apartment.furnitures?.map((f) => f.id!) || [],
-        interfone_configured: apartment.interfone_configured || false,
-        is_rented: apartment.is_rented || false,
-        contract_generated: apartment.contract_generated || false,
-        contract_signed: apartment.contract_signed || false,
-        lease_date: apartment.lease_date || '',
-        last_rent_increase_date: apartment.last_rent_increase_date || '',
+        furniture_ids: apartment.furnitures?.map((f) => f.id).filter((id): id is number => id !== undefined) ?? [],
+        last_rent_increase_date: apartment.last_rent_increase_date ?? '',
       });
     } else {
       formMethods.reset();
@@ -107,23 +104,17 @@ export function ApartmentFormModal({ open, apartment, onClose }: Props) {
 
   const onSubmit = async (values: ApartmentFormValues) => {
     try {
-      // Ensure optional booleans have defaults
-      const payload = {
-        ...values,
-        interfone_configured: values.interfone_configured ?? false,
-        is_rented: values.is_rented ?? false,
-        contract_generated: values.contract_generated ?? false,
-        contract_signed: values.contract_signed ?? false,
-      };
-
       if (apartment?.id) {
         await updateMutation.mutateAsync({
-          ...payload,
+          ...values,
           id: apartment.id,
         });
         toast.success('Apartamento atualizado com sucesso');
       } else {
-        await createMutation.mutateAsync(payload);
+        await createMutation.mutateAsync({
+          ...values,
+          rental_value_double: values.rental_value_double ?? null,
+        });
         toast.success('Apartamento criado com sucesso');
       }
 
@@ -139,8 +130,16 @@ export function ApartmentFormModal({ open, apartment, onClose }: Props) {
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>
+          <DialogTitle className="flex items-center gap-3">
             {apartment ? 'Editar Apartamento' : 'Novo Apartamento'}
+            {apartment && (
+              <Badge
+                variant={apartment.is_rented ? 'destructive' : 'default'}
+                className={apartment.is_rented ? '' : 'bg-success text-success-foreground'}
+              >
+                {apartment.is_rented ? 'Alugado' : 'Disponível'}
+              </Badge>
+            )}
           </DialogTitle>
         </DialogHeader>
 
@@ -222,6 +221,31 @@ export function ApartmentFormModal({ open, apartment, onClose }: Props) {
               )}
             />
 
+            {/* Rental Value Double */}
+            {maxTenants === 2 && (
+              <FormField
+                control={formMethods.control}
+                name="rental_value_double"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Valor do Aluguel (2 pessoas)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="0.00"
+                        {...field}
+                        value={field.value ?? ''}
+                        onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
+                      />
+                    </FormControl>
+                    <FormDescription>Valor para 2 pessoas. Obrigatório quando máximo de inquilinos é 2.</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+
             {/* Cleaning Fee */}
             <FormField
               control={formMethods.control}
@@ -251,15 +275,20 @@ export function ApartmentFormModal({ open, apartment, onClose }: Props) {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Máximo de Inquilinos *</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      placeholder="Ex: 2"
-                      {...field}
-                      value={field.value || ''}
-                      onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
-                    />
-                  </FormControl>
+                  <Select
+                    onValueChange={(value) => field.onChange(Number(value))}
+                    value={field.value ? String(field.value) : undefined}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="1">1</SelectItem>
+                      <SelectItem value="2">2</SelectItem>
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}
@@ -286,11 +315,11 @@ export function ApartmentFormModal({ open, apartment, onClose }: Props) {
                           <FormItem className="flex flex-row items-start space-x-3 space-y-0">
                             <FormControl>
                               <Checkbox
-                                checked={field.value?.includes(item.id!)}
+                                checked={item.id !== undefined && field.value?.includes(item.id)}
                                 onCheckedChange={(checked) => {
-                                  const current = field.value || [];
-                                  if (checked) {
-                                    field.onChange([...current, item.id!]);
+                                  const current = field.value ?? [];
+                                  if (checked && item.id !== undefined) {
+                                    field.onChange([...current, item.id]);
                                   } else {
                                     field.onChange(current.filter((id) => id !== item.id));
                                   }
@@ -308,108 +337,20 @@ export function ApartmentFormModal({ open, apartment, onClose }: Props) {
               )}
             />
 
-            <Separator className="my-4" />
-            <h3 className="text-sm font-medium">Configurações</h3>
-
-            {/* Boolean Flags */}
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={formMethods.control}
-                name="interfone_configured"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                    <FormControl>
-                      <Checkbox checked={field.value} onCheckedChange={field.onChange} />
-                    </FormControl>
-                    <div className="space-y-1 leading-none">
-                      <FormLabel>Interfone Configurado</FormLabel>
-                      <FormDescription>Interfone está configurado e funcionando</FormDescription>
-                    </div>
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={formMethods.control}
-                name="is_rented"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                    <FormControl>
-                      <Checkbox checked={field.value} onCheckedChange={field.onChange} />
-                    </FormControl>
-                    <div className="space-y-1 leading-none">
-                      <FormLabel>Está Alugado</FormLabel>
-                      <FormDescription>Apartamento está atualmente alugado</FormDescription>
-                    </div>
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={formMethods.control}
-                name="contract_generated"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                    <FormControl>
-                      <Checkbox checked={field.value} onCheckedChange={field.onChange} />
-                    </FormControl>
-                    <div className="space-y-1 leading-none">
-                      <FormLabel>Contrato Gerado</FormLabel>
-                      <FormDescription>Contrato já foi gerado</FormDescription>
-                    </div>
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={formMethods.control}
-                name="contract_signed"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                    <FormControl>
-                      <Checkbox checked={field.value} onCheckedChange={field.onChange} />
-                    </FormControl>
-                    <div className="space-y-1 leading-none">
-                      <FormLabel>Contrato Assinado</FormLabel>
-                      <FormDescription>Contrato já foi assinado</FormDescription>
-                    </div>
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            {/* Date Fields */}
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={formMethods.control}
-                name="lease_date"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Data da Locação</FormLabel>
-                    <FormControl>
-                      <Input type="date" {...field} value={field.value || ''} />
-                    </FormControl>
-                    <FormDescription>Data em que o apartamento foi locado</FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={formMethods.control}
-                name="last_rent_increase_date"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Último Reajuste</FormLabel>
-                    <FormControl>
-                      <Input type="date" {...field} value={field.value || ''} />
-                    </FormControl>
-                    <FormDescription>Data do último reajuste de aluguel</FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+            <FormField
+              control={formMethods.control}
+              name="last_rent_increase_date"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Último Reajuste</FormLabel>
+                  <FormControl>
+                    <Input type="date" {...field} value={field.value ?? ''} />
+                  </FormControl>
+                  <FormDescription>Data do último reajuste de aluguel</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={onClose}>

@@ -23,7 +23,7 @@ import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useCalculateLateFee } from '@/lib/api/hooks/use-leases';
-import { Lease } from '@/lib/schemas/lease.schema';
+import { type Lease } from '@/lib/schemas/lease.schema';
 import { formatCurrency } from '@/lib/utils/formatters';
 
 interface Props {
@@ -90,27 +90,27 @@ export function LateFeeModal({ open, lease, onClose }: Props) {
             <CardContent className="pt-6">
               <dl className="space-y-3">
                 <div className="flex justify-between py-2 border-b">
-                  <dt className="font-medium text-sm text-gray-600">Apartamento</dt>
-                  <dd className="text-sm text-gray-900">
+                  <dt className="font-medium text-sm text-muted-foreground">Apartamento</dt>
+                  <dd className="text-sm text-foreground">
                     {lease.apartment?.building?.name} - Apto {lease.apartment?.number}
                   </dd>
                 </div>
                 <div className="flex justify-between py-2 border-b">
-                  <dt className="font-medium text-sm text-gray-600">Inquilino</dt>
-                  <dd className="text-sm text-gray-900">
+                  <dt className="font-medium text-sm text-muted-foreground">Inquilino</dt>
+                  <dd className="text-sm text-foreground">
                     {lease.responsible_tenant?.name}
                   </dd>
                 </div>
                 <div className="flex justify-between py-2 border-b">
-                  <dt className="font-medium text-sm text-gray-600">Valor do Aluguel</dt>
-                  <dd className="text-sm text-gray-900">
-                    {formatCurrency(lease.rental_value)}
+                  <dt className="font-medium text-sm text-muted-foreground">Valor do Aluguel</dt>
+                  <dd className="text-sm text-foreground">
+                    {formatCurrency(lease.apartment?.rental_value ?? 0)}
                   </dd>
                 </div>
                 <div className="flex justify-between py-2">
-                  <dt className="font-medium text-sm text-gray-600">Dia de Vencimento</dt>
-                  <dd className="text-sm text-gray-900">
-                    Dia {lease.due_day}
+                  <dt className="font-medium text-sm text-muted-foreground">Dia de Vencimento</dt>
+                  <dd className="text-sm text-foreground">
+                    Dia {lease.responsible_tenant?.due_day ?? '-'}
                   </dd>
                 </div>
               </dl>
@@ -144,7 +144,7 @@ export function LateFeeModal({ open, lease, onClose }: Props) {
                   selected={paymentDate}
                   onSelect={(date) => date && setPaymentDate(date)}
                   locale={ptBR}
-                  initialFocus
+                  autoFocus
                 />
               </PopoverContent>
             </Popover>
@@ -153,34 +153,34 @@ export function LateFeeModal({ open, lease, onClose }: Props) {
           {result && (
             <Card className={cn(
               result.days_late > 0
-                ? 'border-orange-200 bg-orange-50'
-                : 'border-green-200 bg-green-50'
+                ? 'border-warning/20 bg-warning/10'
+                : 'border-success/20 bg-success/10'
             )}>
               <CardContent className="pt-6">
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Dias de Atraso:</span>
+                    <span className="text-muted-foreground">Dias de Atraso:</span>
                     <span className={cn(
                       'text-lg font-bold',
-                      result.days_late > 0 ? 'text-red-600' : 'text-green-600'
+                      result.days_late > 0 ? 'text-destructive' : 'text-success'
                     )}>
                       {result.days_late} dias
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Taxa Diária:</span>
+                    <span className="text-muted-foreground">Taxa Diária:</span>
                     <span className="text-lg font-medium">
                       {formatCurrency(result.daily_rate)}
                     </span>
                   </div>
                   <div className={cn(
                     'flex justify-between items-center pt-3 border-t-2',
-                    result.days_late > 0 ? 'border-orange-300' : 'border-green-300'
+                    result.days_late > 0 ? 'border-warning/30' : 'border-success/30'
                   )}>
-                    <span className="text-gray-900 font-medium">Multa Total:</span>
+                    <span className="text-foreground font-medium">Multa Total:</span>
                     <span className={cn(
                       'text-2xl font-bold',
-                      result.days_late > 0 ? 'text-red-600' : 'text-green-600'
+                      result.days_late > 0 ? 'text-destructive' : 'text-success'
                     )}>
                       {formatCurrency(result.late_fee)}
                     </span>
@@ -189,17 +189,17 @@ export function LateFeeModal({ open, lease, onClose }: Props) {
                     <Alert className={cn(
                       'mt-3',
                       result.days_late > 0
-                        ? 'border-yellow-200 bg-yellow-50'
-                        : 'border-green-200 bg-green-50'
+                        ? 'border-warning/20 bg-warning/10'
+                        : 'border-success/20 bg-success/10'
                     )}>
                       {result.days_late > 0 ? (
-                        <AlertTriangle className="h-4 w-4 text-yellow-600" />
+                        <AlertTriangle className="h-4 w-4 text-warning" />
                       ) : (
-                        <CheckCircle className="h-4 w-4 text-green-600" />
+                        <CheckCircle className="h-4 w-4 text-success" />
                       )}
                       <AlertDescription className={cn(
                         'ml-2 text-sm',
-                        result.days_late > 0 ? 'text-yellow-800' : 'text-green-800'
+                        result.days_late > 0 ? 'text-warning' : 'text-success'
                       )}>
                         {result.message}
                       </AlertDescription>

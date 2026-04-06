@@ -1,0 +1,617 @@
+[
+{
+  "model": "core.furniture",
+  "pk": 1,
+  "fields": {
+    "created_at": "2025-12-21T16:19:51.535Z",
+    "updated_at": "2025-12-21T16:19:51.628Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "name": "Fogão",
+    "description": ""
+  }
+},
+{
+  "model": "core.furniture",
+  "pk": 2,
+  "fields": {
+    "created_at": "2025-12-21T16:19:51.535Z",
+    "updated_at": "2025-12-21T16:19:51.628Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "name": "Mesa com cadeiras",
+    "description": ""
+  }
+},
+{
+  "model": "core.furniture",
+  "pk": 3,
+  "fields": {
+    "created_at": "2025-12-21T16:19:51.535Z",
+    "updated_at": "2025-12-21T16:19:51.628Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "name": "Armário de Cozinha",
+    "description": ""
+  }
+},
+{
+  "model": "core.furniture",
+  "pk": 4,
+  "fields": {
+    "created_at": "2025-12-21T16:19:51.535Z",
+    "updated_at": "2025-12-21T16:19:51.628Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "name": "1 Sofá",
+    "description": ""
+  }
+},
+{
+  "model": "core.furniture",
+  "pk": 5,
+  "fields": {
+    "created_at": "2025-12-21T16:19:51.535Z",
+    "updated_at": "2025-12-21T16:19:51.628Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "name": "Geladeira",
+    "description": ""
+  }
+},
+{
+  "model": "core.furniture",
+  "pk": 6,
+  "fields": {
+    "created_at": "2025-12-21T16:19:51.535Z",
+    "updated_at": "2025-12-21T16:19:51.628Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "name": "Roupeiro",
+    "description": ""
+  }
+},
+{
+  "model": "core.furniture",
+  "pk": 7,
+  "fields": {
+    "created_at": "2025-12-21T16:19:51.535Z",
+    "updated_at": "2025-12-21T16:19:51.628Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "name": "Cama de casal com colchão",
+    "description": ""
+  }
+},
+{
+  "model": "core.furniture",
+  "pk": 8,
+  "fields": {
+    "created_at": "2025-12-21T16:19:51.535Z",
+    "updated_at": "2025-12-21T16:19:51.628Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "name": "Chuveiro",
+    "description": ""
+  }
+},
+{
+  "model": "core.furniture",
+  "pk": 9,
+  "fields": {
+    "created_at": "2025-12-21T16:19:51.535Z",
+    "updated_at": "2025-12-21T16:19:51.628Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "name": "1 Rack",
+    "description": ""
+  }
+},
+{
+  "model": "core.furniture",
+  "pk": 10,
+  "fields": {
+    "created_at": "2025-12-21T16:19:51.535Z",
+    "updated_at": "2025-12-21T16:19:51.628Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "name": "Máquina de lavar roupas",
+    "description": ""
+  }
+},
+{
+  "model": "core.furniture",
+  "pk": 11,
+  "fields": {
+    "created_at": "2025-12-21T16:19:51.535Z",
+    "updated_at": "2025-12-21T16:19:51.628Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "name": "Botijão de gás",
+    "description": ""
+  }
+},
+{
+  "model": "core.furniture",
+  "pk": 12,
+  "fields": {
+    "created_at": "2025-12-21T16:19:51.535Z",
+    "updated_at": "2025-12-21T16:19:51.628Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "name": "1 Poltrona",
+    "description": ""
+  }
+},
+{
+  "model": "core.furniture",
+  "pk": 13,
+  "fields": {
+    "created_at": "2025-12-21T16:19:51.535Z",
+    "updated_at": "2025-12-21T16:19:51.628Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "name": "1 cortina blackout",
+    "description": ""
+  }
+},
+{
+  "model": "core.furniture",
+  "pk": 14,
+  "fields": {
+    "created_at": "2025-12-21T16:19:51.535Z",
+    "updated_at": "2025-12-21T16:19:51.628Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "name": "Mesa com 1 cadeira",
+    "description": ""
+  }
+},
+{
+  "model": "core.furniture",
+  "pk": 15,
+  "fields": {
+    "created_at": "2025-12-21T16:19:51.535Z",
+    "updated_at": "2025-12-21T16:19:51.628Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "name": "1 Cortina",
+    "description": ""
+  }
+},
+{
+  "model": "core.furniture",
+  "pk": 16,
+  "fields": {
+    "created_at": "2025-12-21T16:19:51.535Z",
+    "updated_at": "2025-12-21T16:19:51.628Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "name": "Cama de solteiro com colchão",
+    "description": ""
+  }
+},
+{
+  "model": "core.furniture",
+  "pk": 17,
+  "fields": {
+    "created_at": "2025-12-21T16:19:51.535Z",
+    "updated_at": "2025-12-21T16:19:51.628Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "name": "2 cortinas blackout",
+    "description": ""
+  }
+},
+{
+  "model": "core.furniture",
+  "pk": 18,
+  "fields": {
+    "created_at": "2025-12-21T16:19:51.535Z",
+    "updated_at": "2025-12-21T16:19:51.628Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "name": "Armário Aéreo",
+    "description": ""
+  }
+},
+{
+  "model": "core.furniture",
+  "pk": 19,
+  "fields": {
+    "created_at": "2025-12-21T16:19:51.535Z",
+    "updated_at": "2025-12-21T16:19:51.628Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "name": "Cortinas",
+    "description": ""
+  }
+},
+{
+  "model": "core.furniture",
+  "pk": 20,
+  "fields": {
+    "created_at": "2025-12-21T16:19:51.535Z",
+    "updated_at": "2025-12-21T16:19:51.628Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "name": "Mesa com 4 cadeiras",
+    "description": ""
+  }
+},
+{
+  "model": "core.furniture",
+  "pk": 21,
+  "fields": {
+    "created_at": "2025-12-21T16:19:51.535Z",
+    "updated_at": "2025-12-21T16:19:51.628Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "name": "2 Poltronas",
+    "description": ""
+  }
+},
+{
+  "model": "core.furniture",
+  "pk": 22,
+  "fields": {
+    "created_at": "2025-12-21T16:19:51.535Z",
+    "updated_at": "2025-12-21T16:19:51.628Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "name": "Escrivaninha com cadeira",
+    "description": ""
+  }
+},
+{
+  "model": "core.furniture",
+  "pk": 23,
+  "fields": {
+    "created_at": "2025-12-21T16:19:51.535Z",
+    "updated_at": "2025-12-21T16:19:51.628Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "name": "Mesa com 2 cadeiras",
+    "description": ""
+  }
+},
+{
+  "model": "core.furniture",
+  "pk": 24,
+  "fields": {
+    "created_at": "2025-12-21T16:19:51.535Z",
+    "updated_at": "2025-12-21T16:19:51.628Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "name": "2 Cortinas",
+    "description": ""
+  }
+},
+{
+  "model": "core.furniture",
+  "pk": 25,
+  "fields": {
+    "created_at": "2025-12-21T16:19:51.535Z",
+    "updated_at": "2025-12-21T16:19:51.628Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "name": "Geladeira Duplex",
+    "description": ""
+  }
+},
+{
+  "model": "core.furniture",
+  "pk": 26,
+  "fields": {
+    "created_at": "2025-12-21T16:19:51.535Z",
+    "updated_at": "2025-12-21T16:19:51.628Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "name": "Cama de solteiro sem colchão",
+    "description": ""
+  }
+},
+{
+  "model": "core.furniture",
+  "pk": 27,
+  "fields": {
+    "created_at": "2025-12-21T16:19:51.535Z",
+    "updated_at": "2025-12-21T16:19:51.628Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "name": "Mesa com 1 Banqueta",
+    "description": ""
+  }
+},
+{
+  "model": "core.furniture",
+  "pk": 28,
+  "fields": {
+    "created_at": "2025-12-21T16:19:51.535Z",
+    "updated_at": "2025-12-21T16:19:51.628Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "name": "Cômoda",
+    "description": ""
+  }
+},
+{
+  "model": "core.furniture",
+  "pk": 29,
+  "fields": {
+    "created_at": "2025-12-21T16:19:51.535Z",
+    "updated_at": "2025-12-21T16:19:51.628Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "name": "Mesa com Banquetas",
+    "description": ""
+  }
+},
+{
+  "model": "core.furniture",
+  "pk": 30,
+  "fields": {
+    "created_at": "2025-12-21T16:19:51.535Z",
+    "updated_at": "2025-12-21T16:19:51.628Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "name": "Fogão de mesa",
+    "description": ""
+  }
+},
+{
+  "model": "core.furniture",
+  "pk": 31,
+  "fields": {
+    "created_at": "2025-12-21T16:19:51.535Z",
+    "updated_at": "2025-12-21T16:19:51.628Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "name": "Frigobar",
+    "description": ""
+  }
+},
+{
+  "model": "core.furniture",
+  "pk": 32,
+  "fields": {
+    "created_at": "2025-12-21T16:19:51.535Z",
+    "updated_at": "2025-12-21T16:19:51.628Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "name": "Mesa com 2 Banquetas",
+    "description": ""
+  }
+},
+{
+  "model": "core.furniture",
+  "pk": 33,
+  "fields": {
+    "created_at": "2025-12-21T16:19:51.535Z",
+    "updated_at": "2025-12-21T16:19:51.628Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "name": "1 Sofá Cama",
+    "description": ""
+  }
+},
+{
+  "model": "core.furniture",
+  "pk": 34,
+  "fields": {
+    "created_at": "2025-12-21T16:19:51.535Z",
+    "updated_at": "2025-12-21T16:19:51.628Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "name": "Escrivaninha",
+    "description": ""
+  }
+},
+{
+  "model": "core.furniture",
+  "pk": 35,
+  "fields": {
+    "created_at": "2025-12-21T16:19:51.535Z",
+    "updated_at": "2025-12-21T16:19:51.628Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "name": "Cama de casal baú com colchão",
+    "description": ""
+  }
+},
+{
+  "model": "core.furniture",
+  "pk": 36,
+  "fields": {
+    "created_at": "2025-12-21T16:19:51.535Z",
+    "updated_at": "2025-12-21T16:19:51.628Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "name": "Armário de canto",
+    "description": ""
+  }
+},
+{
+  "model": "core.furniture",
+  "pk": 37,
+  "fields": {
+    "created_at": "2025-12-21T16:19:51.535Z",
+    "updated_at": "2025-12-21T16:19:51.628Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "name": "4 cortinas blackout",
+    "description": ""
+  }
+},
+{
+  "model": "core.furniture",
+  "pk": 38,
+  "fields": {
+    "created_at": "2025-12-21T16:19:51.535Z",
+    "updated_at": "2025-12-21T16:19:51.628Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "name": "1 Luminária",
+    "description": ""
+  }
+},
+{
+  "model": "core.furniture",
+  "pk": 39,
+  "fields": {
+    "created_at": "2025-12-21T16:19:51.535Z",
+    "updated_at": "2025-12-21T16:19:51.628Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "name": "Mesa com 3 cadeiras",
+    "description": ""
+  }
+},
+{
+  "model": "core.furniture",
+  "pk": 40,
+  "fields": {
+    "created_at": "2025-12-21T16:19:51.535Z",
+    "updated_at": "2025-12-21T16:19:51.628Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "name": "Armário multiuso",
+    "description": ""
+  }
+},
+{
+  "model": "core.furniture",
+  "pk": 41,
+  "fields": {
+    "created_at": "2025-12-21T16:19:51.535Z",
+    "updated_at": "2025-12-21T16:19:51.628Z",
+    "created_by": null,
+    "updated_by": null,
+    "is_deleted": false,
+    "deleted_at": null,
+    "deleted_by": null,
+    "name": "Cama baú de solteiro com colchão",
+    "description": ""
+  }
+}
+]

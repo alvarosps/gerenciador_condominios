@@ -1,0 +1,202 @@
+<h2>Proposta: Pagina de Despesas</h2>
+<p class="subtitle">Lista mensal de despesas com acesso a detalhes de cada categoria</p>
+
+<div class="section">
+  <h3>Lista de Despesas - Marco de 2026</h3>
+  <div class="mockup">
+    <div class="mockup-header">Despesas > Lista Mensal</div>
+    <div class="mockup-body" style="padding: 16px; font-family: system-ui, sans-serif; font-size: 14px;">
+
+      <!-- Month selector -->
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <button class="mock-button" style="padding: 6px 12px; font-size: 12px;">< Fev</button>
+          <span style="font-weight: 600; font-size: 16px;">Marco de 2026</span>
+          <button class="mock-button" style="padding: 6px 12px; font-size: 12px;">Abr ></button>
+        </div>
+        <div style="font-size: 13px; color: #666;">
+          Total: <strong style="color: #dc2626;">R$ 38.851,64</strong>
+        </div>
+      </div>
+
+      <!-- Table -->
+      <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+        <thead>
+          <tr style="border-bottom: 2px solid #e5e7eb; text-align: left;">
+            <th style="padding: 10px 8px; color: #6b7280;">Despesa</th>
+            <th style="padding: 10px 8px; color: #6b7280;">Tipo</th>
+            <th style="padding: 10px 8px; color: #6b7280; text-align: right;">Valor</th>
+            <th style="padding: 10px 8px; color: #6b7280;">Progresso Pgto</th>
+            <th style="padding: 10px 8px; color: #6b7280; text-align: center;">Acoes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- Person rows -->
+          <tr style="border-bottom: 1px solid #f3f4f6;">
+            <td style="padding: 12px 8px;"><span style="margin-right: 6px;">&#128100;</span> <strong>Alvaro</strong></td>
+            <td style="padding: 12px 8px;"><span style="background: #dbeafe; color: #1d4ed8; padding: 2px 8px; border-radius: 12px; font-size: 11px;">Pessoa</span></td>
+            <td style="padding: 12px 8px; text-align: right; font-weight: 600; color: #dc2626;">R$ 11.634,52</td>
+            <td style="padding: 12px 8px;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <div style="flex: 1; background: #e5e7eb; border-radius: 4px; height: 8px;">
+                  <div style="width: 0%; background: #f59e0b; border-radius: 4px; height: 8px;"></div>
+                </div>
+                <span style="font-size: 11px; color: #6b7280;">R$ 0 / R$ 11.634</span>
+              </div>
+            </td>
+            <td style="padding: 12px 8px; text-align: center;"><a href="#" style="color: #2563eb; text-decoration: none; font-size: 12px;">Ver detalhes &rarr;</a></td>
+          </tr>
+
+          <tr style="border-bottom: 1px solid #f3f4f6; background: #f9fafb;">
+            <td style="padding: 12px 8px;"><span style="margin-right: 6px;">&#128100;</span> <strong>Camila</strong><br><span style="font-size: 11px; color: #6b7280;">Salario administracao condominio</span></td>
+            <td style="padding: 12px 8px;"><span style="background: #f3e8ff; color: #7c3aed; padding: 2px 8px; border-radius: 12px; font-size: 11px;">Condominio</span></td>
+            <td style="padding: 12px 8px; text-align: right; font-weight: 600; color: #dc2626;">R$ 3.829,36</td>
+            <td style="padding: 12px 8px; color: #6b7280; font-size: 12px;">-</td>
+            <td style="padding: 12px 8px; text-align: center;"><a href="#" style="color: #2563eb; text-decoration: none; font-size: 12px;">Ver detalhes &rarr;</a></td>
+          </tr>
+
+          <tr style="border-bottom: 1px solid #f3f4f6;">
+            <td style="padding: 12px 8px;"><span style="margin-right: 6px;">&#128100;</span> <strong>Junior</strong></td>
+            <td style="padding: 12px 8px;"><span style="background: #dbeafe; color: #1d4ed8; padding: 2px 8px; border-radius: 12px; font-size: 11px;">Pessoa</span></td>
+            <td style="padding: 12px 8px; text-align: right; font-weight: 600; color: #dc2626;">R$ 2.370,00</td>
+            <td style="padding: 12px 8px;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <div style="flex: 1; background: #e5e7eb; border-radius: 4px; height: 8px;">
+                  <div style="width: 32%; background: #3b82f6; border-radius: 4px; height: 8px;"></div>
+                </div>
+                <span style="font-size: 11px; color: #6b7280;">R$ 767 / R$ 2.370</span>
+              </div>
+            </td>
+            <td style="padding: 12px 8px; text-align: center;"><a href="#" style="color: #2563eb; text-decoration: none; font-size: 12px;">Ver detalhes &rarr;</a></td>
+          </tr>
+
+          <tr style="border-bottom: 1px solid #f3f4f6; background: #f9fafb;">
+            <td style="padding: 12px 8px;"><span style="margin-right: 6px;">&#128100;</span> <strong>Rodrigo</strong></td>
+            <td style="padding: 12px 8px;"><span style="background: #dbeafe; color: #1d4ed8; padding: 2px 8px; border-radius: 12px; font-size: 11px;">Pessoa</span></td>
+            <td style="padding: 12px 8px; text-align: right; font-weight: 600; color: #dc2626;">R$ 12.155,15</td>
+            <td style="padding: 12px 8px;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <div style="flex: 1; background: #e5e7eb; border-radius: 4px; height: 8px;">
+                  <div style="width: 41%; background: #f59e0b; border-radius: 4px; height: 8px;"></div>
+                </div>
+                <span style="font-size: 11px; color: #6b7280;">R$ 5.000 / R$ 12.155</span>
+              </div>
+            </td>
+            <td style="padding: 12px 8px; text-align: center;"><a href="#" style="color: #2563eb; text-decoration: none; font-size: 12px;">Ver detalhes &rarr;</a></td>
+          </tr>
+
+          <tr style="border-bottom: 1px solid #f3f4f6;">
+            <td style="padding: 12px 8px;"><span style="margin-right: 6px;">&#128100;</span> <strong>Tiago</strong></td>
+            <td style="padding: 12px 8px;"><span style="background: #dbeafe; color: #1d4ed8; padding: 2px 8px; border-radius: 12px; font-size: 11px;">Pessoa</span></td>
+            <td style="padding: 12px 8px; text-align: right; font-weight: 600; color: #22c55e;">R$ 1.327,40</td>
+            <td style="padding: 12px 8px;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <div style="flex: 1; background: #e5e7eb; border-radius: 4px; height: 8px;">
+                  <div style="width: 100%; background: #22c55e; border-radius: 4px; height: 8px;"></div>
+                </div>
+                <span style="font-size: 11px; color: #22c55e; font-weight: 600;">Quitado</span>
+              </div>
+            </td>
+            <td style="padding: 12px 8px; text-align: center;"><a href="#" style="color: #2563eb; text-decoration: none; font-size: 12px;">Ver detalhes &rarr;</a></td>
+          </tr>
+
+          <!-- Category rows -->
+          <tr style="border-bottom: 1px solid #f3f4f6; background: #f9fafb;">
+            <td style="padding: 12px 8px;"><span style="margin-right: 6px;">&#9889;</span> <strong>Contas de Luz</strong><br><span style="font-size: 11px; color: #6b7280;">3 predios</span></td>
+            <td style="padding: 12px 8px;"><span style="background: #fef3c7; color: #92400e; padding: 2px 8px; border-radius: 12px; font-size: 11px;">Utilidade</span></td>
+            <td style="padding: 12px 8px; text-align: right; font-weight: 600; color: #dc2626;">R$ 1.843,73</td>
+            <td style="padding: 12px 8px; color: #6b7280; font-size: 12px;">-</td>
+            <td style="padding: 12px 8px; text-align: center;"><a href="#" style="color: #2563eb; text-decoration: none; font-size: 12px;">Ver detalhes &rarr;</a></td>
+          </tr>
+
+          <tr style="border-bottom: 1px solid #f3f4f6;">
+            <td style="padding: 12px 8px;"><span style="margin-right: 6px;">&#128167;</span> <strong>Contas de Agua</strong><br><span style="font-size: 11px; color: #6b7280;">1 predio</span></td>
+            <td style="padding: 12px 8px;"><span style="background: #fef3c7; color: #92400e; padding: 2px 8px; border-radius: 12px; font-size: 11px;">Utilidade</span></td>
+            <td style="padding: 12px 8px; text-align: right; font-weight: 600; color: #dc2626;">R$ 696,04</td>
+            <td style="padding: 12px 8px; color: #6b7280; font-size: 12px;">-</td>
+            <td style="padding: 12px 8px; text-align: center;"><a href="#" style="color: #2563eb; text-decoration: none; font-size: 12px;">Ver detalhes &rarr;</a></td>
+          </tr>
+
+          <tr style="border-bottom: 1px solid #f3f4f6; background: #f9fafb;">
+            <td style="padding: 12px 8px;"><span style="margin-right: 6px;">&#127970;</span> <strong>IPTU</strong><br><span style="font-size: 11px; color: #6b7280;">2 predios</span></td>
+            <td style="padding: 12px 8px;"><span style="background: #fef3c7; color: #92400e; padding: 2px 8px; border-radius: 12px; font-size: 11px;">Utilidade</span></td>
+            <td style="padding: 12px 8px; text-align: right; font-weight: 600; color: #dc2626;">R$ 2.242,55</td>
+            <td style="padding: 12px 8px; color: #6b7280; font-size: 12px;">-</td>
+            <td style="padding: 12px 8px; text-align: center;"><a href="#" style="color: #2563eb; text-decoration: none; font-size: 12px;">Ver detalhes &rarr;</a></td>
+          </tr>
+
+          <tr style="border-bottom: 1px solid #f3f4f6;">
+            <td style="padding: 12px 8px;"><span style="margin-right: 6px;">&#128246;</span> <strong>Internet</strong><br><span style="font-size: 11px; color: #6b7280;">3 itens</span></td>
+            <td style="padding: 12px 8px;"><span style="background: #ecfdf5; color: #065f46; padding: 2px 8px; border-radius: 12px; font-size: 11px;">Fixo</span></td>
+            <td style="padding: 12px 8px; text-align: right; font-weight: 600; color: #dc2626;">R$ 459,80</td>
+            <td style="padding: 12px 8px; color: #6b7280; font-size: 12px;">-</td>
+            <td style="padding: 12px 8px; text-align: center;"><a href="#" style="color: #2563eb; text-decoration: none; font-size: 12px;">Ver detalhes &rarr;</a></td>
+          </tr>
+
+          <!-- More rows abbreviated -->
+          <tr style="border-bottom: 1px solid #f3f4f6; background: #f9fafb;">
+            <td style="padding: 12px 8px;"><span style="margin-right: 6px;">&#128222;</span> <strong>Celular / Claro</strong></td>
+            <td style="padding: 12px 8px;"><span style="background: #ecfdf5; color: #065f46; padding: 2px 8px; border-radius: 12px; font-size: 11px;">Fixo</span></td>
+            <td style="padding: 12px 8px; text-align: right; font-weight: 600; color: #dc2626;">R$ 443,09</td>
+            <td style="padding: 12px 8px; color: #6b7280; font-size: 12px;">-</td>
+            <td style="padding: 12px 8px; text-align: center;"><a href="#" style="color: #2563eb; text-decoration: none; font-size: 12px;">Ver detalhes &rarr;</a></td>
+          </tr>
+
+          <tr style="border-bottom: 1px solid #f3f4f6;">
+            <td style="padding: 12px 8px;"><span style="margin-right: 6px;">&#127793;</span> <strong>Sitio</strong><br><span style="font-size: 11px; color: #6b7280;">2 itens</span></td>
+            <td style="padding: 12px 8px;"><span style="background: #ecfdf5; color: #065f46; padding: 2px 8px; border-radius: 12px; font-size: 11px;">Fixo</span></td>
+            <td style="padding: 12px 8px; text-align: right; font-weight: 600; color: #dc2626;">R$ 900,00</td>
+            <td style="padding: 12px 8px; color: #6b7280; font-size: 12px;">-</td>
+            <td style="padding: 12px 8px; text-align: center;"><a href="#" style="color: #2563eb; text-decoration: none; font-size: 12px;">Ver detalhes &rarr;</a></td>
+          </tr>
+
+          <tr style="border-bottom: 1px solid #f3f4f6; background: #f9fafb;">
+            <td style="padding: 12px 8px;"><span style="margin-right: 6px;">&#128188;</span> <strong>Funcionarios</strong><br><span style="font-size: 11px; color: #6b7280;">1 funcionario</span></td>
+            <td style="padding: 12px 8px;"><span style="background: #fce7f3; color: #9d174d; padding: 2px 8px; border-radius: 12px; font-size: 11px;">Salario</span></td>
+            <td style="padding: 12px 8px; text-align: right; font-weight: 600; color: #dc2626;">R$ 800,00</td>
+            <td style="padding: 12px 8px; color: #6b7280; font-size: 12px;">-</td>
+            <td style="padding: 12px 8px; text-align: center;"><a href="#" style="color: #2563eb; text-decoration: none; font-size: 12px;">Ver detalhes &rarr;</a></td>
+          </tr>
+
+          <tr>
+            <td style="padding: 12px 8px;"><span style="margin-right: 6px;">&#8226;&#8226;&#8226;</span> <strong>Outros</strong><br><span style="font-size: 11px; color: #6b7280;">1 item</span></td>
+            <td style="padding: 12px 8px;"><span style="background: #ecfdf5; color: #065f46; padding: 2px 8px; border-radius: 12px; font-size: 11px;">Fixo</span></td>
+            <td style="padding: 12px 8px; text-align: right; font-weight: 600; color: #dc2626;">R$ 150,00</td>
+            <td style="padding: 12px 8px; color: #6b7280; font-size: 12px;">-</td>
+            <td style="padding: 12px 8px; text-align: center;"><a href="#" style="color: #2563eb; text-decoration: none; font-size: 12px;">Ver detalhes &rarr;</a></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<h3>Estrutura de URL para pagina de detalhes</h3>
+<p class="subtitle">Como identificar cada despesa na URL?</p>
+
+<div class="options">
+  <div class="option" data-choice="slug" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Por slug</h3>
+      <p><code>/financial/expenses/alvaro</code>, <code>/financial/expenses/electricity</code></p>
+      <p>URLs limpas e legíveis. Precisa de slug mapping no backend.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="type-id" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Por tipo + ID</h3>
+      <p><code>/financial/expenses/person/3</code>, <code>/financial/expenses/utility/electricity</code></p>
+      <p>Explicito, facil de parsear. Mais verboso mas sem ambiguidade.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="query" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Por query params</h3>
+      <p><code>/financial/expenses/details?type=person&id=3</code></p>
+      <p>Flexivel, nao precisa de rotas dinamicas. Menos clean na URL.</p>
+    </div>
+  </div>
+</div>

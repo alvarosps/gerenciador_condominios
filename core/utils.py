@@ -8,14 +8,13 @@ This module provides helper functions for:
 
 import logging
 from decimal import Decimal
-from typing import Union
 
 from num2words import num2words
 
 logger = logging.getLogger(__name__)
 
 
-def number_to_words(value: Union[int, float, Decimal]) -> str:
+def number_to_words(value: int | float | Decimal) -> str:
     """
     Convert a number to its word representation in Portuguese (BR).
 
@@ -33,12 +32,12 @@ def number_to_words(value: Union[int, float, Decimal]) -> str:
     """
     try:
         return str(num2words(float(value), lang="pt_BR"))
-    except Exception as e:
-        logger.error(f"Erro ao converter número para extenso: {e}")
+    except Exception:
+        logger.exception("Erro ao converter número para extenso")
         return str(value)
 
 
-def format_currency(value: Union[int, float, Decimal]) -> str:
+def format_currency(value: int | float | Decimal) -> str:
     """
     Format a numeric value as Brazilian currency (R$).
 
@@ -53,7 +52,7 @@ def format_currency(value: Union[int, float, Decimal]) -> str:
         'R$1.500,00'
         >>> format_currency(1500.50)
         'R$1.500,50'
-        >>> format_currency(Decimal('1500.00'))
+        >>> format_currency(Decimal("1500.00"))
         'R$1.500,00'
     """
     # Format with US-style separators, then swap to Brazilian format

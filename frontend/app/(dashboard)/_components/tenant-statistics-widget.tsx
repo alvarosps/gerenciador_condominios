@@ -49,11 +49,14 @@ export function TenantStatisticsWidget() {
     payload,
   }: {
     active?: boolean;
-    payload?: Array<{ name: string; value: number; payload: { color: string } }>;
+    payload?: { name: string; value: number; payload: { color: string } }[];
   }) => {
-    if (active && payload && payload.length) {
+    if (active && payload?.length) {
       const dataItem = payload[0];
-      const total = pieData[0].value + pieData[1].value;
+      if (!dataItem) return null;
+      const first = pieData[0];
+      const second = pieData[1];
+      const total = (first?.value ?? 0) + (second?.value ?? 0);
       const percentage = total > 0 ? ((dataItem.value / total) * 100).toFixed(1) : '0';
 
       return (
@@ -99,7 +102,7 @@ export function TenantStatisticsWidget() {
                   cy="50%"
                   outerRadius={80}
                   label={(props) =>
-                    `${props.value} (${(Number(props.percent || 0) * 100).toFixed(0)}%)`
+                    `${String(props.value)} (${(Number(props.percent ?? 0) * 100).toFixed(0)}%)`
                   }
                   labelLine={false}
                 >
@@ -120,7 +123,7 @@ export function TenantStatisticsWidget() {
                 <span>Total de Inquilinos</span>
                 <Users className="h-4 w-4" />
               </div>
-              <div className="text-3xl font-bold text-blue-500">{data.total_tenants}</div>
+              <div className="text-3xl font-bold text-info">{data.total_tenants}</div>
             </div>
 
             <div className="pt-4 border-t space-y-3">
@@ -156,13 +159,13 @@ export function TenantStatisticsWidget() {
         {/* Bottom Summary */}
         <div className="mt-6 pt-4 border-t grid grid-cols-2 gap-4">
           <div className="text-center">
-            <div className="text-2xl font-bold text-blue-500">{data.individual_tenants}</div>
+            <div className="text-2xl font-bold text-info">{data.individual_tenants}</div>
             <div className="text-xs text-muted-foreground flex items-center justify-center gap-1 mt-1">
               <User className="h-3 w-3" /> Pessoas Físicas
             </div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-bold text-green-500">{data.company_tenants}</div>
+            <div className="text-2xl font-bold text-success">{data.company_tenants}</div>
             <div className="text-xs text-muted-foreground flex items-center justify-center gap-1 mt-1">
               <Building className="h-3 w-3" /> Empresas
             </div>

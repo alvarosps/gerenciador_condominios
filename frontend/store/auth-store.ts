@@ -9,6 +9,7 @@ export interface User {
   email: string;
   first_name: string;
   last_name: string;
+  is_staff: boolean;
 }
 
 /**
@@ -58,6 +59,7 @@ export const useAuthStore = create<AuthState>()(
       setToken: (token) =>
         set({
           token,
+          isAuthenticated: true,
         }),
 
       setUser: (user) =>
