@@ -152,6 +152,9 @@ max-complexity = 12
 "core/services/base.py" = ["SLF001"]
 # auth.py uses local imports to avoid circular dependency (core.auth ↔ core.models)
 "core/auth.py" = ["PLC0415"]
+# tasks.py and views.py use local imports to avoid circular deps and lazy-load Celery
+"core/tasks.py" = ["PLC0415"]
+"core/views.py" = ["PLC0415"]
 
 [tool.ruff.lint.pylint]
 max-args = 8

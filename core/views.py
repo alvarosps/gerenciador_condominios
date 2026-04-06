@@ -5,14 +5,14 @@ from decimal import Decimal, InvalidOperation
 from typing import Any, cast
 
 from django.contrib.auth.models import User
-from django.core.exceptions import PermissionDenied, ValidationError
+from django.core.exceptions import ValidationError
 from django.db import DatabaseError, IntegrityError, OperationalError, connection
 from django.db.models import Count, DateField, Q, QuerySet
 from django.db.models.expressions import RawSQL
 from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 
@@ -32,7 +32,7 @@ from .serializers import (
     RentAdjustmentSerializer,
     TenantSerializer,
 )
-from .services import ContractService, DashboardService, FeeCalculatorService
+from .services import DashboardService, FeeCalculatorService
 from .services.lease_service import change_tenant_due_day, terminate_lease, transfer_lease
 from .services.rent_adjustment_service import RentAdjustmentService
 
@@ -365,33 +365,17 @@ class LeaseViewSet(viewsets.ModelViewSet):
         lease = self.get_object()
 
         try:
-            # Delegate all business logic to ContractService
-            pdf_path = ContractService.generate_contract(lease)
+            from core.tasks import generate_contract_pdf
 
+            task = generate_contract_pdf.delay(lease.id)
             return Response(
-                {"message": "Contrato gerado com sucesso!", "pdf_path": pdf_path},
-                status=status.HTTP_200_OK,
-            )
-        except ValidationError as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        except PermissionDenied as e:
-            return Response({"error": str(e)}, status=status.HTTP_403_FORBIDDEN)
-        except FileNotFoundError:
-            logger.exception("Template not found during contract generation")
-            return Response(
-                {"error": "Template de contrato não encontrado"},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-        except (DatabaseError, IntegrityError):
-            logger.exception("Database error during contract generation")
-            return Response(
-                {"error": "Erro ao salvar dados do contrato"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                {"task_id": task.id, "status": "processing"},
+                status=status.HTTP_202_ACCEPTED,
             )
         except Exception:
-            logger.exception("Unexpected error during contract generation")
+            logger.exception("Failed to dispatch contract generation task")
             return Response(
-                {"error": "Erro interno ao gerar contrato"},
+                {"error": "Falha ao iniciar geração do contrato."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
@@ -807,3 +791,19 @@ class RentAdjustmentViewSet(viewsets.ViewSet):
         """
         result = RentAdjustmentService.activate_pending_adjustments()
         return Response(result, status=status.HTTP_200_OK)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def task_status(request: Request, task_id: str) -> Response:
+    """Check the status of an async task (e.g., PDF generation)."""
+    from celery.result import AsyncResult
+
+    result = AsyncResult(task_id)
+    data: dict[str, Any] = {"task_id": task_id, "status": result.status}
+    if result.ready():
+        if result.successful():
+            data["result"] = result.result
+        else:
+            data["error"] = str(result.result)
+    return Response(data)

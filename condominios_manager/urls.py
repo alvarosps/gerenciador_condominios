@@ -30,6 +30,7 @@ from core.auth import (
     oauth_status,
 )
 from core.throttles import AuthRateThrottle
+from core.views import task_status
 
 
 class ThrottledTokenObtainPairView(TokenObtainPairView):
@@ -43,6 +44,8 @@ class ThrottledTokenRefreshView(TokenRefreshView):
 urlpatterns = [
     # Django admin
     path("admin/", admin.site.urls),
+    # Async task status
+    path("api/tasks/<str:task_id>/status/", task_status, name="task_status"),
     # JWT Authentication endpoints
     path("api/auth/token/", ThrottledTokenObtainPairView.as_view(), name="token_obtain_pair"),
     path("api/auth/token/refresh/", ThrottledTokenRefreshView.as_view(), name="token_refresh"),
