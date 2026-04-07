@@ -6,123 +6,121 @@ from decimal import Decimal
 import pytest
 from rest_framework import status
 
-from core.models import Apartment, Building, Dependent, Lease, Tenant
+from core.models import Lease
+from tests.factories import (
+    make_apartment,
+    make_building,
+    make_dependent,
+    make_lease,
+    make_tenant,
+)
 
 
 @pytest.fixture
 def building(admin_user):
-    return Building.objects.create(
+    return make_building(
         street_number=7100,
+        user=admin_user,
         name="Edifício Lease CRUD",
         address="Rua Lease CRUD, 7100",
-        created_by=admin_user,
-        updated_by=admin_user,
     )
 
 
 @pytest.fixture
 def apartment(building, admin_user):
-    return Apartment.objects.create(
+    return make_apartment(
         building=building,
         number=101,
+        user=admin_user,
         rental_value=Decimal("1500.00"),
         cleaning_fee=Decimal("200.00"),
         max_tenants=3,
-        created_by=admin_user,
-        updated_by=admin_user,
     )
 
 
 @pytest.fixture
 def apartment2(building, admin_user):
-    return Apartment.objects.create(
+    return make_apartment(
         building=building,
         number=102,
+        user=admin_user,
         rental_value=Decimal("1800.00"),
         rental_value_double=Decimal("1950.00"),
         cleaning_fee=Decimal("250.00"),
         max_tenants=2,
-        created_by=admin_user,
-        updated_by=admin_user,
-    )
-
-
-@pytest.fixture
-def dependent2(tenant2, admin_user):
-    return Dependent.objects.create(
-        tenant=tenant2,
-        name="Filho de Maria",
-        phone="11988887777",
-        created_by=admin_user,
-        updated_by=admin_user,
     )
 
 
 @pytest.fixture
 def tenant(admin_user):
-    return Tenant.objects.create(
-        name="Carlos Lease CRUD",
+    return make_tenant(
         cpf_cnpj="29375235017",
+        user=admin_user,
+        name="Carlos Lease CRUD",
         phone="11999990011",
         marital_status="Solteiro(a)",
         profession="Engenheiro",
         due_day=10,
-        created_by=admin_user,
-        updated_by=admin_user,
     )
 
 
 @pytest.fixture
 def tenant2(admin_user):
-    return Tenant.objects.create(
-        name="Maria Lease CRUD",
+    return make_tenant(
         cpf_cnpj="52998224725",
+        user=admin_user,
+        name="Maria Lease CRUD",
         phone="11999990022",
         marital_status="Casado(a)",
         profession="Médica",
         due_day=10,
-        created_by=admin_user,
-        updated_by=admin_user,
     )
 
 
 @pytest.fixture
 def tenant3(admin_user):
-    return Tenant.objects.create(
-        name="Pedro Lease CRUD",
+    return make_tenant(
         cpf_cnpj="11222333000181",
+        user=admin_user,
+        name="Pedro Lease CRUD",
         is_company=True,
         phone="11999990033",
         marital_status="Solteiro(a)",
         profession="TI",
         due_day=15,
-        created_by=admin_user,
-        updated_by=admin_user,
     )
 
 
 @pytest.fixture
 def dependent(tenant, admin_user):
-    return Dependent.objects.create(
+    return make_dependent(
         tenant=tenant,
+        user=admin_user,
         name="Filho de Carlos",
         phone="11977776666",
-        created_by=admin_user,
-        updated_by=admin_user,
+    )
+
+
+@pytest.fixture
+def dependent2(tenant2, admin_user):
+    return make_dependent(
+        tenant=tenant2,
+        user=admin_user,
+        name="Filho de Maria",
+        phone="11988887777",
     )
 
 
 @pytest.fixture
 def lease(apartment, tenant, admin_user):
-    return Lease.objects.create(
+    return make_lease(
         apartment=apartment,
-        responsible_tenant=tenant,
+        tenant=tenant,
+        user=admin_user,
         start_date=date(2026, 1, 1),
         validity_months=12,
         tag_fee=Decimal("50.00"),
         rental_value=Decimal("1500.00"),
-        created_by=admin_user,
-        updated_by=admin_user,
     )
 
 
