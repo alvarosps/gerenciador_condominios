@@ -404,13 +404,12 @@ const authHandlers = [
     const data = (await request.json()) as { email: string; password: string };
     if (data.email === 'test@example.com' && data.password === 'password123') {
       return HttpResponse.json({
-        access: 'mock-access-token-12345',
-        refresh: 'mock-refresh-token-67890',
         user: {
           id: 1,
           email: 'test@example.com',
           first_name: 'Test',
           last_name: 'User',
+          is_staff: false,
         },
       });
     }
@@ -432,8 +431,6 @@ const authHandlers = [
     }
     return HttpResponse.json(
       {
-        access: 'mock-access-token-12345',
-        refresh: 'mock-refresh-token-67890',
         user: {
           id: 2,
           email: data.email,
@@ -446,16 +443,10 @@ const authHandlers = [
     );
   }),
 
-  // Refresh token
-  http.post(`${API_BASE}/auth/token/refresh/`, async ({ request }) => {
+  // Refresh token — tokens set in HttpOnly cookies, body is empty
+  http.post(`${API_BASE}/auth/token/refresh/`, async () => {
     await delay(50);
-    const data = (await request.json()) as { refresh: string };
-    if (data.refresh === 'mock-refresh-token-67890') {
-      return HttpResponse.json({
-        access: 'mock-new-access-token-54321',
-      });
-    }
-    return HttpResponse.json({ detail: 'Token is invalid or expired' }, { status: 401 });
+    return HttpResponse.json({});
   }),
 
   // Login (JWT token endpoint used by useLogin)
@@ -464,8 +455,13 @@ const authHandlers = [
     const data = (await request.json()) as { username: string; password: string };
     if (data.username === 'testuser' && data.password === 'password123') {
       return HttpResponse.json({
-        access: 'mock-access-token-12345',
-        refresh: 'mock-refresh-token-67890',
+        user: {
+          id: 1,
+          email: 'testuser@example.com',
+          first_name: 'Test',
+          last_name: 'User',
+          is_staff: false,
+        },
       });
     }
     return HttpResponse.json({ detail: 'Invalid credentials' }, { status: 401 });

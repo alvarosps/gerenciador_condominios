@@ -12,7 +12,6 @@ import { http, HttpResponse } from 'msw';
 import {
   useLogin,
   useRegister,
-  useRefreshToken,
   useCurrentUser,
   useLogout,
   useGoogleLogin,
@@ -23,11 +22,11 @@ import { useAuthStore } from '@/store/auth-store';
 
 const API_BASE = 'http://localhost:8008/api';
 
-// Note: success tests for useLogin and useRefreshToken cannot be collocated with
-// failure tests in the same describe block. The Axios 401 interceptor performs
-// async side-effects (dynamic import + window.location assignment) that outlive
-// the test boundary and prevent subsequent mutations from settling. The failure
-// tests cover the error path; success behavior is covered by useCurrentUser tests.
+// Note: success tests for useLogin cannot be collocated with failure tests in the
+// same describe block. The Axios 401 interceptor performs async side-effects
+// (dynamic import + window.location assignment) that outlive the test boundary
+// and prevent subsequent mutations from settling. The failure tests cover the
+// error path; success behavior is covered by useCurrentUser tests.
 
 // Store original window.location
 const originalLocation = window.location;
@@ -67,7 +66,6 @@ describe('useAuth hooks', () => {
 
       await waitFor(() => expect(result.current.isError).toBe(true), { timeout: 5000 });
     });
-
   });
 
   describe('useRegister', () => {
@@ -115,23 +113,8 @@ describe('useAuth hooks', () => {
       expect(result.current.isSuccess).toBe(true);
       const storeState = useAuthStore.getState();
       expect(storeState.isAuthenticated).toBe(true);
-      expect(storeState.token).toBe('mock-access-token-12345');
-      expect(storeState.refreshToken).toBe('mock-refresh-token-67890');
       expect(storeState.user?.email).toBe('newuser@example.com');
     });
-  });
-
-  describe('useRefreshToken', () => {
-    it('should fail with invalid refresh token', async () => {
-      const { result } = renderHook(() => useRefreshToken(), {
-        wrapper: createWrapper(),
-      });
-
-      result.current.mutate('invalid-refresh-token');
-
-      await waitFor(() => expect(result.current.isError).toBe(true), { timeout: 5000 });
-    });
-
   });
 
   describe('useCurrentUser', () => {
@@ -147,7 +130,7 @@ describe('useAuth hooks', () => {
 
     it('should return current user data when authenticated', async () => {
       // Set real store state before rendering hook
-      useAuthStore.getState().setAuth('mock-token', 'mock-refresh', {
+      useAuthStore.getState().setAuth({
         id: 1,
         email: 'test@example.com',
         first_name: 'Test',
@@ -182,15 +165,13 @@ describe('useAuth hooks', () => {
   });
 
   describe('useLogout', () => {
-    it('should clear localStorage tokens on logout', async () => {
-      const removeItemSpy = localStorage.removeItem.bind(localStorage);
-      const calls: string[] = [];
-      Object.defineProperty(localStorage, 'removeItem', {
-        configurable: true,
-        value: (key: string) => {
-          calls.push(key);
-          removeItemSpy(key);
-        },
+    it('should clear auth store on logout', async () => {
+      useAuthStore.getState().setAuth({
+        id: 1,
+        email: 'test@example.com',
+        first_name: 'Test',
+        last_name: 'User',
+        is_staff: false,
       });
 
       const { result } = renderHook(() => useLogout(), {
@@ -199,7 +180,6 @@ describe('useAuth hooks', () => {
 
       result.current.mutate();
 
-      // Wait for mutation to settle (success or error — both paths clear auth state)
       await waitFor(
         () => {
           expect(result.current.isPending).toBe(false);
@@ -207,19 +187,13 @@ describe('useAuth hooks', () => {
         { timeout: 5000 },
       );
 
-      // Verify localStorage was cleared (logout clears tokens regardless of success/error)
-      expect(calls).toContain('access_token');
-      expect(calls).toContain('refresh_token');
-
-      // Restore
-      Object.defineProperty(localStorage, 'removeItem', {
-        configurable: true,
-        value: removeItemSpy,
-      });
+      const storeState = useAuthStore.getState();
+      expect(storeState.isAuthenticated).toBe(false);
+      expect(storeState.user).toBeNull();
     });
 
     it('should clear auth store on successful logout', async () => {
-      useAuthStore.getState().setAuth('token', 'refresh', {
+      useAuthStore.getState().setAuth({
         id: 1,
         email: 'test@example.com',
         first_name: 'Test',

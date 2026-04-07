@@ -27,8 +27,6 @@ vi.mock('@/app/(dashboard)/financial/expenses/_components/expense-form-modal', (
 describe('DailyControlPage admin gating', () => {
   beforeEach(() => {
     useAuthStore.setState({
-      token: null,
-      refreshToken: null,
       user: null,
       isAuthenticated: false,
     });
@@ -44,8 +42,6 @@ describe('DailyControlPage admin gating', () => {
         is_staff: false,
       },
       isAuthenticated: true,
-      token: 'fake-token',
-      refreshToken: 'fake-refresh',
     });
 
     renderWithProviders(<DailyControlPage />);
@@ -68,8 +64,6 @@ describe('DailyControlPage admin gating', () => {
         is_staff: true,
       },
       isAuthenticated: true,
-      token: 'fake-admin-token',
-      refreshToken: 'fake-admin-refresh',
     });
 
     renderWithProviders(<DailyControlPage />);
@@ -93,8 +87,6 @@ describe('DailyControlPage admin gating', () => {
         is_staff: false,
       },
       isAuthenticated: true,
-      token: 'fake-token',
-      refreshToken: 'fake-refresh',
     });
 
     renderWithProviders(<DailyControlPage />);

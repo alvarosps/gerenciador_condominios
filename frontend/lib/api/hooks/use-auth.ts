@@ -23,55 +23,32 @@ export interface RegisterData {
 }
 
 /**
- * Authentication response from backend (JWT token endpoint)
+ * Authentication response from backend — tokens in HttpOnly cookies, user in body
  */
 export interface AuthResponse {
-  access: string;
-  refresh: string;
-}
-
-/**
- * Registration response from backend — includes tokens and user profile
- */
-export interface RegisterResponse {
-  access: string;
-  refresh: string;
   user: User;
 }
 
 /**
- * Token refresh response
+ * Registration response from backend — tokens in HttpOnly cookies, user in body
  */
-export interface RefreshTokenResponse {
-  access: string;
+export interface RegisterResponse {
+  user: User;
 }
 
 /**
- * Hook for user login with JWT
+ * Hook for user login with HttpOnly cookie-based JWT
  */
 export function useLogin() {
   const setAuth = useAuthStore((state) => state.setAuth);
 
   return useMutation({
     mutationFn: async (credentials: LoginCredentials) => {
-      const { data: tokens } = await apiClient.post<AuthResponse>('/auth/token/', credentials);
-
-      // Store tokens immediately so the next request is authenticated
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('access_token', tokens.access);
-        localStorage.setItem('refresh_token', tokens.refresh);
-        document.cookie = 'is_authenticated=1; path=/; max-age=3600; SameSite=Lax';
-      }
-
-      // Fetch user profile with the new token
-      const { data: user } = await apiClient.get<User>('/auth/me/', {
-        headers: { Authorization: `Bearer ${tokens.access}` },
-      });
-
-      return { tokens, user };
+      const { data } = await apiClient.post<AuthResponse>('/auth/token/', credentials);
+      return data;
     },
-    onSuccess: ({ tokens, user }) => {
-      setAuth(tokens.access, tokens.refresh, user);
+    onSuccess: (data) => {
+      setAuth(data.user);
     },
   });
 }
@@ -85,17 +62,10 @@ export function useRegister() {
   return useMutation({
     mutationFn: async (registerData: RegisterData) => {
       const { data } = await apiClient.post<RegisterResponse>('/auth/register/', registerData);
-
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('access_token', data.access);
-        localStorage.setItem('refresh_token', data.refresh);
-        document.cookie = 'is_authenticated=1; path=/; max-age=3600; SameSite=Lax';
-      }
-
       return data;
     },
     onSuccess: (data) => {
-      setAuth(data.access, data.refresh, data.user);
+      setAuth(data.user);
     },
   });
 }
@@ -109,71 +79,18 @@ export function useLogout() {
 
   return useMutation({
     mutationFn: async () => {
-      const refreshToken =
-        typeof window !== 'undefined' ? localStorage.getItem('refresh_token') : null;
-      await apiClient.post('/auth/logout/', { refresh: refreshToken ?? '' });
+      await apiClient.post('/auth/logout/');
     },
     onSuccess: () => {
-      // Clear auth state
       clearAuth();
-
-      // Clear tokens from localStorage and cookie
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh_token');
-
-        // Clear cookie by setting expired date
-        document.cookie = 'is_authenticated=; path=/; max-age=0; SameSite=Lax';
-      }
-
-      // Clear all cached queries
       queryClient.clear();
-
-      // Redirect to login
       window.location.href = '/login';
     },
     onError: () => {
       // Even if backend logout fails, clear client state
       clearAuth();
-
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh_token');
-
-        // Clear cookie by setting expired date
-        document.cookie = 'is_authenticated=; path=/; max-age=0; SameSite=Lax';
-      }
-
       queryClient.clear();
       window.location.href = '/login';
-    },
-  });
-}
-
-/**
- * Hook to refresh JWT token
- */
-export function useRefreshToken() {
-  const setToken = useAuthStore((state) => state.setToken);
-
-  return useMutation({
-    mutationFn: async (refreshToken: string) => {
-      const { data } = await apiClient.post<RefreshTokenResponse>('/auth/token/refresh/', {
-        refresh: refreshToken,
-      });
-      return data;
-    },
-    onSuccess: (data) => {
-      // Update token in store
-      setToken(data.access);
-
-      // Update token in localStorage and cookie
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('access_token', data.access);
-
-        // Update cookie for middleware auth check (24 hour expiry)
-        document.cookie = 'is_authenticated=1; path=/; max-age=3600; SameSite=Lax';
-      }
     },
   });
 }

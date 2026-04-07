@@ -17,17 +17,17 @@ interface MainLayoutProps {
 }
 
 export function MainLayout({ children }: MainLayoutProps) {
-  const { user, token, setUser } = useAuthStore();
+  const { user, isAuthenticated, setUser } = useAuthStore();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // Fetch user profile if we have a token but no user data (e.g., old session)
+  // Fetch user profile if authenticated but no user data (e.g., cookie session restored)
   useEffect(() => {
-    if (token && !user) {
+    if (isAuthenticated && !user) {
       void apiClient.get<User>('/auth/me/').then(({ data }) => {
         setUser(data);
       });
     }
-  }, [token, user, setUser]);
+  }, [isAuthenticated, user, setUser]);
 
   return (
     <div className="min-h-screen">
