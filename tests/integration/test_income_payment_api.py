@@ -6,113 +6,108 @@ from decimal import Decimal
 import pytest
 from rest_framework import status
 
-from core.models import (
-    Apartment,
-    Building,
-    EmployeePayment,
-    ExpenseCategory,
-    Income,
-    Lease,
-    Person,
-    PersonIncome,
-    RentPayment,
-    Tenant,
+from core.models import EmployeePayment, Income, PersonIncome, RentPayment
+from tests.factories import (
+    make_apartment,
+    make_building,
+    make_employee_payment,
+    make_expense_category,
+    make_income,
+    make_lease,
+    make_person,
+    make_person_income,
+    make_rent_payment,
+    make_tenant,
 )
 
 
 @pytest.fixture
 def person_income_test(admin_user):
-    return Person.objects.create(
+    return make_person(
+        user=admin_user,
         name="Rodrigo Income Test",
         relationship="Proprietário",
         phone="11999990505",
         email="rodrigo_income_test@test.com",
         is_owner=True,
         is_employee=False,
-        created_by=admin_user,
-        updated_by=admin_user,
     )
 
 
 @pytest.fixture
 def employee_person_test(admin_user):
-    return Person.objects.create(
+    return make_person(
+        user=admin_user,
         name="Rosa Income Test",
         relationship="Funcionária",
         phone="11988880505",
         email="rosa_income_test@test.com",
         is_owner=False,
         is_employee=True,
-        created_by=admin_user,
-        updated_by=admin_user,
     )
 
 
 @pytest.fixture
 def building_income_test(admin_user):
-    return Building.objects.create(
+    return make_building(
         street_number=9505,
+        user=admin_user,
         name="Edifício Income Test",
         address="Rua Teste, 9505",
-        created_by=admin_user,
-        updated_by=admin_user,
     )
 
 
 @pytest.fixture
 def apartment_income_test(building_income_test, admin_user):
-    return Apartment.objects.create(
+    return make_apartment(
         building=building_income_test,
         number=505,
+        user=admin_user,
         rental_value=Decimal("1300.00"),
         max_tenants=2,
-        created_by=admin_user,
-        updated_by=admin_user,
     )
 
 
 @pytest.fixture
 def tenant_income_test(admin_user):
-    return Tenant.objects.create(
-        name="João Income Test",
+    return make_tenant(
         cpf_cnpj="52998224725",
+        user=admin_user,
+        name="João Income Test",
         phone="11977770505",
         marital_status="Solteiro(a)",
         profession="Engenheiro",
         due_day=10,
-        created_by=admin_user,
-        updated_by=admin_user,
     )
 
 
 @pytest.fixture
 def lease_income_test(apartment_income_test, tenant_income_test, admin_user):
-    return Lease.objects.create(
+    return make_lease(
         apartment=apartment_income_test,
-        responsible_tenant=tenant_income_test,
+        tenant=tenant_income_test,
+        user=admin_user,
         start_date=date(2026, 1, 1),
         validity_months=12,
         tag_fee=Decimal("50.00"),
         rental_value=Decimal("1300.00"),
-        created_by=admin_user,
-        updated_by=admin_user,
     )
 
 
 @pytest.fixture
 def category_income_test(admin_user):
-    return ExpenseCategory.objects.create(
+    return make_expense_category(
         name="Receita Extra Session05",
+        user=admin_user,
         description="Receitas diversas session05",
         color="#00FF05",
-        created_by=admin_user,
-        updated_by=admin_user,
     )
 
 
 @pytest.fixture
 def income_obj(admin_user, person_income_test, building_income_test, category_income_test):
-    return Income.objects.create(
+    return make_income(
+        user=admin_user,
         description="Receita de lavanderia s05",
         amount=Decimal("200.00"),
         income_date=date(2026, 3, 15),
@@ -121,14 +116,13 @@ def income_obj(admin_user, person_income_test, building_income_test, category_in
         category=category_income_test,
         is_recurring=False,
         is_received=False,
-        created_by=admin_user,
-        updated_by=admin_user,
     )
 
 
 @pytest.fixture
 def recurring_income_obj(admin_user, person_income_test):
-    return Income.objects.create(
+    return make_income(
+        user=admin_user,
         description="Aposentadoria s05",
         amount=Decimal("3500.00"),
         income_date=date(2026, 1, 1),
@@ -137,61 +131,55 @@ def recurring_income_obj(admin_user, person_income_test):
         expected_monthly_amount=Decimal("3500.00"),
         is_received=True,
         received_date=date(2026, 1, 5),
-        created_by=admin_user,
-        updated_by=admin_user,
     )
 
 
 @pytest.fixture
 def rent_payment_obj(admin_user, lease_income_test):
-    return RentPayment.objects.create(
+    return make_rent_payment(
         lease=lease_income_test,
+        user=admin_user,
         reference_month=date(2026, 3, 1),
         amount_paid=Decimal("1300.00"),
         payment_date=date(2026, 3, 10),
-        created_by=admin_user,
-        updated_by=admin_user,
     )
 
 
 @pytest.fixture
 def employee_payment_obj(admin_user, employee_person_test):
-    return EmployeePayment.objects.create(
+    return make_employee_payment(
         person=employee_person_test,
+        user=admin_user,
         reference_month=date(2026, 3, 1),
         base_salary=Decimal("800.00"),
         variable_amount=Decimal("150.00"),
         rent_offset=Decimal("0.00"),
         cleaning_count=5,
         is_paid=False,
-        created_by=admin_user,
-        updated_by=admin_user,
     )
 
 
 @pytest.fixture
 def person_income_apartment_obj(admin_user, person_income_test, apartment_income_test):
-    return PersonIncome.objects.create(
+    return make_person_income(
         person=person_income_test,
+        user=admin_user,
         income_type="apartment_rent",
         apartment=apartment_income_test,
         start_date=date(2026, 1, 1),
         is_active=True,
-        created_by=admin_user,
-        updated_by=admin_user,
     )
 
 
 @pytest.fixture
 def person_income_stipend_obj(admin_user, person_income_test):
-    return PersonIncome.objects.create(
+    return make_person_income(
         person=person_income_test,
+        user=admin_user,
         income_type="fixed_stipend",
         fixed_amount=Decimal("1100.00"),
         start_date=date(2026, 1, 1),
         is_active=True,
-        created_by=admin_user,
-        updated_by=admin_user,
     )
 
 
