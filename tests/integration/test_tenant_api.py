@@ -7,34 +7,31 @@ from django.contrib.auth.models import User
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from core.models import (
-    Apartment,
-    Building,
-    Lease,
-    Notification,
-    RentPayment,
-    Tenant,
+from core.models import Notification, Tenant
+from tests.factories import (
+    make_apartment,
+    make_building,
+    make_lease,
+    make_rent_payment,
 )
 
 
 @pytest.fixture
 def tenant_user(admin_user):
     """Create a tenant with a linked Django user and active lease."""
-    building = Building.objects.create(
-        street_number="500",
+    building = make_building(
+        street_number=500,
+        user=admin_user,
         name="Test Building Tenant",
         address="Rua Teste 500",
-        created_by=admin_user,
-        updated_by=admin_user,
     )
-    apartment = Apartment.objects.create(
+    apartment = make_apartment(
         building=building,
         number=501,
+        user=admin_user,
         rental_value=Decimal("1500.00"),
         cleaning_fee=Decimal("150.00"),
         max_tenants=2,
-        created_by=admin_user,
-        updated_by=admin_user,
     )
     user = User.objects.create_user(username="tenant_portal_test", is_staff=False)
     tenant = Tenant.objects.create(
@@ -48,15 +45,14 @@ def tenant_user(admin_user):
         created_by=admin_user,
         updated_by=admin_user,
     )
-    lease = Lease.objects.create(
+    lease = make_lease(
         apartment=apartment,
-        responsible_tenant=tenant,
+        tenant=tenant,
+        user=admin_user,
         start_date=timezone.now().date(),
         validity_months=12,
         rental_value=Decimal("1500.00"),
         number_of_tenants=1,
-        created_by=admin_user,
-        updated_by=admin_user,
     )
     lease.tenants.add(tenant)
     return tenant, user, lease
@@ -92,13 +88,12 @@ class TestTenantMe:
 class TestTenantPayments:
     def test_list_own_payments(self, tenant_client, tenant_user, admin_user):
         _, _, lease = tenant_user
-        RentPayment.objects.create(
+        make_rent_payment(
             lease=lease,
+            user=admin_user,
             reference_month=timezone.now().date().replace(day=1),
             amount_paid=Decimal("1500.00"),
             payment_date=timezone.now().date(),
-            created_by=admin_user,
-            updated_by=admin_user,
         )
         response = tenant_client.get("/api/tenant/payments/")
         assert response.status_code == 200
