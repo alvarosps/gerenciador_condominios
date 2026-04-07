@@ -1,12 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
 import type { AdminUser, UserFormValues } from '@/lib/schemas/user';
-
-const QUERY_KEY = ['admin-users'] as const;
+import { queryKeys } from '@/lib/api/query-keys';
 
 export function useAdminUsers() {
   return useQuery({
-    queryKey: QUERY_KEY,
+    queryKey: queryKeys.adminUsers.all,
     queryFn: async () => {
       const { data } = await apiClient.get<AdminUser[]>('/admin/users/');
       return data;
@@ -22,7 +21,7 @@ export function useCreateAdminUser() {
       return data;
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.adminUsers.all });
     },
   });
 }
@@ -35,7 +34,7 @@ export function useUpdateAdminUser() {
       return data;
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.adminUsers.all });
     },
   });
 }
@@ -47,7 +46,7 @@ export function useDeleteAdminUser() {
       await apiClient.delete(`/admin/users/${id}/`);
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.adminUsers.all });
     },
   });
 }
