@@ -16,36 +16,38 @@ import pytest
 from freezegun import freeze_time
 
 from core.models import (
-    Building,
-    Expense,
-    ExpenseCategory,
-    ExpenseInstallment,
     ExpenseType,
-    Person,
 )
 from core.services.cash_flow_service import CashFlowService
 from core.services.financial_dashboard_service import FinancialDashboardService
 from core.services.simulation_service import SimulationService
+from tests.factories import (
+    make_building,
+    make_expense,
+    make_expense_category,
+    make_expense_installment,
+    make_person,
+)
 
 
 @pytest.fixture
-def person_alvaro() -> Person:
-    return Person.objects.create(name="Alvaro", relationship="Pai")
+def person_alvaro():
+    return make_person(name="Alvaro", relationship="Pai")
 
 
 @pytest.fixture
-def person_rodrigo() -> Person:
-    return Person.objects.create(name="Rodrigo", relationship="Filho")
+def person_rodrigo():
+    return make_person(name="Rodrigo", relationship="Filho")
 
 
 @pytest.fixture
-def category_pessoal() -> ExpenseCategory:
-    return ExpenseCategory.objects.create(name="Pessoal", color="#EF4444")
+def category_pessoal():
+    return make_expense_category(name="Pessoal", color="#EF4444")
 
 
 @pytest.fixture
-def building_836() -> Building:
-    return Building.objects.create(street_number=836, name="Edifício 836", address="Rua Teste, 836")
+def building_836():
+    return make_building(street_number=836, name="Edifício 836", address="Rua Teste, 836")
 
 
 class TestSimulationServiceSyntaxFix:
@@ -98,8 +100,8 @@ class TestSimulationServiceSyntaxFix:
 class TestExpenseEndDate:
     """Fix 2: Expense model must support end_date field."""
 
-    def test_create_expense_with_end_date(self, category_pessoal: ExpenseCategory) -> None:
-        expense = Expense.objects.create(
+    def test_create_expense_with_end_date(self, category_pessoal) -> None:
+        expense = make_expense(
             description="Unimed",
             expense_type=ExpenseType.FIXED_EXPENSE,
             total_amount=Decimal("2230.00"),
@@ -112,8 +114,8 @@ class TestExpenseEndDate:
         expense.refresh_from_db()
         assert expense.end_date == date(2026, 12, 31)
 
-    def test_end_date_nullable(self, category_pessoal: ExpenseCategory) -> None:
-        expense = Expense.objects.create(
+    def test_end_date_nullable(self, category_pessoal) -> None:
+        expense = make_expense(
             description="Internet",
             expense_type=ExpenseType.FIXED_EXPENSE,
             total_amount=Decimal("150.00"),
@@ -131,10 +133,10 @@ class TestFixedExpenseEndDate:
 
     @freeze_time("2026-03-15")
     def test_fixed_expense_with_end_date_excluded_after(
-        self, category_pessoal: ExpenseCategory
+        self, category_pessoal
     ) -> None:
         """A fixed expense with end_date=2026-02-28 should NOT appear in March cash flow."""
-        Expense.objects.create(
+        make_expense(
             description="Seguro antigo",
             expense_type=ExpenseType.FIXED_EXPENSE,
             total_amount=Decimal("500.00"),
@@ -149,10 +151,10 @@ class TestFixedExpenseEndDate:
 
     @freeze_time("2026-03-15")
     def test_fixed_expense_without_end_date_projects_forever(
-        self, category_pessoal: ExpenseCategory
+        self, category_pessoal
     ) -> None:
         """A fixed expense with end_date=None should always appear."""
-        Expense.objects.create(
+        make_expense(
             description="Internet",
             expense_type=ExpenseType.FIXED_EXPENSE,
             total_amount=Decimal("150.00"),
@@ -167,11 +169,11 @@ class TestFixedExpenseEndDate:
     @freeze_time("2026-03-15")
     def test_fixed_expense_with_person_in_person_summary(
         self,
-        person_rodrigo: Person,
-        category_pessoal: ExpenseCategory,
+        person_rodrigo,
+        category_pessoal,
     ) -> None:
         """Fixed expenses linked to a person should appear in their person summary."""
-        Expense.objects.create(
+        make_expense(
             description="Unimed via Rodrigo",
             expense_type=ExpenseType.FIXED_EXPENSE,
             total_amount=Decimal("2230.00"),
@@ -194,11 +196,11 @@ class TestIsOffsetFiltering:
     @freeze_time("2026-03-15")
     def test_projected_installments_exclude_offset(
         self,
-        person_alvaro: Person,
+        person_alvaro,
     ) -> None:
         """Projected expenses should not include offset installments."""
         # Normal expense with installment in April (future month = projected)
-        normal = Expense.objects.create(
+        normal = make_expense(
             description="Compra normal",
             expense_type=ExpenseType.CARD_PURCHASE,
             total_amount=Decimal("600.00"),
@@ -208,7 +210,7 @@ class TestIsOffsetFiltering:
             total_installments=3,
             is_offset=False,
         )
-        ExpenseInstallment.objects.create(
+        make_expense_installment(
             expense=normal,
             installment_number=3,
             total_installments=3,
@@ -221,7 +223,7 @@ class TestIsOffsetFiltering:
         april_without = next(m for m in projection_without_offset if m["month"] == 4)
 
         # Now add an offset installment in April — should NOT change the total
-        offset = Expense.objects.create(
+        offset = make_expense(
             description="Compra para sogros",
             expense_type=ExpenseType.CARD_PURCHASE,
             total_amount=Decimal("300.00"),
@@ -231,7 +233,7 @@ class TestIsOffsetFiltering:
             total_installments=3,
             is_offset=True,
         )
-        ExpenseInstallment.objects.create(
+        make_expense_installment(
             expense=offset,
             installment_number=3,
             total_installments=3,
@@ -248,10 +250,10 @@ class TestIsOffsetFiltering:
     @freeze_time("2026-03-15")
     def test_utility_bills_exclude_offset(
         self,
-        building_836: Building,
+        building_836,
     ) -> None:
         """Utility bills with is_offset=True should not be included."""
-        Expense.objects.create(
+        make_expense(
             description="Conta de água normal",
             expense_type=ExpenseType.WATER_BILL,
             total_amount=Decimal("200.00"),
@@ -259,7 +261,7 @@ class TestIsOffsetFiltering:
             building=building_836,
             is_offset=False,
         )
-        Expense.objects.create(
+        make_expense(
             description="Conta de água offset",
             expense_type=ExpenseType.WATER_BILL,
             total_amount=Decimal("150.00"),
@@ -273,10 +275,10 @@ class TestIsOffsetFiltering:
     @freeze_time("2026-03-15")
     def test_category_breakdown_excludes_offset(
         self,
-        category_pessoal: ExpenseCategory,
+        category_pessoal,
     ) -> None:
         """Category breakdown should not include offset expenses."""
-        Expense.objects.create(
+        make_expense(
             description="Gasto real",
             expense_type=ExpenseType.ONE_TIME_EXPENSE,
             total_amount=Decimal("500.00"),
@@ -284,7 +286,7 @@ class TestIsOffsetFiltering:
             category=category_pessoal,
             is_offset=False,
         )
-        Expense.objects.create(
+        make_expense(
             description="Gasto offset",
             expense_type=ExpenseType.ONE_TIME_EXPENSE,
             total_amount=Decimal("300.00"),
