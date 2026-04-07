@@ -4,11 +4,16 @@ import { personSimpleSchema } from './credit-card.schema';
 import { creditCardSchema } from './credit-card.schema';
 import { expenseCategorySchema } from './expense-category.schema';
 import { expenseInstallmentSchema } from './expense-installment.schema';
+import {
+  EXPENSE_TYPES,
+  isPersonFieldVisible,
+  isBuildingFieldVisible,
+} from '@/lib/utils/expense-type-config';
 
 const expenseBaseSchema = z.object({
   id: z.number().optional(),
   description: z.string().min(1, 'Descrição é obrigatória'),
-  expense_type: z.string().min(1, 'Tipo é obrigatório'),
+  expense_type: z.enum(EXPENSE_TYPES, 'Tipo é obrigatório'),
   total_amount: z
     .string()
     .or(z.number())
@@ -85,11 +90,11 @@ export function validateExpenseRules(
     }
   }
 
-  if ((type === 'bank_loan' || type === 'personal_loan') && !data.person_id) {
+  if (isPersonFieldVisible(type) && type !== 'card_purchase' && !data.person_id) {
     ctx.addIssue({ code: 'custom', message: 'Pessoa é obrigatória para este tipo de empréstimo', path: ['person_id'] });
   }
 
-  if (['water_bill', 'electricity_bill', 'property_tax'].includes(type) && !data.building_id) {
+  if (isBuildingFieldVisible(type) && !data.building_id) {
     ctx.addIssue({ code: 'custom', message: 'Prédio é obrigatório para este tipo de despesa', path: ['building_id'] });
   }
 
