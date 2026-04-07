@@ -14,58 +14,60 @@ import pytest
 from freezegun import freeze_time
 from rest_framework import status
 
-from core.models import Apartment, Building, Lease, Tenant
+from core.models import Lease
+from tests.factories import (
+    make_apartment,
+    make_building,
+    make_lease,
+    make_tenant,
+)
 
 
 @pytest.fixture
 def building(admin_user):
-    return Building.objects.create(
+    return make_building(
         street_number=4400,
+        user=admin_user,
         name="Edifício Lease Actions",
         address="Rua Lease, 4400",
-        created_by=admin_user,
-        updated_by=admin_user,
     )
 
 
 @pytest.fixture
 def apartment(building, admin_user):
-    return Apartment.objects.create(
+    return make_apartment(
         building=building,
         number=101,
+        user=admin_user,
         rental_value=Decimal("1500.00"),
         cleaning_fee=Decimal("200.00"),
         max_tenants=2,
-        created_by=admin_user,
-        updated_by=admin_user,
     )
 
 
 @pytest.fixture
 def tenant(admin_user):
-    return Tenant.objects.create(
-        name="Carlos Lease",
+    return make_tenant(
         cpf_cnpj="29375235017",
+        user=admin_user,
+        name="Carlos Lease",
         phone="11999990044",
         marital_status="Solteiro(a)",
         profession="Engenheiro",
         due_day=10,
-        created_by=admin_user,
-        updated_by=admin_user,
     )
 
 
 @pytest.fixture
 def lease(apartment, tenant, admin_user):
-    return Lease.objects.create(
+    return make_lease(
         apartment=apartment,
-        responsible_tenant=tenant,
+        tenant=tenant,
+        user=admin_user,
         start_date=date(2026, 1, 1),
         validity_months=12,
         tag_fee=Decimal("50.00"),
         rental_value=Decimal("1500.00"),
-        created_by=admin_user,
-        updated_by=admin_user,
     )
 
 
@@ -126,41 +128,32 @@ class TestChangeDueDate:
         daily_rate=1250/30=41.67, fee=round(41.67*15)=round(625.05)=625
         total_due=1250+625=1875
         """
-        building = Building.objects.create(
-            street_number=9900,
-            name="Edifício Round Test",
-            address="Rua Round, 9900",
-            created_by=admin_user,
-            updated_by=admin_user,
-        )
-        apt = Apartment.objects.create(
+        building = make_building(street_number=9900, user=admin_user, name="Edifício Round Test", address="Rua Round, 9900")
+        apt = make_apartment(
             building=building,
             number=204,
+            user=admin_user,
             rental_value=Decimal("1250.00"),
             cleaning_fee=Decimal("100.00"),
             max_tenants=2,
-            created_by=admin_user,
-            updated_by=admin_user,
         )
-        tnt = Tenant.objects.create(
-            name="Tenant Round Test",
+        tnt = make_tenant(
             cpf_cnpj="52998224725",
+            user=admin_user,
+            name="Tenant Round Test",
             phone="11999990099",
             marital_status="Solteiro(a)",
             profession="Tester",
             due_day=22,
-            created_by=admin_user,
-            updated_by=admin_user,
         )
-        lse = Lease.objects.create(
+        lse = make_lease(
             apartment=apt,
-            responsible_tenant=tnt,
+            tenant=tnt,
+            user=admin_user,
             start_date=date(2026, 2, 22),
             validity_months=12,
             tag_fee=Decimal("50.00"),
             rental_value=Decimal("1250.00"),
-            created_by=admin_user,
-            updated_by=admin_user,
         )
 
         url = self.url_template.format(pk=lse.pk)
@@ -274,15 +267,14 @@ class TestLeaseSignalIsRented:
         """When a Lease is created, apartment.is_rented must become True."""
         assert not apartment.is_rented
 
-        Lease.objects.create(
+        make_lease(
             apartment=apartment,
-            responsible_tenant=tenant,
+            tenant=tenant,
+            user=admin_user,
             start_date=date(2026, 1, 1),
             validity_months=12,
             tag_fee=Decimal("0.00"),
             rental_value=Decimal("1500.00"),
-            created_by=admin_user,
-            updated_by=admin_user,
         )
 
         apartment.refresh_from_db()
