@@ -97,7 +97,7 @@ describe('RentAdjustmentAlerts', () => {
         isSuccess: true,
         isFetched: true,
         status: 'success',
-        data: { alerts: [], ipcaLatestMonth: null },
+        data: { alerts: [], ipcaLatestMonth: null, fallbackPercentage: 0 },
       }),
     );
     vi.spyOn(rentAdjustmentHooks, 'useApplyRentAdjustment').mockReturnValue(idleMutation);
@@ -119,6 +119,7 @@ describe('RentAdjustmentAlerts', () => {
         data: {
           alerts: [mockAlert],
           ipcaLatestMonth: '2025-01-01',
+          fallbackPercentage: 5,
         },
       }),
     );

@@ -52,11 +52,12 @@ const mockTenant: Tenant = {
   cpf_cnpj: '98765432100',
   phone: '(11) 99999-0000',
   email: 'maria@example.com',
-  nationality: 'Brasileira',
   profession: 'Professora',
   marital_status: 'Solteiro(a)',
   due_day: 10,
   dependents: [],
+  is_company: false,
+  furnitures: [],
 };
 
 describe('TenantLeaseModal', () => {
