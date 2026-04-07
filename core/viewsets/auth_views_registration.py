@@ -1,33 +1,30 @@
 """
-Registration and logout views.
+Registration view.
 
 Endpoints:
-    POST /api/auth/register/ — create user account, return JWT tokens + user info
-    POST /api/auth/logout/   — blacklist refresh token, return 204
+    POST /api/auth/register/ — create user account, set HttpOnly cookies, return user info
 """
 
 import logging
-from typing import cast
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers, status
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework_simplejwt.exceptions import TokenError
-from rest_framework_simplejwt.tokens import RefreshToken, Token
+from rest_framework_simplejwt.tokens import RefreshToken
 
 from core.throttles import AuthRateThrottle
+from core.viewsets.auth_views_cookie import _set_auth_cookies
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
 
 _EMAIL_DUPLICATE_MSG = "Um usuário com este email já existe."
 _PASSWORDS_MISMATCH_MSG = "As senhas não conferem."
-_REFRESH_REQUIRED_MSG = "Este campo é obrigatório."
 
 
 class RegisterSerializer(serializers.Serializer):
@@ -57,13 +54,14 @@ class RegisterSerializer(serializers.Serializer):
 
 class RegisterView(APIView):
     """
-    Create a new user account and return JWT tokens.
+    Create a new user account, set HttpOnly auth cookies, and return user info.
 
     POST /api/auth/register/
 
     Body: { email, password, password2, first_name, last_name }
 
-    Returns 201 with { access, refresh, user: { id, email, first_name, last_name, is_staff } }
+    Returns 201 with { user: { id, email, first_name, last_name, is_staff } }
+    Tokens are set as HttpOnly cookies (access_token, refresh_token, is_authenticated).
     """
 
     permission_classes = [AllowAny]
@@ -87,10 +85,8 @@ class RegisterView(APIView):
         refresh = RefreshToken.for_user(user)
         logger.info("New user registered: email=%s pk=%s", user.email, user.pk)
 
-        return Response(
+        response = Response(
             {
-                "access": str(refresh.access_token),
-                "refresh": str(refresh),
                 "user": {
                     "id": user.pk,
                     "email": user.email,
@@ -101,36 +97,5 @@ class RegisterView(APIView):
             },
             status=status.HTTP_201_CREATED,
         )
-
-
-class LogoutView(APIView):
-    """
-    Blacklist the provided refresh token.
-
-    POST /api/auth/logout/
-
-    Body: { refresh: "<refresh_token>" }
-
-    Returns 204 on success.
-    """
-
-    permission_classes = [IsAuthenticated]
-    throttle_classes = [AuthRateThrottle]
-
-    def post(self, request: Request) -> Response:
-        refresh_token: str = request.data.get("refresh", "")
-        if not refresh_token:
-            return Response(
-                {"refresh": _REFRESH_REQUIRED_MSG},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        try:
-            # RefreshToken.__init__ accepts str at runtime; stubs incorrectly type it as Token
-            token = RefreshToken(cast(Token, refresh_token))
-            token.blacklist()
-        except TokenError as exc:
-            return Response({"refresh": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
-
-        logger.info("User logged out: pk=%s", request.user.pk)
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        _set_auth_cookies(response, str(refresh.access_token), str(refresh))
+        return response

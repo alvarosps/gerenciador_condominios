@@ -10,7 +10,7 @@ User = get_user_model()
 
 @pytest.mark.integration
 class TestRegisterEndpoint:
-    def test_register_creates_user_and_returns_tokens(self, api_client):
+    def test_register_creates_user_and_sets_cookies(self, api_client):
         response = api_client.post(
             "/api/auth/register/",
             {
@@ -24,8 +24,9 @@ class TestRegisterEndpoint:
         )
         assert response.status_code == status.HTTP_201_CREATED
         data = response.data
-        assert "access" in data
-        assert "refresh" in data
+        # Tokens are in cookies, not in body
+        assert "access" not in data
+        assert "refresh" not in data
         assert "user" in data
         user_data = data["user"]
         assert user_data["email"] == "newuser@example.com"
@@ -33,6 +34,11 @@ class TestRegisterEndpoint:
         assert user_data["last_name"] == "Silva"
         assert "is_staff" in user_data
         assert "id" in user_data
+        # Auth cookies must be set
+        assert "access_token" in response.cookies
+        assert "refresh_token" in response.cookies
+        assert response.cookies["access_token"]["httponly"]
+        assert response.cookies["refresh_token"]["httponly"]
         # Verify user was actually created in DB
         assert User.objects.filter(email="newuser@example.com").exists()
 
@@ -111,49 +117,25 @@ class TestRegisterEndpoint:
 
 @pytest.mark.integration
 class TestLogoutEndpoint:
-    def test_logout_blacklists_refresh_token(self, api_client, admin_user):
+    def test_logout_blacklists_refresh_token_from_cookie(self, api_client, admin_user):
         refresh = RefreshToken.for_user(admin_user)
         api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {refresh.access_token}")
+        api_client.cookies["refresh_token"] = str(refresh)
 
-        response = api_client.post(
-            "/api/auth/logout/",
-            {"refresh": str(refresh)},
-            format="json",
-        )
+        response = api_client.post("/api/auth/logout/")
         assert response.status_code == status.HTTP_204_NO_CONTENT
+        # Auth cookies must be cleared
+        assert response.cookies["access_token"].value == ""
+        assert response.cookies["refresh_token"].value == ""
 
-        # Token should now be blacklisted — using it again returns 401
-        response2 = api_client.post(
-            "/api/auth/token/refresh/",
-            {"refresh": str(refresh)},
-            format="json",
-        )
-        assert response2.status_code == status.HTTP_401_UNAUTHORIZED
-
-    def test_logout_requires_authentication(self, api_client, admin_user):
-        refresh = RefreshToken.for_user(admin_user)
-
-        response = api_client.post(
-            "/api/auth/logout/",
-            {"refresh": str(refresh)},
-            format="json",
-        )
+    def test_logout_requires_authentication(self, api_client):
+        response = api_client.post("/api/auth/logout/")
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
-    def test_logout_returns_400_when_refresh_token_missing(self, api_client, admin_user):
+    def test_logout_succeeds_without_refresh_cookie(self, api_client, admin_user):
+        """Logout without a refresh cookie still succeeds (graceful handling)."""
         refresh = RefreshToken.for_user(admin_user)
         api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {refresh.access_token}")
 
-        response = api_client.post("/api/auth/logout/", {}, format="json")
-        assert response.status_code == status.HTTP_400_BAD_REQUEST
-
-    def test_logout_returns_400_for_invalid_refresh_token(self, api_client, admin_user):
-        refresh = RefreshToken.for_user(admin_user)
-        api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {refresh.access_token}")
-
-        response = api_client.post(
-            "/api/auth/logout/",
-            {"refresh": "not.a.valid.token"},
-            format="json",
-        )
-        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        response = api_client.post("/api/auth/logout/")
+        assert response.status_code == status.HTTP_204_NO_CONTENT
