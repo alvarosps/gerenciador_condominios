@@ -47,6 +47,17 @@ import { useBuildings } from '@/lib/api/hooks/use-buildings';
 import { useExpenseCategories } from '@/lib/api/hooks/use-expense-categories';
 import { type Expense, validateExpenseRules } from '@/lib/schemas/expense.schema';
 import { EXPENSE_TYPE_OPTIONS, ROUTES } from '@/lib/utils/constants';
+import {
+  isPersonFieldVisible,
+  isBuildingFieldVisible,
+  isInstallmentFieldVisible,
+  isOffsetFieldVisible,
+  isDebtInstallmentFieldVisible,
+  isValidExpenseType,
+  PERSON_REQUIRED_TYPES,
+  BUILDING_REQUIRED_TYPES,
+} from '@/lib/utils/expense-type-config';
+import type { ExpenseType } from '@/lib/utils/expense-type-config';
 
 interface Props {
   open: boolean;
@@ -83,20 +94,6 @@ const expenseFormSchema = z
 
 type ExpenseFormValues = z.infer<typeof expenseFormSchema>;
 
-// Types that require person
-const PERSON_REQUIRED_TYPES = ['card_purchase', 'bank_loan', 'personal_loan'];
-// Types that show person as optional
-const PERSON_OPTIONAL_TYPES = ['one_time_expense', 'fixed_expense'];
-// Types that require building
-const BUILDING_REQUIRED_TYPES = ['water_bill', 'electricity_bill', 'property_tax'];
-// Types that show building as optional
-const BUILDING_OPTIONAL_TYPES = ['fixed_expense', 'one_time_expense'];
-// Types that show is_offset toggle (desconto)
-const OFFSET_TYPES = ['card_purchase', 'bank_loan', 'personal_loan'];
-// Types that show installment fields
-const INSTALLMENT_TYPES = ['card_purchase', 'bank_loan', 'personal_loan'];
-// Types that show debt_installment toggle (utility bills)
-const DEBT_INSTALLMENT_TYPES = ['water_bill', 'electricity_bill', 'property_tax'];
 
 export function ExpenseFormModal({ open, expense, defaultExpenseDate, onClose, onSuccess }: Props) {
   const createMutation = useCreateExpense();
@@ -208,12 +205,12 @@ export function ExpenseFormModal({ open, expense, defaultExpenseDate, onClose, o
     }
   }, [expense, form, defaultExpenseDate]);
 
-  const showPersonField = PERSON_REQUIRED_TYPES.includes(watchedType) || PERSON_OPTIONAL_TYPES.includes(watchedType);
+  const showPersonField = isPersonFieldVisible(watchedType);
   const showCreditCardField = watchedType === 'card_purchase';
-  const showBuildingField = BUILDING_REQUIRED_TYPES.includes(watchedType) || BUILDING_OPTIONAL_TYPES.includes(watchedType);
-  const showInstallmentFields = INSTALLMENT_TYPES.includes(watchedType);
-  const showDebtInstallmentToggle = DEBT_INSTALLMENT_TYPES.includes(watchedType);
-  const showOffsetToggle = OFFSET_TYPES.includes(watchedType);
+  const showBuildingField = isBuildingFieldVisible(watchedType);
+  const showInstallmentFields = isInstallmentFieldVisible(watchedType);
+  const showDebtInstallmentToggle = isDebtInstallmentFieldVisible(watchedType);
+  const showOffsetToggle = isOffsetFieldVisible(watchedType);
   const showBankFields = watchedType === 'bank_loan';
   const showFixedExpenseFields = watchedType === 'fixed_expense';
   const isEmployeeSalary = watchedType === 'employee_salary';
@@ -224,12 +221,20 @@ export function ExpenseFormModal({ open, expense, defaultExpenseDate, onClose, o
     if (isSubmittingRef.current) return;
     isSubmittingRef.current = true;
 
+    if (!isValidExpenseType(values.expense_type)) {
+      toast.error('Tipo de despesa inválido');
+      isSubmittingRef.current = false;
+      return;
+    }
+
+    const typedValues = { ...values, expense_type: values.expense_type };
+
     try {
       if (expense?.id) {
-        await updateMutation.mutateAsync({ ...values, id: expense.id });
+        await updateMutation.mutateAsync({ ...typedValues, id: expense.id });
         toast.success('Despesa atualizada com sucesso');
       } else {
-        const created = await createMutation.mutateAsync({ ...values, is_paid: false });
+        const created = await createMutation.mutateAsync({ ...typedValues, is_paid: false });
         toast.success('Despesa criada com sucesso');
 
         // Auto-generate installments if applicable
@@ -401,7 +406,7 @@ export function ExpenseFormModal({ open, expense, defaultExpenseDate, onClose, o
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>
-                          Pessoa{PERSON_REQUIRED_TYPES.includes(watchedType) ? '' : ' (opcional)'}
+                          Pessoa{PERSON_REQUIRED_TYPES.includes(watchedType as ExpenseType) ? '' : ' (opcional)'}
                         </FormLabel>
                         <Select
                           value={field.value ? String(field.value) : 'none'}
@@ -496,7 +501,7 @@ export function ExpenseFormModal({ open, expense, defaultExpenseDate, onClose, o
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>
-                          Pr\u00e9dio{BUILDING_REQUIRED_TYPES.includes(watchedType) ? '' : ' (opcional)'}
+                          Pr\u00e9dio{BUILDING_REQUIRED_TYPES.includes(watchedType as ExpenseType) ? '' : ' (opcional)'}
                         </FormLabel>
                         <Select
                           value={field.value ? String(field.value) : 'none'}
