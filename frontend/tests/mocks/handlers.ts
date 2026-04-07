@@ -1984,6 +1984,70 @@ const templateHandlers = [
 ];
 
 /**
+ * Tenant portal handlers
+ */
+const tenantPortalHandlers = [
+  // Request OTP via WhatsApp
+  http.post(`${API_BASE}/auth/whatsapp/request/`, async ({ request }) => {
+    await delay(100);
+    const data = (await request.json()) as { cpf_cnpj: string };
+    if (!data.cpf_cnpj) {
+      return HttpResponse.json({ detail: 'CPF/CNPJ é obrigatório' }, { status: 400 });
+    }
+    return HttpResponse.json({ detail: 'Código enviado via WhatsApp' });
+  }),
+
+  // Verify OTP and return JWT via cookies
+  http.post(`${API_BASE}/auth/whatsapp/verify/`, async ({ request }) => {
+    await delay(100);
+    const data = (await request.json()) as { cpf_cnpj: string; code: string };
+    if (data.code !== '123456') {
+      return HttpResponse.json({ detail: 'Código inválido ou expirado' }, { status: 400 });
+    }
+    return HttpResponse.json({
+      user: {
+        id: 10,
+        email: '',
+        first_name: 'João',
+        last_name: 'Silva',
+        is_staff: false,
+      },
+    });
+  }),
+
+  // Tenant profile
+  http.get(`${API_BASE}/tenant/me/`, async () => {
+    await delay(50);
+    return HttpResponse.json({
+      id: 1,
+      name: 'João Silva',
+      cpf_cnpj: '12345678901',
+      phone: '(11) 99999-0001',
+      marital_status: 'Solteiro(a)',
+      profession: 'Engenheiro',
+      due_day: 5,
+      dependents: [],
+      lease: {
+        id: 1,
+        start_date: '2024-01-01',
+        validity_months: 12,
+        rental_value: '1300.00',
+        pending_rental_value: null,
+        pending_rental_value_date: null,
+        number_of_tenants: 1,
+        contract_generated: true,
+      },
+      apartment: {
+        id: 1,
+        number: '101',
+        building_name: '836',
+        building_address: 'Rua das Flores, 836',
+      },
+    });
+  }),
+];
+
+/**
  * All handlers combined
  */
 export const handlers = [
@@ -2013,4 +2077,5 @@ export const handlers = [
   ...landlordHandlers,
   ...rentPaymentHandlers,
   ...templateHandlers,
+  ...tenantPortalHandlers,
 ];
