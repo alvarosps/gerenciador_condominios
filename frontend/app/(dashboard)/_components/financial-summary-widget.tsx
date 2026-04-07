@@ -2,8 +2,7 @@
 
 import { DollarSign, Home, AlertTriangle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loading } from '@/components/shared/loading';
+import { DashboardWidgetWrapper } from './dashboard-widget-wrapper';
 import { useDashboardFinancialSummary } from '@/lib/api/hooks/use-dashboard';
 import { formatCurrency } from '@/lib/utils/formatters';
 import { cn } from '@/lib/utils';
@@ -52,28 +51,7 @@ function StatisticCard({
 export function FinancialSummaryWidget() {
   const { data, isLoading, error } = useDashboardFinancialSummary();
 
-  if (isLoading) {
-    return (
-      <Card>
-        <CardContent className="pt-6">
-          <Loading tip="Carregando resumo financeiro..." />
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (error) {
-    return (
-      <Alert variant="destructive">
-        <AlertTriangle className="h-4 w-4" />
-        <AlertDescription>
-          Erro ao carregar resumo financeiro. Não foi possível carregar os dados. Tente novamente mais tarde.
-        </AlertDescription>
-      </Alert>
-    );
-  }
-
-  if (!data) return null;
+  if (!data && !isLoading && !error) return null;
 
   const getOccupancyColor = (rate: number): string => {
     if (rate >= 90) return 'text-success';
@@ -83,37 +61,46 @@ export function FinancialSummaryWidget() {
   };
 
   return (
-    <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-      <StatisticCard
-        title="Receita Total"
-        value={formatCurrency(data.total_income)}
-        icon={<DollarSign />}
-        valueColor="text-success"
-        description="Soma de aluguéis + taxas"
-      />
+    <DashboardWidgetWrapper
+      title="Resumo Financeiro"
+      isLoading={isLoading}
+      error={error}
+      skeletonLines={4}
+    >
+      {data && (
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+          <StatisticCard
+            title="Receita Total"
+            value={formatCurrency(data.total_income)}
+            icon={<DollarSign />}
+            valueColor="text-success"
+            description="Soma de aluguéis + taxas"
+          />
 
-      <StatisticCard
-        title="Receita por Apartamento"
-        value={formatCurrency(data.revenue_per_apartment)}
-        description="Média por apartamento alugado"
-      />
+          <StatisticCard
+            title="Receita por Apartamento"
+            value={formatCurrency(data.revenue_per_apartment)}
+            description="Média por apartamento alugado"
+          />
 
-      <StatisticCard
-        title="Taxa de Ocupação"
-        value={data.occupancy_rate}
-        suffix="%"
-        icon={<Home />}
-        valueColor={getOccupancyColor(data.occupancy_rate)}
-        description={`${data.rented_apartments} de ${data.total_apartments} apartamentos`}
-      />
+          <StatisticCard
+            title="Taxa de Ocupação"
+            value={data.occupancy_rate}
+            suffix="%"
+            icon={<Home />}
+            valueColor={getOccupancyColor(data.occupancy_rate)}
+            description={`${data.rented_apartments} de ${data.total_apartments} apartamentos`}
+          />
 
-      <StatisticCard
-        title="Apartamentos Vagos"
-        value={data.vacant_apartments}
-        icon={<AlertTriangle />}
-        valueColor={data.vacant_apartments > 0 ? 'text-warning' : 'text-success'}
-        description="Disponíveis para locação"
-      />
-    </div>
+          <StatisticCard
+            title="Apartamentos Vagos"
+            value={data.vacant_apartments}
+            icon={<AlertTriangle />}
+            valueColor={data.vacant_apartments > 0 ? 'text-warning' : 'text-success'}
+            description="Disponíveis para locação"
+          />
+        </div>
+      )}
+    </DashboardWidgetWrapper>
   );
 }
