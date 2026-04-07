@@ -7,74 +7,75 @@ from pathlib import Path
 import pytest
 from django.conf import settings
 
-from core.infrastructure import FileSystemDocumentStorage, PDFGenerationError, StorageError
-from core.models import Apartment, Building, Furniture, Landlord, Lease, Tenant
+from core.models import Landlord
 from core.services.contract_service import ContractService
+from tests.factories import (
+    make_apartment,
+    make_building,
+    make_furniture,
+    make_lease,
+    make_tenant,
+)
 
 
 @pytest.fixture
 def building(admin_user):
-    return Building.objects.create(
+    return make_building(
         street_number=6601,
+        user=admin_user,
         name="Contract Test Building",
         address="Rua Contract, 6601",
-        created_by=admin_user,
-        updated_by=admin_user,
     )
 
 
 @pytest.fixture
 def apartment(building, admin_user):
-    return Apartment.objects.create(
+    return make_apartment(
         building=building,
         number=101,
-        rental_value=Decimal("1500.00"),
+        user=admin_user,
         cleaning_fee=Decimal("200.00"),
         max_tenants=3,
-        created_by=admin_user,
-        updated_by=admin_user,
+        rental_value=Decimal("1500.00"),
     )
 
 
 @pytest.fixture
 def tenant(admin_user):
-    return Tenant.objects.create(
+    return make_tenant(
+        cpf_cnpj="71286955084",
+        user=admin_user,
         name="Contract Tenant",
-        cpf_cnpj="71286955084",  # Valid CPF
         phone="11966660001",
         marital_status="Casado(a)",
         profession="Médico",
         due_day=10,
-        created_by=admin_user,
-        updated_by=admin_user,
     )
 
 
 @pytest.fixture
 def second_tenant(admin_user):
-    return Tenant.objects.create(
+    return make_tenant(
+        cpf_cnpj="98765432100",
+        user=admin_user,
         name="Second Contract Tenant",
-        cpf_cnpj="98765432100",  # Valid CPF
         phone="11966660002",
         marital_status="Solteiro(a)",
         profession="Enfermeiro",
         due_day=10,
-        created_by=admin_user,
-        updated_by=admin_user,
     )
 
 
 @pytest.fixture
 def lease(apartment, tenant, admin_user):
-    l = Lease.objects.create(
+    l = make_lease(
         apartment=apartment,
-        responsible_tenant=tenant,
+        tenant=tenant,
+        user=admin_user,
         start_date="2026-01-01",
         validity_months=12,
         tag_fee=Decimal("50.00"),
         rental_value=Decimal("1500.00"),
-        created_by=admin_user,
-        updated_by=admin_user,
     )
     l.tenants.add(tenant)
     return l
@@ -101,19 +102,11 @@ def landlord(admin_user):
 
 @pytest.mark.unit
 class TestCalculateLeaseFurniture:
-    def test_returns_apartment_furniture_minus_tenant_furniture(self, apartment, tenant, lease, admin_user):
-        fridge = Furniture.objects.create(
-            name="Geladeira Test CF",
-            description="",
-            created_by=admin_user,
-            updated_by=admin_user,
-        )
-        tv = Furniture.objects.create(
-            name="TV Test CF",
-            description="",
-            created_by=admin_user,
-            updated_by=admin_user,
-        )
+    def test_returns_apartment_furniture_minus_tenant_furniture(
+        self, apartment, tenant, lease, admin_user
+    ):
+        fridge = make_furniture(name="Geladeira Test CF", user=admin_user)
+        tv = make_furniture(name="TV Test CF", user=admin_user)
         apartment.furnitures.add(fridge, tv)
         tenant.furnitures.add(tv)  # TV belongs to tenant
 
@@ -123,11 +116,7 @@ class TestCalculateLeaseFurniture:
         assert "TV Test CF" not in names
 
     def test_empty_when_tenant_has_all_furniture(self, apartment, tenant, lease, admin_user):
-        stove = Furniture.objects.create(
-            name="Fogão Test CF",
-            created_by=admin_user,
-            updated_by=admin_user,
-        )
+        stove = make_furniture(name="Fogão Test CF", user=admin_user)
         apartment.furnitures.add(stove)
         tenant.furnitures.add(stove)
 
@@ -135,11 +124,7 @@ class TestCalculateLeaseFurniture:
         assert result == []
 
     def test_returns_all_apt_furniture_when_no_tenant_furniture(self, apartment, lease, admin_user):
-        chair = Furniture.objects.create(
-            name="Cadeira Test CF",
-            created_by=admin_user,
-            updated_by=admin_user,
-        )
+        chair = make_furniture(name="Cadeira Test CF", user=admin_user)
         apartment.furnitures.add(chair)
 
         result = ContractService.calculate_lease_furniture(lease)
@@ -149,16 +134,8 @@ class TestCalculateLeaseFurniture:
         self, apartment, tenant, second_tenant, lease, admin_user
     ):
         lease.tenants.add(second_tenant)
-        sofa = Furniture.objects.create(
-            name="Sofá Test CF",
-            created_by=admin_user,
-            updated_by=admin_user,
-        )
-        wardrobe = Furniture.objects.create(
-            name="Guarda-roupa Test CF",
-            created_by=admin_user,
-            updated_by=admin_user,
-        )
+        sofa = make_furniture(name="Sofá Test CF", user=admin_user)
+        wardrobe = make_furniture(name="Guarda-roupa Test CF", user=admin_user)
         apartment.furnitures.add(sofa, wardrobe)
         tenant.furnitures.add(sofa)
         second_tenant.furnitures.add(wardrobe)
@@ -172,9 +149,21 @@ class TestPrepareContractContext:
     def test_returns_required_keys(self, lease, landlord):
         context = ContractService.prepare_contract_context(lease)
         required_keys = [
-            "tenant", "building_number", "apartment_number", "furnitures",
-            "validity", "start_date", "final_date", "rental_value", "next_month_date",
-            "tag_fee", "cleaning_fee", "valor_total", "lease", "valor_tags", "rules",
+            "tenant",
+            "building_number",
+            "apartment_number",
+            "furnitures",
+            "validity",
+            "start_date",
+            "final_date",
+            "rental_value",
+            "next_month_date",
+            "tag_fee",
+            "cleaning_fee",
+            "valor_total",
+            "lease",
+            "valor_tags",
+            "rules",
             "landlord",
         ]
         for key in required_keys:
@@ -345,9 +334,7 @@ class TestGeneratePdfFromHtml:
         mock_playwright_ctx.chromium.launch.return_value = mock_browser
         mock_browser.new_page.return_value = mock_page
 
-        mock_sync_playwright = mocker.patch(
-            "core.services.contract_service.sync_playwright"
-        )
+        mock_sync_playwright = mocker.patch("core.services.contract_service.sync_playwright")
         mock_sync_playwright.return_value.__enter__ = mocker.MagicMock(
             return_value=mock_playwright_ctx
         )
@@ -369,9 +356,7 @@ class TestGeneratePdfFromHtml:
         mock_playwright_ctx.chromium.launch.return_value = mock_browser
         mock_browser.new_page.return_value = mock_page
 
-        mock_sync_playwright = mocker.patch(
-            "core.services.contract_service.sync_playwright"
-        )
+        mock_sync_playwright = mocker.patch("core.services.contract_service.sync_playwright")
         mock_sync_playwright.return_value.__enter__ = mocker.MagicMock(
             return_value=mock_playwright_ctx
         )
@@ -394,9 +379,7 @@ class TestGeneratePdfFromHtml:
         mock_playwright_ctx.chromium.launch.return_value = mock_browser
         mock_browser.new_page.return_value = mock_page
 
-        mock_sync_playwright = mocker.patch(
-            "core.services.contract_service.sync_playwright"
-        )
+        mock_sync_playwright = mocker.patch("core.services.contract_service.sync_playwright")
         mock_sync_playwright.return_value.__enter__ = mocker.MagicMock(
             return_value=mock_playwright_ctx
         )

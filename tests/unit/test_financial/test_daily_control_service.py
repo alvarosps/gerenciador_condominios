@@ -11,8 +11,6 @@ from django.core.exceptions import ObjectDoesNotExist
 from freezegun import freeze_time
 
 from core.models import (
-    Apartment,
-    Building,
     Expense,
     ExpenseInstallment,
     ExpenseType,
@@ -20,44 +18,41 @@ from core.models import (
     Lease,
     Person,
     RentPayment,
-    Tenant,
 )
 from core.services.daily_control_service import DailyControlService
+from tests.factories import (
+    make_apartment,
+    make_building,
+    make_expense,
+    make_expense_installment,
+    make_income,
+    make_lease,
+    make_person,
+    make_rent_payment,
+    make_tenant,
+)
 
 
 @pytest.fixture
-def building() -> Building:
-    return Building.objects.create(street_number=836, name="Edifício 836", address="Rua Teste, 836")
+def building():
+    return make_building(street_number=836, name="Edifício 836", address="Rua Teste, 836")
 
 
 @pytest.fixture
-def apartment(building: Building) -> Apartment:
-    return Apartment.objects.create(
-        building=building,
-        number=101,
-        rental_value=Decimal("1200.00"),
-        max_tenants=2,
-        is_rented=True,
-    )
+def apartment(building):
+    return make_apartment(building=building, number=101, rental_value=Decimal("1200.00"), max_tenants=2, is_rented=True)
 
 
 @pytest.fixture
-def tenant() -> Tenant:
-    return Tenant.objects.create(
-        name="João Silva",
-        cpf_cnpj="98765432100",
-        phone="11999999999",
-        marital_status="Solteiro(a)",
-        profession="Engenheiro",
-        due_day=7,
-    )
+def tenant():
+    return make_tenant(cpf_cnpj="98765432100", name="João Silva", due_day=7)
 
 
 @pytest.fixture
-def lease(apartment: Apartment, tenant: Tenant) -> Lease:
-    return Lease.objects.create(
+def lease(apartment, tenant):
+    return make_lease(
         apartment=apartment,
-        responsible_tenant=tenant,
+        tenant=tenant,
         start_date=date(2025, 1, 1),
         validity_months=12,
         tag_fee=Decimal("50.00"),
@@ -66,8 +61,8 @@ def lease(apartment: Apartment, tenant: Tenant) -> Lease:
 
 
 @pytest.fixture
-def person() -> Person:
-    return Person.objects.create(name="Rodrigo", relationship="Filho")
+def person():
+    return make_person(name="Rodrigo", relationship="Filho")
 
 
 @pytest.mark.django_db
@@ -95,7 +90,7 @@ class TestDailyBreakdown:
 
     def test_recurring_income_on_correct_day(self) -> None:
         """Recurring income should appear on its income_date day of month."""
-        Income.objects.create(
+        make_income(
             description="Aposentadoria",
             amount=Decimal("1500.00"),
             income_date=date(2026, 3, 7),
@@ -111,7 +106,7 @@ class TestDailyBreakdown:
 
     def test_installments_on_due_date(self, person: Person) -> None:
         """Expense installments should appear on their due_date."""
-        expense = Expense.objects.create(
+        expense = make_expense(
             description="MEGA BRICK",
             expense_type=ExpenseType.CARD_PURCHASE,
             total_amount=Decimal("600.00"),
@@ -120,7 +115,7 @@ class TestDailyBreakdown:
             is_installment=True,
             total_installments=10,
         )
-        ExpenseInstallment.objects.create(
+        make_expense_installment(
             expense=expense,
             installment_number=5,
             total_installments=10,
@@ -137,7 +132,7 @@ class TestDailyBreakdown:
 
     def test_paid_items_marked(self, lease: Lease) -> None:
         """Paid items should show paid=True."""
-        RentPayment.objects.create(
+        make_rent_payment(
             lease=lease,
             reference_month=date(2026, 3, 1),
             amount_paid=Decimal("1200.00"),
@@ -160,7 +155,7 @@ class TestDailyBreakdown:
 
     def test_excludes_offset_expenses(self, person: Person) -> None:
         """Offset expenses should not appear in exits."""
-        expense = Expense.objects.create(
+        expense = make_expense(
             description="Desconto Sogros",
             expense_type=ExpenseType.CARD_PURCHASE,
             total_amount=Decimal("200.00"),
@@ -170,7 +165,7 @@ class TestDailyBreakdown:
             total_installments=4,
             is_offset=True,
         )
-        ExpenseInstallment.objects.create(
+        make_expense_installment(
             expense=expense,
             installment_number=1,
             total_installments=4,
@@ -187,7 +182,7 @@ class TestMonthSummary:
     @freeze_time("2026-03-22")
     def test_summary_totals(self, lease: Lease) -> None:
         """Summary should calculate expected and received totals."""
-        RentPayment.objects.create(
+        make_rent_payment(
             lease=lease,
             reference_month=date(2026, 3, 1),
             amount_paid=Decimal("1200.00"),
@@ -200,7 +195,7 @@ class TestMonthSummary:
     @freeze_time("2026-03-22")
     def test_overdue_count(self, person: Person) -> None:
         """Should count overdue items correctly."""
-        expense = Expense.objects.create(
+        expense = make_expense(
             description="Parcela Vencida",
             expense_type=ExpenseType.CARD_PURCHASE,
             total_amount=Decimal("100.00"),
@@ -209,7 +204,7 @@ class TestMonthSummary:
             is_installment=True,
             total_installments=5,
         )
-        ExpenseInstallment.objects.create(
+        make_expense_installment(
             expense=expense,
             installment_number=2,
             total_installments=5,
@@ -224,13 +219,13 @@ class TestMonthSummary:
     @freeze_time("2026-03-22")
     def test_current_balance(self, lease: Lease, person: Person) -> None:
         """Current balance = received - paid."""
-        RentPayment.objects.create(
+        make_rent_payment(
             lease=lease,
             reference_month=date(2026, 3, 1),
             amount_paid=Decimal("1200.00"),
             payment_date=date(2026, 3, 7),
         )
-        expense = Expense.objects.create(
+        expense = make_expense(
             description="Parcela Paga",
             expense_type=ExpenseType.CARD_PURCHASE,
             total_amount=Decimal("500.00"),
@@ -239,7 +234,7 @@ class TestMonthSummary:
             is_installment=True,
             total_installments=5,
         )
-        ExpenseInstallment.objects.create(
+        make_expense_installment(
             expense=expense,
             installment_number=2,
             total_installments=5,
@@ -256,7 +251,7 @@ class TestMonthSummary:
 class TestMarkPaid:
     def test_mark_installment_paid(self, person: Person) -> None:
         """Should mark an installment as paid."""
-        expense = Expense.objects.create(
+        expense = make_expense(
             description="Test Parcela",
             expense_type=ExpenseType.CARD_PURCHASE,
             total_amount=Decimal("600.00"),
@@ -265,7 +260,7 @@ class TestMarkPaid:
             is_installment=True,
             total_installments=6,
         )
-        inst = ExpenseInstallment.objects.create(
+        inst = make_expense_installment(
             expense=expense,
             installment_number=3,
             total_installments=6,
@@ -281,7 +276,7 @@ class TestMarkPaid:
 
     def test_mark_expense_paid(self) -> None:
         """Should mark an expense as paid."""
-        expense = Expense.objects.create(
+        expense = make_expense(
             description="Conta de Luz",
             expense_type=ExpenseType.ELECTRICITY_BILL,
             total_amount=Decimal("250.00"),
@@ -296,7 +291,7 @@ class TestMarkPaid:
 
     def test_mark_income_received(self) -> None:
         """Should mark an income as received."""
-        income = Income.objects.create(
+        income = make_income(
             description="Aposentadoria",
             amount=Decimal("1500.00"),
             income_date=date(2026, 3, 7),
@@ -310,7 +305,7 @@ class TestMarkPaid:
 
     def test_mark_already_paid_returns_status(self, person: Person) -> None:
         """Should return already_paid status if item is already paid."""
-        expense = Expense.objects.create(
+        expense = make_expense(
             description="Já Pago",
             expense_type=ExpenseType.ONE_TIME_EXPENSE,
             total_amount=Decimal("50.00"),

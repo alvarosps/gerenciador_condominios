@@ -369,7 +369,7 @@ def building_with_apartment(admin_user, sample_building_data, sample_apartment_d
     building = make_building(user=admin_user, **sample_building_data)
     apartment = make_apartment(
         building=building,
-        number=str(sample_apartment_data["number"]),
+        number=sample_apartment_data["number"],
         user=admin_user,
         **{k: v for k, v in sample_apartment_data.items() if k != "number"},
     )

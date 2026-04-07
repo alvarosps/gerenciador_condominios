@@ -40,7 +40,7 @@ def make_building(street_number: int = 100, user=None, **kwargs):
     return baker.make("core.Building", street_number=street_number, **defaults)
 
 
-def make_apartment(building=None, number: str = "101", user=None, **kwargs):
+def make_apartment(building=None, number: int = 101, user=None, **kwargs):
     if building is None:
         building = make_building(user=user)
     defaults = {
@@ -57,10 +57,10 @@ def make_apartment(building=None, number: str = "101", user=None, **kwargs):
 def make_tenant(cpf_cnpj: str | None = None, user=None, **kwargs):
     defaults = {
         "cpf_cnpj": cpf_cnpj or _next_cpf(),
-        "full_name": kwargs.pop("full_name", "Test Tenant"),
+        "name": kwargs.pop("name", "Test Tenant"),
         "phone": kwargs.pop("phone", "11999999999"),
-        "nationality": "Brasileiro",
         "marital_status": "Solteiro(a)",
+        "profession": "Engenheiro",
     }
     if user:
         defaults["created_by"] = user
@@ -76,8 +76,8 @@ def make_lease(apartment=None, tenant=None, user=None, **kwargs):
         tenant = make_tenant(user=user)
     defaults = {
         "rental_value": Decimal("1000.00"),
-        "due_day": 5,
         "start_date": date(2026, 1, 1),
+        "validity_months": 12,
     }
     if user:
         defaults["created_by"] = user
@@ -136,3 +136,116 @@ def make_income(user=None, **kwargs):
         defaults["updated_by"] = user
     defaults.update(kwargs)
     return baker.make("core.Income", **defaults)
+
+
+def make_furniture(name: str = "Test Furniture", user=None, **kwargs):
+    defaults: dict = {"name": name}
+    if user:
+        defaults["created_by"] = user
+        defaults["updated_by"] = user
+    defaults.update(kwargs)
+    return baker.make("core.Furniture", **defaults)
+
+
+def make_dependent(tenant=None, user=None, **kwargs):
+    if tenant is None:
+        tenant = make_tenant(user=user)
+    defaults = {
+        "name": "Test Dependent",
+        "phone": "11987654321",
+    }
+    if user:
+        defaults["created_by"] = user
+        defaults["updated_by"] = user
+    defaults.update(kwargs)
+    return baker.make("core.Dependent", tenant=tenant, **defaults)
+
+
+def make_credit_card(person=None, user=None, **kwargs):
+    if person is None:
+        person = make_person(user=user)
+    defaults = {
+        "nickname": "Test Card",
+        "last_four_digits": "1234",
+        "closing_day": 15,
+        "due_day": 22,
+        "is_active": True,
+    }
+    if user:
+        defaults["created_by"] = user
+        defaults["updated_by"] = user
+    defaults.update(kwargs)
+    return baker.make("core.CreditCard", person=person, **defaults)
+
+
+def make_expense_category(name: str = "Test Category", user=None, **kwargs):
+    defaults: dict = {"name": name, "color": "#6B7280"}
+    if user:
+        defaults["created_by"] = user
+        defaults["updated_by"] = user
+    defaults.update(kwargs)
+    return baker.make("core.ExpenseCategory", **defaults)
+
+
+def make_rent_payment(lease=None, user=None, **kwargs):
+    if lease is None:
+        lease = make_lease(user=user)
+    defaults = {
+        "reference_month": date(2026, 3, 1),
+        "amount_paid": Decimal("1000.00"),
+        "payment_date": date(2026, 3, 5),
+    }
+    if user:
+        defaults["created_by"] = user
+        defaults["updated_by"] = user
+    defaults.update(kwargs)
+    return baker.make("core.RentPayment", lease=lease, **defaults)
+
+
+def make_employee_payment(person=None, user=None, **kwargs):
+    if person is None:
+        person = make_person(user=user)
+    defaults = {
+        "reference_month": date(2026, 3, 1),
+        "base_salary": Decimal("800.00"),
+        "variable_amount": Decimal("0.00"),
+        "rent_offset": Decimal("0.00"),
+        "cleaning_count": 0,
+        "is_paid": False,
+    }
+    if user:
+        defaults["created_by"] = user
+        defaults["updated_by"] = user
+    defaults.update(kwargs)
+    return baker.make("core.EmployeePayment", person=person, **defaults)
+
+
+def make_person_income(person=None, user=None, **kwargs):
+    if person is None:
+        person = make_person(user=user)
+    defaults = {
+        "income_type": "fixed_stipend",
+        "fixed_amount": Decimal("1000.00"),
+        "start_date": date(2026, 1, 1),
+        "is_active": True,
+    }
+    if user:
+        defaults["created_by"] = user
+        defaults["updated_by"] = user
+    defaults.update(kwargs)
+    return baker.make("core.PersonIncome", person=person, **defaults)
+
+
+def make_person_payment(person=None, user=None, **kwargs):
+    if person is None:
+        person = make_person(user=user)
+    defaults = {
+        "reference_month": date(2026, 3, 1),
+        "amount": Decimal("500.00"),
+        "payment_date": date(2026, 3, 5),
+    }
+    if user:
+        defaults["created_by"] = user
+        defaults["updated_by"] = user
+    defaults.update(kwargs)
+    return baker.make("core.PersonPayment", person=person, **defaults)
