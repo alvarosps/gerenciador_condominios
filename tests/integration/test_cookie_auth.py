@@ -129,3 +129,71 @@ class TestCookieLogout:
     def test_logout_requires_authentication(self, api_client):
         response = api_client.post("/api/auth/logout/")
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+@pytest.mark.integration
+class TestOAuthCookieFlow:
+    def test_exchange_oauth_code_sets_cookies(self, api_client, admin_user):
+        from rest_framework_simplejwt.tokens import RefreshToken as RT
+
+        from core.models import OAuthExchangeCode
+
+        refresh = RT.for_user(admin_user)
+        exchange = OAuthExchangeCode.objects.create(
+            user=admin_user,
+            access_token=str(refresh.access_token),
+            refresh_token=str(refresh),
+        )
+
+        response = api_client.post(
+            "/api/auth/oauth/exchange/",
+            {"code": str(exchange.code)},
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        assert "access_token" in response.cookies
+        assert response.cookies["access_token"]["httponly"] is True
+        assert "access" not in response.data
+        assert "user" in response.data
+
+    def test_exchange_oauth_code_returns_user_info(self, api_client, admin_user):
+        from rest_framework_simplejwt.tokens import RefreshToken as RT
+
+        from core.models import OAuthExchangeCode
+
+        refresh = RT.for_user(admin_user)
+        exchange = OAuthExchangeCode.objects.create(
+            user=admin_user,
+            access_token=str(refresh.access_token),
+            refresh_token=str(refresh),
+        )
+
+        response = api_client.post(
+            "/api/auth/oauth/exchange/",
+            {"code": str(exchange.code)},
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        user_data = response.data["user"]
+        assert user_data["email"] == admin_user.email
+        assert "is_staff" in user_data
+
+    def test_exchange_oauth_code_invalid_code_returns_400(self, api_client):
+        import uuid
+
+        response = api_client.post(
+            "/api/auth/oauth/exchange/",
+            {"code": str(uuid.uuid4())},
+            format="json",
+        )
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    def test_exchange_oauth_code_missing_code_returns_400(self, api_client):
+        response = api_client.post(
+            "/api/auth/oauth/exchange/",
+            {},
+            format="json",
+        )
+        assert response.status_code == status.HTTP_400_BAD_REQUEST

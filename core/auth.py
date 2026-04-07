@@ -20,6 +20,7 @@ from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from core.models import OAuthExchangeCode
+from core.viewsets.auth_views_cookie import _set_auth_cookies
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -127,9 +128,9 @@ def google_oauth_callback(request: Request) -> Any:
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
-def exchange_oauth_code(request: Request) -> JsonResponse:
+def exchange_oauth_code(request: Request) -> Response:
     """
-    Exchange a one-time OAuth code for JWT tokens.
+    Exchange a one-time OAuth code for HttpOnly cookie tokens.
 
     URL: /api/auth/oauth/exchange/
     Method: POST
@@ -138,33 +139,33 @@ def exchange_oauth_code(request: Request) -> JsonResponse:
 
     code = request.data.get("code")
     if not code:
-        return JsonResponse({"error": "Code is required"}, status=400)
+        return Response({"error": "Code is required"}, status=400)
 
     try:
         exchange = OAuthExchangeCode.objects.get(code=code)
     except (OAuthExchangeCode.DoesNotExist, ValueError):
-        return JsonResponse({"error": "Invalid or expired code"}, status=400)
+        return Response({"error": "Invalid or expired code"}, status=400)
 
     if not exchange.is_valid():
-        return JsonResponse({"error": "Invalid or expired code"}, status=400)
+        return Response({"error": "Invalid or expired code"}, status=400)
 
     exchange.is_used = True
     exchange.save(update_fields=["is_used"])
 
     user = exchange.user
-    return JsonResponse(
+    response = Response(
         {
-            "access": exchange.access_token,
-            "refresh": exchange.refresh_token,
             "user": {
                 "id": user.id,
-                "username": user.username,
                 "email": user.email,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
                 "is_staff": user.is_staff,
-                "is_superuser": user.is_superuser,
             },
         }
     )
+    _set_auth_cookies(response, exchange.access_token, exchange.refresh_token)
+    return response
 
 
 @api_view(["POST"])
