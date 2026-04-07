@@ -13,8 +13,10 @@ class TestJWTTokenEndpoints:
             format="json",
         )
         assert response.status_code == status.HTTP_200_OK
-        assert "access" in response.data
-        assert "refresh" in response.data
+        # Tokens are set as HttpOnly cookies, not in response body
+        assert "access_token" in response.cookies
+        assert "refresh_token" in response.cookies
+        assert "user" in response.data
 
     def test_obtain_token_with_invalid_credentials(self, api_client):
         response = api_client.post(
@@ -29,20 +31,17 @@ class TestJWTTokenEndpoints:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
     def test_refresh_token_with_valid_refresh(self, api_client, admin_user):
-        obtain_response = api_client.post(
+        # Login to get refresh_token cookie
+        api_client.post(
             "/api/auth/token/",
             {"username": "admin", "password": "testpass123"},
             format="json",
         )
-        refresh_token = obtain_response.data["refresh"]
-
-        response = api_client.post(
-            "/api/auth/token/refresh/",
-            {"refresh": refresh_token},
-            format="json",
-        )
+        # Refresh uses the cookie set by login (APIClient carries cookies automatically)
+        response = api_client.post("/api/auth/token/refresh/", format="json")
         assert response.status_code == status.HTTP_200_OK
-        assert "access" in response.data
+        # New access cookie is set; body is empty
+        assert "access_token" in response.cookies
 
     def test_refresh_token_with_invalid_token(self, api_client):
         response = api_client.post(
@@ -52,7 +51,8 @@ class TestJWTTokenEndpoints:
         )
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
-    def test_refresh_token_with_missing_field(self, api_client):
+    def test_refresh_token_with_no_cookie_and_no_body(self, api_client):
+        # No refresh cookie and no body — should return 400
         response = api_client.post("/api/auth/token/refresh/", {}, format="json")
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
@@ -71,9 +71,7 @@ class TestCurrentUserEndpoint:
         response = api_client.get("/api/auth/me/")
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
-    def test_get_current_user_regular_user(
-        self, regular_authenticated_api_client, regular_user
-    ):
+    def test_get_current_user_regular_user(self, regular_authenticated_api_client, regular_user):
         response = regular_authenticated_api_client.get("/api/auth/me/")
         assert response.status_code == status.HTTP_200_OK
         assert response.data["email"] == "user@test.com"

@@ -20,7 +20,6 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
 from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerView
-from rest_framework_simplejwt.views import TokenBlacklistView, TokenObtainPairView, TokenRefreshView
 
 from core.auth import (
     current_user,
@@ -31,14 +30,19 @@ from core.auth import (
 )
 from core.throttles import AuthRateThrottle
 from core.views import task_status
-from core.viewsets.auth_views_registration import LogoutView, RegisterView
+from core.viewsets.auth_views_cookie import (
+    CookieTokenObtainPairView,
+    CookieTokenRefreshView,
+    cookie_logout,
+)
+from core.viewsets.auth_views_registration import RegisterView
 
 
-class ThrottledTokenObtainPairView(TokenObtainPairView):
+class ThrottledTokenObtainPairView(CookieTokenObtainPairView):
     throttle_classes = [AuthRateThrottle]
 
 
-class ThrottledTokenRefreshView(TokenRefreshView):
+class ThrottledTokenRefreshView(CookieTokenRefreshView):
     throttle_classes = [AuthRateThrottle]
 
 
@@ -50,12 +54,11 @@ urlpatterns = [
     # JWT Authentication endpoints
     path("api/auth/token/", ThrottledTokenObtainPairView.as_view(), name="token_obtain_pair"),
     path("api/auth/token/refresh/", ThrottledTokenRefreshView.as_view(), name="token_refresh"),
-    path("api/auth/token/blacklist/", TokenBlacklistView.as_view(), name="token_blacklist"),
     # Current user profile
     path("api/auth/me/", current_user, name="current_user"),
     # Registration and logout
     path("api/auth/register/", RegisterView.as_view(), name="auth_register"),
-    path("api/auth/logout/", LogoutView.as_view(), name="auth_logout"),
+    path("api/auth/logout/", cookie_logout, name="auth_logout"),
     # Custom OAuth endpoints
     path("api/auth/oauth/google/callback/", google_oauth_callback, name="google_oauth_callback"),
     path("api/auth/oauth/exchange/", exchange_oauth_code, name="exchange_oauth_code"),
