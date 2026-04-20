@@ -452,3 +452,178 @@ class TestGetEligibleLeasesExtra:
         matching = next(item for item in result if item["lease_id"] == lease.pk)
         assert matching["last_adjustment"] is not None
         assert matching["last_adjustment"]["percentage"] == "5.00"
+
+
+# Valid CPFs (checksum verified) — reserved for new test classes below
+_CPF_16 = "98765432100"
+_CPF_17 = "12398765482"
+_CPF_18 = "45612398719"
+_CPF_19 = "78945612319"
+_CPF_20 = "32178945619"
+_CPF_21 = "65432178982"
+_CPF_22 = "14725836982"
+
+
+@pytest.mark.integration
+@pytest.mark.django_db
+class TestFutureAdjustment:
+    """Tests for apply_adjustment() when renewal_date is in a future calendar month."""
+
+    def test_future_adjustment_sets_pending_not_current(self) -> None:
+        apartment = _make_apartment(_make_building(9601))
+        lease = _make_lease(apartment, _make_tenant(_CPF_16))
+        original_rental_value = lease.rental_value
+
+        # renewal_date one month in the future — should set pending, not apply
+        future_date = date.today() + relativedelta(months=1)
+        RentAdjustmentService.apply_adjustment(
+            lease=lease,
+            percentage=Decimal("5.00"),
+            update_apartment_prices=False,
+            renewal_date=future_date,
+        )
+
+        lease.refresh_from_db()
+        assert lease.rental_value == original_rental_value
+        assert lease.pending_rental_value is not None
+        # 1400.00 * 1.05 = 1470.00
+        assert lease.pending_rental_value == Decimal("1470.00")
+        assert lease.pending_rental_value_date == future_date
+
+    def test_future_adjustment_does_not_update_apartment(self) -> None:
+        apartment = _make_apartment(_make_building(9602))
+        original_apt_value = apartment.rental_value
+        lease = _make_lease(apartment, _make_tenant(_CPF_17))
+
+        future_date = date.today() + relativedelta(months=1)
+        RentAdjustmentService.apply_adjustment(
+            lease=lease,
+            percentage=Decimal("5.00"),
+            update_apartment_prices=True,
+            renewal_date=future_date,
+        )
+
+        apartment.refresh_from_db()
+        assert apartment.rental_value == original_apt_value
+
+    def test_current_date_adjustment_is_not_treated_as_future(self) -> None:
+        apartment = _make_apartment(_make_building(9603))
+        lease = _make_lease(apartment, _make_tenant(_CPF_18))
+
+        # renewal_date = today — same calendar month, must apply immediately
+        today = date.today()
+        RentAdjustmentService.apply_adjustment(
+            lease=lease,
+            percentage=Decimal("5.00"),
+            update_apartment_prices=False,
+            renewal_date=today,
+        )
+
+        lease.refresh_from_db()
+        assert lease.rental_value == Decimal("1470.00")
+        assert lease.pending_rental_value is None
+        assert lease.pending_rental_value_date is None
+
+
+@pytest.mark.integration
+@pytest.mark.django_db
+class TestActivatePendingAdjustments:
+    """Tests for activate_pending_adjustments()."""
+
+    def test_activates_pending_when_date_arrived(self) -> None:
+        apartment = _make_apartment(_make_building(9604))
+        lease = _make_lease(apartment, _make_tenant(_CPF_19))
+
+        # Set pending with a date in the past (already due)
+        past_date = date.today() - relativedelta(months=1)
+        lease.pending_rental_value = Decimal("1470.00")
+        lease.pending_rental_value_date = past_date
+        lease.save()
+
+        # Create matching RentAdjustment so the service can find the multiplier
+        RentAdjustment.objects.create(
+            lease=lease,
+            adjustment_date=past_date,
+            percentage=Decimal("5.00"),
+            previous_value=Decimal("1400.00"),
+            new_value=Decimal("1470.00"),
+            apartment_updated=False,
+        )
+
+        activated = RentAdjustmentService.activate_pending_adjustments()
+
+        assert activated >= 1
+        lease.refresh_from_db()
+        assert lease.rental_value == Decimal("1470.00")
+        assert lease.pending_rental_value is None
+        assert lease.pending_rental_value_date is None
+
+    def test_does_not_activate_future_pending(self) -> None:
+        apartment = _make_apartment(_make_building(9605))
+        lease = _make_lease(apartment, _make_tenant(_CPF_20))
+        original_value = lease.rental_value
+
+        # Set pending with a future date
+        future_date = date.today() + relativedelta(months=1)
+        lease.pending_rental_value = Decimal("1470.00")
+        lease.pending_rental_value_date = future_date
+        lease.save()
+
+        RentAdjustmentService.activate_pending_adjustments()
+
+        lease.refresh_from_db()
+        assert lease.rental_value == original_value
+        assert lease.pending_rental_value == Decimal("1470.00")
+
+    def test_returns_zero_when_no_pending(self) -> None:
+        # No leases with pending values in clean state
+        activated = RentAdjustmentService.activate_pending_adjustments()
+        assert activated == 0
+
+
+@pytest.mark.integration
+@pytest.mark.django_db
+class TestPrepaidUntilWarning:
+    """Tests for prepaid_warning flag in get_eligible_leases()."""
+
+    def test_prepaid_warning_true_when_future(self) -> None:
+        apartment = _make_apartment(_make_building(9606))
+        # Start 11 months ago — eligible within alert window
+        lease = _make_lease(
+            apartment,
+            _make_tenant(_CPF_21),
+            start_date=date.today() - relativedelta(months=11),
+            validity_months=24,
+        )
+        # Set prepaid_until to a future date
+        lease.prepaid_until = date.today() + relativedelta(months=2)
+        lease.save()
+
+        result = RentAdjustmentService.get_eligible_leases()
+
+        alerts = result["alerts"]
+        lease_ids = [item["lease_id"] for item in alerts]
+        assert lease.pk in lease_ids
+        matching = next(item for item in alerts if item["lease_id"] == lease.pk)
+        assert matching["prepaid_warning"] is True
+
+    def test_prepaid_warning_false_when_past(self) -> None:
+        apartment = _make_apartment(_make_building(9607))
+        # Start 11 months ago — eligible within alert window
+        lease = _make_lease(
+            apartment,
+            _make_tenant(_CPF_22),
+            start_date=date.today() - relativedelta(months=11),
+            validity_months=24,
+        )
+        # Set prepaid_until to a past date
+        lease.prepaid_until = date.today() - relativedelta(months=1)
+        lease.save()
+
+        result = RentAdjustmentService.get_eligible_leases()
+
+        alerts = result["alerts"]
+        lease_ids = [item["lease_id"] for item in alerts]
+        assert lease.pk in lease_ids
+        matching = next(item for item in alerts if item["lease_id"] == lease.pk)
+        assert matching["prepaid_warning"] is False
