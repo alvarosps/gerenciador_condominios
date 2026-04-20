@@ -85,7 +85,7 @@ class TenantSummarySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Tenant
-        fields = ["id", "name", "cpf_cnpj"]
+        fields = ["id", "name", "cpf_cnpj", "phone", "due_day"]
         read_only_fields = fields
 
 
