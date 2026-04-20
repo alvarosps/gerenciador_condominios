@@ -38,7 +38,7 @@ interface RowSelection<T> {
   onChange?: (selectedRowKeys: React.Key[], selectedRows: T[]) => void;
 }
 
-interface DataTableProps<T extends Record<string, unknown>> {
+interface DataTableProps<T extends object> {
   dataSource?: T[];
   columns: Column<T>[];
   loading?: boolean;
@@ -54,7 +54,7 @@ interface DataTableProps<T extends Record<string, unknown>> {
   defaultSortDirection?: 'asc' | 'desc';
 }
 
-export function DataTable<T extends Record<string, unknown>>({
+export function DataTable<T extends object>({
   dataSource = [],
   columns,
   loading = false,
@@ -230,10 +230,9 @@ export function DataTable<T extends Record<string, unknown>>({
               {rowSelection && (
                 <TableHead style={{ width: 50 }}>
                   <Checkbox
-                    checked={allSelected}
+                    checked={someSelected ? 'indeterminate' : allSelected}
                     onCheckedChange={handleSelectAll}
                     aria-label="Select all"
-                    className={someSelected ? 'opacity-50' : ''}
                   />
                 </TableHead>
               )}

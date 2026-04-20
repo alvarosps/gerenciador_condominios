@@ -14,7 +14,10 @@ from django.conf import settings
 from django.core.management import call_command
 from django.test import override_settings
 from freezegun import freeze_time as _freeze_time
+from model_bakery import baker
 from rest_framework.test import APIClient
+
+from tests.factories import make_apartment, make_building, make_person
 
 # Ensure test settings are applied
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "condominios_manager.settings")
@@ -278,17 +281,6 @@ def sample_lease_data() -> dict[str, Any]:
 
 
 @pytest.fixture
-def cleanup_test_contracts():
-    """
-    Cleans up any test contract files created during tests.
-    Runs after test completion.
-    """
-    return
-    # Cleanup logic would go here if needed
-    # Currently handled by tmp_path fixture
-
-
-@pytest.fixture
 def freeze_time():
     """
     Provides freezegun's freeze_time for time-dependent tests.
@@ -373,18 +365,13 @@ def pytest_collection_modifyitems(config, items):
 @pytest.fixture
 def building_with_apartment(admin_user, sample_building_data, sample_apartment_data):
     """Pre-built building + apartment for integration tests."""
-    from core.models import Apartment, Building
 
-    building = Building.objects.create(
-        **sample_building_data,
-        created_by=admin_user,
-        updated_by=admin_user,
-    )
-    apt_data = {**sample_apartment_data, "building": building}
-    apartment = Apartment.objects.create(
-        **apt_data,
-        created_by=admin_user,
-        updated_by=admin_user,
+    building = make_building(user=admin_user, **sample_building_data)
+    apartment = make_apartment(
+        building=building,
+        number=sample_apartment_data["number"],
+        user=admin_user,
+        **{k: v for k, v in sample_apartment_data.items() if k != "number"},
     )
     return building, apartment
 
@@ -392,15 +379,10 @@ def building_with_apartment(admin_user, sample_building_data, sample_apartment_d
 @pytest.fixture
 def person_with_credit_card(admin_user):
     """Pre-built person + credit card for financial tests."""
-    from core.models import CreditCard, Person
 
-    person = Person.objects.create(
-        name="Test Person",
-        relationship="Familiar",
-        created_by=admin_user,
-        updated_by=admin_user,
-    )
-    card = CreditCard.objects.create(
+    person = make_person(user=admin_user, relationship="Familiar")
+    card = baker.make(
+        "core.CreditCard",
         person=person,
         nickname="Test Card",
         closing_day=15,

@@ -36,6 +36,7 @@ import {
 } from '@/lib/api/hooks/use-person-payments';
 import { usePersons } from '@/lib/api/hooks/use-persons';
 import type { PersonPayment } from '@/lib/schemas/person-payment.schema';
+import { handleError } from '@/lib/utils/error-handler';
 
 interface Props {
   open: boolean;
@@ -130,7 +131,7 @@ export function PersonPaymentFormModal({
       form.reset();
     } catch (error) {
       toast.error('Erro ao salvar pagamento');
-      console.error('Save error:', error);
+      handleError(error, 'PersonPaymentFormModal.onSubmit');
     }
   };
 

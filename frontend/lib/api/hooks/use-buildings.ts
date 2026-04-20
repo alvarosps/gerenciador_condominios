@@ -27,7 +27,7 @@ export function useBuildings() {
  */
 export function useBuilding(id: number | null) {
   return useQuery({
-    queryKey: id ? queryKeys.buildings.detail(id) : queryKeys.buildings.all,
+    queryKey: queryKeys.buildings.detail(id ?? 0),
     queryFn: async () => {
       if (!id) throw new Error('Building ID is required');
       const { data } = await apiClient.get<Building>(`/buildings/${id}/`);

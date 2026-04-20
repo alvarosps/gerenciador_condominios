@@ -4,7 +4,7 @@ import type { NextRequest } from 'next/server';
 /**
  * List of public paths that don't require authentication
  */
-const PUBLIC_PATHS = ['/login', '/register'];
+const PUBLIC_PATHS = ['/login', '/register', '/tenant/login'];
 
 /**
  * Middleware to protect routes that require authentication
@@ -24,7 +24,7 @@ const PUBLIC_PATHS = ['/login', '/register'];
  */
 export function middleware(request: NextRequest) {
   // Check for access token in cookies (synced from localStorage on login)
-  const hasToken = request.cookies.has('access_token');
+  const hasToken = request.cookies.has('is_authenticated');
 
   // Get current path
   const path = request.nextUrl.pathname;

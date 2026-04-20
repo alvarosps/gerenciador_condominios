@@ -4,4 +4,5 @@ pyproject.toml
 src/condominios_manager.egg-info/PKG-INFO
 src/condominios_manager.egg-info/SOURCES.txt
 src/condominios_manager.egg-info/dependency_links.txt
+src/condominios_manager.egg-info/requires.txt
 src/condominios_manager.egg-info/top_level.txt

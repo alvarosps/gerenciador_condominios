@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -201,9 +201,11 @@ export default function RentPaymentsPage() {
     [crud, handleDelete, isAdmin],
   );
 
-  if (error) {
-    toast.error('Erro ao carregar pagamentos de aluguel');
-  }
+  useEffect(() => {
+    if (error) {
+      toast.error('Erro ao carregar pagamentos de aluguel');
+    }
+  }, [error]);
 
   return (
     <div>

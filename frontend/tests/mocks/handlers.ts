@@ -404,13 +404,12 @@ const authHandlers = [
     const data = (await request.json()) as { email: string; password: string };
     if (data.email === 'test@example.com' && data.password === 'password123') {
       return HttpResponse.json({
-        access: 'mock-access-token-12345',
-        refresh: 'mock-refresh-token-67890',
         user: {
           id: 1,
           email: 'test@example.com',
           first_name: 'Test',
           last_name: 'User',
+          is_staff: false,
         },
       });
     }
@@ -432,29 +431,22 @@ const authHandlers = [
     }
     return HttpResponse.json(
       {
-        access: 'mock-access-token-12345',
-        refresh: 'mock-refresh-token-67890',
         user: {
           id: 2,
           email: data.email,
           first_name: data.first_name,
           last_name: data.last_name,
+          is_staff: false,
         },
       },
       { status: 201 }
     );
   }),
 
-  // Refresh token
-  http.post(`${API_BASE}/auth/token/refresh/`, async ({ request }) => {
+  // Refresh token — tokens set in HttpOnly cookies, body is empty
+  http.post(`${API_BASE}/auth/token/refresh/`, async () => {
     await delay(50);
-    const data = (await request.json()) as { refresh: string };
-    if (data.refresh === 'mock-refresh-token-67890') {
-      return HttpResponse.json({
-        access: 'mock-new-access-token-54321',
-      });
-    }
-    return HttpResponse.json({ detail: 'Token is invalid or expired' }, { status: 401 });
+    return HttpResponse.json({});
   }),
 
   // Login (JWT token endpoint used by useLogin)
@@ -463,8 +455,13 @@ const authHandlers = [
     const data = (await request.json()) as { username: string; password: string };
     if (data.username === 'testuser' && data.password === 'password123') {
       return HttpResponse.json({
-        access: 'mock-access-token-12345',
-        refresh: 'mock-refresh-token-67890',
+        user: {
+          id: 1,
+          email: 'testuser@example.com',
+          first_name: 'Test',
+          last_name: 'User',
+          is_staff: false,
+        },
       });
     }
     return HttpResponse.json({ detail: 'Invalid credentials' }, { status: 401 });
@@ -1939,6 +1936,118 @@ const personIncomeHandlers = [
 ];
 
 /**
+ * Contract template handlers
+ */
+const templateHandlers = [
+  http.get(`${API_BASE}/templates/current/`, async () => {
+    await delay(50);
+    return HttpResponse.json({
+      content: '<html><body>Contrato padrão</body></html>',
+    });
+  }),
+
+  http.post(`${API_BASE}/templates/save/`, async () => {
+    await delay(100);
+    return HttpResponse.json({
+      message: 'Template salvo com sucesso!',
+      backup_path: '/path/to/backup.html',
+      backup_filename: 'contract_template_backup_20260405_120000.html',
+    });
+  }),
+
+  http.get(`${API_BASE}/templates/backups/`, async () => {
+    await delay(50);
+    return HttpResponse.json([
+      {
+        filename: 'contract_template_backup_20260405_120000.html',
+        path: '/path/to/backup.html',
+        size: 5432,
+        created_at: '2026-04-05T12:00:00',
+      },
+    ]);
+  }),
+
+  http.post(`${API_BASE}/templates/restore/`, async () => {
+    await delay(100);
+    return HttpResponse.json({
+      message: 'Template restaurado com sucesso de backup.html',
+      safety_backup: 'contract_template_before_restore_20260405_120000.html',
+    });
+  }),
+
+  http.post(`${API_BASE}/templates/preview/`, async () => {
+    await delay(100);
+    return HttpResponse.json({
+      html: '<html><body>Preview com dados renderizados</body></html>',
+    });
+  }),
+];
+
+/**
+ * Tenant portal handlers
+ */
+const tenantPortalHandlers = [
+  // Request OTP via WhatsApp
+  http.post(`${API_BASE}/auth/whatsapp/request/`, async ({ request }) => {
+    await delay(100);
+    const data = (await request.json()) as { cpf_cnpj: string };
+    if (!data.cpf_cnpj) {
+      return HttpResponse.json({ detail: 'CPF/CNPJ é obrigatório' }, { status: 400 });
+    }
+    return HttpResponse.json({ detail: 'Código enviado via WhatsApp' });
+  }),
+
+  // Verify OTP and return JWT via cookies
+  http.post(`${API_BASE}/auth/whatsapp/verify/`, async ({ request }) => {
+    await delay(100);
+    const data = (await request.json()) as { cpf_cnpj: string; code: string };
+    if (data.code !== '123456') {
+      return HttpResponse.json({ detail: 'Código inválido ou expirado' }, { status: 400 });
+    }
+    return HttpResponse.json({
+      user: {
+        id: 10,
+        email: '',
+        first_name: 'João',
+        last_name: 'Silva',
+        is_staff: false,
+      },
+    });
+  }),
+
+  // Tenant profile
+  http.get(`${API_BASE}/tenant/me/`, async () => {
+    await delay(50);
+    return HttpResponse.json({
+      id: 1,
+      name: 'João Silva',
+      cpf_cnpj: '12345678901',
+      phone: '(11) 99999-0001',
+      marital_status: 'Solteiro(a)',
+      profession: 'Engenheiro',
+      due_day: 5,
+      dependents: [],
+      lease: {
+        id: 1,
+        start_date: '2024-01-01',
+        validity_months: 12,
+        rental_value: '1300.00',
+        pending_rental_value: null,
+        pending_rental_value_date: null,
+        number_of_tenants: 1,
+        contract_generated: true,
+      },
+      apartment: {
+        id: 1,
+        number: '101',
+        building_name: '836',
+        building_address: 'Rua das Flores, 836',
+      },
+    });
+  }),
+];
+
+/**
  * All handlers combined
  */
 export const handlers = [
@@ -1967,4 +2076,6 @@ export const handlers = [
   ...financialSettingsHandlers,
   ...landlordHandlers,
   ...rentPaymentHandlers,
+  ...templateHandlers,
+  ...tenantPortalHandlers,
 ];

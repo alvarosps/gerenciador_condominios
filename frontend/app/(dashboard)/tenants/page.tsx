@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   Accordion,
   AccordionContent,
@@ -34,6 +34,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   Plus,
   Pencil,
@@ -44,10 +45,11 @@ import {
   Search,
   ArrowRightLeft,
   FilePlus,
+  AlertCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { DataTable, type Column } from '@/components/tables/data-table';
-import { TenantFormWizard } from './_components/tenant-form-wizard';
+import { TenantFormWizard } from './_components/wizard';
 import { TenantLeaseModal } from './_components/tenant-lease-modal';
 import { ContractViewModal } from './_components/contract-view-modal';
 import {
@@ -57,7 +59,7 @@ import {
 import { useLeases, usePatchLease } from '@/lib/api/hooks/use-leases';
 import { type Tenant } from '@/lib/schemas/tenant.schema';
 import { type Lease } from '@/lib/schemas/lease.schema';
-import { formatCPFOrCNPJ, formatBrazilianPhone } from '@/lib/utils/formatters';
+import { formatCpfCnpj, formatPhone } from '@/lib/utils/formatters';
 import { tenantExportColumns } from '@/lib/hooks/use-export';
 import { useCrudPage } from '@/lib/hooks/use-crud-page';
 
@@ -182,7 +184,7 @@ export default function TenantsPage() {
       key: 'cpf_cnpj',
       width: 180,
       render: (value) => (
-        <span className="font-mono text-sm">{formatCPFOrCNPJ(value as string)}</span>
+        <span className="font-mono text-sm">{formatCpfCnpj(value as string)}</span>
       ),
     },
     {
@@ -190,7 +192,7 @@ export default function TenantsPage() {
       dataIndex: 'phone',
       key: 'phone',
       width: 150,
-      render: (value) => formatBrazilianPhone(value as string),
+      render: (value) => formatPhone(value as string),
     },
     {
       title: 'Kitnet',
@@ -345,9 +347,11 @@ export default function TenantsPage() {
     return { tenantsWithLease: withLease, tenantsWithoutLease: withoutLease };
   }, [tenants, leaseByTenantId]);
 
-  if (error) {
-    toast.error('Erro ao carregar inquilinos');
-  }
+  useEffect(() => {
+    if (error) {
+      toast.error('Erro ao carregar inquilinos');
+    }
+  }, [error]);
 
   const hasActiveFilters = filters.is_company !== undefined || filters.search !== '';
 
@@ -388,6 +392,16 @@ export default function TenantsPage() {
           </Button>
         </div>
       </div>
+
+      {error && !tenants && (
+        <Alert variant="destructive" className="mb-4">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Erro</AlertTitle>
+          <AlertDescription>
+            Erro ao carregar dados. Verifique sua conexão e tente novamente.
+          </AlertDescription>
+        </Alert>
+      )}
 
       {crud.bulkOps.hasSelection && (
         <div className="mb-4 p-4 bg-primary/5 border border-primary/20 rounded flex justify-between items-center">

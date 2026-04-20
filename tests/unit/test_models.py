@@ -16,7 +16,14 @@ from core.models import (
     Lease,
     Tenant,
 )
-
+from tests.factories import (
+    make_apartment,
+    make_building,
+    make_dependent,
+    make_furniture,
+    make_lease,
+    make_tenant,
+)
 
 # =============================================================================
 # Fixtures
@@ -25,37 +32,26 @@ from core.models import (
 
 @pytest.fixture
 def building() -> Building:
-    return Building.objects.create(
-        street_number=999,
-        name="Edifício Teste",
-        address="Rua Teste, 999",
-    )
+    return make_building(street_number=999, name="Edifício Teste", address="Rua Teste, 999")
 
 
 @pytest.fixture
 def apartment(building: Building) -> Apartment:
-    return Apartment.objects.create(
-        building=building,
-        number=101,
-        rental_value="1500.00",
-        max_tenants=2,
-    )
+    return make_apartment(building=building, number=101, max_tenants=2)
 
 
 @pytest.fixture
 def tenant() -> Tenant:
-    return Tenant.objects.create(
-        name="João Teste",
+    return make_tenant(
         cpf_cnpj="52998224725",
-        phone="11987654321",
-        marital_status="Solteiro(a)",
+        name="João Teste",
         profession="Engenheiro",
     )
 
 
 @pytest.fixture
 def furniture() -> Furniture:
-    return Furniture.objects.create(name="Geladeira Teste", description="Frost Free")
+    return make_furniture(name="Geladeira Teste", description="Frost Free")
 
 
 # =============================================================================
@@ -186,15 +182,11 @@ class TestTenantModel:
 @pytest.mark.unit
 class TestDependentModel:
     def test_str(self, tenant: Tenant) -> None:
-        dep = Dependent.objects.create(
-            tenant=tenant, name="Maria Teste", phone="11987654322"
-        )
+        dep = make_dependent(tenant=tenant, name="Maria Teste", phone="11987654322")
         assert str(dep) == "Maria Teste (dependente de João Teste)"
 
     def test_soft_delete(self, tenant: Tenant) -> None:
-        dep = Dependent.objects.create(
-            tenant=tenant, name="Maria Teste", phone="11987654322"
-        )
+        dep = make_dependent(tenant=tenant, name="Maria Teste", phone="11987654322")
         pk = dep.pk
         dep.delete()
         assert Dependent.objects.filter(pk=pk).count() == 0
@@ -209,21 +201,19 @@ class TestDependentModel:
 @pytest.mark.unit
 class TestLeaseModel:
     def test_str(self, apartment: Apartment, tenant: Tenant) -> None:
-        lease = Lease.objects.create(
+        lease = make_lease(
             apartment=apartment,
-            responsible_tenant=tenant,
+            tenant=tenant,
             start_date=date(2025, 1, 1),
             validity_months=12,
             rental_value=Decimal("1500.00"),
         )
         assert str(lease) == "Locação do Apto 101 - 999"
 
-    def test_soft_delete_sets_is_rented_false(
-        self, apartment: Apartment, tenant: Tenant
-    ) -> None:
-        lease = Lease.objects.create(
+    def test_soft_delete_sets_is_rented_false(self, apartment: Apartment, tenant: Tenant) -> None:
+        lease = make_lease(
             apartment=apartment,
-            responsible_tenant=tenant,
+            tenant=tenant,
             start_date=date(2025, 1, 1),
             validity_months=12,
             rental_value=Decimal("1500.00"),
@@ -235,9 +225,7 @@ class TestLeaseModel:
         apartment.refresh_from_db()
         assert apartment.is_rented is False
 
-    def test_clean_validates_lease_dates(
-        self, apartment: Apartment, tenant: Tenant
-    ) -> None:
+    def test_clean_validates_lease_dates(self, apartment: Apartment, tenant: Tenant) -> None:
         # Start date more than 10 years in the past
         lease = Lease(
             apartment=apartment,
@@ -362,32 +350,26 @@ class TestContractRuleModel:
 @pytest.mark.unit
 class TestSoftDeleteManager:
     def test_with_deleted_includes_all(self) -> None:
-        b1 = Building.objects.create(
-            street_number=777, name="Predio A", address="Rua A"
-        )
-        b2 = Building.objects.create(
-            street_number=778, name="Predio B", address="Rua B"
-        )
+        b1 = make_building(street_number=777, name="Predio A", address="Rua A")
+        b2 = make_building(street_number=778, name="Predio B", address="Rua B")
         b1.delete()
         all_pks = set(Building.objects.with_deleted().values_list("pk", flat=True))
         assert b1.pk in all_pks
         assert b2.pk in all_pks
 
     def test_deleted_only_excludes_active(self) -> None:
-        b = Building.objects.create(street_number=779, name="Predio C", address="Rua C")
+        b = make_building(street_number=779, name="Predio C", address="Rua C")
         pk = b.pk
         b.delete()
         deleted = Building.objects.deleted_only()
         assert deleted.filter(pk=pk).exists()
         # Active buildings should not appear
-        active = Building.objects.create(street_number=780, name="Predio D", address="Rua D")
+        active = make_building(street_number=780, name="Predio D", address="Rua D")
         assert not deleted.filter(pk=active.pk).exists()
 
     def test_restore_with_user(self, django_user_model: type) -> None:
-        user = django_user_model.objects.create_user(
-            username="restoreruser", password="pass"
-        )
-        b = Building.objects.create(street_number=781, name="Predio E", address="Rua E")
+        user = django_user_model.objects.create_user(username="restoreruser", password="pass")
+        b = make_building(street_number=781, name="Predio E", address="Rua E")
         b.delete()
         b.restore(restored_by=user)
         b.refresh_from_db()

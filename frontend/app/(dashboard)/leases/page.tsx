@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useLeaseModals } from './_hooks/use-lease-modals';
 import dynamic from 'next/dynamic';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -33,6 +34,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   Plus,
   Trash2,
@@ -40,6 +42,7 @@ import {
   FileText,
   FileSpreadsheet,
   Loader2,
+  AlertCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { DataTable } from '@/components/tables/data-table';
@@ -105,13 +108,7 @@ interface BuildingLeaseFilters {
 
 export default function LeasesPage() {
   // Page-specific modals (not handled by useCrudPage)
-  const [isContractModalOpen, setIsContractModalOpen] = useState(false);
-  const [isLateFeeModalOpen, setIsLateFeeModalOpen] = useState(false);
-  const [isDueDateModalOpen, setIsDueDateModalOpen] = useState(false);
-  const [isTerminateModalOpen, setIsTerminateModalOpen] = useState(false);
-  const [actionLease, setActionLease] = useState<Lease | null>(null);
-  const [adjustRentLease, setAdjustRentLease] = useState<Lease | null>(null);
-  const [historyLeaseId, setHistoryLeaseId] = useState<number | null>(null);
+  const modals = useLeaseModals();
 
   // Per-building filter state
   const [filtersByBuilding, setFiltersByBuilding] = useState<Record<number, BuildingLeaseFilters>>({});
@@ -179,52 +176,58 @@ export default function LeasesPage() {
   };
 
   // Page-specific action handlers
-  const handleGenerateContract = useCallback((lease: Lease) => {
-    setActionLease(lease);
-    setIsContractModalOpen(true);
-  }, []);
+  const handleGenerateContract = useCallback(
+    (lease: Lease) => {
+      modals.openModal('contract', lease);
+    },
+    [modals],
+  );
 
-  const handleCalculateLateFee = useCallback((lease: Lease) => {
-    setActionLease(lease);
-    setIsLateFeeModalOpen(true);
-  }, []);
+  const handleCalculateLateFee = useCallback(
+    (lease: Lease) => {
+      modals.openModal('lateFee', lease);
+    },
+    [modals],
+  );
 
-  const handleChangeDueDate = useCallback((lease: Lease) => {
-    setActionLease(lease);
-    setIsDueDateModalOpen(true);
-  }, []);
+  const handleChangeDueDate = useCallback(
+    (lease: Lease) => {
+      modals.openModal('dueDate', lease);
+    },
+    [modals],
+  );
 
-  const handleTerminate = useCallback((lease: Lease) => {
-    setActionLease(lease);
-    setIsTerminateModalOpen(true);
-  }, []);
+  const handleTerminate = useCallback(
+    (lease: Lease) => {
+      modals.openModal('terminate', lease);
+    },
+    [modals],
+  );
 
-  const handleAdjustRent = useCallback((lease: Lease) => {
-    setAdjustRentLease(lease);
-  }, []);
+  const handleAdjustRent = useCallback(
+    (lease: Lease) => {
+      modals.openModal('adjustRent', lease);
+    },
+    [modals],
+  );
 
-  const handleViewAdjustmentHistory = useCallback((lease: Lease) => {
-    setHistoryLeaseId(lease.id ?? null);
-  }, []);
-
-  const handleActionModalClose = useCallback(() => {
-    setIsContractModalOpen(false);
-    setIsLateFeeModalOpen(false);
-    setIsDueDateModalOpen(false);
-    setActionLease(null);
-  }, []);
+  const handleViewAdjustmentHistory = useCallback(
+    (lease: Lease) => {
+      if (lease.id !== undefined) modals.openHistory(lease.id);
+    },
+    [modals],
+  );
 
   const handleConfirmTerminate = useCallback(async () => {
-    if (!actionLease?.id) return;
+    if (!modals.actionLease?.id) return;
     try {
-      await terminateMutation.mutateAsync(actionLease.id);
+      await terminateMutation.mutateAsync(modals.actionLease.id);
       toast.success('Contrato encerrado com sucesso');
-      setIsTerminateModalOpen(false);
-      setActionLease(null);
+      modals.closeModal();
     } catch {
       toast.error('Erro ao encerrar contrato');
     }
-  }, [actionLease, terminateMutation]);
+  }, [modals, terminateMutation]);
 
   const handleDelete = useCallback((lease: Lease) => {
     crud.setItemToDelete(lease);
@@ -258,9 +261,11 @@ export default function LeasesPage() {
     ]
   );
 
-  if (error) {
-    toast.error('Erro ao carregar locações');
-  }
+  useEffect(() => {
+    if (error) {
+      toast.error('Erro ao carregar locações');
+    }
+  }, [error]);
 
   return (
     <div>
@@ -300,6 +305,16 @@ export default function LeasesPage() {
           </Button>
         </div>
       </div>
+
+      {error && !leases && (
+        <Alert variant="destructive" className="mb-4">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Erro</AlertTitle>
+          <AlertDescription>
+            Erro ao carregar dados. Verifique sua conexão e tente novamente.
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Bulk Selection Banner */}
       {crud.bulkOps.hasSelection && (
@@ -444,32 +459,33 @@ export default function LeasesPage() {
       />
 
       <ContractGenerateModal
-        open={isContractModalOpen}
-        lease={actionLease}
-        onClose={handleActionModalClose}
+        open={modals.isOpen('contract')}
+        lease={modals.actionLease}
+        onClose={modals.closeModal}
       />
 
       <LateFeeModal
-        open={isLateFeeModalOpen}
-        lease={actionLease}
-        onClose={handleActionModalClose}
+        open={modals.isOpen('lateFee')}
+        lease={modals.actionLease}
+        onClose={modals.closeModal}
       />
 
       <DueDateModal
-        open={isDueDateModalOpen}
-        lease={actionLease}
-        onClose={handleActionModalClose}
+        open={modals.isOpen('dueDate')}
+        lease={modals.actionLease}
+        onClose={modals.closeModal}
       />
 
       {/* Terminate Contract Dialog */}
-      <AlertDialog open={isTerminateModalOpen} onOpenChange={setIsTerminateModalOpen}>
+      <AlertDialog open={modals.isOpen('terminate')} onOpenChange={() => modals.closeModal()}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Encerrar Contrato</AlertDialogTitle>
             <AlertDialogDescription>
               Tem certeza que deseja encerrar o contrato do Apto{' '}
-              {actionLease?.apartment?.number} — {actionLease?.apartment?.building?.name}? O
-              apartamento será marcado como disponível.
+              {modals.actionLease?.apartment?.number} —{' '}
+              {modals.actionLease?.apartment?.building?.name}? O apartamento será marcado como
+              disponível.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -502,15 +518,15 @@ export default function LeasesPage() {
       />
 
       <RentAdjustmentModal
-        open={adjustRentLease !== null}
-        lease={adjustRentLease}
-        onClose={() => setAdjustRentLease(null)}
+        open={modals.isOpen('adjustRent')}
+        lease={modals.actionLease}
+        onClose={modals.closeModal}
       />
 
       <RentAdjustmentHistorySheet
-        open={historyLeaseId !== null}
-        leaseId={historyLeaseId}
-        onClose={() => setHistoryLeaseId(null)}
+        open={modals.historyLeaseId !== null}
+        leaseId={modals.historyLeaseId}
+        onClose={modals.closeHistory}
       />
     </div>
   );

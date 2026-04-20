@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { message } from 'antd';
 import type { Key } from 'antd/es/table/interface';
+import { handleError } from '@/lib/utils/error-handler';
 
 interface BulkOperationsOptions {
   entityName: string; // e.g., "prédio", "apartamento"
@@ -69,7 +70,7 @@ export function useBulkOperations(options: BulkOperationsOptions) {
         onSuccess();
       }
     } catch (error) {
-      console.error('Bulk delete error:', error);
+      handleError(error, 'useBulkOperations.bulkDelete');
       message.error(
         `Erro ao excluir ${itemText}. Alguns itens podem ter dependências.`
       );
@@ -114,7 +115,7 @@ export function useBulkOperations(options: BulkOperationsOptions) {
         onSuccess();
       }
     } catch (error) {
-      console.error('Bulk status change error:', error);
+      handleError(error, 'useBulkOperations.bulkStatusChange');
       message.error(`Erro ao atualizar status de ${itemText}`);
     }
   };

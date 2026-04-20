@@ -2016,16 +2016,16 @@ class TestNextMonthStart:
 
     @pytest.mark.unit
     def test_december_wraps_to_next_year(self) -> None:
-        from core.services.financial_dashboard_service import _next_month_start
+        from core.services.date_calculator import DateCalculatorService
 
-        result = _next_month_start(2025, 12)
+        result = DateCalculatorService.next_month_start(2025, 12)
         assert result == date(2026, 1, 1)
 
     @pytest.mark.unit
     def test_regular_month_increments(self) -> None:
-        from core.services.financial_dashboard_service import _next_month_start
+        from core.services.date_calculator import DateCalculatorService
 
-        result = _next_month_start(2026, 3)
+        result = DateCalculatorService.next_month_start(2026, 3)
         assert result == date(2026, 4, 1)
 
 

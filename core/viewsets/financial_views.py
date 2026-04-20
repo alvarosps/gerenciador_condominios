@@ -47,6 +47,7 @@ from core.serializers import (
     PersonSerializer,
     RentPaymentSerializer,
 )
+from core.services.expense_service import ExpenseService
 from core.services.person_payment_schedule_service import PersonPaymentScheduleService
 
 logger = logging.getLogger(__name__)
@@ -262,45 +263,26 @@ class ExpenseViewSet(viewsets.ModelViewSet):
         """Overwrite expense fields and rebuild all installments from scratch."""
         expense = self.get_object()
 
-        # Update expense fields
-        for field in (
-            "description",
-            "total_amount",
-            "category_id",
-            "notes",
-            "is_installment",
-            "total_installments",
-            "is_offset",
-        ):
-            if field in request.data:
-                if field == "category_id":
-                    expense.category_id = request.data[field]
-                else:
-                    setattr(expense, field, request.data[field])
-        expense.save()
-
-        # Hard-delete ALL existing installments (bypass soft delete)
-        ExpenseInstallment.all_objects.filter(expense=expense).delete()
-
-        # Create new installments from provided list
-        new_installments = request.data.get("installments", [])
-        rebuild_user = cast(User, request.user)
-        to_create = [
-            ExpenseInstallment(
-                expense=expense,
-                installment_number=inst_data["installment_number"],
-                total_installments=inst_data["total_installments"],
-                amount=inst_data["amount"],
-                due_date=inst_data["due_date"],
-                is_paid=inst_data.get("is_paid", False),
-                paid_date=inst_data.get("paid_date"),
-                created_by=rebuild_user,
-                updated_by=rebuild_user,
+        field_updates = {
+            field: request.data[field]
+            for field in (
+                "description",
+                "total_amount",
+                "category_id",
+                "notes",
+                "is_installment",
+                "total_installments",
+                "is_offset",
             )
-            for inst_data in new_installments
-        ]
-        if to_create:
-            ExpenseInstallment.objects.bulk_create(to_create)
+            if field in request.data
+        }
+
+        ExpenseService.rebuild_installments(
+            expense=expense,
+            field_updates=field_updates,
+            installments_data=request.data.get("installments", []),
+            user=cast(User, request.user),
+        )
 
         expense = self.get_queryset().get(pk=expense.pk)
         serializer = self.get_serializer(expense)

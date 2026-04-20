@@ -42,9 +42,6 @@ export function formatCpfCnpj(value: string): string {
   return value;
 }
 
-// Alias for backward compatibility
-export const formatCPFOrCNPJ = formatCpfCnpj;
-
 /**
  * Format Brazilian phone number (11) 98765-4321
  */
@@ -58,9 +55,6 @@ export function formatPhone(phone: string): string {
   }
   return phone;
 }
-
-// Alias for backward compatibility
-export const formatBrazilianPhone = formatPhone;
 
 /**
  * Format date to Brazilian format (DD/MM/YYYY)

@@ -4,6 +4,7 @@ import { AlertCircle } from "lucide-react";
 import { useEffect } from "react";
 
 import { Button } from "@/components/ui/button";
+import { handleError } from "@/lib/utils/error-handler";
 
 export default function DashboardError({
   error,
@@ -13,7 +14,7 @@ export default function DashboardError({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error("Dashboard error:", error);
+    handleError(error, "ErrorBoundary");
   }, [error]);
 
   return (

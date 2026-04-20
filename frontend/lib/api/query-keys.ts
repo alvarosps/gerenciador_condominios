@@ -150,6 +150,10 @@ export const queryKeys = {
     byMonth: (year: number, month: number) =>
       [...queryKeys.monthlyPurchases.all, year, month] as const,
   },
+  adminUsers: {
+    all: ['admin-users'] as const,
+    list: () => [...queryKeys.adminUsers.all] as const,
+  },
   landlord: {
     all: ['landlord'] as const,
     current: () => [...queryKeys.landlord.all, 'current'] as const,

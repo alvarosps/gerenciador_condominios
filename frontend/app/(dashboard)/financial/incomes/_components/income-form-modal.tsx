@@ -36,6 +36,7 @@ import { usePersons } from '@/lib/api/hooks/use-persons';
 import { useBuildings } from '@/lib/api/hooks/use-buildings';
 import { useExpenseCategories } from '@/lib/api/hooks/use-expense-categories';
 import { type Income } from '@/lib/schemas/income.schema';
+import { handleError } from '@/lib/utils/error-handler';
 
 interface Props {
   open: boolean;
@@ -124,7 +125,7 @@ export function IncomeFormModal({ open, income, onClose }: Props) {
       form.reset();
     } catch (error) {
       toast.error('Erro ao salvar receita');
-      console.error('Save error:', error);
+      handleError(error, 'IncomeFormModal.onSubmit');
     }
   };
 

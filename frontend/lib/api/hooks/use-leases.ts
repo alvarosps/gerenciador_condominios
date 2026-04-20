@@ -38,7 +38,7 @@ export function useLeases(filters?: {
  */
 export function useLease(id: number | null) {
   return useQuery({
-    queryKey: id ? queryKeys.leases.detail(id) : queryKeys.leases.all,
+    queryKey: queryKeys.leases.detail(id ?? 0),
     queryFn: async () => {
       if (!id) throw new Error('Lease ID is required');
       const { data } = await apiClient.get<Lease>(`/leases/${id}/`);

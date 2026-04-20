@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
-import { formatCurrency, formatCPFOrCNPJ, formatBrazilianPhone } from '@/lib/utils/formatters';
+import { formatCurrency, formatCpfCnpj, formatPhone } from '@/lib/utils/formatters';
+import { handleError } from '@/lib/utils/error-handler';
 
 interface ExportOptions {
   filename?: string;
@@ -84,7 +85,7 @@ export function useExport() {
 
       return { success: true, filename };
     } catch (error) {
-      console.error('Export error:', error);
+      handleError(error, 'useExport.exportToExcel');
       throw new Error('Erro ao exportar arquivo');
     } finally {
       setIsExporting(false);
@@ -139,7 +140,7 @@ export function useExport() {
 
       return { success: true, filename };
     } catch (error) {
-      console.error('Export error:', error);
+      handleError(error, 'useExport.exportToCSV');
       throw new Error('Erro ao exportar arquivo CSV');
     } finally {
       setIsExporting(false);
@@ -205,12 +206,12 @@ export const tenantExportColumns = [
   {
     key: 'cpf_cnpj' as const,
     label: 'CPF / CNPJ',
-    format: (value: unknown) => formatCPFOrCNPJ(toStr(value)),
+    format: (value: unknown) => formatCpfCnpj(toStr(value)),
   },
   {
     key: 'phone' as const,
     label: 'Telefone',
-    format: (value: unknown) => formatBrazilianPhone(toStr(value)),
+    format: (value: unknown) => formatPhone(toStr(value)),
   },
   {
     key: 'is_company' as const,

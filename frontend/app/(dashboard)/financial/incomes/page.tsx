@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -251,9 +251,11 @@ export default function IncomesPage() {
     });
   };
 
-  if (error) {
-    toast.error('Erro ao carregar receitas');
-  }
+  useEffect(() => {
+    if (error) {
+      toast.error('Erro ao carregar receitas');
+    }
+  }, [error]);
 
   return (
     <div>

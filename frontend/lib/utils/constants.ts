@@ -2,6 +2,23 @@
  * Application-wide constants
  */
 
+export interface ExpenseTypeOption {
+  value: string;
+  label: string;
+}
+
+export const EXPENSE_TYPE_OPTIONS: ExpenseTypeOption[] = [
+  { value: 'card_purchase', label: 'Compra no Cartão' },
+  { value: 'bank_loan', label: 'Empréstimo Bancário' },
+  { value: 'personal_loan', label: 'Empréstimo Pessoal' },
+  { value: 'water_bill', label: 'Conta de Água' },
+  { value: 'electricity_bill', label: 'Conta de Luz' },
+  { value: 'property_tax', label: 'IPTU' },
+  { value: 'fixed_expense', label: 'Gasto Fixo Mensal' },
+  { value: 'one_time_expense', label: 'Gasto Único' },
+  { value: 'employee_salary', label: 'Salário Funcionário' },
+];
+
 export const MARITAL_STATUS_OPTIONS = [
   { value: 'Solteiro(a)', label: 'Solteiro(a)' },
   { value: 'Casado(a)', label: 'Casado(a)' },

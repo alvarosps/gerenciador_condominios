@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Plus, Trash2, User, Phone } from 'lucide-react';
-import { formatBrazilianPhone } from '@/lib/utils/formatters';
+import { formatPhone } from '@/lib/utils/formatters';
 
 interface TenantFormValues {
   name: string;
@@ -113,7 +113,7 @@ export function DependentFormList({ formMethods }: Props) {
                             className="pl-10"
                             {...formField}
                             onChange={(e) => {
-                              const formatted = formatBrazilianPhone(e.target.value);
+                              const formatted = formatPhone(e.target.value);
                               formField.onChange(formatted);
                             }}
                           />

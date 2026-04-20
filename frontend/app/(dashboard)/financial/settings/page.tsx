@@ -22,6 +22,7 @@ import {
   useUpdateFinancialSettings,
 } from '@/lib/api/hooks/use-financial-settings';
 import { useAuthStore } from '@/store/auth-store';
+import { handleError } from '@/lib/utils/error-handler';
 
 const settingsFormSchema = z.object({
   initial_balance: z.string().min(1, 'Saldo inicial é obrigatório'),
@@ -66,7 +67,7 @@ export default function FinancialSettingsPage() {
       toast.success('Configurações salvas com sucesso');
     } catch (error) {
       toast.error('Erro ao salvar configurações');
-      console.error('Save error:', error);
+      handleError(error, 'FinancialSettingsPage.onSubmit');
     }
   };
 

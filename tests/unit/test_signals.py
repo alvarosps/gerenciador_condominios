@@ -13,38 +13,36 @@ from core.models import (
     Lease,
     Tenant,
 )
+from tests.factories import (
+    make_apartment,
+    make_building,
+    make_dependent,
+    make_furniture,
+    make_lease,
+    make_tenant,
+)
 
 
 @pytest.fixture
 def building() -> Building:
-    return Building.objects.create(
-        street_number=701, name="Signal Building", address="Rua Signals, 701"
-    )
+    return make_building(street_number=701)
 
 
 @pytest.fixture
 def apartment(building: Building) -> Apartment:
-    return Apartment.objects.create(
-        building=building, number=201, rental_value="1200.00", max_tenants=2
-    )
+    return make_apartment(building=building, number=201, max_tenants=2)
 
 
 @pytest.fixture
 def tenant() -> Tenant:
-    return Tenant.objects.create(
-        name="Signal Tenant",
-        cpf_cnpj="52998224725",
-        phone="11987654321",
-        marital_status="Solteiro(a)",
-        profession="Dev",
-    )
+    return make_tenant(cpf_cnpj="52998224725", name="Signal Tenant")
 
 
 @pytest.fixture
 def lease(apartment: Apartment, tenant: Tenant) -> Lease:
-    return Lease.objects.create(
+    return make_lease(
         apartment=apartment,
-        responsible_tenant=tenant,
+        tenant=tenant,
         start_date=date(2025, 1, 1),
         validity_months=12,
         rental_value=Decimal("1200.00"),
@@ -91,13 +89,7 @@ class TestSyncApartmentIsRented:
         self, lease: Lease, apartment: Apartment
     ) -> None:
         """Historical soft-deleted lease re-save must not override active lease state."""
-        second_tenant = Tenant.objects.create(
-            name="Second Tenant",
-            cpf_cnpj="46959416000",
-            phone="11999998888",
-            marital_status="Solteiro(a)",
-            profession="Engenheiro",
-        )
+        second_tenant = make_tenant(cpf_cnpj="46959416000")
         # Soft-delete the first lease so the unique constraint allows a new active lease
         lease.delete()
         apartment.refresh_from_db()
@@ -132,13 +124,7 @@ class TestSyncApartmentIsRented:
         apartment.refresh_from_db()
         assert apartment.is_rented is False
 
-        second_tenant = Tenant.objects.create(
-            name="New Tenant",
-            cpf_cnpj="29765710070",
-            phone="11977776666",
-            marital_status="Casado(a)",
-            profession="Professor",
-        )
+        second_tenant = make_tenant(cpf_cnpj="29765710070")
         Lease.objects.create(
             apartment=apartment,
             responsible_tenant=second_tenant,
@@ -164,13 +150,13 @@ class TestBuildingSignals:
         assert building.name == "Updated Name"
 
     def test_building_delete_signal_fires_without_exception(self) -> None:
-        b = Building.objects.create(street_number=702, name="Del Building", address="Rua Del")
+        b = make_building(street_number=702)
         b.delete()
         assert b.is_deleted is True
 
     def test_building_hard_delete_fires_post_delete_signal(self) -> None:
         """Covers lines 58-59: post_delete signal for Building (hard delete)."""
-        b = Building.objects.create(street_number=703, name="Hard Del Building", address="Rua Hard Del")
+        b = make_building(street_number=703)
         pk = b.pk
         b.delete(hard_delete=True)
         assert not Building.all_objects.filter(pk=pk).exists()
@@ -195,7 +181,7 @@ class TestApartmentSignals:
         assert Apartment.objects.filter(pk=pk).count() == 0
 
     def test_furniture_m2m_change_triggers_signal(self, apartment: Apartment) -> None:
-        furniture = Furniture.objects.create(name="Signal Furniture")
+        furniture = make_furniture(name="Signal Furniture")
         apartment.furnitures.add(furniture)
         # m2m_changed signal fires — verify no exception and M2M updated
         assert apartment.furnitures.filter(pk=furniture.pk).exists()
@@ -222,7 +208,7 @@ class TestTenantSignals:
         assert Tenant.objects.filter(pk=pk).count() == 0
 
     def test_furniture_m2m_change_triggers_signal(self, tenant: Tenant) -> None:
-        furniture = Furniture.objects.create(name="Tenant Furniture")
+        furniture = make_furniture(name="Tenant Furniture")
         tenant.furnitures.add(furniture)
         assert tenant.furnitures.filter(pk=furniture.pk).exists()
         tenant.furnitures.clear()
@@ -237,14 +223,14 @@ class TestTenantSignals:
 @pytest.mark.unit
 class TestFurnitureSignals:
     def test_furniture_save_triggers_signal(self) -> None:
-        furniture = Furniture.objects.create(name="New Furniture Signal")
+        furniture = make_furniture(name="New Furniture Signal")
         furniture.description = "Updated"
         furniture.save()
         furniture.refresh_from_db()
         assert furniture.description == "Updated"
 
     def test_furniture_delete_triggers_signal(self) -> None:
-        furniture = Furniture.objects.create(name="Delete Furniture Signal")
+        furniture = make_furniture(name="Delete Furniture Signal")
         pk = furniture.pk
         furniture.delete()
         assert Furniture.objects.filter(pk=pk).count() == 0
@@ -258,21 +244,21 @@ class TestFurnitureSignals:
 @pytest.mark.unit
 class TestDependentSignals:
     def test_dependent_save_triggers_signal(self, tenant: Tenant) -> None:
-        dep = Dependent.objects.create(tenant=tenant, name="Dep Signal", phone="11987654399")
+        dep = make_dependent(tenant=tenant, name="Dep Signal", phone="11987654399")
         dep.name = "Dep Updated"
         dep.save()
         dep.refresh_from_db()
         assert dep.name == "Dep Updated"
 
     def test_dependent_delete_triggers_signal(self, tenant: Tenant) -> None:
-        dep = Dependent.objects.create(tenant=tenant, name="Dep Del", phone="11987654398")
+        dep = make_dependent(tenant=tenant, name="Dep Del", phone="11987654398")
         pk = dep.pk
         dep.delete()
         assert Dependent.objects.filter(pk=pk).count() == 0
 
     def test_dependent_hard_delete_fires_post_delete_signal(self, tenant: Tenant) -> None:
         """Covers lines 260-261: post_delete signal for Dependent (hard delete)."""
-        dep = Dependent.objects.create(tenant=tenant, name="Dep Hard Del", phone="11987654397")
+        dep = make_dependent(tenant=tenant, name="Dep Hard Del", phone="11987654397")
         pk = dep.pk
         dep.delete(hard_delete=True)
         assert not Dependent.all_objects.filter(pk=pk).exists()
@@ -287,13 +273,7 @@ class TestDependentSignals:
 class TestLeaseTenantsM2MSignals:
     def test_adding_tenant_to_lease_triggers_signal(self, lease: Lease, tenant: Tenant) -> None:
         # tenant already added via responsible, test adding to M2M
-        second_tenant = Tenant.objects.create(
-            name="Second Tenant Signal",
-            cpf_cnpj="723.456.789-50",
-            phone="11912345678",
-            marital_status="Solteiro(a)",
-            profession="Arquiteto",
-        )
+        second_tenant = make_tenant(cpf_cnpj="72345678950")
         lease.tenants.add(second_tenant)
         assert lease.tenants.filter(pk=second_tenant.pk).exists()
         lease.tenants.remove(second_tenant)
@@ -316,7 +296,7 @@ class TestApartmentHardDeleteSignal:
 
     def test_apartment_furniture_m2m_clear_triggers_signal(self, apartment: Apartment) -> None:
         """Covers post_clear action in furniture m2m signal."""
-        furniture = Furniture.objects.create(name="Clear Signal Furniture")
+        furniture = make_furniture(name="Clear Signal Furniture")
         apartment.furnitures.add(furniture)
         apartment.furnitures.clear()
         assert apartment.furnitures.count() == 0
@@ -345,7 +325,7 @@ class TestTenantHardDeleteSignal:
 class TestFurnitureHardDeleteSignal:
     def test_furniture_hard_delete_fires_post_delete_signal(self) -> None:
         """Covers lines 229-230: post_delete signal for Furniture (hard delete)."""
-        furniture = Furniture.objects.create(name="Hard Delete Furniture Signal")
+        furniture = make_furniture(name="Hard Delete Furniture Signal")
         pk = furniture.pk
         furniture.delete(hard_delete=True)
         assert not Furniture.all_objects.filter(pk=pk).exists()

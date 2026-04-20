@@ -50,7 +50,7 @@ import { useAvailableApartments } from '@/lib/api/hooks/use-apartments';
 import { type Tenant } from '@/lib/schemas/tenant.schema';
 import { type Dependent } from '@/lib/schemas/tenant.schema';
 import { type Lease } from '@/lib/schemas/lease.schema';
-import { formatCPFOrCNPJ, formatCurrency } from '@/lib/utils/formatters';
+import { formatCpfCnpj, formatCurrency } from '@/lib/utils/formatters';
 import { apiClient } from '@/lib/api/client';
 
 const TAG_FEE_SINGLE = 50;
@@ -316,7 +316,7 @@ export function TenantLeaseModal({
           <CardContent className="pt-4">
             <div className="text-sm">
               <div className="font-medium">{tenant.name}</div>
-              <div className="text-muted-foreground">{formatCPFOrCNPJ(tenant.cpf_cnpj)}</div>
+              <div className="text-muted-foreground">{formatCpfCnpj(tenant.cpf_cnpj)}</div>
             </div>
           </CardContent>
         </Card>

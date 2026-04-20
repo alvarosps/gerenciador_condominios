@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
+import { handleError } from '@/lib/utils/error-handler';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,7 +15,7 @@ export default function Error({
 }) {
   useEffect(() => {
     // Log the error to an error reporting service
-    console.error(error);
+    handleError(error, 'ErrorBoundary');
   }, [error]);
 
   return (
