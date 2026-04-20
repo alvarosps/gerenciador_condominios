@@ -29,6 +29,9 @@ import {
   useUpdateBuilding,
 } from '@/lib/api/hooks/use-buildings';
 import { type Building } from '@/lib/schemas/building.schema';
+import { handleError } from '@/lib/utils/error-handler';
+import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes';
+import { ConfirmDiscardDialog } from '@/components/ui/confirm-discard-dialog';
 
 interface BuildingFormModalProps {
   open: boolean;
@@ -64,6 +67,9 @@ export function BuildingFormModal({
     },
   });
 
+  const { isDirty } = formMethods.formState;
+  const unsaved = useUnsavedChanges(isDirty);
+
   useEffect(() => {
     if (building) {
       formMethods.reset({
@@ -90,12 +96,13 @@ export function BuildingFormModal({
       formMethods.reset();
     } catch (error) {
       toast.error('Erro ao salvar prédio');
-      console.error('Save error:', error);
+      handleError(error, 'BuildingFormModal.onSubmit');
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
+    <>
+    <Dialog open={open} onOpenChange={(isOpen) => unsaved.handleOpenChange(isOpen, onClose)}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>
@@ -180,5 +187,11 @@ export function BuildingFormModal({
         </Form>
       </DialogContent>
     </Dialog>
+    <ConfirmDiscardDialog
+      open={unsaved.showConfirmDialog}
+      onConfirm={() => unsaved.confirmDiscard(onClose)}
+      onCancel={unsaved.cancelDiscard}
+    />
+    </>
   );
 }

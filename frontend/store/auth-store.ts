@@ -16,49 +16,28 @@ export interface User {
  * Authentication state interface
  */
 interface AuthState {
-  token: string | null;
-  refreshToken: string | null;
   user: User | null;
   isAuthenticated: boolean;
 
   // Actions
-  setAuth: (token: string, refreshToken: string, user: User) => void;
-  setTokens: (token: string, refreshToken: string) => void;
-  setToken: (token: string) => void;
+  setAuth: (user: User) => void;
   setUser: (user: User) => void;
   clearAuth: () => void;
 }
 
 /**
  * Zustand store for authentication state
- * Persisted to localStorage for session persistence
+ * Tokens are stored in HttpOnly cookies — only user profile is persisted here
  */
 export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
-      token: null,
-      refreshToken: null,
       user: null,
       isAuthenticated: false,
 
-      setAuth: (token, refreshToken, user) =>
+      setAuth: (user) =>
         set({
-          token,
-          refreshToken,
           user,
-          isAuthenticated: true,
-        }),
-
-      setTokens: (token, refreshToken) =>
-        set({
-          token,
-          refreshToken,
-          isAuthenticated: true,
-        }),
-
-      setToken: (token) =>
-        set({
-          token,
           isAuthenticated: true,
         }),
 
@@ -69,18 +48,13 @@ export const useAuthStore = create<AuthState>()(
 
       clearAuth: () =>
         set({
-          token: null,
-          refreshToken: null,
           user: null,
           isAuthenticated: false,
         }),
     }),
     {
       name: 'auth-storage',
-      // Persist all auth data including tokens for long-lived sessions
       partialize: (state) => ({
-        token: state.token,
-        refreshToken: state.refreshToken,
         user: state.user,
         isAuthenticated: state.isAuthenticated,
       }),

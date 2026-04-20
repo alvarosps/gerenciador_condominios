@@ -25,6 +25,7 @@ import { toast } from 'sonner';
 import { useCalculateLateFee } from '@/lib/api/hooks/use-leases';
 import { type Lease } from '@/lib/schemas/lease.schema';
 import { formatCurrency } from '@/lib/utils/formatters';
+import { handleError } from '@/lib/utils/error-handler';
 
 interface Props {
   open: boolean;
@@ -56,7 +57,7 @@ export function LateFeeModal({ open, lease, onClose }: Props) {
       toast.success('Multa calculada com sucesso!');
     } catch (error) {
       toast.error('Erro ao calcular multa');
-      console.error('Late fee calculation error:', error);
+      handleError(error, 'LateFeeModal.handleCalculate');
     }
   };
 

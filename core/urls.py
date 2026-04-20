@@ -8,6 +8,7 @@ from .views import (
     DashboardViewSet,
     FurnitureViewSet,
     LeaseViewSet,
+    RentAdjustmentViewSet,
     TenantViewSet,
     health_check,
 )
@@ -37,7 +38,9 @@ from .viewsets import (
 )
 from .viewsets.auth_views import SetPasswordViewSet, WhatsAppAuthViewSet
 from .viewsets.notification_views import AdminNotificationViewSet
+from .viewsets.profile_views import change_password, update_profile
 from .viewsets.tenant_views import TenantViewSet as TenantPortalViewSet
+from .viewsets.user_admin_views import UserAdminViewSet
 
 router = DefaultRouter()
 router.register(r"buildings", BuildingViewSet)
@@ -72,7 +75,9 @@ router.register(r"expense-month-skips", ExpenseMonthSkipViewSet, basename="expen
 router.register(r"month-advance", MonthAdvanceViewSet, basename="month-advance")
 router.register(r"admin/proofs", AdminProofViewSet, basename="admin-proofs")
 router.register(r"admin/notifications", AdminNotificationViewSet, basename="admin-notifications")
+router.register(r"admin/users", UserAdminViewSet, basename="admin-users")
 router.register(r"devices", DeviceTokenViewSet, basename="devices")
+router.register(r"rent-adjustments", RentAdjustmentViewSet, basename="rent-adjustments")
 
 _whatsapp_auth = WhatsAppAuthViewSet.as_view({"post": "request_code"})
 _whatsapp_verify = WhatsAppAuthViewSet.as_view({"post": "verify_code"})
@@ -99,6 +104,8 @@ urlpatterns = [
     path("api/auth/whatsapp/request/", _whatsapp_auth, name="whatsapp-request"),
     path("api/auth/whatsapp/verify/", _whatsapp_verify, name="whatsapp-verify"),
     path("api/auth/set-password/", _set_password, name="set-password"),
+    path("api/auth/me/update/", update_profile, name="update_profile"),
+    path("api/auth/change-password/", change_password, name="change_password"),
     # Tenant portal
     path("api/tenant/me/", _tenant_me, name="tenant-me"),
     path("api/tenant/contract/", _tenant_contract, name="tenant-contract"),

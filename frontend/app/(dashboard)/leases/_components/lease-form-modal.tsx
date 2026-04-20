@@ -53,6 +53,7 @@ import { type Lease } from '@/lib/schemas/lease.schema';
 import { type Dependent } from '@/lib/schemas/tenant.schema';
 import { formatCurrency } from '@/lib/utils/formatters';
 import { apiClient } from '@/lib/api/client';
+import { handleError } from '@/lib/utils/error-handler';
 
 const TAG_FEE_SINGLE = 50;
 const TAG_FEE_DOUBLE = 80;
@@ -329,7 +330,7 @@ export function LeaseFormModal({ open, lease, onClose }: Props) {
       formMethods.reset();
     } catch (error) {
       toast.error('Erro ao salvar locação');
-      console.error('Save error:', error);
+      handleError(error, 'LeaseFormModal.onSubmit');
     }
   };
 

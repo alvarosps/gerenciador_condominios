@@ -42,6 +42,8 @@ logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
 
+_SENTINEL = object()
+
 _CACHE_KEY_MAX_LENGTH = 200
 
 
@@ -147,8 +149,8 @@ def cache_result(timeout: int = 300, key_prefix: str = "") -> Callable:
             cache_key = get_cache_key(*args, prefix=key_prefix or func.__name__, **kwargs)
 
             # Try to get from cache
-            cached_value = cache.get(cache_key)
-            if cached_value is not None:
+            cached_value = cache.get(cache_key, _SENTINEL)
+            if cached_value is not _SENTINEL:
                 logger.debug(f"Cache HIT: {cache_key}")
                 return cast(T, cached_value)
 
@@ -227,22 +229,26 @@ class CacheManager:
         """
         if not _is_redis_backend():
             return 0
-
         try:
             redis_client = get_redis_connection("default")
             key_prefix = settings.CACHES["default"].get("KEY_PREFIX", "condominios")
             full_pattern = f"{key_prefix}:1:{pattern}"
-            keys = redis_client.keys(full_pattern)
+            count = 0
+            cursor = 0
+            while True:
+                cursor, keys = redis_client.scan(cursor, match=full_pattern, count=100)
+                if keys:
+                    count += len(keys)
+                    redis_client.delete(*keys)
+                if cursor == 0:
+                    break
         except Exception:
             logger.exception(f"Error invalidating cache pattern {pattern}")
             return 0
         else:
-            if keys:
-                count: int = cast(int, redis_client.delete(*keys))
+            if count > 0:
                 logger.info(f"Invalidated {count} cache keys matching pattern: {pattern}")
-                return count
-            logger.debug(f"No cache keys found matching pattern: {pattern}")
-            return 0
+            return count
 
     @staticmethod
     def clear_all() -> bool:

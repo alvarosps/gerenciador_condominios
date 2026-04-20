@@ -12,6 +12,61 @@ Classifier: Programming Language :: Python :: 3.14
 Requires-Python: >=3.12
 Description-Content-Type: text/markdown
 License-File: LICENSE
+Requires-Dist: Django<6.0,>=5.2.0
+Requires-Dist: djangorestframework<3.16,>=3.15.0
+Requires-Dist: django-cors-headers<5.0,>=4.6.0
+Requires-Dist: drf-spectacular<0.30,>=0.28.0
+Requires-Dist: djangorestframework-simplejwt<5.6,>=5.3.1
+Requires-Dist: django-allauth[socialaccount]<0.70,>=0.63.0
+Requires-Dist: cryptography<47.0,>=44.0.0
+Requires-Dist: python-decouple<4.0,>=3.8
+Requires-Dist: python-dotenv<2.0,>=1.0.1
+Requires-Dist: psycopg[binary]<4.0,>=3.2.0
+Requires-Dist: django-redis<7.0,>=5.4.0
+Requires-Dist: redis<6.0,>=5.0.0
+Requires-Dist: playwright<2.0,>=1.50.0
+Requires-Dist: reportlab<5.0,>=4.1.0
+Requires-Dist: Pillow<13.0,>=11.0.0
+Requires-Dist: num2words<0.6,>=0.5.14
+Requires-Dist: python-dateutil<3.0,>=2.8.0
+Requires-Dist: requests<3.0,>=2.31.0
+Requires-Dist: Jinja2<4.0,>=3.1.0
+Requires-Dist: python-json-logger<4.0,>=3.0.0
+Requires-Dist: celery<6.0,>=5.4.0
+Requires-Dist: twilio<10.0,>=9.0.0
+Requires-Dist: gunicorn<26.0,>=23.0.0; sys_platform != "win32"
+Requires-Dist: sentry-sdk<3.0,>=2.0.0
+Requires-Dist: whitenoise<7.0,>=6.8.0
+Requires-Dist: django-storages[s3]<2.0,>=1.14.0
+Requires-Dist: boto3<2.0,>=1.35.0
+Requires-Dist: websockets<17.0,>=14.0
+Provides-Extra: dev
+Requires-Dist: ruff<1.0,>=0.11.0; extra == "dev"
+Requires-Dist: mypy<2.0,>=1.16.0; extra == "dev"
+Requires-Dist: django-stubs[compatible-mypy]<6.0,>=5.2.0; extra == "dev"
+Requires-Dist: djangorestframework-stubs[compatible-mypy]<4.0,>=3.15.0; extra == "dev"
+Requires-Dist: types-python-dateutil<3.0,>=2.9.0; extra == "dev"
+Requires-Dist: types-requests<3.0,>=2.31.0; extra == "dev"
+Requires-Dist: bandit<2.0,>=1.9.0; extra == "dev"
+Requires-Dist: safety<4.0,>=3.0.0; extra == "dev"
+Requires-Dist: pytest<10.0,>=9.0.0; extra == "dev"
+Requires-Dist: pytest-django<5.0,>=4.10.0; extra == "dev"
+Requires-Dist: pytest-cov<8.0,>=6.0.0; extra == "dev"
+Requires-Dist: pytest-mock<4.0,>=3.14.0; extra == "dev"
+Requires-Dist: pytest-xdist<4.0,>=3.8.0; extra == "dev"
+Requires-Dist: pytest-timeout<3.0,>=2.3.0; extra == "dev"
+Requires-Dist: pytest-env<2.0,>=1.1.0; extra == "dev"
+Requires-Dist: pytest-asyncio<2.0,>=1.0.0; extra == "dev"
+Requires-Dist: factory-boy<4.0,>=3.3.0; extra == "dev"
+Requires-Dist: faker<41.0,>=29.0.0; extra == "dev"
+Requires-Dist: freezegun<2.0,>=1.4.0; extra == "dev"
+Requires-Dist: model-bakery<2.0,>=1.20.0; extra == "dev"
+Requires-Dist: responses<1.0,>=0.25.0; extra == "dev"
+Requires-Dist: coverage<8.0,>=7.6.0; extra == "dev"
+Requires-Dist: pre-commit<5.0,>=4.0.0; extra == "dev"
+Requires-Dist: ipython<10.0,>=9.0.0; extra == "dev"
+Requires-Dist: ipdb<1.0,>=0.13.0; extra == "dev"
+Requires-Dist: django-debug-toolbar<7.0,>=5.0.0; extra == "dev"
 Dynamic: license-file
 
 # Condomínios Manager
@@ -30,19 +85,16 @@ A comprehensive property management system for rental properties in Brazil, buil
 ## Features
 
 ### Property Management
-
 - **Buildings**: Manage multiple buildings with address, utilities, and common expenses
 - **Apartments**: Track apartments with bedrooms, floor, position, and rental values
 - **Furniture Inventory**: Track furniture condition and assignment to apartments/tenants
 
 ### Tenant Management
-
 - **Tenant Registry**: Store tenant information with CPF/CNPJ validation
 - **Dependents**: Track tenant dependents and family members
 - **Multi-step Wizard**: 6-step form for complete tenant registration
 
 ### Lease Management
-
 - **Lease Tracking**: Manage active, expired, and terminated leases
 - **Multiple Tenants**: Support for multiple tenants per lease
 - **Contract Generation**: Automatic PDF contract generation with customizable templates
@@ -50,7 +102,6 @@ A comprehensive property management system for rental properties in Brazil, buil
 - **Due Date Changes**: Track and calculate fees for due date changes
 
 ### Dashboard & Analytics
-
 - **Financial Summary**: Total revenue, average rent, collected fees
 - **Late Payments**: Track overdue leases with amounts
 - **Lease Metrics**: Expiring leases (30/60/90 days), occupancy rates
@@ -58,7 +109,6 @@ A comprehensive property management system for rental properties in Brazil, buil
 - **Building Analytics**: Per-building revenue and occupancy
 
 ### Contract Template Editor
-
 - **Monaco Editor**: HTML editing with syntax highlighting
 - **Live Preview**: See changes with sample data
 - **Auto-Backup**: Automatic backup on save
@@ -67,7 +117,6 @@ A comprehensive property management system for rental properties in Brazil, buil
 ## Tech Stack
 
 ### Backend
-
 - **Django 5.0.2** with Django REST Framework 3.14
 - **PostgreSQL 15+** database
 - **JWT Authentication** with SimpleJWT
@@ -75,7 +124,6 @@ A comprehensive property management system for rental properties in Brazil, buil
 - **Pyppeteer** for PDF generation (Chrome headless)
 
 ### Frontend
-
 - **Next.js 14** with App Router
 - **React 18** with TypeScript
 - **Ant Design 5** + Tailwind CSS
@@ -85,7 +133,6 @@ A comprehensive property management system for rental properties in Brazil, buil
 - **Monaco Editor** for template editing
 
 ### Testing
-
 - **Backend**: pytest with pytest-django (523 tests, 83.86% coverage)
 - **Frontend**: Vitest + React Testing Library + MSW (93 tests)
 
@@ -332,14 +379,14 @@ POST /api/token/refresh/
 
 All resources support standard REST operations:
 
-| Method | Endpoint                | Description          |
-| ------ | ----------------------- | -------------------- |
-| GET    | `/api/{resource}/`      | List all (paginated) |
-| POST   | `/api/{resource}/`      | Create new           |
-| GET    | `/api/{resource}/{id}/` | Get by ID            |
-| PUT    | `/api/{resource}/{id}/` | Full update          |
-| PATCH  | `/api/{resource}/{id}/` | Partial update       |
-| DELETE | `/api/{resource}/{id}/` | Delete               |
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/{resource}/` | List all (paginated) |
+| POST | `/api/{resource}/` | Create new |
+| GET | `/api/{resource}/{id}/` | Get by ID |
+| PUT | `/api/{resource}/{id}/` | Full update |
+| PATCH | `/api/{resource}/{id}/` | Partial update |
+| DELETE | `/api/{resource}/{id}/` | Delete |
 
 **Available Resources**: `buildings`, `apartments`, `tenants`, `leases`, `furnitures`, `dependents`
 

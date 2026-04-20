@@ -19,6 +19,7 @@ Models and their cache invalidation relationships:
 import logging
 from typing import Any
 
+from django.db.models import Exists, OuterRef
 from django.db.models.signals import m2m_changed, post_delete, post_save
 from django.dispatch import receiver
 
@@ -170,15 +171,17 @@ def invalidate_tenant_furniture_cache(
 @receiver(post_save, sender=Lease)
 def sync_apartment_is_rented(sender: type[Lease], instance: Lease, **kwargs: Any) -> None:
     """Sync apartment.is_rented based on whether any active lease exists."""
-    has_active_lease = Lease.objects.filter(apartment_id=instance.apartment_id).exists()
-    Apartment.objects.filter(pk=instance.apartment_id).update(is_rented=has_active_lease)
+    Apartment.objects.filter(pk=instance.apartment_id).update(
+        is_rented=Exists(Lease.objects.filter(apartment_id=OuterRef("pk")))
+    )
 
 
 @receiver(post_delete, sender=Lease)
 def sync_apartment_is_rented_on_delete(sender: type[Lease], instance: Lease, **kwargs: Any) -> None:
     """Sync apartment.is_rented when lease is hard-deleted."""
-    has_active_lease = Lease.objects.filter(apartment_id=instance.apartment_id).exists()
-    Apartment.objects.filter(pk=instance.apartment_id).update(is_rented=has_active_lease)
+    Apartment.objects.filter(pk=instance.apartment_id).update(
+        is_rented=Exists(Lease.objects.filter(apartment_id=OuterRef("pk")))
+    )
 
 
 @receiver(post_save, sender=Lease)

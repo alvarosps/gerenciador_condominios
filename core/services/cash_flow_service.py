@@ -13,6 +13,7 @@ from django.db.models import Avg, Max, Q, Sum
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 
+from core.cache import cache_result
 from core.models import (
     Apartment,
     EmployeePayment,
@@ -30,16 +31,10 @@ from core.models import (
     PersonPayment,
     RentPayment,
 )
+from core.services.date_calculator import DateCalculatorService
 
 MONTHS_IN_YEAR = 12
 UTILITY_LOOKBACK_MONTHS = 3
-
-
-def _next_month_start(year: int, month: int) -> date:
-    """Return the first day of the month following (year, month)."""
-    if month == MONTHS_IN_YEAR:
-        return date(year + 1, 1, 1)
-    return date(year, month + 1, 1)
 
 
 class CashFlowService:
@@ -94,7 +89,7 @@ class CashFlowService:
 
         # Extra income: received in the month + recurring projections
         month_start = date(year, month, 1)
-        next_month = _next_month_start(year, month)
+        next_month = DateCalculatorService.next_month_start(year, month)
 
         # One-time/non-recurring income received this month
         received_income = Income.objects.filter(
@@ -164,6 +159,8 @@ class CashFlowService:
                 apartment__owner__isnull=False,
             )
             .filter(start_date__lte=month_start)
+            .exclude(prepaid_until__gte=month_start)
+            .exclude(is_salary_offset=True)
             .select_related("apartment", "apartment__owner", "apartment__building")
         )
 
@@ -414,7 +411,7 @@ class CashFlowService:
     def get_monthly_expenses(year: int, month: int) -> dict[str, Any]:
         """Calculate expenses for a given month across all 10 categories."""
         month_start = date(year, month, 1)
-        next_month = _next_month_start(year, month)
+        next_month = DateCalculatorService.next_month_start(year, month)
 
         skipped_expense_ids: set[int] = set(
             ExpenseMonthSkip.objects.filter(
@@ -505,6 +502,7 @@ class CashFlowService:
         }
 
     @staticmethod
+    @cache_result(timeout=300, key_prefix="cash-flow-projection")
     def get_cash_flow_projection(
         months: int = 12,
         *,
@@ -670,26 +668,35 @@ class CashFlowService:
     def _get_projected_expenses(year: int, month: int) -> Decimal:
         """Calculate projected expenses for a future month."""
         month_start = date(year, month, 1)
-        next_month = _next_month_start(year, month)
+        next_month = DateCalculatorService.next_month_start(year, month)
 
         total = Decimal("0.00")
 
-        # Owner repayments
+        # Owner repayments — exclude prepaid and salary-offset leases
         owner_total = Decimal("0.00")
-        owner_leases = Lease.objects.filter(
-            apartment__is_rented=True,
-            apartment__owner__isnull=False,
+        owner_leases = (
+            Lease.objects.filter(
+                apartment__is_rented=True,
+                apartment__owner__isnull=False,
+            )
+            .exclude(prepaid_until__gte=month_start)
+            .exclude(is_salary_offset=True)
         )
         for lease in owner_leases:
             owner_total += lease.rental_value
         total += owner_total
 
-        # Person stipends
-        stipend_total: Decimal = PersonIncome.objects.filter(
-            income_type=PersonIncomeType.FIXED_STIPEND,
-            is_active=True,
-            fixed_amount__isnull=False,
-        ).aggregate(total=Coalesce(Sum("fixed_amount"), Decimal("0.00")))["total"]
+        # Person stipends — filter to active range only (same logic as _collect_person_stipends)
+        stipend_total: Decimal = (
+            PersonIncome.objects.filter(
+                income_type=PersonIncomeType.FIXED_STIPEND,
+                is_active=True,
+                fixed_amount__isnull=False,
+                start_date__lte=month_start,
+            )
+            .exclude(end_date__lt=month_start)
+            .aggregate(total=Coalesce(Sum("fixed_amount"), Decimal("0.00")))["total"]
+        )
         total += stipend_total
 
         # Known installments (card, loan, debt, property_tax) with due_date in month
@@ -759,7 +766,7 @@ class CashFlowService:
         month_filters = Q()
         for y, m in months_seen:
             m_start = date(y, m, 1)
-            m_end = _next_month_start(y, m)
+            m_end = DateCalculatorService.next_month_start(y, m)
             month_filters |= Q(expense_date__gte=m_start, expense_date__lt=m_end)
 
         monthly_totals: Decimal = (
@@ -784,7 +791,7 @@ class CashFlowService:
         person = Person.objects.get(pk=person_id)
 
         month_start = date(year, month, 1)
-        next_month = _next_month_start(year, month)
+        next_month = DateCalculatorService.next_month_start(year, month)
 
         skipped_expense_ids: set[int] = set(
             ExpenseMonthSkip.objects.filter(
@@ -813,12 +820,13 @@ class CashFlowService:
                     }
                 )
 
-        # Receives: fixed stipends
+        # Receives: fixed stipends — filter to active range only
         stipends = PersonIncome.objects.filter(
             person=person,
             income_type=PersonIncomeType.FIXED_STIPEND,
             is_active=True,
-        )
+            start_date__lte=month_start,
+        ).exclude(end_date__lt=month_start)
         for stipend in stipends:
             amount = stipend.fixed_amount or Decimal("0.00")
             receives += amount

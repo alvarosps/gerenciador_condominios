@@ -36,6 +36,7 @@ import {
 } from '@/lib/api/hooks/use-rent-payments';
 import { useLeases } from '@/lib/api/hooks/use-leases';
 import type { RentPayment } from '@/lib/schemas/rent-payment.schema';
+import { handleError } from '@/lib/utils/error-handler';
 
 interface Props {
   open: boolean;
@@ -113,7 +114,7 @@ export function RentPaymentFormModal({ open, rentPayment, onClose }: Props) {
       form.reset();
     } catch (error) {
       toast.error('Erro ao salvar pagamento');
-      console.error('Save error:', error);
+      handleError(error, 'RentPaymentFormModal.onSubmit');
     }
   };
 

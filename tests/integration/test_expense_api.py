@@ -7,69 +7,62 @@ import pytest
 from freezegun import freeze_time
 from rest_framework import status
 
-from core.models import (
-    Building,
-    CreditCard,
-    Expense,
-    ExpenseCategory,
-    ExpenseInstallment,
-    Person,
+from core.models import Expense, ExpenseInstallment
+from tests.factories import (
+    make_building,
+    make_credit_card,
+    make_expense,
+    make_expense_category,
+    make_expense_installment,
+    make_person,
 )
 
 
 @pytest.fixture
 def person(admin_user):
-    return Person.objects.create(
+    return make_person(
+        user=admin_user,
         name="Rodrigo Silva",
         relationship="Proprietário",
         phone="11999998888",
         email="rodrigo@test.com",
         is_owner=True,
         is_employee=False,
-        created_by=admin_user,
-        updated_by=admin_user,
     )
 
 
 @pytest.fixture
 def credit_card(person, admin_user):
-    return CreditCard.objects.create(
+    return make_credit_card(
         person=person,
+        user=admin_user,
         nickname="Nubank",
         last_four_digits="1234",
         closing_day=15,
         due_day=22,
         is_active=True,
-        created_by=admin_user,
-        updated_by=admin_user,
     )
 
 
 @pytest.fixture
 def building(admin_user):
-    return Building.objects.create(
-        street_number=836,
-        name="Edifício Teste",
-        address="Rua Teste, 836",
-        created_by=admin_user,
-        updated_by=admin_user,
-    )
+    return make_building(street_number=836, user=admin_user, name="Edifício Teste", address="Rua Teste, 836")
 
 
 @pytest.fixture
 def category(admin_user):
-    return ExpenseCategory.objects.create(
+    return make_expense_category(
         name="Manutenção",
+        user=admin_user,
         description="Gastos com manutenção",
         color="#FF5733",
-        created_by=admin_user,
-        updated_by=admin_user,
     )
 
 
 @pytest.fixture
 def simple_expense(admin_user, person, category):
-    return Expense.objects.create(
+    return make_expense(
+        user=admin_user,
         description="Compra de material",
         expense_type="one_time_expense",
         total_amount=Decimal("500.00"),
@@ -77,14 +70,13 @@ def simple_expense(admin_user, person, category):
         person=person,
         category=category,
         is_paid=False,
-        created_by=admin_user,
-        updated_by=admin_user,
     )
 
 
 @pytest.fixture
 def card_expense(admin_user, person, credit_card, category):
-    return Expense.objects.create(
+    return make_expense(
+        user=admin_user,
         description="Compra no cartão",
         expense_type="card_purchase",
         total_amount=Decimal("1200.00"),
@@ -95,14 +87,13 @@ def card_expense(admin_user, person, credit_card, category):
         is_installment=True,
         total_installments=6,
         is_paid=False,
-        created_by=admin_user,
-        updated_by=admin_user,
     )
 
 
 @pytest.fixture
 def loan_expense(admin_user, person):
-    return Expense.objects.create(
+    return make_expense(
+        user=admin_user,
         description="Empréstimo Caixa",
         expense_type="bank_loan",
         total_amount=Decimal("24000.00"),
@@ -113,14 +104,13 @@ def loan_expense(admin_user, person):
         is_installment=True,
         total_installments=12,
         is_paid=False,
-        created_by=admin_user,
-        updated_by=admin_user,
     )
 
 
 @pytest.fixture
 def paid_expense(admin_user, person):
-    return Expense.objects.create(
+    return make_expense(
+        user=admin_user,
         description="Gasto já pago",
         expense_type="one_time_expense",
         total_amount=Decimal("100.00"),
@@ -128,23 +118,20 @@ def paid_expense(admin_user, person):
         person=person,
         is_paid=True,
         paid_date=date(2026, 2, 1),
-        created_by=admin_user,
-        updated_by=admin_user,
     )
 
 
 @pytest.fixture
 def expense_with_installments(card_expense, admin_user):
     for i in range(1, 7):
-        ExpenseInstallment.objects.create(
+        make_expense_installment(
             expense=card_expense,
+            user=admin_user,
             installment_number=i,
             total_installments=6,
             amount=Decimal("200.00"),
             due_date=date(2026, 3 + i, 22) if 3 + i <= 12 else date(2027, 3 + i - 12, 22),
             is_paid=False,
-            created_by=admin_user,
-            updated_by=admin_user,
         )
     return card_expense
 
@@ -270,14 +257,13 @@ class TestExpenseAPI:
     def test_filter_by_building(
         self, authenticated_api_client, building, admin_user, simple_expense
     ):
-        building_expense = Expense.objects.create(
+        building_expense = make_expense(
+            user=admin_user,
             description="Conta de luz",
             expense_type="electricity_bill",
             total_amount=Decimal("250.00"),
             expense_date=date(2026, 3, 10),
             building=building,
-            created_by=admin_user,
-            updated_by=admin_user,
         )
         response = authenticated_api_client.get(
             self.url, {"building_id": building_expense.building_id}

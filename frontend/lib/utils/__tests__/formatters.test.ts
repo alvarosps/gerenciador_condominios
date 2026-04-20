@@ -4,9 +4,7 @@ import {
   formatCPF,
   formatCNPJ,
   formatCpfCnpj,
-  formatCPFOrCNPJ,
   formatPhone,
-  formatBrazilianPhone,
   formatDate,
   formatMonthYear,
   formatDateISO,
@@ -101,9 +99,6 @@ describe('formatCpfCnpj', () => {
     expect(formatCpfCnpj('12345')).toBe('12345');
   });
 
-  it('formatCPFOrCNPJ is an alias for formatCpfCnpj', () => {
-    expect(formatCPFOrCNPJ('12345678900')).toBe(formatCpfCnpj('12345678900'));
-  });
 });
 
 describe('formatPhone', () => {
@@ -123,9 +118,6 @@ describe('formatPhone', () => {
     expect(formatPhone('1234')).toBe('1234');
   });
 
-  it('formatBrazilianPhone is an alias for formatPhone', () => {
-    expect(formatBrazilianPhone('11987654321')).toBe(formatPhone('11987654321'));
-  });
 });
 
 describe('formatDate', () => {

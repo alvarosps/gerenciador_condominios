@@ -110,7 +110,15 @@ class FinancialDashboardViewSet(viewsets.ViewSet):
             )
 
         detail_id_str = request.query_params.get("id")
-        detail_id = int(detail_id_str) if detail_id_str else None
+        detail_id: int | None = None
+        if detail_id_str:
+            try:
+                detail_id = int(detail_id_str)
+            except ValueError:
+                return Response(
+                    {"error": "Parâmetro 'id' deve ser um número inteiro."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
         today = timezone.now().date()
         try:

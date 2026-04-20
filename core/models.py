@@ -11,6 +11,8 @@ This module defines the core domain models for property management:
 """
 
 import re
+import uuid
+from datetime import timedelta
 from decimal import Decimal
 from typing import Any
 
@@ -1077,6 +1079,18 @@ class Expense(AuditMixin, SoftDeleteMixin, models.Model):
             models.Index(fields=["is_paid", "-expense_date"], name="expense_paid_date_idx"),
             models.Index(fields=["person", "expense_type"], name="exp_person_type_idx"),
             models.Index(fields=["person", "expense_date"], name="exp_person_date_idx"),
+            models.Index(
+                fields=["is_recurring", "expense_date"],
+                name="idx_expense_recurring_date",
+            ),
+            models.Index(
+                fields=["category", "expense_date"],
+                name="idx_expense_category_date",
+            ),
+            models.Index(
+                fields=["person", "is_paid", "expense_date"],
+                name="idx_expense_person_paid_date",
+            ),
         ]
         constraints = [
             models.CheckConstraint(
@@ -1116,13 +1130,15 @@ class Expense(AuditMixin, SoftDeleteMixin, models.Model):
         return result
 
     def restore(self, restored_by: Any = None) -> None:
+        original_deleted_at = self.deleted_at
         super().restore(restored_by=restored_by)
-        # Cascade restore to child installments
-        self.installments.filter(is_deleted=True).update(
-            is_deleted=False,
-            deleted_at=None,
-            deleted_by=None,
-        )
+        if original_deleted_at:
+            window = timedelta(seconds=2)
+            self.installments.filter(
+                is_deleted=True,
+                deleted_at__gte=original_deleted_at - window,
+                deleted_at__lte=original_deleted_at + window,
+            ).update(is_deleted=False, deleted_at=None, deleted_by=None)
 
 
 class ExpenseInstallment(AuditMixin, SoftDeleteMixin, models.Model):
@@ -1644,3 +1660,31 @@ class Notification(AuditMixin, models.Model):
 
     def __str__(self) -> str:
         return f"{self.type} → {self.recipient} ({self.sent_at:%Y-%m-%d})"
+
+
+class OAuthExchangeCode(models.Model):
+    """One-time code for OAuth token exchange. Expires in 60 seconds."""
+
+    TTL_SECONDS = 60
+
+    code = models.UUIDField(default=uuid.uuid4, unique=True, db_index=True)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="oauth_exchange_codes"
+    )
+    access_token = models.TextField()
+    refresh_token = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_used = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "core_oauth_exchange_code"
+
+    def __str__(self) -> str:
+        return f"OAuthExchange({self.code}) for user {self.user_id}"
+
+    def is_valid(self) -> bool:
+        """Check if the code is unused and not expired."""
+        if self.is_used:
+            return False
+        elapsed = (timezone.now() - self.created_at).total_seconds()
+        return elapsed <= self.TTL_SECONDS

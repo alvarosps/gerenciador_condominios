@@ -202,16 +202,6 @@ export default function LoginPage() {
             Entrar com Google
           </Button>
 
-          <div className="mt-6 text-center text-sm text-muted-foreground">
-            <p>Ainda não tem uma conta?</p>
-            <Button
-              variant="link"
-              className="p-0 h-auto font-normal"
-              onClick={() => router.push('/register')}
-            >
-              Criar nova conta
-            </Button>
-          </div>
         </CardContent>
       </Card>
     </div>

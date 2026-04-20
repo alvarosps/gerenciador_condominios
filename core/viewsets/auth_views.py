@@ -149,6 +149,12 @@ class WhatsAppAuthViewSet(viewsets.ViewSet):
                     status=status.HTTP_404_NOT_FOUND,
                 )
 
+            if verification.attempts >= _MAX_VERIFY_ATTEMPTS:
+                return Response(
+                    {"error": "Código bloqueado por excesso de tentativas. Solicite um novo."},
+                    status=status.HTTP_429_TOO_MANY_REQUESTS,
+                )
+
             if not verification.is_valid:
                 return Response(
                     {"error": "Código expirado ou esgotado. Solicite um novo código."},

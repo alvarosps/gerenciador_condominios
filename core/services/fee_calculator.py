@@ -15,7 +15,7 @@ from decimal import Decimal
 from django.conf import settings
 from django.utils import timezone
 
-_DECEMBER = 12  # Month number for December
+from core.services.date_calculator import DateCalculatorService
 
 
 class FeeCalculatorService:
@@ -74,7 +74,7 @@ class FeeCalculatorService:
             >>> result["late_days"]
             5
             >>> result["late_fee"]
-            Decimal('375.00')  # (1500/30) × 5 × 1.05
+            Decimal('12.50')  # (1500/30) × 5 × 0.05
         """
         if rental_value < Decimal(0):
             msg = "rental_value must be non-negative"
@@ -97,13 +97,6 @@ class FeeCalculatorService:
             "late_fee": Decimal("0.00"),
             "message": "Aluguel não está atrasado.",
         }
-
-    @staticmethod
-    def _next_month(year: int, month: int) -> tuple[int, int]:
-        """Return (year, month) for the month after the given one."""
-        if month == _DECEMBER:
-            return year + 1, 1
-        return year, month + 1
 
     @staticmethod
     def _clamp_day(year: int, month: int, day: int) -> date:
@@ -145,8 +138,10 @@ class FeeCalculatorService:
         if new_due_day > current_due_day:
             new_date = FeeCalculatorService._clamp_day(year, month, new_due_day)
         else:
-            next_year, next_month = FeeCalculatorService._next_month(year, month)
-            new_date = FeeCalculatorService._clamp_day(next_year, next_month, new_due_day)
+            next_start = DateCalculatorService.next_month_start(year, month)
+            new_date = FeeCalculatorService._clamp_day(
+                next_start.year, next_start.month, new_due_day
+            )
 
         days_difference = (new_date - old_date).days + 1  # inclusive count
 

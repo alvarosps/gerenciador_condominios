@@ -33,15 +33,9 @@ from core.models import (
 )
 
 from .cash_flow_service import MONTHS_IN_YEAR, CashFlowService
+from .date_calculator import DateCalculatorService
 
 MAX_BREAK_EVEN_MONTHS = 60
-
-
-def _next_month_start(year: int, month: int) -> date:
-    """Return the first day of the month following (year, month)."""
-    if month == MONTHS_IN_YEAR:
-        return date(year + 1, 1, 1)
-    return date(year, month + 1, 1)
 
 
 def _resolve_building_label(building: Building | None, description: str) -> str:
@@ -81,7 +75,7 @@ class FinancialDashboardService:
 
         # Monthly obligations estimate: installments due this month (unpaid, excluding offsets)
         month_start = date(year, month, 1)
-        next_month = _next_month_start(year, month)
+        next_month = DateCalculatorService.next_month_start(year, month)
 
         total_monthly_obligations = ExpenseInstallment.objects.filter(
             due_date__gte=month_start,
@@ -132,7 +126,7 @@ class FinancialDashboardService:
         """Return debt breakdown per person: card debt, loan debt, monthly amounts."""
         today = timezone.now().date()
         month_start = date(today.year, today.month, 1)
-        next_month = _next_month_start(today.year, today.month)
+        next_month = DateCalculatorService.next_month_start(today.year, today.month)
 
         # Get persons who have expenses with installments
         persons_with_expenses = Person.objects.filter(
@@ -320,61 +314,101 @@ class FinancialDashboardService:
     @staticmethod
     @cache_result(timeout=120, key_prefix="financial-dashboard-category")
     def get_expense_category_breakdown(year: int, month: int) -> list[dict[str, Any]]:
-        """Return expense totals grouped by category for a given month."""
-        month_start = date(year, month, 1)
-        next_month = _next_month_start(year, month)
+        """Return expense totals grouped by category for a given month.
 
-        expenses_in_month = Expense.objects.filter(
-            expense_date__gte=month_start,
-            expense_date__lt=next_month,
-            is_offset=False,
+        Direct expenses (not installment-based) are bucketed by expense_date.
+        Installment expenses are bucketed by the installment due_date so they appear
+        in the month the payment is actually due rather than when the expense was recorded.
+        """
+        month_start = date(year, month, 1)
+        next_month = DateCalculatorService.next_month_start(year, month)
+
+        # Direct expenses: not installment-based, use expense_date
+        direct_expenses = (
+            Expense.objects.filter(
+                expense_date__gte=month_start,
+                expense_date__lt=next_month,
+                is_offset=False,
+                is_installment=False,
+            )
+            .values("category__id", "category__name", "category__color")
+            .annotate(
+                total=Coalesce(Sum("total_amount"), Decimal("0.00")),
+                count=Count("id"),
+            )
         )
 
-        # Get grand total for percentage calculation
-        grand_total = expenses_in_month.aggregate(
-            total=Coalesce(Sum("total_amount"), Decimal("0.00"))
-        )["total"]
+        # Installment amounts: use the installment due_date
+        installment_expenses = (
+            ExpenseInstallment.objects.filter(
+                due_date__gte=month_start,
+                due_date__lt=next_month,
+                expense__is_offset=False,
+            )
+            .values(
+                "expense__category__id",
+                "expense__category__name",
+                "expense__category__color",
+            )
+            .annotate(
+                total=Coalesce(Sum("amount"), Decimal("0.00")),
+                count=Count("expense__id", distinct=True),
+            )
+        )
+
+        # Merge both result sets by category key
+        category_map: dict[int | None, dict[str, Any]] = {}
+
+        for item in direct_expenses:
+            key = item["category__id"]
+            category_map[key] = {
+                "category_id": key,
+                "category_name": item["category__name"] or "Sem Categoria",
+                "color": item["category__color"] or "#6B7280",
+                "total": item["total"],
+                "count": item["count"],
+            }
+
+        for item in installment_expenses:
+            key = item["expense__category__id"]
+            if key in category_map:
+                category_map[key]["total"] += item["total"]
+                category_map[key]["count"] += item["count"]
+            else:
+                category_map[key] = {
+                    "category_id": key,
+                    "category_name": item["expense__category__name"] or "Sem Categoria",
+                    "color": item["expense__category__color"] or "#6B7280",
+                    "total": item["total"],
+                    "count": item["count"],
+                }
+
+        if not category_map:
+            return []
+
+        grand_total = sum((entry["total"] for entry in category_map.values()), Decimal("0.00"))
 
         if grand_total == Decimal("0.00"):
             return []
 
-        # Group by category
-        category_data = (
-            expenses_in_month.values("category__id", "category__name", "category__color")
-            .annotate(
-                total=Sum("total_amount"),
-                count=Count("id"),
-            )
-            .order_by("-total")
-        )
-
-        result = []
-        for item in category_data:
-            category_id = item["category__id"]
-            category_name = item["category__name"] or "Sem Categoria"
-            color = item["category__color"] or "#6B7280"
-            total = item["total"]
-            percentage = float(total / grand_total * 100)
-
-            result.append(
-                {
-                    "category_id": category_id,
-                    "category_name": category_name,
-                    "color": color,
-                    "total": total,
-                    "percentage": round(percentage, 2),
-                    "count": item["count"],
-                }
-            )
-
-        return result
+        return [
+            {
+                "category_id": entry["category_id"],
+                "category_name": entry["category_name"],
+                "color": entry["color"],
+                "total": entry["total"],
+                "percentage": round(float(entry["total"] / grand_total * 100), 2),
+                "count": entry["count"],
+            }
+            for entry in sorted(category_map.values(), key=lambda x: x["total"], reverse=True)
+        ]
 
     @staticmethod
     @cache_result(timeout=120, key_prefix="financial-dashboard-summary")
     def get_dashboard_summary(year: int, month: int) -> dict[str, Any]:
         """Return consolidated dashboard summary: income breakdown, expense by person, and balance."""
         month_start = date(year, month, 1)
-        next_month = _next_month_start(year, month)
+        next_month = DateCalculatorService.next_month_start(year, month)
 
         skipped_expense_ids: set[int] = set(
             ExpenseMonthSkip.objects.filter(
@@ -413,6 +447,7 @@ class FinancialDashboardService:
         current_year: int,
         current_month: int,
         lookback_months: int = 6,
+        financial_settings: FinancialSettings | None = None,
     ) -> dict[str, dict[str, Any]]:
         """Calculate payment allocation using waterfall: oldest debt first.
 
@@ -420,7 +455,7 @@ class FinancialDashboardService:
         Only considers months from FinancialSettings.initial_balance_date onwards.
         """
         # Determine start date from FinancialSettings
-        settings = FinancialSettings.objects.first()
+        settings = financial_settings
         start_date = (
             settings.initial_balance_date if settings else date(current_year, current_month, 1)
         )
@@ -460,7 +495,7 @@ class FinancialDashboardService:
             month_data.append(initial_balance_entry)
         for y, m in months:
             month_start = date(y, m, 1)
-            next_m = _next_month_start(y, m)
+            next_m = DateCalculatorService.next_month_start(y, m)
             expense_total = FinancialDashboardService._calc_person_expense_total(
                 person, month_start, next_m
             )
@@ -619,6 +654,9 @@ class FinancialDashboardService:
         overdue: list[dict[str, Any]] = []
         current_month_start = date(current_year, current_month, 1)
 
+        # Fetch once to avoid N+1 in the person loop below
+        financial_settings = FinancialSettings.objects.first()
+
         # Person overdue via waterfall allocation
         persons = Person.objects.filter(is_employee=False).order_by("name")
         for person in persons:
@@ -631,7 +669,7 @@ class FinancialDashboardService:
                 continue
 
             waterfall = FinancialDashboardService._get_person_waterfall(
-                person, current_year, current_month, lookback_months
+                person, current_year, current_month, lookback_months, financial_settings
             )
 
             # Only show previous months with pending > 0
@@ -804,7 +842,7 @@ class FinancialDashboardService:
         month_start: date,
     ) -> tuple[Decimal, list[dict[str, Any]]]:
         """Collect recurring and one-time extra incomes for the month."""
-        next_month = _next_month_start(month_start.year, month_start.month)
+        next_month = DateCalculatorService.next_month_start(month_start.year, month_start.month)
         extra_incomes: list[dict[str, Any]] = []
         extra_income_total = Decimal("0.00")
 
@@ -839,7 +877,6 @@ class FinancialDashboardService:
 
         return extra_income_total, extra_incomes
 
-    @staticmethod
     @staticmethod
     def _ensure_employee_payments(month_start: date) -> None:
         """Auto-create EmployeePayment for employees missing one this month.
@@ -1766,7 +1803,7 @@ class FinancialDashboardService:
           "employee"     — employee salary payments
         """
         month_start = date(year, month, 1)
-        next_month = _next_month_start(year, month)
+        next_month = DateCalculatorService.next_month_start(year, month)
 
         dispatch: dict[str, Callable[[], dict[str, Any]]] = {
             "person": lambda: FinancialDashboardService._detail_person(
@@ -1992,7 +2029,7 @@ class FinancialDashboardService:
         fixed_expenses. Also returns aggregation by category with percentages.
         """
         month_start = date(year, month, 1)
-        next_month = _next_month_start(year, month)
+        next_month = DateCalculatorService.next_month_start(year, month)
 
         skipped_expense_ids: set[int] = set(
             ExpenseMonthSkip.objects.filter(

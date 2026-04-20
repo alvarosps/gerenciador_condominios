@@ -13,7 +13,7 @@ import {
 import { useRouter } from 'next/navigation';
 import { useDebounce } from '@/lib/hooks/use-debounce';
 import { apiClient } from '@/lib/api/client';
-import { formatCurrency, formatCPFOrCNPJ, formatBrazilianPhone } from '@/lib/utils/formatters';
+import { formatCurrency, formatCpfCnpj, formatPhone } from '@/lib/utils/formatters';
 import { type Building } from '@/lib/schemas/building.schema';
 import { type Apartment } from '@/lib/schemas/apartment.schema';
 import { type Tenant } from '@/lib/schemas/tenant.schema';
@@ -101,8 +101,8 @@ export function GlobalSearch() {
             type: 'tenant',
             id: item.id,
             title: item.name,
-            subtitle: formatCPFOrCNPJ(item.cpf_cnpj),
-            metadata: `${formatBrazilianPhone(item.phone)} - ${item.profession}`,
+            subtitle: formatCpfCnpj(item.cpf_cnpj),
+            metadata: `${formatPhone(item.phone)} - ${item.profession}`,
             url: '/dashboard/tenants',
           });
         }

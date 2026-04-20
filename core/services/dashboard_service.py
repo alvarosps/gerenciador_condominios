@@ -16,10 +16,12 @@ from datetime import date, timedelta
 from decimal import Decimal
 from typing import Any, cast
 
-from django.db.models import Count, Q, Sum
+from django.db.models import Count, DateField, Q, Sum
+from django.db.models.expressions import RawSQL
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 
+from core.cache import cache_result
 from core.models import Apartment, Building, Dependent, Lease, RentPayment, Tenant
 
 from .fee_calculator import FeeCalculatorService
@@ -48,6 +50,7 @@ class DashboardService:
     """
 
     @staticmethod
+    @cache_result(timeout=120, key_prefix="dashboard-financial-summary")
     def get_financial_summary() -> dict[str, Any]:
         """
         Calculate financial summary across all properties.
@@ -128,6 +131,7 @@ class DashboardService:
         return summary
 
     @staticmethod
+    @cache_result(timeout=120, key_prefix="dashboard-lease-metrics")
     def get_lease_metrics() -> dict[str, Any]:
         """
         Calculate lease statistics and metrics.
@@ -174,25 +178,23 @@ class DashboardService:
         inactive_leases = total_leases - active_leases
         contracts_pending = total_leases - contracts_generated
 
-        # Calculate expiring and expired leases using database-level filtering
-        # Instead of looping, we filter by start_date ranges
-        # A lease is expired if start_date + validity_months * 30 days < today
-        # A lease is expiring soon if start_date + validity_months * 30 days <= today + 30
-        #
-        # We use values() to calculate in Python but with minimal data transfer
-        lease_dates = Lease.objects.values("start_date", "validity_months")
+        # Calculate expiring and expired leases using database-level annotation
 
-        expiring_soon = 0
-        expired_leases = 0
-
-        for lease_data in lease_dates:
-            final_date = lease_data["start_date"] + timedelta(
-                days=lease_data["validity_months"] * 30
-            )
-            if final_date < today:
-                expired_leases += 1
-            elif final_date <= expiry_threshold:
-                expiring_soon += 1
+        annotated = Lease.objects.annotate(
+            end_date=RawSQL(
+                "(start_date + (validity_months || ' months')::interval)::date",
+                [],
+                output_field=DateField(),
+            ),
+        )
+        counts = annotated.aggregate(
+            expiring_soon=Count(
+                "id", filter=Q(end_date__gte=today, end_date__lte=expiry_threshold)
+            ),
+            expired_leases=Count("id", filter=Q(end_date__lt=today)),
+        )
+        expiring_soon = counts["expiring_soon"]
+        expired_leases = counts["expired_leases"]
 
         metrics = {
             "total_leases": total_leases,
@@ -210,6 +212,7 @@ class DashboardService:
         return metrics
 
     @staticmethod
+    @cache_result(timeout=300, key_prefix="dashboard-building-stats")
     def get_building_statistics() -> list[dict[str, Any]]:
         """
         Get per-building statistics and occupancy.
@@ -276,6 +279,7 @@ class DashboardService:
         return building_stats
 
     @staticmethod
+    @cache_result(timeout=120, key_prefix="dashboard-late-payment")
     def get_late_payment_summary() -> dict[str, Any]:
         """
         Calculate late payment statistics across all active leases.
@@ -382,6 +386,7 @@ class DashboardService:
         return summary
 
     @staticmethod
+    @cache_result(timeout=300, key_prefix="dashboard-tenant-stats")
     def get_tenant_statistics() -> dict[str, Any]:
         """
         Calculate tenant statistics and demographics.

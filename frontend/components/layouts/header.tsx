@@ -1,6 +1,7 @@
 'use client';
 
 import { Bell, LogOut, Settings } from 'lucide-react';
+import Link from 'next/link';
 import { useLogout } from '@/lib/api/hooks/use-auth';
 import { useAuthStore } from '@/store/auth-store';
 import { useHydration } from '@/lib/hooks/use-hydration';
@@ -106,9 +107,11 @@ export function Header() {
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
-              <Settings className="mr-2 h-4 w-4" />
-              <span>Configurações</span>
+            <DropdownMenuItem asChild>
+              <Link href="/settings">
+                <Settings className="mr-2 h-4 w-4" />
+                <span>Configurações</span>
+              </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem

@@ -85,7 +85,7 @@ class TenantSummarySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Tenant
-        fields = ["id", "name", "cpf_cnpj"]
+        fields = ["id", "name", "cpf_cnpj", "phone", "due_day"]
         read_only_fields = fields
 
 
@@ -195,7 +195,9 @@ class ApartmentSerializer(serializers.ModelSerializer):
     def create(self, validated_data: dict[str, Any]) -> Apartment:
         """Create apartment with furniture relationships."""
         furniture_ids = validated_data.pop("furniture_ids", [])
-        apartment = Apartment.objects.create(**validated_data)
+        apartment = Apartment(**validated_data)
+        apartment.full_clean()
+        apartment.save()
         if furniture_ids:
             apartment.furnitures.set(furniture_ids)
         return apartment
@@ -206,6 +208,7 @@ class ApartmentSerializer(serializers.ModelSerializer):
 
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
+        instance.full_clean()
         instance.save()
 
         if furniture_ids is not None:
@@ -295,7 +298,9 @@ class TenantSerializer(serializers.ModelSerializer):
     def create(self, validated_data: dict[str, Any]) -> Tenant:
         dependents_data = validated_data.pop("dependents", [])
         furniture_ids = validated_data.pop("furniture_ids", [])
-        tenant = Tenant.objects.create(**validated_data)
+        tenant = Tenant(**validated_data)
+        tenant.full_clean()
+        tenant.save()
         if furniture_ids:
             tenant.furnitures.set(furniture_ids)
         for dep_data in dependents_data:
@@ -307,6 +312,7 @@ class TenantSerializer(serializers.ModelSerializer):
         furniture_ids = validated_data.pop("furniture_ids", None)
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
+        instance.full_clean()
         instance.save()
 
         if furniture_ids is not None:
@@ -472,7 +478,9 @@ class LeaseSerializer(serializers.ModelSerializer):
         if "last_rent_increase_date" not in validated_data:
             validated_data["last_rent_increase_date"] = validated_data["start_date"]
 
-        lease = Lease.objects.create(**validated_data)
+        lease = Lease(**validated_data)
+        lease.full_clean()
+        lease.save()
         if tenants:
             lease.tenants.set(tenants)
 
@@ -490,6 +498,7 @@ class LeaseSerializer(serializers.ModelSerializer):
 
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
+        instance.full_clean()
         instance.save()
 
         if tenants is not None:
@@ -862,21 +871,36 @@ class ExpenseSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         attrs = super().validate(attrs)
-        expense_type = attrs.get("expense_type", "")
 
-        if expense_type == "card_purchase" and not attrs.get("credit_card"):
+        # For partial updates, fall back to instance values for cross-field validation
+        expense_type = attrs.get("expense_type")
+        if expense_type is None and self.instance:
+            expense_type = self.instance.expense_type
+        expense_type = expense_type or ""
+
+        credit_card = attrs.get("credit_card")
+        if credit_card is None and "credit_card" not in attrs and self.instance:
+            credit_card = self.instance.credit_card
+
+        person = attrs.get("person")
+        if person is None and "person" not in attrs and self.instance:
+            person = self.instance.person
+
+        building = attrs.get("building")
+        if building is None and "building" not in attrs and self.instance:
+            building = self.instance.building
+
+        if expense_type == "card_purchase" and not credit_card:
             raise serializers.ValidationError(
                 {"credit_card_id": "Compra no cartão requer um cartão de crédito."}
             )
 
-        if expense_type == "bank_loan" and not attrs.get("person"):
+        if expense_type == "bank_loan" and not person:
             raise serializers.ValidationError(
                 {"person_id": "Empréstimo bancário requer uma pessoa."}
             )
 
-        if expense_type in ("water_bill", "electricity_bill", "property_tax") and not attrs.get(
-            "building"
-        ):
+        if expense_type in ("water_bill", "electricity_bill", "property_tax") and not building:
             raise serializers.ValidationError(
                 {"building_id": "Conta de utilidade requer um prédio."}
             )
@@ -1206,6 +1230,17 @@ class PaymentProofSerializer(serializers.ModelSerializer):
             "rejection_reason",
             "created_at",
         ]
+
+    def validate_file(self, value: Any) -> Any:
+        max_size = 10 * 1024 * 1024  # 10MB
+        allowed_types = {"image/jpeg", "image/png", "application/pdf"}
+        if value.size > max_size:
+            msg = "Arquivo excede o tamanho máximo de 10MB."
+            raise serializers.ValidationError(msg)
+        if value.content_type not in allowed_types:
+            msg = "Tipo de arquivo não permitido. Use JPEG, PNG ou PDF."
+            raise serializers.ValidationError(msg)
+        return value
 
 
 class NotificationSerializer(serializers.ModelSerializer):

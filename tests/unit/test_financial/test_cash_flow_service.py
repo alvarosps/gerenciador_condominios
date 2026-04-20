@@ -11,7 +11,6 @@ from core.models import (
     Building,
     EmployeePayment,
     Expense,
-    ExpenseCategory,
     ExpenseInstallment,
     ExpenseType,
     FinancialSettings,
@@ -23,8 +22,8 @@ from core.models import (
     RentPayment,
     Tenant,
 )
-from core.services.cash_flow_service import CashFlowService, _next_month_start
-
+from core.services.cash_flow_service import CashFlowService
+from core.services.date_calculator import DateCalculatorService
 
 # =============================================================================
 # _next_month_start helper
@@ -34,13 +33,13 @@ from core.services.cash_flow_service import CashFlowService, _next_month_start
 @pytest.mark.unit
 class TestNextMonthStart:
     def test_mid_year(self) -> None:
-        assert _next_month_start(2026, 3) == date(2026, 4, 1)
+        assert DateCalculatorService.next_month_start(2026, 3) == date(2026, 4, 1)
 
     def test_december_wraps_to_january(self) -> None:
-        assert _next_month_start(2026, 12) == date(2027, 1, 1)
+        assert DateCalculatorService.next_month_start(2026, 12) == date(2027, 1, 1)
 
     def test_november(self) -> None:
-        assert _next_month_start(2026, 11) == date(2026, 12, 1)
+        assert DateCalculatorService.next_month_start(2026, 11) == date(2026, 12, 1)
 
 
 # =============================================================================
@@ -121,16 +120,24 @@ class TestGetMonthlyIncome:
     def test_excludes_owner_apartment(self, building: Building) -> None:
         owner = Person.objects.create(name="Owner", relationship="Dono")
         owned_apt = Apartment.objects.create(
-            building=building, number=202, rental_value=Decimal("2000.00"),
-            max_tenants=1, owner=owner
+            building=building,
+            number=202,
+            rental_value=Decimal("2000.00"),
+            max_tenants=1,
+            owner=owner,
         )
         t = Tenant.objects.create(
-            name="Owner Tenant", cpf_cnpj="11144477735", phone="11912345678",
-            marital_status="Solteiro(a)", profession="Dev"
+            name="Owner Tenant",
+            cpf_cnpj="11144477735",
+            phone="11912345678",
+            marital_status="Solteiro(a)",
+            profession="Dev",
         )
         Lease.objects.create(
-            apartment=owned_apt, responsible_tenant=t,
-            start_date=date(2025, 1, 1), validity_months=12,
+            apartment=owned_apt,
+            responsible_tenant=t,
+            start_date=date(2025, 1, 1),
+            validity_months=12,
             rental_value=Decimal("2000.00"),
         )
         result = CashFlowService.get_monthly_income(2026, 3)
@@ -195,10 +202,17 @@ class TestGetMonthlyExpenses:
     def test_returns_all_expense_keys(self) -> None:
         result = CashFlowService.get_monthly_expenses(2026, 3)
         expected_keys = [
-            "owner_repayments", "person_stipends", "card_installments",
-            "loan_installments", "utility_bills", "debt_installments",
-            "property_tax", "employee_salary", "fixed_expenses",
-            "one_time_expenses", "total",
+            "owner_repayments",
+            "person_stipends",
+            "card_installments",
+            "loan_installments",
+            "utility_bills",
+            "debt_installments",
+            "property_tax",
+            "employee_salary",
+            "fixed_expenses",
+            "one_time_expenses",
+            "total",
         ]
         for key in expected_keys:
             assert key in result
@@ -207,8 +221,12 @@ class TestGetMonthlyExpenses:
         from core.models import CreditCard
 
         cc = CreditCard.objects.create(
-            person=person, nickname="CF Card", last_four_digits="9999",
-            closing_day=5, due_day=12, is_active=True
+            person=person,
+            nickname="CF Card",
+            last_four_digits="9999",
+            closing_day=5,
+            due_day=12,
+            is_active=True,
         )
         expense = Expense.objects.create(
             description="Card Expense CF",
@@ -221,8 +239,11 @@ class TestGetMonthlyExpenses:
             total_installments=3,
         )
         ExpenseInstallment.objects.create(
-            expense=expense, installment_number=2, total_installments=3,
-            amount=Decimal("100.00"), due_date=date(2026, 3, 15)
+            expense=expense,
+            installment_number=2,
+            total_installments=3,
+            amount=Decimal("100.00"),
+            due_date=date(2026, 3, 15),
         )
         result = CashFlowService.get_monthly_expenses(2026, 3)
         assert result["card_installments"] >= Decimal("100.00")
@@ -264,8 +285,12 @@ class TestGetMonthlyExpenses:
         from core.models import CreditCard
 
         cc = CreditCard.objects.create(
-            person=person, nickname="Offset Card", last_four_digits="8888",
-            closing_day=5, due_day=12, is_active=True
+            person=person,
+            nickname="Offset Card",
+            last_four_digits="8888",
+            closing_day=5,
+            due_day=12,
+            is_active=True,
         )
         expense = Expense.objects.create(
             description="Offset Expense CF",
@@ -279,8 +304,11 @@ class TestGetMonthlyExpenses:
             is_offset=True,
         )
         ExpenseInstallment.objects.create(
-            expense=expense, installment_number=1, total_installments=1,
-            amount=Decimal("200.00"), due_date=date(2026, 3, 15)
+            expense=expense,
+            installment_number=1,
+            total_installments=1,
+            amount=Decimal("200.00"),
+            due_date=date(2026, 3, 15),
         )
         result_before = CashFlowService.get_monthly_expenses(2026, 3)
         # The offset installment should not appear in card_installments
@@ -302,16 +330,24 @@ class TestGetMonthlyExpenses:
     def test_owner_repayments_counted(self, building: Building) -> None:
         owner = Person.objects.create(name="Owner CF", relationship="Dono")
         apt = Apartment.objects.create(
-            building=building, number=303, rental_value=Decimal("1800.00"),
-            max_tenants=1, owner=owner
+            building=building,
+            number=303,
+            rental_value=Decimal("1800.00"),
+            max_tenants=1,
+            owner=owner,
         )
         t = Tenant.objects.create(
-            name="Owner T", cpf_cnpj="12345678909", phone="11999888777",
-            marital_status="Solteiro(a)", profession="Dev"
+            name="Owner T",
+            cpf_cnpj="12345678909",
+            phone="11999888777",
+            marital_status="Solteiro(a)",
+            profession="Dev",
         )
         Lease.objects.create(
-            apartment=apt, responsible_tenant=t,
-            start_date=date(2025, 1, 1), validity_months=12,
+            apartment=apt,
+            responsible_tenant=t,
+            start_date=date(2025, 1, 1),
+            validity_months=12,
             rental_value=Decimal("1800.00"),
         )
         result = CashFlowService.get_monthly_expenses(2026, 3)
@@ -418,8 +454,12 @@ class TestGetPersonSummary:
         from core.models import CreditCard
 
         cc = CreditCard.objects.create(
-            person=person, nickname="Summary Card", last_four_digits="7777",
-            closing_day=5, due_day=12, is_active=True
+            person=person,
+            nickname="Summary Card",
+            last_four_digits="7777",
+            closing_day=5,
+            due_day=12,
+            is_active=True,
         )
         expense = Expense.objects.create(
             description="Card Summary",
@@ -432,8 +472,11 @@ class TestGetPersonSummary:
             total_installments=3,
         )
         ExpenseInstallment.objects.create(
-            expense=expense, installment_number=2, total_installments=3,
-            amount=Decimal("200.00"), due_date=date(2026, 3, 12)
+            expense=expense,
+            installment_number=2,
+            total_installments=3,
+            amount=Decimal("200.00"),
+            due_date=date(2026, 3, 12),
         )
         result = CashFlowService.get_person_summary(person.pk, 2026, 3)
         assert result["card_total"] >= Decimal("200.00")
@@ -442,8 +485,12 @@ class TestGetPersonSummary:
         from core.models import CreditCard
 
         cc = CreditCard.objects.create(
-            person=person, nickname="Net Card", last_four_digits="6666",
-            closing_day=5, due_day=12, is_active=True
+            person=person,
+            nickname="Net Card",
+            last_four_digits="6666",
+            closing_day=5,
+            due_day=12,
+            is_active=True,
         )
         expense = Expense.objects.create(
             description="Net Test",
@@ -456,8 +503,11 @@ class TestGetPersonSummary:
             total_installments=1,
         )
         ExpenseInstallment.objects.create(
-            expense=expense, installment_number=1, total_installments=1,
-            amount=Decimal("300.00"), due_date=date(2026, 3, 12)
+            expense=expense,
+            installment_number=1,
+            total_installments=1,
+            amount=Decimal("300.00"),
+            due_date=date(2026, 3, 12),
         )
         result = CashFlowService.get_person_summary(person.pk, 2026, 3)
         # net_amount = income - expenses; person has no income, so should be negative
@@ -474,4 +524,10 @@ class TestGetPersonSummary:
             updated_by=admin_user,
         )
         result = CashFlowService.get_person_summary(person.pk, 2026, 3)
-        assert result["net_amount"] >= Decimal("500.00") - result["card_total"] - result["loan_total"] - result["fixed_total"]
+        assert (
+            result["net_amount"]
+            >= Decimal("500.00")
+            - result["card_total"]
+            - result["loan_total"]
+            - result["fixed_total"]
+        )

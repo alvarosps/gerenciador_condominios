@@ -5,14 +5,14 @@ from decimal import Decimal, InvalidOperation
 from typing import Any, cast
 
 from django.contrib.auth.models import User
-from django.core.exceptions import PermissionDenied, ValidationError
+from django.core.exceptions import ValidationError
 from django.db import DatabaseError, IntegrityError, OperationalError, connection
 from django.db.models import Count, DateField, Q, QuerySet
 from django.db.models.expressions import RawSQL
 from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 
@@ -32,8 +32,8 @@ from .serializers import (
     RentAdjustmentSerializer,
     TenantSerializer,
 )
-from .services import ContractService, DashboardService, FeeCalculatorService
-from .services.lease_service import terminate_lease, transfer_lease
+from .services import DashboardService, FeeCalculatorService
+from .services.lease_service import change_tenant_due_day, terminate_lease, transfer_lease
 from .services.rent_adjustment_service import RentAdjustmentService
 
 logger = logging.getLogger(__name__)
@@ -365,33 +365,17 @@ class LeaseViewSet(viewsets.ModelViewSet):
         lease = self.get_object()
 
         try:
-            # Delegate all business logic to ContractService
-            pdf_path = ContractService.generate_contract(lease)
+            from core.tasks import generate_contract_pdf
 
+            task = generate_contract_pdf.delay(lease.id)
             return Response(
-                {"message": "Contrato gerado com sucesso!", "pdf_path": pdf_path},
-                status=status.HTTP_200_OK,
-            )
-        except ValidationError as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        except PermissionDenied as e:
-            return Response({"error": str(e)}, status=status.HTTP_403_FORBIDDEN)
-        except FileNotFoundError:
-            logger.exception("Template not found during contract generation")
-            return Response(
-                {"error": "Template de contrato não encontrado"},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-        except (DatabaseError, IntegrityError):
-            logger.exception("Database error during contract generation")
-            return Response(
-                {"error": "Erro ao salvar dados do contrato"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                {"task_id": task.id, "status": "processing"},
+                status=status.HTTP_202_ACCEPTED,
             )
         except Exception:
-            logger.exception("Unexpected error during contract generation")
+            logger.exception("Failed to dispatch contract generation task")
             return Response(
-                {"error": "Erro interno ao gerar contrato"},
+                {"error": "Falha ao iniciar geração do contrato."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
@@ -452,9 +436,7 @@ class LeaseViewSet(viewsets.ModelViewSet):
 
             # Update the due date on the tenant (source of truth)
             old_due_day = lease.responsible_tenant.due_day
-            tenant = lease.responsible_tenant
-            tenant.due_day = new_due_day
-            tenant.save(update_fields=["due_day"])
+            change_tenant_due_day(lease.responsible_tenant, new_due_day)
 
             return Response(
                 {
@@ -490,26 +472,16 @@ class LeaseViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-    @action(detail=True, methods=["post"], url_path="terminate")
+    @action(detail=True, methods=["post"], url_path="terminate", permission_classes=[IsAdminUser])
     def terminate(self, request: Request, pk: int | None = None) -> Response:
         """Terminate a lease contract."""
-        if not request.user.is_staff:
-            return Response(
-                {"detail": "Apenas administradores podem encerrar contratos."},
-                status=status.HTTP_403_FORBIDDEN,
-            )
         lease = self.get_object()
         terminate_lease(lease.id, request.user)
         return Response({"detail": "Contrato encerrado com sucesso."}, status=status.HTTP_200_OK)
 
-    @action(detail=True, methods=["post"], url_path="transfer")
+    @action(detail=True, methods=["post"], url_path="transfer", permission_classes=[IsAdminUser])
     def transfer(self, request: Request, pk: int | None = None) -> Response:
         """Transfer a lease to a new apartment."""
-        if not request.user.is_staff:
-            return Response(
-                {"detail": "Apenas administradores podem transferir contratos."},
-                status=status.HTTP_403_FORBIDDEN,
-            )
         lease = self.get_object()
         try:
             new_lease = transfer_lease(lease.id, request.data.copy(), request.user)
@@ -631,9 +603,6 @@ class DashboardViewSet(viewsets.ViewSet):
                 "revenue_per_apartment": "1000.00"
             }
         """
-        # Activate any pending rent adjustments whose month has arrived
-        RentAdjustmentService.activate_pending_adjustments()
-
         summary = DashboardService.get_financial_summary()
         return Response(summary, status=status.HTTP_200_OK)
 
@@ -806,3 +775,35 @@ class DashboardViewSet(viewsets.ViewSet):
             data,
             status=status.HTTP_200_OK,
         )
+
+
+class RentAdjustmentViewSet(viewsets.ViewSet):
+    """ViewSet for rent adjustment operations."""
+
+    permission_classes = [IsAdminUser]
+
+    @action(detail=False, methods=["post"], url_path="activate")
+    def activate_pending(self, request: Request) -> Response:
+        """
+        Activate all pending rent adjustments whose month has arrived.
+
+        POST /api/rent-adjustments/activate/
+        """
+        result = RentAdjustmentService.activate_pending_adjustments()
+        return Response(result, status=status.HTTP_200_OK)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def task_status(request: Request, task_id: str) -> Response:
+    """Check the status of an async task (e.g., PDF generation)."""
+    from celery.result import AsyncResult
+
+    result = AsyncResult(task_id)
+    data: dict[str, Any] = {"task_id": task_id, "status": result.status}
+    if result.ready():
+        if result.successful():
+            data["result"] = result.result
+        else:
+            data["error"] = str(result.result)
+    return Response(data)

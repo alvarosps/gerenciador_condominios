@@ -12,11 +12,10 @@ Mock policy: send_verification_code is mocked because it is an external boundary
 from datetime import timedelta
 from unittest.mock import patch
 
+import pytest
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIClient
-
-import pytest
 
 from core.models import Apartment, Building, Lease, Tenant, WhatsAppVerification
 
@@ -202,6 +201,32 @@ class TestVerifyCode:
         client = APIClient()
         response = client.post(VERIFY_URL, {"cpf_cnpj": _CPF}, format="json")
         assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    def test_verify_lockout_after_three_wrong_attempts(self, admin_user):
+        """After 3 wrong attempts the verification is locked and returns 429."""
+        _make_tenant(admin_user)
+        client = APIClient()
+
+        with patch("core.viewsets.auth_views.send_verification_code"):
+            client.post(REQUEST_URL, {"cpf_cnpj": _CPF}, format="json")
+
+        # Three wrong attempts exhaust the counter
+        for _ in range(3):
+            response = client.post(
+                VERIFY_URL,
+                {"cpf_cnpj": _CPF, "code": "000000"},
+                format="json",
+            )
+            assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+        # Fourth attempt (even with the right code) is blocked with 429
+        verification = WhatsAppVerification.objects.filter(cpf_cnpj=_CPF).latest("created_at")
+        response = client.post(
+            VERIFY_URL,
+            {"cpf_cnpj": _CPF, "code": verification.code},
+            format="json",
+        )
+        assert response.status_code == status.HTTP_429_TOO_MANY_REQUESTS
 
     def test_verify_second_login_reuses_existing_user(self, admin_user, django_user_model):
         """Second successful login reuses the existing linked user."""

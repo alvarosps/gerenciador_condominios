@@ -42,6 +42,7 @@ import { ProfessionalInfoStep } from './professional-info-step';
 import { DependentsStep } from './dependents-step';
 import { FurnitureStep } from './furniture-step';
 import { ReviewStep } from './review-step';
+import { handleError } from '@/lib/utils/error-handler';
 
 interface Props {
   open: boolean;
@@ -164,7 +165,7 @@ export function TenantFormWizard({ open, tenant, onClose }: Props) {
       setCurrentStep(0);
     } catch (error) {
       toast.error('Erro ao salvar inquilino');
-      console.error('Save error:', error);
+      handleError(error, 'TenantFormWizard.onSubmit');
     }
   };
 

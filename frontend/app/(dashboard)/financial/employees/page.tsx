@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useCallback } from 'react';
+import { useMemo, useCallback, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -250,9 +250,11 @@ export default function EmployeesPage() {
     ],
   );
 
-  if (error) {
-    toast.error('Erro ao carregar pagamentos de funcionários');
-  }
+  useEffect(() => {
+    if (error) {
+      toast.error('Erro ao carregar pagamentos de funcionários');
+    }
+  }, [error]);
 
   return (
     <div>

@@ -229,9 +229,6 @@ CACHE_MIDDLEWARE_SECONDS = 900
 # PERFORMANCE SETTINGS
 # ============================================================
 
-# Database query optimization
-CONN_MAX_AGE = 600
-
 # Template caching
 TEMPLATES[0]["OPTIONS"]["loaders"] = [
     (

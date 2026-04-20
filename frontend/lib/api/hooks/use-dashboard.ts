@@ -87,7 +87,6 @@ export function useDashboardFinancialSummary() {
       return data;
     },
     staleTime: 1000 * 60 * 5, // 5 minutes (backend caches this)
-    refetchInterval: 1000 * 60 * 5, // Auto-refetch every 5 minutes
   });
 }
 
@@ -103,7 +102,6 @@ export function useDashboardLeaseMetrics() {
       return data;
     },
     staleTime: 1000 * 60 * 5,
-    refetchInterval: 1000 * 60 * 5,
   });
 }
 
@@ -121,7 +119,6 @@ export function useDashboardBuildingStatistics() {
       return data;
     },
     staleTime: 1000 * 60 * 5,
-    refetchInterval: 1000 * 60 * 5,
   });
 }
 
@@ -138,7 +135,7 @@ export function useDashboardLatePayments() {
       );
       return data;
     },
-    refetchInterval: 1000 * 60 * 5, // Refetch every 5 minutes for real-time alerts
+    refetchInterval: 1000 * 60 * 10, // Late payments need periodic refresh
   });
 }
 

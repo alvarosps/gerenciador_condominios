@@ -17,6 +17,7 @@ import { useGenerateContract } from '@/lib/api/hooks/use-leases';
 import { type Lease } from '@/lib/schemas/lease.schema';
 import { formatCurrency } from '@/lib/utils/formatters';
 import { format, parseISO } from 'date-fns';
+import { handleError } from '@/lib/utils/error-handler';
 
 interface Props {
   open: boolean;
@@ -37,7 +38,7 @@ export function ContractGenerateModal({ open, lease, onClose }: Props) {
       toast.success(result.message || 'Contrato gerado com sucesso!');
     } catch (error) {
       toast.error('Erro ao gerar contrato');
-      console.error('Contract generation error:', error);
+      handleError(error, 'ContractGenerateModal.handleGenerate');
     }
   };
 

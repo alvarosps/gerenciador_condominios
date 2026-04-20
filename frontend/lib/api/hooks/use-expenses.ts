@@ -34,7 +34,7 @@ export function useExpenses(filters?: ExpenseFilters) {
 
 export function useExpense(id: number | null) {
   return useQuery({
-    queryKey: id ? queryKeys.expenses.detail(id) : queryKeys.expenses.all,
+    queryKey: queryKeys.expenses.detail(id ?? 0),
     queryFn: async () => {
       if (!id) throw new Error('Expense ID is required');
       const { data } = await apiClient.get<Expense>(`/expenses/${id}/`);

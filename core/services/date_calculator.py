@@ -12,6 +12,8 @@ import logging
 from datetime import date, timedelta
 from typing import Any
 
+DECEMBER = 12
+
 from dateutil.relativedelta import relativedelta
 from django.utils import timezone
 
@@ -250,3 +252,10 @@ class DateCalculatorService:
                 dates["final_date"]
             ),
         }
+
+    @staticmethod
+    def next_month_start(year: int, month: int) -> date:
+        """Return the first day of the next month."""
+        if month == DECEMBER:
+            return date(year + 1, 1, 1)
+        return date(year, month + 1, 1)
