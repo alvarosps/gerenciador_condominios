@@ -493,3 +493,11 @@ TWILIO_WHATSAPP_FROM = config("TWILIO_WHATSAPP_FROM", default="")
 TWILIO_TEMPLATE_VERIFICATION = config("TWILIO_TEMPLATE_VERIFICATION", default="")
 TWILIO_TEMPLATE_RENT_ADJUSTMENT = config("TWILIO_TEMPLATE_RENT_ADJUSTMENT", default="")
 TWILIO_TEMPLATE_GENERIC = config("TWILIO_TEMPLATE_GENERIC", default="")
+
+# Celery Configuration
+CELERY_BROKER_URL = config("CELERY_BROKER_URL", default=None)
+# If no broker is provided (like in basic Render deployments), run tasks synchronously
+if CELERY_BROKER_URL:
+    CELERY_TASK_ALWAYS_EAGER = False
+else:
+    CELERY_TASK_ALWAYS_EAGER = True
