@@ -46,11 +46,15 @@ export const useAuthStore = create<AuthState>()(
           user,
         }),
 
-      clearAuth: () =>
+      clearAuth: () => {
+        if (typeof document !== 'undefined') {
+          document.cookie = 'is_authenticated=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+        }
         set({
           user: null,
           isAuthenticated: false,
-        }),
+        });
+      },
     }),
     {
       name: 'auth-storage',
