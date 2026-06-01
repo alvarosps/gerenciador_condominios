@@ -284,11 +284,14 @@ export function LeaseFormModal({ open, lease, onClose }: Props) {
       let residentDependentId = values.resident_dependent_id ?? null;
 
       if (values.number_of_tenants === 2 && showNewDependentForm) {
-        if (!newDependentForm.name || !newDependentForm.phone) {
-          toast.error('Preencha nome e telefone do dependente');
+        if (newDependentForm.name && newDependentForm.phone) {
+          residentDependentId = await createDependentAndGetId(values.responsible_tenant_id);
+        } else if (newDependentForm.name || newDependentForm.phone || newDependentForm.cpf_cnpj) {
+          toast.error('Preencha nome e telefone do dependente, ou deixe tudo em branco para informar depois');
           return;
+        } else {
+          residentDependentId = null;
         }
-        residentDependentId = await createDependentAndGetId(values.responsible_tenant_id);
       }
 
       const payload = {
