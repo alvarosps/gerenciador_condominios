@@ -17,7 +17,22 @@ export const apiClient = axios.create({
  * Response interceptor - Handle 401 errors by refreshing the HttpOnly cookie token
  */
 apiClient.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // Detect Django REST Framework paginated response
+    const data = response.data;
+    if (
+      data &&
+      typeof data === 'object' &&
+      !Array.isArray(data) &&
+      'results' in data &&
+      Array.isArray(data.results) &&
+      'count' in data
+    ) {
+      // Unwrap the results array so the rest of the application gets what it expects
+      response.data = data.results;
+    }
+    return response;
+  },
   async (error: AxiosError & { config?: InternalAxiosRequestConfig & { _retry?: boolean } }) => {
     const originalRequest = error.config;
 
