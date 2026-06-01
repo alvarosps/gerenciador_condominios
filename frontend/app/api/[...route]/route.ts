@@ -1,7 +1,7 @@
-import { NextRequest } from 'next/server';
+import type { NextRequest } from 'next/server';
 
 async function handleProxy(req: NextRequest) {
-  const backendUrl = process.env.BACKEND_API_URL || 'http://localhost:8008/api';
+  const backendUrl = process.env.BACKEND_API_URL ?? 'http://localhost:8008/api';
   
   // Extract path and search params
   const path = req.nextUrl.pathname.replace('/api/', '');
@@ -47,9 +47,10 @@ async function handleProxy(req: NextRequest) {
       status: response.status,
       headers: responseHeaders,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('API Proxy Error:', error);
-    return new Response(JSON.stringify({ error: 'Proxy Error', details: error.message }), {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    return new Response(JSON.stringify({ error: 'Proxy Error', details: errorMessage }), {
       status: 500,
       headers: {
         'Content-Type': 'application/json',
