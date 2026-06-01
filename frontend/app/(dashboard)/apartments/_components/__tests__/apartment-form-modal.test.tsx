@@ -103,7 +103,7 @@ describe('ApartmentFormModal', () => {
     expect(screen.getByRole('button', { name: /criar/i })).toBeInTheDocument();
   });
 
-  it('calls onClose when cancel button is clicked', async () => {
+  it('calls onClose when cancel button is clicked', () => {
     const onClose = vi.fn();
     const { getByRole } = renderWithProviders(
       <ApartmentFormModal open={true} onClose={onClose} />,
