@@ -28,11 +28,12 @@ pdf.ln(10)
 pdf.set_font("Helvetica", size=12)
 
 # Content
-text = """À(o) Locatária(o) da Kitnet 205, Prédio 836
+text = """À(o) Locatário(a) Pedro Machado Toledo,
+Kitnet 205, Prédio 836
 
 Assunto: Notificação de Reajuste Anual de Aluguel
 
-Prezado(a) Inquilino(a),
+Prezado(a) Pedro Machado Toledo,
 
 Servimo-nos da presente para notificar formalmente que, de acordo com as cláusulas do contrato de locação e as normas legais vigentes, o valor do seu aluguel sofrerá o reajuste anual a partir do mês atual.
 
@@ -50,15 +51,10 @@ O reajuste anual pelo IPCA é um procedimento padrão, previsto na Lei do Inquil
 
 O novo valor de R$ 975,00 (novecentos e setenta e cinco reais) já deverá ser considerado para o pagamento do aluguel com vencimento agora no mês de Junho/2026.
 
-Caso os boletos já tenham sido emitidos ou programados com o valor antigo, enviaremos a via atualizada para o devido pagamento, ou a diferença poderá ser ajustada conforme orientação da administração.
-
 Ficamos à inteira disposição para eventuais dúvidas ou esclarecimentos adicionais.
 
 Atenciosamente,
 
-
-
-___________________________________________________
 A Administração / Locador
 Data: 01 de Junho de 2026
 """
