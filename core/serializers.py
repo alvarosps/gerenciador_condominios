@@ -428,19 +428,6 @@ class LeaseSerializer(serializers.ModelSerializer):
         if number_of_tenants == _DOUBLE_OCCUPANCY:
             resident_dependent = attrs.get("resident_dependent")
 
-            # For update: if number_of_tenants is not changing, resident_dependent
-            # is already set on the instance — no need to re-supply it.
-            already_set = (
-                self.instance is not None
-                and self.instance.number_of_tenants == _DOUBLE_OCCUPANCY
-                and "number_of_tenants" not in attrs
-            )
-
-            if resident_dependent is None and not already_set:
-                raise serializers.ValidationError(
-                    {"resident_dependent_id": "Obrigatório quando number_of_tenants é 2."}
-                )
-
             if resident_dependent is not None:
                 responsible_tenant = attrs.get(
                     "responsible_tenant",

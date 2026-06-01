@@ -254,11 +254,14 @@ export function TenantLeaseModal({
       let residentDependentId = values.resident_dependent_id ?? null;
 
       if (values.number_of_tenants === 2 && showNewDependentForm) {
-        if (!newDependentForm.name || !newDependentForm.phone) {
-          toast.error('Preencha nome e telefone do dependente');
+        if (newDependentForm.name && newDependentForm.phone) {
+          residentDependentId = await createDependentAndGetId(tenantId);
+        } else if (newDependentForm.name || newDependentForm.phone || newDependentForm.cpf_cnpj) {
+          toast.error('Preencha nome e telefone do dependente, ou deixe tudo em branco para informar depois');
           return;
+        } else {
+          residentDependentId = null;
         }
-        residentDependentId = await createDependentAndGetId(tenantId);
       }
 
       const payload = {
