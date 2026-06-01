@@ -5,6 +5,7 @@ const nextConfig = {
   experimental: {
     optimizePackageImports: ['lucide-react'],
   },
+  skipTrailingSlashRedirect: true,
   async rewrites() {
     // Determine the destination URL: use BACKEND_URL or NEXT_PUBLIC_API_URL (without /api at the end if it has it, or handle it carefully)
     // To be safe, if we just use an env var like BACKEND_API_URL
