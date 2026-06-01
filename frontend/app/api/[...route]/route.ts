@@ -42,6 +42,7 @@ async function handleProxy(req: NextRequest) {
     // Remove headers that might confuse the client/proxy
     responseHeaders.delete('content-encoding');
     responseHeaders.delete('transfer-encoding');
+    responseHeaders.delete('content-length'); // fetch decompresses automatically, so original length is wrong
 
     return new Response(response.body, {
       status: response.status,
