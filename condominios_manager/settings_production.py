@@ -7,6 +7,7 @@ Use this by setting: DJANGO_SETTINGS_MODULE=condominios_manager.settings_product
 
 from datetime import timedelta
 
+# pyrefly: ignore [missing-import]
 import dj_database_url
 import sentry_sdk
 from decouple import config

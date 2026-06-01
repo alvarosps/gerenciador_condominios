@@ -19,16 +19,19 @@ export const apiClient = axios.create({
 apiClient.interceptors.response.use(
   (response) => {
     // Detect Django REST Framework paginated response
-    const data = response.data;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any
+    const data: any = response.data;
     if (
       data &&
       typeof data === 'object' &&
       !Array.isArray(data) &&
       'results' in data &&
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       Array.isArray(data.results) &&
       'count' in data
     ) {
       // Unwrap the results array so the rest of the application gets what it expects
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
       response.data = data.results;
     }
     return response;
