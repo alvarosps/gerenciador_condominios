@@ -234,6 +234,7 @@ CACHE_MIDDLEWARE_SECONDS = 900
 # ============================================================
 
 # Template caching
+TEMPLATES[0]["APP_DIRS"] = False
 TEMPLATES[0]["OPTIONS"]["loaders"] = [
     (
         "django.template.loaders.cached.Loader",
