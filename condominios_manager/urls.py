@@ -82,6 +82,12 @@ if settings.DEBUG:
         path("api/schema/redoc/", SpectacularRedocView.as_view(url_name="schema"), name="redoc"),
     ]
 
-# Serve media files (contracts) in development
-if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+from django.urls import re_path
+from django.views.static import serve
+
+# Serve media files (contracts) in both development and production
+# (Since we generate files dynamically, we need this to serve the PDFs)
+urlpatterns += [
+    re_path(r'^contracts/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT}),
+    re_path(r'^media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT}),
+]
