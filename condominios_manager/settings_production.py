@@ -7,6 +7,7 @@ Use this by setting: DJANGO_SETTINGS_MODULE=condominios_manager.settings_product
 
 from datetime import timedelta
 
+import dj_database_url
 import sentry_sdk
 from decouple import config
 from sentry_sdk.integrations.django import DjangoIntegration
@@ -99,8 +100,11 @@ if USE_S3:
 # DATABASE CONFIGURATION
 # ============================================================
 
-# Database connection pooling
-DATABASES["default"]["CONN_MAX_AGE"] = 600  # 10 minutes
+# Database connection pooling and parsing URL
+db_from_env = dj_database_url.config(conn_max_age=600, ssl_require=True)
+if db_from_env:
+    DATABASES["default"].update(db_from_env)
+
 DATABASES["default"]["OPTIONS"] = {
     "connect_timeout": 10,
     "options": "-c statement_timeout=30000",  # 30 seconds
