@@ -27,6 +27,7 @@ python-dotenv>=1.0.1,<2.0
 # Database
 # psycopg (v3) — native Python 3.14 support
 psycopg[binary]>=3.2.0,<4.0
+dj-database-url>=2.1.0,<3.0
 
 # Caching
 django-redis>=5.4.0,<7.0
