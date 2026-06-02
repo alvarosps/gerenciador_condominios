@@ -41,6 +41,8 @@ logger = logging.getLogger(__name__)
 
 MIN_MONTH = 1
 MAX_MONTH = 12
+MIN_YEAR = 2000
+MAX_YEAR = 2100
 
 
 @api_view(["GET"])
@@ -725,6 +727,12 @@ class DashboardViewSet(viewsets.ViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        if not MIN_YEAR <= year <= MAX_YEAR:
+            return Response(
+                {"error": "O ano deve estar entre 2000 e 2100."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         building_id_raw = request.query_params.get("building_id")
         try:
             building_id = int(building_id_raw) if building_id_raw is not None else None
@@ -758,6 +766,13 @@ class DashboardViewSet(viewsets.ViewSet):
         if not lease_id:
             return Response(
                 {"error": "lease_id é obrigatório."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            lease_id = int(lease_id)
+        except (TypeError, ValueError):
+            return Response(
+                {"error": "lease_id deve ser numérico."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 

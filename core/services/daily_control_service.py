@@ -339,7 +339,7 @@ def _collect_entries_by_day(
         entry = {
             "type": "rent",
             "description": f"Aluguel Apto {lease.apartment.number}/{lease.apartment.building.street_number}",
-            "amount": float(lease.rental_value),
+            "amount": float(RentScheduleService.effective_rental_value(lease, month_start)),
             "expected": True,
             "paid": payment is not None,
         }
@@ -653,7 +653,7 @@ def _get_expected_rent_total(month_start: date) -> Decimal:
     """Total expected rent income from collectible leases (single source of truth)."""
     total = Decimal("0.00")
     for lease in RentScheduleService.collectible_leases(month_start):
-        total += lease.rental_value
+        total += RentScheduleService.effective_rental_value(lease, month_start)
     return total
 
 

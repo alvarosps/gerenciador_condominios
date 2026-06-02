@@ -90,6 +90,17 @@ class TestDailyBreakdown:
         assert rent_entries[0]["amount"] == 1200.0
         assert rent_entries[0]["paid"] is False
 
+    def test_rent_entry_uses_effective_value_during_pending_increase(self, lease: Lease) -> None:
+        """Daily-control rent amount honors a pending increase (effective value), consistent
+        with the rent calendar and the recorded RentPayment."""
+        lease.pending_rental_value = Decimal("1500.00")
+        lease.pending_rental_value_date = date(2026, 3, 1)
+        lease.save(update_fields=["pending_rental_value", "pending_rental_value_date"])
+        result = DailyControlService.get_daily_breakdown(2026, 3)
+        rent_entries = [e for day in result for e in day["entries"] if e["type"] == "rent"]
+        assert len(rent_entries) == 1
+        assert rent_entries[0]["amount"] == 1500.0
+
     def test_recurring_income_on_correct_day(self) -> None:
         """Recurring income should appear on its income_date day of month."""
         make_income(
