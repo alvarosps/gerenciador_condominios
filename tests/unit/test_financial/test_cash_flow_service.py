@@ -172,6 +172,33 @@ class TestGetMonthlyIncome:
         result = CashFlowService.get_monthly_income(2026, 3)
         assert len(result["rent_details"]) == 0
 
+    def test_excludes_lease_whose_window_ended_even_if_is_rented(self, building: Building) -> None:
+        """Date-aware single source of truth: a lease whose validity window ended before the
+        queried month is excluded from income even though apartment.is_rented is still True."""
+        apt = Apartment.objects.create(
+            building=building, number=303, rental_value=Decimal("1000.00"), max_tenants=1
+        )
+        t = Tenant.objects.create(
+            name="Contrato Encerrado",
+            cpf_cnpj="11144477735",
+            phone="11900000003",
+            marital_status="Solteiro(a)",
+            profession="Dev",
+            due_day=10,
+        )
+        # Window 2024-01 .. 2025-01 does not cover March 2026; the lease creation still
+        # flips apartment.is_rented to True via signal.
+        Lease.objects.create(
+            apartment=apt,
+            responsible_tenant=t,
+            start_date=date(2024, 1, 1),
+            validity_months=12,
+            rental_value=Decimal("1000.00"),
+        )
+        result = CashFlowService.get_monthly_income(2026, 3)
+        apt_ids = [d["apartment_id"] for d in result["rent_details"]]
+        assert apt.pk not in apt_ids
+
     def test_includes_recurring_income(self) -> None:
         Income.objects.create(
             description="Aposentadoria",

@@ -53,13 +53,9 @@ class CashFlowService:
         """
         reference_date = date(year, month, 1)
 
-        # Active leases excluding owner apartments, prepaid, and salary offset
-        leases = (
-            Lease.objects.filter(apartment__is_rented=True)
-            .filter(apartment__owner__isnull=True)
-            .exclude(is_salary_offset=True)
-            .select_related("apartment", "apartment__building", "responsible_tenant")
-        )
+        # Collectible condo rent for the month — single source of truth (date-aware window
+        # + pay-to-live prepaid boundary; excludes owner pass-through and salary offset).
+        leases = RentScheduleService.collectible_leases(reference_date)
 
         # Get rent payments for this month
         rent_payments = {
@@ -73,9 +69,6 @@ class CashFlowService:
         rent_details = []
 
         for lease in leases:
-            # Pay-to-live: skip months already covered by prepayment (boundary-correct).
-            if RentScheduleService.is_prepaid_for_month(lease, year, month):
-                continue
             rent_income += lease.rental_value
             payment = rent_payments.get(lease.id)
             rent_details.append(
@@ -651,17 +644,9 @@ class CashFlowService:
     @staticmethod
     def _get_projected_income(year: int, month: int) -> Decimal:
         """Calculate projected income for a future month."""
-        # Active leases (same exclusions as get_monthly_income, but no payment check)
+        # Collectible condo rent (single source of truth — same set as get_monthly_income).
         rent_income = Decimal("0.00")
-        leases = (
-            Lease.objects.filter(apartment__is_rented=True)
-            .filter(apartment__owner__isnull=True)
-            .exclude(is_salary_offset=True)
-            .select_related("responsible_tenant")
-        )
-        for lease in leases:
-            if RentScheduleService.is_prepaid_for_month(lease, year, month):
-                continue
+        for lease in RentScheduleService.collectible_leases(date(year, month, 1)):
             rent_income += lease.rental_value
 
         # Recurring extra income
