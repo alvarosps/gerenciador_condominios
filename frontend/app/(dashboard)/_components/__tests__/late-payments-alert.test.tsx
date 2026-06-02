@@ -89,7 +89,7 @@ describe('LatePaymentsAlert', () => {
 
   it('renders nothing while loading', () => {
     vi.spyOn(dashboardHooks, 'useDashboardLatePayments').mockReturnValue(
-      makeQueryResult({ isLoading: true, isPending: true, fetchStatus: 'fetching' }),
+      makeQueryResult({ isLoading: true, isPending: true, fetchStatus: 'fetching' })
     );
     vi.spyOn(rentCalendarHooks, 'useToggleRentPayment').mockReturnValue(makeIdleToggle());
 
@@ -110,7 +110,7 @@ describe('LatePaymentsAlert', () => {
           average_late_days: 0,
           late_leases: [],
         },
-      }),
+      })
     );
     vi.spyOn(rentCalendarHooks, 'useToggleRentPayment').mockReturnValue(makeIdleToggle());
 
@@ -130,7 +130,7 @@ describe('LatePaymentsAlert', () => {
         isFetched: true,
         status: 'success',
         data: lateLeasesData,
-      }),
+      })
     );
     vi.spyOn(rentCalendarHooks, 'useToggleRentPayment').mockReturnValue(makeIdleToggle());
 
@@ -150,11 +150,9 @@ describe('LatePaymentsAlert', () => {
         isFetched: true,
         status: 'success',
         data: lateLeasesData,
-      }),
+      })
     );
-    vi.spyOn(rentCalendarHooks, 'useToggleRentPayment').mockReturnValue(
-      makeIdleToggle({ mutate }),
-    );
+    vi.spyOn(rentCalendarHooks, 'useToggleRentPayment').mockReturnValue(makeIdleToggle({ mutate }));
 
     const user = userEvent.setup();
     renderWithProviders(<LatePaymentsAlert />);
@@ -178,7 +176,7 @@ describe('LatePaymentsAlert', () => {
         isSuccess: true,
         status: 'success',
         data: undefined,
-      }),
+      })
     );
     vi.spyOn(rentCalendarHooks, 'useToggleRentPayment').mockReturnValue(makeIdleToggle());
 
