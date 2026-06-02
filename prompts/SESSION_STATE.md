@@ -18,7 +18,7 @@
 |---|--------|--------|---------|
 | 21 | Backend: `RentScheduleService` + refactor DRY do `DailyControlService` | concluída | `prompts/21-backend-rent-schedule-service.md` |
 | 22 | Backend: endpoints `rent_calendar` + `toggle_rent_payment` | concluída | `prompts/22-backend-rent-calendar-endpoints.md` |
-| 23 | Frontend: hooks `use-rent-calendar` (optimistic) + query-keys + MSW | pendente | `prompts/23-frontend-rent-calendar-hooks.md` |
+| 23 | Frontend: hooks `use-rent-calendar` (optimistic) + query-keys + MSW | concluída | `prompts/23-frontend-rent-calendar-hooks.md` |
 | 24 | Frontend: UI (5 componentes, grid date-fns) + montagem no dashboard | pendente | `prompts/24-frontend-rent-calendar-ui.md` |
 | 25 | Refator `late-payments-alert` → toggle unificado + remover `mark_rent_paid` + audit | pendente | `prompts/25-refactor-consumer-and-audit.md` |
 
@@ -46,6 +46,20 @@
 > - **Mecanismo de sinalização de erro do service (para a Sessão 25)**: `RentScheduleService.toggle_payment` **NÃO lança exceção** — retorna sempre um `dict {status, is_paid, message}`. Recusa ⇒ `status == "error"` (mês finalizado / lease não-cobrável ou inexistente / pago+dia-passou). A view mapeia `status == "error"` → **HTTP 400** `{"error": result["message"]}` (mensagens em PT); sucesso → **HTTP 200** com o dict completo. Não há caso 404 dedicado: lease inexistente cai em "não é cobrável" → 400 (conforme o service sinaliza). `get_month_schedule` apenas retorna `dict` (sem erros de negócio).
 > - **Throttling em testes**: DRF liga `SimpleRateThrottle.timer = time.time` como atributo de classe; sob `freezegun` é chamado como método ligado (`fake_time(self)`) e quebra. Fixture autouse `_disable_throttling` em `test_rent_calendar_api.py` desabilita throttle (boundary de infra externa) via `override_settings(REST_FRAMEWORK=...)` preservando auth. Mesma incompatibilidade afeta tests pré-existentes que combinam `@freeze_time` + API client (ex.: `tests/e2e/test_financial_lifecycle.py`) — fora do escopo desta sessão.
 > - Erros pré-existentes (não relacionados) ao rodar lint/type em `core/views.py`: pyright/mypy apontam `generate_contract_pdf.delay(...)` (celery `shared_task` sem stubs) na action `generate_contract` — presentes no HEAD antes desta sessão; o código novo (`rent_calendar`/`toggle_rent_payment`) é 100% limpo.
+
+### Sessão 23 — Arquivos Criados
+- `frontend/lib/api/hooks/use-rent-calendar.ts` — `useRentCalendar(year, month, buildingId?)` (`useQuery`, `staleTime` 30s, repassa `building_id` só quando definido) + `useToggleRentPayment()` (`useMutation` optimistic v5) + tipos TS hand-written (`RentCalendar`, `RentCalendarDay`, `RentCalendarItem`, `RentCalendarStats`, `ToggleRentPaymentRequest`, `ToggleRentPaymentResponse`) exportados via `export type`. Função pura `flipPaidByLease` (flip imutável reutilizado no optimistic update).
+- `frontend/lib/api/hooks/__tests__/use-rent-calendar.test.tsx` — 6 testes Vitest+MSW (fetch/shape com os 9 campos de stats; `building_id` repassado na query string; optimistic flip observável; rollback no erro discriminante; invalidação no settle das 3 keys).
+- `frontend/tests/mocks/data/rent-calendar.ts` — `createMockRentCalendar` + `createMockRentCalendarItem` (importam os tipos do hook; **não** entram no barrel `data/index.ts`).
+
+### Sessão 23 — Arquivos Modificados
+- `frontend/lib/api/query-keys.ts` — grupo `rentCalendar` (`all: ['rent-calendar']` + `month(year, month, buildingId?)` com `buildingId ?? null` para estabilizar a key).
+- `frontend/tests/mocks/handlers.ts` — `rentCalendarHandlers` (`GET /dashboard/rent_calendar/` lendo `year`/`month`/`building_id`; `POST /dashboard/toggle_rent_payment/` com `await delay(100)` e mensagem PT), importando `createMockRentCalendar` direto de `./data/rent-calendar`; incluído `...rentCalendarHandlers` no array `handlers`.
+
+> **Nota Sessão 23**:
+> - Optimistic update v5 sobre **toda** a área `rentCalendar.all` via `getQueriesData`/`setQueryData` — a mutation **não** conhece year/month/buildingId; `onMutate` cancela + snapshota + faz flip imutável (`flipPaidByLease`), `onError` restaura o snapshot, `onSettled` invalida `rentCalendar` + `dashboard.latePaymentSummary` + `dashboard.financialSummary`.
+> - **Teste de flip determinístico sem mock de internals**: `createTestQueryClient` tem `gcTime:0`, então dado semeado via `setQueryData` sem observador é coletado num tick. Solução correta (exercita o caminho real query→cache→mutation): o handler GET popula o cache e um `useRentCalendar` montado mantém a entrada viva; o POST é sobrescrito com `delay(200)` para abrir a janela e o flip é asserido via `waitFor` lendo `queryClient.getQueryData(...)`. No teste de rollback, o refetch do `onSettled` é adiado (`delay`) e retorna `is_paid:true` (1º GET=false, GETs seguintes=true) — assim o `false` observado após o erro só pode vir do rollback, não do refetch; depois aguarda o refetch settlar para não deixar request pendente no teardown.
+> - `useMarkRentPaid` (`use-dashboard.ts`) e o endpoint `mark_rent_paid` permanecem **intactos** — removidos só na Sessão 25 (sem backward-compat shim; remoção deliberadamente adiada para manter todas as sessões verdes). Nenhuma UI nesta sessão. 6 testes passando; `type-check` e `lint` limpos.
 
 ---
 

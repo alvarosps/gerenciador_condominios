@@ -128,6 +128,11 @@ export const queryKeys = {
     latePaymentSummary: () => [...queryKeys.dashboard.all, 'late_payment_summary'] as const,
     tenantStatistics: () => [...queryKeys.dashboard.all, 'tenant_statistics'] as const,
   },
+  rentCalendar: {
+    all: ['rent-calendar'] as const,
+    month: (year: number, month: number, buildingId?: number) =>
+      [...queryKeys.rentCalendar.all, 'month', year, month, buildingId ?? null] as const,
+  },
   rentAdjustments: {
     all: ['rent-adjustments'] as const,
     byLease: (leaseId: number | null) => [...queryKeys.rentAdjustments.all, leaseId] as const,
