@@ -10,10 +10,8 @@ import {
 } from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  useDashboardLatePayments,
-  useMarkRentPaid,
-} from '@/lib/api/hooks/use-dashboard';
+import { useDashboardLatePayments } from '@/lib/api/hooks/use-dashboard';
+import { useToggleRentPayment } from '@/lib/api/hooks/use-rent-calendar';
 import { formatCurrency } from '@/lib/utils/formatters';
 import { handleError } from '@/lib/utils/error-handler';
 import Link from 'next/link';
@@ -25,9 +23,14 @@ function formatDate(dateStr: string | null): string {
   return `${day}/${month}/${year}`;
 }
 
+function currentReferenceMonth(): string {
+  const now = new Date();
+  return `${String(now.getFullYear())}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+}
+
 export function LatePaymentsAlert() {
   const { data, isLoading } = useDashboardLatePayments();
-  const markPaid = useMarkRentPaid();
+  const toggle = useToggleRentPayment();
 
   if (isLoading) return null;
 
@@ -46,14 +49,17 @@ export function LatePaymentsAlert() {
   const totalLateFees = parseFloat(data.total_late_fees) || 0;
 
   function handleMarkPaid(leaseId: number) {
-    markPaid.mutate(leaseId, {
-      onSuccess: (result) => {
-        toast.success(result.message);
+    toggle.mutate(
+      { lease_id: leaseId, reference_month: currentReferenceMonth() },
+      {
+        onSuccess: (result) => {
+          toast.success(result.message);
+        },
+        onError: (error) => {
+          handleError(error, 'Erro ao marcar como pago');
+        },
       },
-      onError: (error) => {
-        handleError(error, 'Erro ao marcar como pago');
-      },
-    });
+    );
   }
 
   return (
@@ -115,7 +121,7 @@ export function LatePaymentsAlert() {
                     variant="default"
                     size="sm"
                     onClick={() => handleMarkPaid(item.lease_id)}
-                    disabled={markPaid.isPending}
+                    disabled={toggle.isPending}
                   >
                     <Check className="mr-1 h-4 w-4" />
                     Pago
