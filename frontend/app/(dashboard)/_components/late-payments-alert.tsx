@@ -1,6 +1,6 @@
 'use client';
 
-import { AlertTriangle, CheckCircle2, Check, Eye } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Eye } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Accordion,
@@ -11,11 +11,8 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useDashboardLatePayments } from '@/lib/api/hooks/use-dashboard';
-import { useToggleRentPayment } from '@/lib/api/hooks/use-rent-calendar';
 import { formatCurrency } from '@/lib/utils/formatters';
-import { handleError } from '@/lib/utils/error-handler';
 import Link from 'next/link';
-import { toast } from 'sonner';
 
 function formatDate(dateStr: string | null): string {
   if (!dateStr) return 'Nenhum';
@@ -23,14 +20,8 @@ function formatDate(dateStr: string | null): string {
   return `${day}/${month}/${year}`;
 }
 
-function currentReferenceMonth(): string {
-  const now = new Date();
-  return `${String(now.getFullYear())}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
-}
-
 export function LatePaymentsAlert() {
   const { data, isLoading } = useDashboardLatePayments();
-  const toggle = useToggleRentPayment();
 
   if (isLoading) return null;
 
@@ -47,20 +38,6 @@ export function LatePaymentsAlert() {
   }
 
   const totalLateFees = parseFloat(data.total_late_fees) || 0;
-
-  function handleMarkPaid(leaseId: number) {
-    toggle.mutate(
-      { lease_id: leaseId, reference_month: currentReferenceMonth() },
-      {
-        onSuccess: (result) => {
-          toast.success(result.message);
-        },
-        onError: (error) => {
-          handleError(error, 'Erro ao marcar como pago');
-        },
-      }
-    );
-  }
 
   return (
     <Accordion type="single" collapsible>
@@ -81,6 +58,10 @@ export function LatePaymentsAlert() {
           </div>
         </AccordionTrigger>
         <AccordionContent className="px-6 pb-4">
+          <p className="text-muted-foreground mb-3 text-sm">
+            Para registrar pagamentos por mês, use o <strong>Controle de Aluguéis do Mês</strong> no
+            topo do dashboard (navegue até o mês em atraso e marque como pago).
+          </p>
           <div className="space-y-3">
             {data.late_leases.map((item) => (
               <div
@@ -115,15 +96,6 @@ export function LatePaymentsAlert() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button
-                    variant="default"
-                    size="sm"
-                    onClick={() => handleMarkPaid(item.lease_id)}
-                    disabled={toggle.isPending}
-                  >
-                    <Check className="mr-1 h-4 w-4" />
-                    Pago
-                  </Button>
                   <Link href="/leases">
                     <Button variant="ghost" size="sm">
                       <Eye className="mr-2 h-4 w-4" />

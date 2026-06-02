@@ -126,8 +126,13 @@ payment_date|null, is_overdue, day_passed, can_toggle, late_fee, late_days`.
 
 `_collect_entries_by_day` (rent, `daily_control_service.py:337-365`), `_get_expected_rent_total`
 (`:669-680`) e `_get_received_rent_total` (`:704-710`) passam a usar `RentScheduleService`
-(`collectible_leases` + `clamp_due_day` + `effective_rental_value`). Comportamento idêntico —
-os 16 testes de `tests/unit/test_financial/test_daily_control_service.py` devem permanecer verdes.
+(`collectible_leases` + `clamp_due_day` + `effective_rental_value`). A refatoração migra
+**intencionalmente** a seleção de aluguel para a fonte única **date-aware**: a porção de aluguel
+deixa de filtrar pelo booleano `apartment.is_rented` e passa a usar a janela `start_date..end_date`.
+Na maioria dos casos o resultado é idêntico; difere (corretamente) nos casos de borda `is_rented`
+vs janela — cobertos por `test_excludes_lease_window_outside_month_even_if_rented` e
+`test_includes_lease_covering_month_regardless_of_is_rented`. Os 16 testes de
+`tests/unit/test_financial/test_daily_control_service.py` permanecem verdes.
 
 ### 4.3 Endpoints — `DashboardViewSet` (`core/views.py:578`)
 
@@ -166,7 +171,7 @@ para otimização futura — YAGNI.)
 Servidor **sempre revalida** (defesa em profundidade); mensagens de erro em PT.
 
 ### 4.5 Stats — cálculo
-- `received_total` = Σ `amount_paid` de `RentPayment` cobráveis no mês.
+- `received_total` = Σ `amount_paid` de **todos** os `RentPayment` ativos do mês (sem filtro de cobrabilidade — definição canônica de "recebido"), opcionalmente filtrado por `building_id`. Assimetria **intencional** com `to_receive_total` (baseado em leases cobráveis).
 - `to_receive_total` = Σ valor efetivo dos leases cobráveis do mês **sem** `RentPayment`.
 - `expected_total` = received + to_receive.
 - `vacant_kitnets` = `Apartment.objects.filter(is_rented=False)` (default exclui deletados), filtrado por prédio se aplicável → `count` + Σ `rental_value`.

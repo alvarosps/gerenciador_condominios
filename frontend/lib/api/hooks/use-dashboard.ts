@@ -45,6 +45,7 @@ interface LateLeaseInfo {
   rental_value: string;
   due_day: number;
   late_days: number;
+  late_months: number;
   late_fee: string;
   last_payment_date: string | null;
 }

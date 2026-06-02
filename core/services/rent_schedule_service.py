@@ -22,7 +22,7 @@ from typing import Any
 
 from django.contrib.auth.models import User
 from django.db import transaction
-from django.db.models import QuerySet
+from django.db.models import Count, QuerySet, Sum
 from django.utils import timezone
 
 from core.models import Apartment, Lease, MonthSnapshot, RentPayment
@@ -62,12 +62,15 @@ class RentScheduleService:
 
         Returns ``rental_value`` unless a pending increase is in effect for the
         month — i.e. both ``pending_rental_value`` and ``pending_rental_value_date``
-        are set and ``reference_month >= pending_rental_value_date``.
+        are set and the month has reached the pending date. The comparison is
+        month-granular (``reference_month >= pending_rental_value_date`` clamped to
+        the first of its month) to match ``RentAdjustmentService.activate_pending_adjustments``,
+        so a mid-month pending date activates the increase for that whole month.
         """
         if (
             lease.pending_rental_value is not None
             and lease.pending_rental_value_date is not None
-            and reference_month >= lease.pending_rental_value_date
+            and reference_month >= lease.pending_rental_value_date.replace(day=1)
         ):
             return lease.pending_rental_value
         return lease.rental_value
@@ -193,7 +196,7 @@ class RentScheduleService:
         is_current_month = (year, month) == (today.year, today.month)
         is_current_or_past = (year, month) <= (today.year, today.month)
 
-        received_total = RentScheduleService.received_total(reference_month)
+        received_total = RentScheduleService.received_total(reference_month, building_id)
 
         leases = list(RentScheduleService.collectible_leases(reference_month, building_id))
         payments = RentScheduleService._active_payments_by_lease(reference_month)
@@ -238,16 +241,18 @@ class RentScheduleService:
         }
 
     @staticmethod
-    def received_total(reference_month: date) -> Decimal:
+    def received_total(reference_month: date, building_id: int | None = None) -> Decimal:
         """Canonical "rent received" for the month.
 
         Sum of ``amount_paid`` of all active RentPayments whose ``reference_month``
         is the first day of the month — WITHOUT pre-filtering by collectibility.
+        Honors the optional ``building_id`` so building-scoped stats stay coherent
+        with ``to_receive_total`` (which is already building-scoped).
         """
-        total = ZERO
-        for payment in RentPayment.objects.filter(reference_month=reference_month):
-            total += payment.amount_paid
-        return total
+        payments = RentPayment.objects.filter(reference_month=reference_month)
+        if building_id is not None:
+            payments = payments.filter(lease__apartment__building_id=building_id)
+        return payments.aggregate(total=Sum("amount_paid"))["total"] or ZERO
 
     @staticmethod
     def toggle_payment(lease_id: int, reference_month: date, user: User) -> dict[str, Any]:
@@ -280,6 +285,11 @@ class RentScheduleService:
                 .first()
             )
 
+            # Re-check finalization inside the locked block (defense against a
+            # concurrent month finalization between the pre-check and the mutation).
+            if RentScheduleService._is_month_finalized(reference_month):
+                return _error("O mês está finalizado e não pode ser alterado.", payment is not None)
+
             if payment is None:
                 amount = RentScheduleService.effective_rental_value(lease, reference_month)
                 RentPayment.objects.create(
@@ -303,7 +313,7 @@ class RentScheduleService:
                     is_paid=True,
                 )
 
-            payment.delete()
+            payment.delete(deleted_by=user)
             logger.info("Soft-deleted rent payment for lease %s (%s)", lease_id, reference_month)
             return {
                 "status": "ok",
@@ -375,12 +385,8 @@ class RentScheduleService:
         apartments = Apartment.objects.filter(is_rented=False)
         if building_id is not None:
             apartments = apartments.filter(building_id=building_id)
-        count = 0
-        total = ZERO
-        for apartment in apartments:
-            count += 1
-            total += apartment.rental_value
-        return count, total
+        agg = apartments.aggregate(count=Count("id"), total=Sum("rental_value"))
+        return agg["count"] or 0, agg["total"] or ZERO
 
 
 def _as_decimal(value: int | Decimal | str) -> Decimal:
