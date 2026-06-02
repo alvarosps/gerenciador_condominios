@@ -104,7 +104,7 @@ interface RentDayPanelProps {
   items: RentCalendarItem[];
   dayLabel: string;
   nextDueDate: string | null;
-  isPending: boolean;
+  pendingLeaseId: number | null;
   onToggle: (leaseId: number) => void;
   onGoToday: () => void;
   onGoNextDue: () => void;
@@ -114,7 +114,7 @@ export function RentDayPanel({
   items,
   dayLabel,
   nextDueDate,
-  isPending,
+  pendingLeaseId,
   onToggle,
   onGoToday,
   onGoNextDue,
@@ -152,7 +152,7 @@ export function RentDayPanel({
               <DayItemCard
                 key={item.lease_id}
                 item={item}
-                isPending={isPending}
+                isPending={pendingLeaseId === item.lease_id}
                 onToggle={onToggle}
               />
             ))}

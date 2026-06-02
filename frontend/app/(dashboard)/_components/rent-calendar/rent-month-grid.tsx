@@ -23,8 +23,19 @@ interface DayCellProps {
   onSelectDay: (day: number) => void;
 }
 
+function statusLabel(item: RentCalendarItem): string {
+  if (item.is_paid) return 'pago';
+  if (item.is_overdue) return 'em atraso';
+  return 'a vencer';
+}
+
 function DayCell({ day, items, isToday, isSelected, onSelectDay }: DayCellProps) {
-  const label = isToday ? `Dia ${String(day)} (hoje)` : `Dia ${String(day)}`;
+  const base = isToday ? `Dia ${String(day)} (hoje)` : `Dia ${String(day)}`;
+  // Announce tenant + status to screen readers so the grid does not rely on color alone.
+  const label =
+    items.length > 0
+      ? `${base}: ${items.map((i) => `${i.tenant_name} (${statusLabel(i)})`).join(', ')}`
+      : base;
 
   return (
     <button
@@ -52,6 +63,7 @@ function DayCell({ day, items, isToday, isSelected, onSelectDay }: DayCellProps)
           {items.map((item) => (
             <div
               key={item.lease_id}
+              title={`${item.tenant_name} — ${statusLabel(item)}`}
               className={cn('truncate rounded px-1 py-0.5 text-[11px] leading-none', chipClass(item))}
             >
               {item.tenant_name}

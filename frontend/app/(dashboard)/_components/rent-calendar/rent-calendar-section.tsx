@@ -57,6 +57,7 @@ export function RentCalendarSection() {
   const [period, setPeriod] = useState({ year: now.getFullYear(), month: now.getMonth() + 1 });
   const [pickedDay, setPickedDay] = useState<number | null>(null);
   const [buildingValue, setBuildingValue] = useState<string>(ALL_BUILDINGS);
+  const [pendingLeaseId, setPendingLeaseId] = useState<number | null>(null);
 
   const { year, month } = period;
   const buildingId = buildingValue === ALL_BUILDINGS ? undefined : Number(buildingValue);
@@ -75,6 +76,7 @@ export function RentCalendarSection() {
   );
 
   function handleToggle(leaseId: number) {
+    setPendingLeaseId(leaseId);
     toggleMutation.mutate(
       { lease_id: leaseId, reference_month: referenceMonth },
       {
@@ -83,6 +85,9 @@ export function RentCalendarSection() {
         },
         onError: (error) => {
           handleError(error, 'Erro ao atualizar pagamento');
+        },
+        onSettled: () => {
+          setPendingLeaseId(null);
         },
       },
     );
@@ -150,7 +155,7 @@ export function RentCalendarSection() {
             items={selectedItems}
             dayLabel={dayLabel(year, month, selectedDay)}
             nextDueDate={data.next_due_date}
-            isPending={toggleMutation.isPending}
+            pendingLeaseId={pendingLeaseId}
             onToggle={handleToggle}
             onGoToday={goToday}
             onGoNextDue={goNextDue}

@@ -546,15 +546,20 @@ const dashboardHandlers = [
     await delay(50);
     return HttpResponse.json({
       total_late_leases: 1,
-      total_late_fees: 75.0,
+      total_late_fees: '75.00',
+      average_late_days: 5,
       late_leases: [
         {
           lease_id: 1,
-          tenant_name: 'João Silva',
-          building: 'Building A',
           apartment_number: 101,
+          building_number: '836',
+          tenant_name: 'João Silva',
+          rental_value: '1200.00',
+          due_day: 5,
           late_days: 5,
-          late_fee: 75.0,
+          late_months: 1,
+          late_fee: '75.00',
+          last_payment_date: '2026-04-05',
         },
       ],
     });

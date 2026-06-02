@@ -24,7 +24,7 @@ function makeItem(overrides: Partial<RentCalendarItem>): RentCalendarItem {
 const baseProps = {
   dayLabel: 'Segunda, 15/06',
   nextDueDate: '2026-06-20' as string | null,
-  isPending: false,
+  pendingLeaseId: null as number | null,
   onToggle: vi.fn(),
   onGoToday: vi.fn(),
   onGoNextDue: vi.fn(),
