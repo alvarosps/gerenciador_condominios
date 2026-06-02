@@ -378,6 +378,8 @@ class ContractService:
         temp_html_path.write_text(html_content, encoding="utf-8")
 
         try:
+            import os
+            os.environ["PLAYWRIGHT_BROWSERS_PATH"] = "0"
             chrome_path = getattr(settings, "CHROME_EXECUTABLE_PATH", None)
 
             with sync_playwright() as p:
