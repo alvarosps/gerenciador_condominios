@@ -104,6 +104,7 @@ type StatusFilter = 'all' | 'active' | 'expired' | 'expiring';
 interface BuildingLeaseFilters {
   responsible_tenant_id: number | undefined;
   status: StatusFilter;
+  contract_status: 'all' | 'generated' | 'signed' | 'pending';
 }
 
 export default function LeasesPage() {
@@ -141,7 +142,7 @@ export default function LeasesPage() {
   }, [leases]);
 
   const getFilters = (buildingId: number): BuildingLeaseFilters =>
-    filtersByBuilding[buildingId] ?? { responsible_tenant_id: undefined, status: 'all' };
+    filtersByBuilding[buildingId] ?? { responsible_tenant_id: undefined, status: 'all', contract_status: 'all' };
 
   const updateFilter = (buildingId: number, updates: Partial<BuildingLeaseFilters>): void => {
     setFiltersByBuilding((prev) => ({
@@ -170,6 +171,13 @@ export default function LeasesPage() {
         if (filters.status === 'active' && color !== 'green') return false;
         if (filters.status === 'expired' && color !== 'red') return false;
         if (filters.status === 'expiring' && color !== 'orange') return false;
+      }
+      if (filters.contract_status && filters.contract_status !== 'all') {
+        const isGenerated = lease.contract_generated;
+        const isSigned = lease.contract_signed;
+        if (filters.contract_status === 'generated' && (!isGenerated || isSigned)) return false;
+        if (filters.contract_status === 'signed' && !isSigned) return false;
+        if (filters.contract_status === 'pending' && (isGenerated || isSigned)) return false;
       }
       return true;
     });
@@ -356,7 +364,7 @@ export default function LeasesPage() {
           const filteredLeases = getFilteredLeases(buildingId, buildingLeases);
           const filters = getFilters(buildingId);
           const hasActiveFilters =
-            filters.responsible_tenant_id !== undefined || filters.status !== 'all';
+            filters.responsible_tenant_id !== undefined || filters.status !== 'all' || filters.contract_status !== 'all';
 
           // Build tenant options from leases in this building
           const tenantOptions: SearchableSelectOption[] = [
@@ -418,6 +426,26 @@ export default function LeasesPage() {
                         <SelectItem value="active">Ativo</SelectItem>
                         <SelectItem value="expired">Expirado</SelectItem>
                         <SelectItem value="expiring">Expirando em breve</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Status do Contrato</label>
+                    <Select
+                      value={filters.contract_status}
+                      onValueChange={(value) =>
+                        updateFilter(buildingId, { contract_status: value as 'all' | 'generated' | 'signed' | 'pending' })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Todos" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        <SelectItem value="generated">Gerado</SelectItem>
+                        <SelectItem value="signed">Assinado</SelectItem>
+                        <SelectItem value="pending">Pendente</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
