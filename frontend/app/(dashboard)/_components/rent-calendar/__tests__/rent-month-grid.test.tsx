@@ -50,6 +50,25 @@ describe('RentMonthGrid', () => {
     expect(screen.getByText('João Silva')).toBeInTheDocument();
   });
 
+  it('colors tenant chips by status (paid / overdue / due)', () => {
+    const days: RentCalendarDay[] = [
+      {
+        day: 5,
+        date: '2026-06-05',
+        weekday: 'Sexta',
+        items: [
+          makeItem({ lease_id: 1, tenant_name: 'PaidTenant', is_paid: true }),
+          makeItem({ lease_id: 2, tenant_name: 'OverdueTenant', is_overdue: true, day_passed: true }),
+          makeItem({ lease_id: 3, tenant_name: 'DueTenant' }),
+        ],
+      },
+    ];
+    render(<RentMonthGrid {...baseProps} days={days} />);
+    expect(screen.getByText('PaidTenant')).toHaveClass('bg-success/10');
+    expect(screen.getByText('OverdueTenant')).toHaveClass('bg-destructive/10');
+    expect(screen.getByText('DueTenant')).toHaveClass('bg-amber-500/10');
+  });
+
   it('calls onSelectDay with the clicked day number', () => {
     const onSelectDay = vi.fn();
     render(<RentMonthGrid {...baseProps} days={[]} onSelectDay={onSelectDay} />);
@@ -68,8 +87,10 @@ describe('RentMonthGrid', () => {
       { day: 30, date: '2026-06-30', weekday: 'Terça', items: [makeItem({ tenant_name: 'Teresa Gomes' })] },
     ];
     render(<RentMonthGrid {...baseProps} days={days} />);
-    const cell = screen.getByRole('gridcell', { name: 'Dia 30' });
+    // Cell aria-label now includes the tenant + status (not color-only).
+    const cell = screen.getByRole('gridcell', { name: /^Dia 30/ });
     expect(within(cell).getByText('Teresa Gomes')).toBeInTheDocument();
+    expect(cell).toHaveAccessibleName(/Teresa Gomes \(a vencer\)/);
   });
 
   it('fires month navigation callbacks', () => {
