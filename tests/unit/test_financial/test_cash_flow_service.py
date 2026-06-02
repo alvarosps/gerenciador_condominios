@@ -9,6 +9,7 @@ from freezegun import freeze_time
 from core.models import (
     Apartment,
     Building,
+    CreditCard,
     EmployeePayment,
     Expense,
     ExpenseInstallment,
@@ -233,8 +234,6 @@ class TestGetMonthlyExpenses:
             assert key in result
 
     def test_card_installments_counted(self, person: Person) -> None:
-        from core.models import CreditCard
-
         cc = CreditCard.objects.create(
             person=person,
             nickname="CF Card",
@@ -297,8 +296,6 @@ class TestGetMonthlyExpenses:
         assert result["one_time_expenses"] >= Decimal("300.00")
 
     def test_is_offset_excluded_from_card_installments(self, person: Person) -> None:
-        from core.models import CreditCard
-
         cc = CreditCard.objects.create(
             person=person,
             nickname="Offset Card",
@@ -466,8 +463,6 @@ class TestGetPersonSummary:
         assert "net_amount" in result
 
     def test_card_total_includes_card_installments(self, person: Person) -> None:
-        from core.models import CreditCard
-
         cc = CreditCard.objects.create(
             person=person,
             nickname="Summary Card",
@@ -497,8 +492,6 @@ class TestGetPersonSummary:
         assert result["card_total"] >= Decimal("200.00")
 
     def test_net_amount_subtracts_expenses(self, person: Person) -> None:
-        from core.models import CreditCard
-
         cc = CreditCard.objects.create(
             person=person,
             nickname="Net Card",
