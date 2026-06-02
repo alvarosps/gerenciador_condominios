@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useLeases } from "@/lib/api/hooks/use-admin-properties";
 import { useToggleRentPayment } from "@/lib/api/hooks/use-admin-actions";
 import type { LeaseSimple } from "@/lib/schemas/admin";
+import axios from "axios";
 
 export default function MarkPaidScreen() {
   const [selectedLease, setSelectedLease] = useState<LeaseSimple | null>(null);
@@ -21,6 +22,13 @@ export default function MarkPaidScreen() {
       Alert.alert("Erro", "Informe o mês de referência (YYYY-MM-DD).");
       return;
     }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(referenceMonth)) {
+      Alert.alert(
+        "Erro",
+        "Mês de referência inválido. Use o formato YYYY-MM-DD (ex.: 2026-04-01).",
+      );
+      return;
+    }
 
     togglePayment.mutate(
       {
@@ -29,11 +37,21 @@ export default function MarkPaidScreen() {
       },
       {
         onSuccess: (result) => {
+          // result.message differentiates "marcado como pago" vs "marcado como não pago"
+          // (this endpoint is a toggle), so the actual effect is always shown.
           Alert.alert("Sucesso", result.message);
           setSelectedLease(null);
           setReferenceMonth("");
         },
-        onError: () => Alert.alert("Erro", "Não foi possível atualizar o pagamento."),
+        onError: (error) => {
+          // Surface the backend's specific rejection (mês finalizado / não cobrável /
+          // vencimento já passou) instead of a generic message.
+          const detail =
+            axios.isAxiosError(error) && typeof error.response?.data?.error === "string"
+              ? error.response.data.error
+              : "Não foi possível atualizar o pagamento.";
+          Alert.alert("Erro", detail);
+        },
       },
     );
   }
