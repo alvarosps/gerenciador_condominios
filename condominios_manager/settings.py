@@ -465,13 +465,10 @@ def _detect_chrome_executable() -> str:
     if chrome_in_path:
         return chrome_in_path
 
-    # Return a default that will fail gracefully with a clear error message
-    default_paths = {
-        "windows": r"C:\Program Files\Google\Chrome\Application\chrome.exe",
-        "darwin": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-        "linux": "/usr/bin/chromium",
-    }
-    return default_paths.get(system, "/usr/bin/chromium")
+    # Se não encontrou no sistema, retorna vazio para que o Playwright 
+    # tente usar seu próprio binário instalado (caso exista).
+    # Em produção (Render), não forçar /usr/bin/chromium se ele não existe.
+    return ""
 
 
 # Chrome path from environment or auto-detected

@@ -371,10 +371,16 @@ class LeaseViewSet(viewsets.ModelViewSet):
             
             # Se a task rodar sincronamente (eager), o resultado já estará pronto
             if task.ready():
-                return Response(
-                    {"pdf_path": task.result, "message": "Contrato gerado com sucesso!"},
-                    status=status.HTTP_200_OK,
-                )
+                if task.successful():
+                    return Response(
+                        {"pdf_path": task.result, "message": "Contrato gerado com sucesso!"},
+                        status=status.HTTP_200_OK,
+                    )
+                else:
+                    return Response(
+                        {"error": "Falha na geração do contrato (task failed)."},
+                        status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    )
                 
             return Response(
                 {"task_id": task.id, "status": "processing"},
