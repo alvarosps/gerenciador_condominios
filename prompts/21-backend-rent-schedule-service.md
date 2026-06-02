@@ -90,7 +90,9 @@ class RentScheduleService:
         - não-deletados (manager padrão Lease.objects)
         - apartment.owner is null  (repasse de proprietário NÃO é receita do condomínio)
         - is_salary_offset=False
-        - prepaid_until NÃO cobre o mês (excluir prepaid_until >= reference_month)
+        - mês NÃO pré-pago: excluir apenas quando prepaid_until > vencimento clampado do mês
+          (pagar-para-morar; a parcela que vence exatamente em prepaid_until é a próxima a
+          vencer e é mantida). Compara com o dia de vencimento clampado, NÃO com reference_month.
         - janela start_date..end_date intersecta o mês:
             start_date <= último dia do mês  E  end_date >= reference_month,
             onde end_date = DateCalculatorService.calculate_final_date(start_date, validity_months)
@@ -98,7 +100,7 @@ class RentScheduleService:
         - select_related('apartment', 'apartment__building', 'responsible_tenant')
 
         IMPORTANTE: a janela de datas é date-aware (NÃO depende do booleano apartment.is_rented).
-        Os filtros ORM-expressáveis (owner, salary_offset, prepaid, building, start_date <=
+        Os filtros ORM-expressáveis (owner, salary_offset, building, start_date <=
         último dia do mês) ficam no queryset; o limite superior (end_date é calculado por
         DateCalculatorService) é aplicado em Python sobre o queryset já reduzido. Não usar
         apartment__is_rented em lugar nenhum — a cobrabilidade é puramente date-aware."""
@@ -207,7 +209,7 @@ Criar `tests/unit/test_financial/test_rent_schedule_service.py`. Usar `@pytest.m
 - [ ] inclui lease ativo padrão cuja janela cobre o mês.
 - [ ] **exclui** lease cujo `apartment.owner` está definido (repasse).
 - [ ] **exclui** lease com `is_salary_offset=True`.
-- [ ] **exclui** lease com `prepaid_until >= reference_month` (mês pré-pago).
+- [ ] **exclui** lease com `prepaid_until > vencimento clampado do mês`; **mantém** o mês cujo vencimento é exatamente `prepaid_until` (próxima parcela a vencer — pagar-para-morar).
 - [ ] **exclui** lease cuja janela `start_date..end_date` NÃO intersecta o mês (ex.: contrato que terminou antes do mês, ou que começa depois) — **date-aware, independente de `is_rented`**. Incluir caso explícito: lease com `is_rented=True` mas janela fora do mês → **excluído**; e lease cuja janela cobre o mês com `is_rented` qualquer → **incluído**.
 - [ ] `building_id` filtra por prédio (lease de outro prédio não aparece).
 - [ ] não inclui lease soft-deleted.

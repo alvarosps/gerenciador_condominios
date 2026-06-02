@@ -196,6 +196,58 @@ class TestCollectibleLeases:
         result = list(RentScheduleService.collectible_leases(date(2026, 3, 1)))
         assert prepaid_lease not in result
 
+    def test_prepaid_boundary_keeps_month_whose_due_equals_prepaid_until(self, building) -> None:
+        """Pay-to-live: prepaid_until is the end of the last paid period. The installment
+        due exactly on prepaid_until is the NEXT one due and must stay collectible — the
+        month whose clamped due date equals prepaid_until is NOT prepaid (regression for
+        the month-start off-by-one). Kitnet 113: prepaid_until=2026-09-29, due_day=29."""
+        apt = make_apartment(
+            building=building,
+            number=113,
+            rental_value=Decimal("1300.00"),
+            max_tenants=1,
+            is_rented=True,
+        )
+        tenant = make_tenant(cpf_cnpj="52998224725", name="Kitnet 113", due_day=29)
+        prepaid_lease = make_lease(
+            apartment=apt,
+            tenant=tenant,
+            start_date=date(2025, 6, 1),
+            validity_months=24,
+            rental_value=Decimal("1300.00"),
+            prepaid_until=date(2026, 9, 29),
+        )
+        # Aug: due 29/08 < prepaid_until 29/09 -> already paid -> excluded.
+        assert prepaid_lease not in list(RentScheduleService.collectible_leases(date(2026, 8, 1)))
+        # Sep: due 29/09 == prepaid_until -> NEXT one due -> COLLECTIBLE.
+        assert prepaid_lease in list(RentScheduleService.collectible_leases(date(2026, 9, 1)))
+        # Oct: due 29/10 > prepaid_until -> collectible.
+        assert prepaid_lease in list(RentScheduleService.collectible_leases(date(2026, 10, 1)))
+
+    def test_prepaid_excludes_month_whose_due_precedes_prepaid_until(self, building) -> None:
+        """A month whose clamped due date falls strictly before prepaid_until is already
+        covered and excluded — compared against the clamped due date, not the month start."""
+        apt = make_apartment(
+            building=building,
+            number=114,
+            rental_value=Decimal("1000.00"),
+            max_tenants=1,
+            is_rented=True,
+        )
+        tenant = make_tenant(cpf_cnpj="12345678909", name="Dia 10", due_day=10)
+        prepaid_lease = make_lease(
+            apartment=apt,
+            tenant=tenant,
+            start_date=date(2025, 6, 1),
+            validity_months=24,
+            rental_value=Decimal("1000.00"),
+            prepaid_until=date(2026, 9, 20),
+        )
+        # Sep: due 10/09 < prepaid_until 20/09 -> covered -> excluded.
+        assert prepaid_lease not in list(RentScheduleService.collectible_leases(date(2026, 9, 1)))
+        # Oct: due 10/10 > prepaid_until -> collectible.
+        assert prepaid_lease in list(RentScheduleService.collectible_leases(date(2026, 10, 1)))
+
     def test_excludes_lease_window_outside_month_even_if_rented(self, building) -> None:
         """Date-aware: a rented apartment whose lease window is before the month is excluded."""
         apt = make_apartment(
