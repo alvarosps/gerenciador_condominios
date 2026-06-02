@@ -85,9 +85,11 @@ if settings.DEBUG:
 from django.urls import re_path
 from django.views.static import serve
 
+from pathlib import Path
+
 # Serve media files (contracts) in both development and production
 # (Since we generate files dynamically, we need this to serve the PDFs)
 urlpatterns += [
-    re_path(r'^contracts/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT}),
+    re_path(r'^contracts/(?P<path>.*)$', serve, {'document_root': str(Path(settings.BASE_DIR) / settings.PDF_OUTPUT_DIR)}),
     re_path(r'^media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT}),
 ]
