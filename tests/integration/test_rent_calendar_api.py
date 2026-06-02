@@ -205,6 +205,12 @@ class TestRentCalendarRead:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
     @freeze_time("2026-06-02")
+    def test_year_out_of_range_returns_400(self, authenticated_api_client):
+        # Out-of-range year must be a clean 400, not a 500 from date(year, 1, 1).
+        response = authenticated_api_client.get(RENT_CALENDAR_URL, {"year": 99999, "month": 6})
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    @freeze_time("2026-06-02")
     def test_non_integer_year_returns_400(self, authenticated_api_client):
         response = authenticated_api_client.get(RENT_CALENDAR_URL, {"year": "abc", "month": 6})
         assert response.status_code == status.HTTP_400_BAD_REQUEST
@@ -311,6 +317,14 @@ class TestToggleRentPayment:
     def test_missing_lease_id_returns_400(self, authenticated_api_client):
         response = authenticated_api_client.post(
             TOGGLE_URL, {"reference_month": "2026-06-01"}, format="json"
+        )
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    @freeze_time("2026-06-02")
+    def test_non_numeric_lease_id_returns_400(self, authenticated_api_client):
+        # Non-numeric lease_id must be a clean 400, not a 500 from the ORM lookup.
+        response = authenticated_api_client.post(
+            TOGGLE_URL, {"lease_id": "abc", "reference_month": "2026-06-01"}, format="json"
         )
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 

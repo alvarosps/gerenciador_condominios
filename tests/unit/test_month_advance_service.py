@@ -439,6 +439,19 @@ class TestMonthAdvanceService:
         assert len(unpaid) >= 1
         assert unpaid[0]["lease_id"] == active_lease.pk
 
+    def test_validation_detects_unpaid_rent_for_prepaid_boundary_month(self, service, active_lease):
+        """Pay-to-live: a lease prepaid up to the boundary month's due date is the NEXT one
+        due and must be flagged unpaid for that month — month-advance must not finalize a
+        still-due month. Routed through collectible_leases (SSOT). due_day=10."""
+        active_lease.prepaid_until = date(2026, 3, 10)
+        active_lease.save(update_fields=["prepaid_until"])
+        # February: due 10/02 < prepaid_until 10/03 -> already paid -> NOT flagged.
+        feb = service.get_status(2026, 2)["validation"]["unpaid_rent"]
+        assert all(u["lease_id"] != active_lease.pk for u in feb)
+        # March: due 10/03 == prepaid_until -> next one due -> flagged unpaid.
+        mar = service.get_status(2026, 3)["validation"]["unpaid_rent"]
+        assert any(u["lease_id"] == active_lease.pk for u in mar)
+
     def test_validation_detects_missing_utility_bills(self, service):
         status_data = service.get_status(2026, 1)
 
