@@ -43,7 +43,7 @@ Mobile: as 3 colunas empilham verticalmente.
 | # | Decisão | Valor |
 |---|---------|-------|
 | D1 | Escopo de prédios | Todos agregados + filtro opcional por prédio |
-| D2 | Quais aluguéis aparecem | **Só os cobráveis** — exclui `apartment.owner` (repasse), `is_salary_offset`, e meses cobertos por `prepaid_until` |
+| D2 | Quais aluguéis aparecem | **Só os cobráveis** — exclui `apartment.owner` (repasse), `is_salary_offset`, e meses já pré-pagos (`prepaid_until` **>** vencimento clampado do mês — modelo *pagar-para-morar*; a parcela que vence exatamente em `prepaid_until` é a próxima a vencer e é **mantida**) |
 | D3 | Renderização do calendário | **Grid custom** com `date-fns` + Tailwind + primitivos shadcn (sem dayjs, sem nova dependência) |
 | D4 | Atraso | Destacar em vermelho **e** exibir multa calculada (`FeeCalculatorService.calculate_late_fee`) |
 
@@ -92,7 +92,9 @@ class RentScheduleService:
     @staticmethod
     def collectible_leases(reference_month: date, building_id: int | None = None) -> QuerySet[Lease]:
         """Leases cobráveis ativos que cobrem o mês: não-deletados, apartment.owner is null,
-        is_salary_offset=False, prepaid_until não cobre o mês, e janela start_date..end_date
+        is_salary_offset=False, mês não pré-pago (prepaid_until > vencimento clampado do mês —
+        pagar-para-morar; a parcela que vence exatamente em prepaid_until é a próxima a vencer,
+        mantida), e janela start_date..end_date
         (via DateCalculatorService.calculate_final_date) intersecta o mês. Filtro opcional por prédio.
         select_related(apartment, apartment__building, responsible_tenant)."""
 

@@ -86,13 +86,19 @@ class RentScheduleService:
         - not soft-deleted (default ``Lease.objects`` manager),
         - ``apartment.owner`` is null (owner repass is not condominium revenue),
         - ``is_salary_offset=False``,
-        - the month is not prepaid (``prepaid_until`` does not cover it),
+        - the month is not prepaid: ``prepaid_until`` does not extend PAST this month's
+          clamped due date. Pay-to-live: the installment due on M/clamped_due covers
+          [M/D .. (M+1)/D]; it is already paid only if ``prepaid_until`` is strictly after
+          M/D. The installment due exactly on ``prepaid_until`` is the NEXT one due and
+          stays collectible (e.g. prepaid_until=2026-09-29, due_day=29 → Aug excluded,
+          Sep collectible).
         - the window ``start_date..end_date`` intersects the month, where
           ``end_date = DateCalculatorService.calculate_final_date(start_date, validity_months)``.
 
-        ORM-expressible filters (owner, salary offset, prepaid, building,
-        ``start_date <= last day of month``) stay in the queryset; the upper bound
-        (computed end date) is applied in Python over the already-reduced queryset.
+        ORM-expressible filters (owner, salary offset, building,
+        ``start_date <= last day of month``) stay in the queryset; the prepaid boundary and
+        the end-date upper bound (both need the clamped due date / computed end date) are
+        applied in Python over the already-reduced queryset.
         """
         year, month = reference_month.year, reference_month.month
         _, days_in_month = monthrange(year, month)
@@ -102,19 +108,30 @@ class RentScheduleService:
             Lease.objects.filter(start_date__lte=month_end)
             .exclude(apartment__owner__isnull=False)
             .exclude(is_salary_offset=True)
-            .exclude(prepaid_until__gte=reference_month)
             .select_related("apartment", "apartment__building", "responsible_tenant")
         )
 
         if building_id is not None:
             queryset = queryset.filter(apartment__building_id=building_id)
 
-        collectible_ids = [
-            lease.pk
-            for lease in queryset
-            if DateCalculatorService.calculate_final_date(lease.start_date, lease.validity_months)
-            >= reference_month
-        ]
+        collectible_ids = []
+        for lease in queryset:
+            end_date = DateCalculatorService.calculate_final_date(
+                lease.start_date, lease.validity_months
+            )
+            if end_date < reference_month:
+                continue
+            # Pay-to-live prepaid boundary: the month's installment (due on the clamped
+            # due day) is already paid only if prepaid_until is strictly AFTER that due
+            # date. The installment falling exactly on prepaid_until is the next one due
+            # and must stay collectible (off-by-one if compared against month start).
+            if lease.prepaid_until is not None:
+                clamped_due = RentScheduleService.clamp_due_day(
+                    lease.responsible_tenant.due_day, year, month
+                )
+                if lease.prepaid_until > date(year, month, clamped_due):
+                    continue
+            collectible_ids.append(lease.pk)
         return queryset.filter(id__in=collectible_ids)
 
     @staticmethod
