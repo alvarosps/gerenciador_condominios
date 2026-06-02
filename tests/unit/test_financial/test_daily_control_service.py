@@ -11,13 +11,9 @@ from django.core.exceptions import ObjectDoesNotExist
 from freezegun import freeze_time
 
 from core.models import (
-    Expense,
-    ExpenseInstallment,
     ExpenseType,
-    Income,
     Lease,
     Person,
-    RentPayment,
 )
 from core.services.daily_control_service import DailyControlService
 from tests.factories import (
@@ -40,7 +36,13 @@ def building():
 
 @pytest.fixture
 def apartment(building):
-    return make_apartment(building=building, number=101, rental_value=Decimal("1200.00"), max_tenants=2, is_rented=True)
+    return make_apartment(
+        building=building,
+        number=101,
+        rental_value=Decimal("1200.00"),
+        max_tenants=2,
+        is_rented=True,
+    )
 
 
 @pytest.fixture
@@ -53,7 +55,7 @@ def lease(apartment, tenant):
     return make_lease(
         apartment=apartment,
         tenant=tenant,
-        start_date=date(2025, 1, 1),
+        start_date=date(2025, 6, 1),
         validity_months=12,
         tag_fee=Decimal("50.00"),
         rental_value=Decimal("1200.00"),
