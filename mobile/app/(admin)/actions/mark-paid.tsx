@@ -2,21 +2,15 @@ import { Alert, ScrollView, StyleSheet, View } from "react-native";
 import { Button, Card, Text, TextInput } from "react-native-paper";
 import { useState } from "react";
 import { useLeases } from "@/lib/api/hooks/use-admin-properties";
-import { useMarkRentPaid } from "@/lib/api/hooks/use-admin-actions";
+import { useToggleRentPayment } from "@/lib/api/hooks/use-admin-actions";
 import type { LeaseSimple } from "@/lib/schemas/admin";
 
 export default function MarkPaidScreen() {
   const [selectedLease, setSelectedLease] = useState<LeaseSimple | null>(null);
   const [referenceMonth, setReferenceMonth] = useState("");
-  const [amountPaid, setAmountPaid] = useState("");
 
   const { data: leases, isLoading } = useLeases({ is_active: true });
-  const markPaid = useMarkRentPaid();
-
-  function handleSelectLease(lease: LeaseSimple): void {
-    setSelectedLease(lease);
-    setAmountPaid(lease.rental_value);
-  }
+  const togglePayment = useToggleRentPayment();
 
   function handleSubmit(): void {
     if (selectedLease === null) {
@@ -24,28 +18,22 @@ export default function MarkPaidScreen() {
       return;
     }
     if (!referenceMonth) {
-      Alert.alert("Erro", "Informe o mês de referência (YYYY-MM).");
-      return;
-    }
-    if (!amountPaid) {
-      Alert.alert("Erro", "Informe o valor pago.");
+      Alert.alert("Erro", "Informe o mês de referência (YYYY-MM-DD).");
       return;
     }
 
-    markPaid.mutate(
+    togglePayment.mutate(
       {
         lease_id: selectedLease.id,
         reference_month: referenceMonth,
-        amount_paid: amountPaid,
       },
       {
-        onSuccess: () => {
-          Alert.alert("Sucesso", "Pagamento registrado com sucesso.");
+        onSuccess: (result) => {
+          Alert.alert("Sucesso", result.message);
           setSelectedLease(null);
           setReferenceMonth("");
-          setAmountPaid("");
         },
-        onError: () => Alert.alert("Erro", "Não foi possível registrar o pagamento."),
+        onError: () => Alert.alert("Erro", "Não foi possível atualizar o pagamento."),
       },
     );
   }
@@ -70,7 +58,7 @@ export default function MarkPaidScreen() {
                   key={lease.id}
                   mode={selectedLease?.id === lease.id ? "contained" : "outlined"}
                   style={styles.leaseButton}
-                  onPress={() => handleSelectLease(lease)}
+                  onPress={() => setSelectedLease(lease)}
                 >
                   Apto {lease.apartment} — {lease.responsible_tenant.name}
                 </Button>
@@ -87,7 +75,7 @@ export default function MarkPaidScreen() {
       </Card>
 
       <Card style={styles.card}>
-        <Card.Title title="Dados do Pagamento" />
+        <Card.Title title="Mês de Referência" />
         <Card.Content style={styles.formContent}>
           <TextInput
             label="Mês de referência (YYYY-MM-DD)"
@@ -97,22 +85,14 @@ export default function MarkPaidScreen() {
             placeholder="2026-04-01"
             style={styles.input}
           />
-          <TextInput
-            label="Valor pago (R$)"
-            value={amountPaid}
-            onChangeText={setAmountPaid}
-            mode="outlined"
-            keyboardType="decimal-pad"
-            style={styles.input}
-          />
         </Card.Content>
       </Card>
 
       <Button
         mode="contained"
         onPress={handleSubmit}
-        loading={markPaid.isPending}
-        disabled={markPaid.isPending}
+        loading={togglePayment.isPending}
+        disabled={togglePayment.isPending}
         style={styles.submitButton}
       >
         Registrar Pagamento

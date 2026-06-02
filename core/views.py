@@ -16,7 +16,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 
-from .models import Apartment, Building, Furniture, Lease, RentPayment, Tenant
+from .models import Apartment, Building, Furniture, Lease, Tenant
 from .permissions import (
     CanGenerateContract,
     CanModifyLease,
@@ -809,61 +809,6 @@ class DashboardViewSet(viewsets.ViewSet):
         """
         statistics = DashboardService.get_tenant_statistics()
         return Response(statistics, status=status.HTTP_200_OK)
-
-    @action(detail=False, methods=["post"], url_path="mark_rent_paid")
-    def mark_rent_paid(self, request: Request) -> Response:
-        """
-        Mark rent as paid for a lease in the current month.
-
-        POST /api/dashboard/mark_rent_paid/
-
-        Body:
-            {
-                "lease_id": 1,
-                "amount_paid": "1500.00"  (optional, defaults to rental_value)
-            }
-        """
-        lease_id = request.data.get("lease_id")
-        if not lease_id:
-            return Response({"error": "lease_id é obrigatório"}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            lease = Lease.objects.select_related("apartment", "apartment__building").get(
-                id=lease_id
-            )
-        except Lease.DoesNotExist:
-            return Response({"error": "Locação não encontrada"}, status=status.HTTP_404_NOT_FOUND)
-
-        today = timezone.now().date()
-        reference_month = today.replace(day=1)
-
-        # Check if already paid
-        if RentPayment.objects.filter(lease=lease, reference_month=reference_month).exists():
-            return Response(
-                {"error": "Aluguel deste mês já foi registrado como pago"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        amount_str = request.data.get("amount_paid")
-        try:
-            amount_paid = Decimal(amount_str) if amount_str else lease.rental_value
-        except (InvalidOperation, TypeError):
-            return Response({"error": "Valor inválido"}, status=status.HTTP_400_BAD_REQUEST)
-
-        user = cast(User, request.user)
-        RentPayment.objects.create(
-            lease=lease,
-            reference_month=reference_month,
-            amount_paid=amount_paid,
-            payment_date=today,
-            created_by=user,
-            updated_by=user,
-        )
-
-        return Response(
-            {"message": f"Aluguel do Apto {lease.apartment.number} marcado como pago"},
-            status=status.HTTP_201_CREATED,
-        )
 
     @action(detail=False, methods=["get"])
     def rent_adjustment_alerts(self, request: Request) -> Response:
