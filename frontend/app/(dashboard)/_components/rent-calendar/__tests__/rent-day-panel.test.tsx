@@ -86,6 +86,31 @@ describe('RentDayPanel', () => {
     expect(screen.getByText(/multa R\$ 12,50/)).toBeInTheDocument();
   });
 
+  it('hides overdue styling and late fee when an overdue item is (optimistically) paid', () => {
+    // Regression: during the optimistic flip is_paid becomes true while is_overdue is
+    // still stale-true; the card must show the paid style only — no red card, no "+ multa".
+    const { container } = render(
+      <RentDayPanel
+        {...baseProps}
+        items={[
+          makeItem({
+            is_paid: true,
+            payment_date: '2026-06-15',
+            is_overdue: true,
+            day_passed: true,
+            late_fee: '12.50',
+            late_days: 5,
+          }),
+        ]}
+      />,
+    );
+    expect(screen.getByText('Pago')).toBeInTheDocument();
+    expect(screen.queryByText(/multa/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Em atraso/)).not.toBeInTheDocument();
+    expect(container.querySelector('.bg-success\\/10')).toBeInTheDocument();
+    expect(container.querySelector('.bg-destructive\\/10')).not.toBeInTheDocument();
+  });
+
   it('renders an empty state when there are no items', () => {
     render(<RentDayPanel {...baseProps} items={[]} />);
     expect(screen.getByText('Nenhum vencimento neste dia')).toBeInTheDocument();
