@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
+import { NextResponse } from 'next/server';
 
-export async function GET(req: NextRequest) {
+export function GET(req: NextRequest) {
   const backendUrl = process.env.BACKEND_API_URL ?? 'http://localhost:8008/api';
   const baseUrl = backendUrl.replace(/\/api\/?$/, '');
   
