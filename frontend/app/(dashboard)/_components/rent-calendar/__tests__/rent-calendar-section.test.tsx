@@ -1,159 +1,96 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { screen, fireEvent, waitFor } from '@testing-library/react';
-import { renderWithProviders } from '@/tests/test-utils';
+import { describe, it, expect } from 'vitest';
+import { screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { http, HttpResponse, delay } from 'msw';
+import { renderWithProviders, createTestQueryClient } from '@/tests/test-utils';
+import { server } from '@/tests/mocks/server';
+import {
+  createMockRentCalendar,
+  createMockRentCalendarItem,
+} from '@/tests/mocks/data/rent-calendar';
 import { RentCalendarSection } from '../rent-calendar-section';
-import * as rentCalendarHooks from '@/lib/api/hooks/use-rent-calendar';
-import * as buildingsHooks from '@/lib/api/hooks/use-buildings';
-import { formatMonthYear } from '@/lib/utils/formatters';
-import type {
-  RentCalendar,
-  RentCalendarItem,
-} from '@/lib/api/hooks/use-rent-calendar';
 
-type RentCalendarResult = ReturnType<typeof rentCalendarHooks.useRentCalendar>;
-type ToggleResult = ReturnType<typeof rentCalendarHooks.useToggleRentPayment>;
-type BuildingsResult = ReturnType<typeof buildingsHooks.useBuildings>;
+const API_BASE = 'http://localhost:8008/api';
 
-function makeQueryResult(overrides: Partial<RentCalendarResult>): RentCalendarResult {
-  return {
-    data: undefined,
-    isLoading: false,
-    isPending: false,
-    isSuccess: false,
-    isError: false,
-    error: null,
-    status: 'pending',
-    fetchStatus: 'idle',
-    dataUpdatedAt: 0,
-    errorUpdatedAt: 0,
-    failureCount: 0,
-    failureReason: null,
-    errorUpdateCount: 0,
-    isFetched: false,
-    isFetchedAfterMount: false,
-    isFetching: false,
-    isLoadingError: false,
-    isPlaceholderData: false,
-    isRefetchError: false,
-    isRefetching: false,
-    isStale: false,
-    refetch: vi.fn(),
-    ...overrides,
-  } as unknown as RentCalendarResult;
+// The section derives (year, month) from the real current date. Echo whatever it
+// requests and put the item on the same day as `today` so the default-selected day
+// (today's day) shows it — keeps the test independent of the real calendar date.
+function serveCalendar(opts: { isPaid?: boolean } = {}) {
+  server.use(
+    http.get(`${API_BASE}/dashboard/rent_calendar/`, ({ request }) => {
+      const url = new URL(request.url);
+      const year = Number(url.searchParams.get('year'));
+      const month = Number(url.searchParams.get('month'));
+      const mm = String(month).padStart(2, '0');
+      const date = `${String(year)}-${mm}-05`;
+      return HttpResponse.json(
+        createMockRentCalendar({
+          year,
+          month,
+          today: date,
+          next_due_date: date,
+          days: [
+            {
+              day: 5,
+              date,
+              weekday: 'Sexta',
+              items: [createMockRentCalendarItem({ lease_id: 12, is_paid: opts.isPaid ?? false })],
+            },
+          ],
+        }),
+      );
+    }),
+    http.get(`${API_BASE}/buildings/`, () => HttpResponse.json([])),
+  );
 }
-
-function makeBuildingsResult(): BuildingsResult {
-  return { data: [], isLoading: false } as unknown as BuildingsResult;
-}
-
-const mutateMock = vi.fn();
-
-const idleMutation = {
-  mutate: mutateMock,
-  mutateAsync: vi.fn(),
-  isPending: false,
-  isSuccess: false,
-  isError: false,
-  error: null,
-  data: undefined,
-  reset: vi.fn(),
-  status: 'idle',
-  variables: undefined,
-  context: undefined,
-  failureCount: 0,
-  failureReason: null,
-  isIdle: true,
-  isPaused: false,
-  submittedAt: 0,
-} as unknown as ToggleResult;
-
-function makeItem(overrides: Partial<RentCalendarItem>): RentCalendarItem {
-  return {
-    lease_id: 12,
-    tenant_name: 'João Silva',
-    apartment_number: 101,
-    building_number: '836',
-    rental_value: '1500.00',
-    is_paid: false,
-    payment_date: null,
-    is_overdue: false,
-    day_passed: false,
-    can_toggle: true,
-    late_fee: '0.00',
-    late_days: 0,
-    ...overrides,
-  };
-}
-
-const calendar: RentCalendar = {
-  year: 2026,
-  month: 6,
-  today: '2026-06-15',
-  next_due_date: '2026-06-15',
-  days: [{ day: 15, date: '2026-06-15', weekday: 'Segunda', items: [makeItem({})] }],
-  stats: {
-    received_total: '4950.00',
-    to_receive_total: '9650.00',
-    expected_total: '14600.00',
-    paid_count: 3,
-    due_count: 9,
-    overdue_count: 2,
-    overdue_total_fee: '37.50',
-    vacant_kitnets_count: 2,
-    vacant_kitnets_value: '1600.00',
-  },
-};
 
 describe('RentCalendarSection', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    vi.spyOn(buildingsHooks, 'useBuildings').mockReturnValue(makeBuildingsResult());
-    vi.spyOn(rentCalendarHooks, 'useToggleRentPayment').mockReturnValue(idleMutation);
+  it('renders the day panel, month grid and stats from the API', async () => {
+    serveCalendar();
+    renderWithProviders(<RentCalendarSection />, { queryClient: createTestQueryClient() });
+
+    // Column 1 — day panel item
+    expect(await screen.findByText('Apto 101 · Préd. 836')).toBeInTheDocument();
+    // Column 2 — month grid weekday header
+    expect(screen.getByText('Dom')).toBeInTheDocument();
+    // Column 3 — stats
+    expect(screen.getByText('Recebido até hoje')).toBeInTheDocument();
   });
 
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  it('shows a skeleton while loading', () => {
-    vi.spyOn(rentCalendarHooks, 'useRentCalendar').mockReturnValue(
-      makeQueryResult({ isLoading: true, isPending: true, fetchStatus: 'fetching' }),
+  it('shows a skeleton while the calendar is loading', () => {
+    server.use(
+      http.get(`${API_BASE}/dashboard/rent_calendar/`, async () => {
+        await delay(100);
+        return HttpResponse.json(createMockRentCalendar());
+      }),
+      http.get(`${API_BASE}/buildings/`, () => HttpResponse.json([])),
     );
-    const { container } = renderWithProviders(<RentCalendarSection />);
+    const { container } = renderWithProviders(<RentCalendarSection />, {
+      queryClient: createTestQueryClient(),
+    });
     expect(container.querySelector('.animate-pulse')).toBeInTheDocument();
   });
 
-  it('renders the day panel, grid and stats when data is present', async () => {
-    vi.spyOn(rentCalendarHooks, 'useRentCalendar').mockReturnValue(
-      makeQueryResult({ isSuccess: true, status: 'success', data: calendar }),
+  it('optimistically marks rent as paid when the toggle is clicked', async () => {
+    serveCalendar({ isPaid: false });
+    server.use(
+      http.post(`${API_BASE}/dashboard/toggle_rent_payment/`, async () => {
+        await delay(150);
+        return HttpResponse.json({
+          status: 'paid',
+          is_paid: true,
+          message: 'Aluguel marcado como pago.',
+        });
+      }),
     );
-    renderWithProviders(<RentCalendarSection />);
+    renderWithProviders(<RentCalendarSection />, { queryClient: createTestQueryClient() });
 
-    await waitFor(() => {
-      // Day panel (column 1): item rendered
-      expect(screen.getByText('Apto 101 · Préd. 836')).toBeInTheDocument();
-    });
-    // Grid (column 2): weekday header
-    expect(screen.getByText('Dom')).toBeInTheDocument();
-    // Stats (column 3): unique "Recebido até hoje" card + the exact formatMonthYear label
-    expect(screen.getByText('Recebido até hoje')).toBeInTheDocument();
-    expect(screen.getAllByText(formatMonthYear(2026, 6)).length).toBeGreaterThan(0);
-  });
+    const toggle = await screen.findByRole('switch');
+    expect(toggle).toHaveAttribute('aria-checked', 'false');
 
-  it('calls the toggle mutation with lease_id and reference_month of the loaded month', async () => {
-    vi.spyOn(rentCalendarHooks, 'useRentCalendar').mockReturnValue(
-      makeQueryResult({ isSuccess: true, status: 'success', data: calendar }),
-    );
-    renderWithProviders(<RentCalendarSection />);
+    await userEvent.click(toggle);
 
-    await waitFor(() => {
-      expect(screen.getByRole('switch')).toBeInTheDocument();
-    });
-    fireEvent.click(screen.getByRole('switch'));
-
-    expect(mutateMock).toHaveBeenCalledWith(
-      { lease_id: 12, reference_month: '2026-06-01' },
-      expect.anything(),
-    );
+    // The optimistic update flips the cached item -> the day panel now shows "Pago".
+    expect(await screen.findByText('Pago')).toBeInTheDocument();
   });
 });

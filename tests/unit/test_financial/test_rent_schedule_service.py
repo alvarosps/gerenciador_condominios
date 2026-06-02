@@ -111,6 +111,17 @@ class TestEffectiveRentalValue:
         value = RentScheduleService.effective_rental_value(lease, date(2026, 3, 1))
         assert value == Decimal("1400.00")
 
+    def test_returns_pending_value_for_mid_month_pending_date(self, lease) -> None:
+        """A mid-month pending date activates the increase for that whole month
+        (month-granular), matching RentAdjustmentService.activate_pending_adjustments."""
+        lease.pending_rental_value = Decimal("1400.00")
+        lease.pending_rental_value_date = date(2026, 7, 15)
+        lease.save(update_fields=["pending_rental_value", "pending_rental_value_date"])
+        # reference_month is the first of July — before the day-15 pending date, but
+        # the increase must already be in effect for July.
+        value = RentScheduleService.effective_rental_value(lease, date(2026, 7, 1))
+        assert value == Decimal("1400.00")
+
 
 # ──────────────────────────────────────────
 # collectible_leases
@@ -347,6 +358,13 @@ class TestGetMonthSchedule:
         # due_day 7 (lease) is the earliest >= today (2026-03-03)
         assert schedule["next_due_date"] == "2026-03-07"
 
+    @freeze_time("2026-03-20")
+    def test_next_due_date_none_when_no_future_unpaid_due(self, lease) -> None:
+        """When every due date in the month is in the past, next_due_date is None
+        (drives the disabled 'Próximo vencimento' button in the UI)."""
+        schedule = RentScheduleService.get_month_schedule(2026, 3)
+        assert schedule["next_due_date"] is None
+
 
 # ──────────────────────────────────────────
 # get_month_stats
@@ -424,6 +442,46 @@ class TestGetMonthStats:
         assert stats["due_count"] == 2
 
     @freeze_time("2026-03-03")
+    def test_received_and_expected_totals_scoped_by_building(self, building, lease) -> None:
+        """received_total/expected_total honor the building_id filter so the
+        building-scoped view stays coherent with to_receive_total."""
+        make_rent_payment(
+            lease=lease,
+            reference_month=date(2026, 3, 1),
+            amount_paid=Decimal("1200.00"),
+            payment_date=date(2026, 3, 2),
+        )
+        other_building = make_building(
+            street_number=840, name="Edifício 840", address="Rua Teste, 840"
+        )
+        other_apt = make_apartment(
+            building=other_building,
+            number=10,
+            rental_value=Decimal("900.00"),
+            max_tenants=1,
+            is_rented=True,
+        )
+        other_tenant = make_tenant(cpf_cnpj="70000000663", name="Outro Prédio", due_day=5)
+        other_lease = make_lease(
+            apartment=other_apt,
+            tenant=other_tenant,
+            start_date=date(2025, 6, 1),
+            validity_months=12,
+            rental_value=Decimal("900.00"),
+        )
+        make_rent_payment(
+            lease=other_lease,
+            reference_month=date(2026, 3, 1),
+            amount_paid=Decimal("900.00"),
+            payment_date=date(2026, 3, 2),
+        )
+        all_stats = RentScheduleService.get_month_stats(2026, 3)
+        assert all_stats["received_total"] == "2100.00"
+        scoped = RentScheduleService.get_month_stats(2026, 3, building_id=building.id)
+        assert scoped["received_total"] == "1200.00"
+        assert scoped["expected_total"] == "1200.00"
+
+    @freeze_time("2026-03-03")
     def test_vacant_kitnets_count_and_value(self, building, lease) -> None:
         make_apartment(
             building=building,
@@ -498,6 +556,21 @@ class TestTogglePayment:
         assert RentPayment.all_objects.filter(
             lease=lease, reference_month=date(2026, 3, 1), is_deleted=True
         ).exists()
+
+    @freeze_time("2026-03-03")
+    def test_unmark_records_deleted_by(self, lease, admin_user) -> None:
+        """Soft-delete on unmark records the acting user in the audit column."""
+        make_rent_payment(
+            lease=lease,
+            reference_month=date(2026, 3, 1),
+            amount_paid=Decimal("1200.00"),
+            payment_date=date(2026, 3, 2),
+        )
+        RentScheduleService.toggle_payment(lease.id, date(2026, 3, 1), admin_user)
+        deleted = RentPayment.all_objects.get(
+            lease=lease, reference_month=date(2026, 3, 1), is_deleted=True
+        )
+        assert deleted.deleted_by_id == admin_user.id
 
     @freeze_time("2026-03-20")
     def test_refuses_unpay_when_paid_and_day_passed(self, lease, admin_user) -> None:

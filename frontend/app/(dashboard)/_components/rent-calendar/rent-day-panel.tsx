@@ -60,7 +60,7 @@ function DayItemCard({ item, isPending, onToggle }: DayItemCardProps) {
       className={cn(
         'rounded-lg border bg-card p-3',
         item.is_paid && 'border-success/20 bg-success/10',
-        item.is_overdue && 'border-destructive/20 bg-destructive/10',
+        !item.is_paid && item.is_overdue && 'border-destructive/20 bg-destructive/10',
       )}
     >
       <div className="flex items-start justify-between gap-2">
@@ -80,7 +80,7 @@ function DayItemCard({ item, isPending, onToggle }: DayItemCardProps) {
               Pago em {formatDayMonth(item.payment_date)}
             </div>
           )}
-          {item.is_overdue && (
+          {!item.is_paid && item.is_overdue && (
             <div className="text-[11px] font-medium text-destructive">
               + multa {formatCurrency(item.late_fee)}
             </div>

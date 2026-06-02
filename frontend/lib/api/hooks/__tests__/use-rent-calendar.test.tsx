@@ -231,4 +231,47 @@ describe('useToggleRentPayment', () => {
     });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['dashboard', 'financial_summary'] });
   });
+
+  it('optimistically flips is_paid across ALL cached rent-calendar queries', async () => {
+    // Two cached queries that both contain lease 12: all-buildings and a building filter.
+    seedCalendarHandler();
+    const queryClient = createTestQueryClient();
+
+    const { result } = renderHook(
+      () => ({
+        all: useRentCalendar(2026, 6),
+        filtered: useRentCalendar(2026, 6, 1),
+        toggle: useToggleRentPayment(),
+      }),
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    await waitFor(
+      () => {
+        expect(result.current.all.isSuccess).toBe(true);
+        expect(result.current.filtered.isSuccess).toBe(true);
+      },
+      { timeout: 5000 },
+    );
+
+    server.use(
+      http.post(`${API_BASE}/dashboard/toggle_rent_payment/`, async () => {
+        await delay(200);
+        return HttpResponse.json({ status: 'paid', is_paid: true, message: 'ok' });
+      }),
+    );
+
+    result.current.toggle.mutate({ lease_id: 12, reference_month: '2026-06-01' });
+
+    await waitFor(() => {
+      const allData = queryClient.getQueryData<RentCalendar>(queryKeys.rentCalendar.month(2026, 6));
+      const filteredData = queryClient.getQueryData<RentCalendar>(
+        queryKeys.rentCalendar.month(2026, 6, 1),
+      );
+      expect(allData?.days?.[0]?.items?.[0]?.is_paid).toBe(true);
+      expect(filteredData?.days?.[0]?.items?.[0]?.is_paid).toBe(true);
+    });
+
+    await waitFor(() => expect(result.current.toggle.isSuccess).toBe(true), { timeout: 5000 });
+  });
 });
