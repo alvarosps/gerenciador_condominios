@@ -293,3 +293,43 @@ claude -n "session-13-dashboard"      # Terminal 3
 - **Wave 3→4**: 03 cria `financial_views.py`, 04 e 05 adicionam a ele — merge trivial (append)
 - **Wave 4→5**: 05 é a última a tocar `urls.py` antes de 08 — 08 cria arquivo novo
 - **Wave 8**: Sem conflitos (diretórios isolados)
+
+---
+
+# Roadmap — Feature: Calendário de Controle de Aluguéis (Dashboard)
+
+**Design Doc**: `docs/plans/2026-06-02-rent-payment-calendar-design.md`
+**Branch**: `feat/rent-payment-calendar`
+**Status**: feature **web concluída** (sessões 21–25). Reaproveita `RentPayment`/`FeeCalculatorService`/`DateCalculatorService` — sem novo model/migration.
+
+## Cadeia (estritamente sequencial: 21 → 22 → 23 → 24 → 25)
+
+```
+21  Backend: RentScheduleService + refactor DRY do DailyControlService + unit tests
+ ▼
+22  Backend: endpoints rent_calendar + toggle_rent_payment + integration tests
+ ▼
+23  Frontend: data layer (use-rent-calendar optimistic + query-keys + MSW) + hook tests
+ ▼
+24  Frontend: UI (5 componentes grid date-fns + montagem no dashboard) + component tests
+ ▼
+25  Refator late-payments-alert → toggle unificado + remoção de mark_rent_paid + /audit
+```
+
+> **Sequencial obrigatório**: cada sessão depende da anterior. `mark_rent_paid` (backend) e
+> `useMarkRentPaid` (web) são deliberadamente mantidos até a Sessão 25 para que todas as
+> sessões intermediárias permaneçam verdes (sem estado de árvore inválido).
+
+| # | Sessão | Status |
+|---|--------|--------|
+| 21 | `RentScheduleService` + refactor DRY `DailyControlService` | concluída |
+| 22 | endpoints `rent_calendar` + `toggle_rent_payment` | concluída |
+| 23 | hooks `use-rent-calendar` (optimistic) + query-keys + MSW | concluída |
+| 24 | UI (5 componentes + montagem no dashboard) | concluída |
+| 25 | refator consumidor web → toggle unificado + remover `useMarkRentPaid` (web) + audit | concluída |
+
+## Item futuro escopado (fora desta feature)
+
+| Item | Bloqueio | Pré-requisito |
+|------|----------|---------------|
+| Migração do consumidor **mobile** (`mobile/lib/api/hooks/use-admin-actions.ts` + `mobile/app/(admin)/actions/mark-paid.tsx`) de `mark_rent_paid` → `toggle_rent_payment`, seguida da remoção do action backend `mark_rent_paid` | A Sessão 25 escolheu a **saída (B)**: mantém `mark_rent_paid` (backend) + consumidor mobile intactos, pois o app `mobile/` é um consumidor vivo **fora do escopo do design doc** e **inverificável** (sem `type-check`/`lint`/test runner em `mobile/package.json`). | Emendar o design doc (§2/§4.3/§8) para escopar o mobile **e** configurar verificação em `mobile/package.json` (`type-check`/`lint`/test runner). Só então uma sessão dedicada migra o mobile e remove `mark_rent_paid` do backend. |

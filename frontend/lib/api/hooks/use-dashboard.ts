@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '../client';
 import { queryKeys } from '../query-keys';
 
@@ -136,25 +136,6 @@ export function useDashboardLatePayments() {
       return data;
     },
     refetchInterval: 1000 * 60 * 10, // Late payments need periodic refresh
-  });
-}
-
-/**
- * Hook to mark rent as paid for a lease in the current month
- */
-export function useMarkRentPaid() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (leaseId: number) => {
-      const { data } = await apiClient.post<{ message: string }>(
-        '/dashboard/mark_rent_paid/',
-        { lease_id: leaseId }
-      );
-      return data;
-    },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.latePaymentSummary() });
-    },
   });
 }
 

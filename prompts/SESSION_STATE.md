@@ -11,8 +11,8 @@
 
 **Design Doc**: `docs/plans/2026-06-02-rent-payment-calendar-design.md`
 **Mockup**: `docs/mockups/rent-calendar-mockup.html` (light + dark)
-**Status**: planejada (prompts escritos, implementação pendente)
-**Ordem**: 21 → 22 → 23 → 24 → 25 (sequencial; `mark_rent_paid` só é removido na 25)
+**Status**: **web concluída** (sessões 21–25). Remoção do backend `mark_rent_paid` **bloqueada** (saída B — ver Sessão 25): app `mobile/` é consumidor vivo, fora do escopo do design doc e inverificável.
+**Ordem**: 21 → 22 → 23 → 24 → 25 (sequencial; `mark_rent_paid` só seria removido na 25, mas ficou bloqueado pela tensão mobile)
 
 | # | Sessão | Status | Arquivo |
 |---|--------|--------|---------|
@@ -20,7 +20,7 @@
 | 22 | Backend: endpoints `rent_calendar` + `toggle_rent_payment` | concluída | `prompts/22-backend-rent-calendar-endpoints.md` |
 | 23 | Frontend: hooks `use-rent-calendar` (optimistic) + query-keys + MSW | concluída | `prompts/23-frontend-rent-calendar-hooks.md` |
 | 24 | Frontend: UI (5 componentes, grid date-fns) + montagem no dashboard | concluída | `prompts/24-frontend-rent-calendar-ui.md` |
-| 25 | Refator `late-payments-alert` → toggle unificado + remover `mark_rent_paid` + audit | pendente | `prompts/25-refactor-consumer-and-audit.md` |
+| 25 | Refator `late-payments-alert` → toggle unificado + audit (remoção de `mark_rent_paid` **bloqueada** — saída B) | concluída | `prompts/25-refactor-consumer-and-audit.md` |
 
 > Reaproveita `RentPayment` (pago = registro existe), `FeeCalculatorService` (multa) e `DateCalculatorService`. Sem novo model/migration. Calendário admin-only; respeita `MonthSnapshot` finalizado.
 
@@ -77,6 +77,20 @@
 > - **Acessibilidade da grade**: células de dia são `role="gridcell"` dentro de `role="grid"`; seleção via `aria-selected` (não `aria-pressed`, inválido em gridcell). Status nunca só por cor — sempre ícone + rótulo.
 > - `late-payments-alert.tsx`, `use-dashboard.ts`/`useMarkRentPaid` e o endpoint backend `mark_rent_paid` permanecem **intactos** — refator do consumidor unificado + remoção do `mark_rent_paid` é a **Sessão 25**.
 > - Verificação: `npx vitest run "app/(dashboard)/_components/rent-calendar"` 28/28 verde; `tsc --noEmit` sem erros nos arquivos tocados; `eslint` zero erros/avisos. Sem `# noqa`/`eslint-disable`/`@ts-ignore`; sem `as`/`!` em produção (apenas em helpers de fixture de teste, conforme carve-out).
+
+### Sessão 25 — Arquivos Modificados
+- `frontend/app/(dashboard)/_components/late-payments-alert.tsx` — consumidor web migrado para o toggle unificado: importa `useToggleRentPayment` de `@/lib/api/hooks/use-rent-calendar` (não mais `useMarkRentPaid`); `handleMarkPaid` chama `toggle.mutate({ lease_id, reference_month })` com `reference_month` = primeiro dia do **mês corrente** (`YYYY-MM-01`, via helper `currentReferenceMonth()` — mesma semântica do antigo `mark_rent_paid`, que sempre lançava o mês corrente); `disabled={toggle.isPending}`. Sem invalidação duplicada (o hook já invalida `rentCalendar` + `latePaymentSummary` + `financialSummary` no `onSettled`).
+- `frontend/lib/api/hooks/use-dashboard.ts` — `useMarkRentPaid` (create-only, postava `/dashboard/mark_rent_paid/`) **removido** por completo, sem re-export/shim/alias; import trimado de `{ useMutation, useQuery, useQueryClient }` para apenas `{ useQuery }` (os 5 hooks restantes só usam `useQuery`); `queryKeys` mantido (ainda usado pelas queries). Nenhum import órfão.
+- `frontend/app/(dashboard)/_components/__tests__/late-payments-alert.test.tsx` — mocka `useToggleRentPayment` de `@/lib/api/hooks/use-rent-calendar` (fronteira de dados via `vi.spyOn`); novo teste de regressão expande o accordion e clica "Pago", asserindo `toggle.mutate` chamado com `{ lease_id: 1, reference_month }` casando `^\d{4}-\d{2}-01$`. 5 testes verdes.
+- `prompts/SESSION_STATE.md` / `prompts/ROADMAP.md` — esta atualização (feature web 21–25 + decisão saída B sobre o mobile).
+
+> **Nota Sessão 25 — Gate mobile (saída B escolhida)**:
+> - **Tensão de design escalada**: o app `mobile/` é um **consumidor vivo** do endpoint que esta sessão removeria — `mobile/lib/api/hooks/use-admin-actions.ts:37` (`useMarkRentPaid`) e `mobile/app/(admin)/actions/mark-paid.tsx:5,14` postam em `POST /dashboard/mark_rent_paid/` (com body `{ lease_id, reference_month, amount_paid }` — note `amount_paid`, que o endpoint `toggle_rent_payment` **não** aceita). O design doc (§2/§4.3/§8) **não escopou** o mobile, e `mobile/package.json` define apenas `start`/`android`/`ios`/`web` — **sem `type-check`/`lint`/test runner**, logo qualquer migração mobile seria **inverificável** (violaria o TDD Red→Green e a regra de zero-tolerância a warnings).
+> - **Decisão: saída (B)** — concluída **apenas** a migração web + auditoria. **`mark_rent_paid` (backend, `core/views.py`) e o consumidor mobile permanecem intactos.** A remoção de `mark_rent_paid` está **BLOQUEADA** por esta tensão. `core/views.py` **não foi tocado** nesta sessão; nenhum arquivo de `mobile/` foi tocado.
+> - **Risco documentado**: enquanto `mark_rent_paid` existir e o mobile não for migrado/verificado, há divergência (web usa `toggle_rent_payment`, mobile usa `mark_rent_paid`). O `mobile/` não tem rede de segurança automatizada (sem testes/type-check/lint), então uma migração futura **deve primeiro** configurar verificação em `mobile/package.json`.
+> - **Destravamento (saída A futura)**: emendar o design doc (§2 incluir o consumidor mobile, §4.3 descrever a migração, §8 criar sessão dedicada) **e** configurar `type-check`/`lint`/test runner em `mobile/package.json`; só então uma sessão escopada migra o mobile para `toggle_rent_payment` e remove `mark_rent_paid` do backend (+ limpeza de imports mortos `RentPayment`/`cast`/`User` em `core/views.py`).
+> - **Audit (design §2/§8, escopo web)**: feature web completa — `RentScheduleService` (§4.1) + refactor DRY `DailyControlService` (§4.2) [S21], endpoints `rent_calendar`/`toggle_rent_payment` (§4.3) [S22], `use-rent-calendar` (hook + toggle optimistic) + grupo `rentCalendar` em query-keys (§6) [S23], 5 componentes do calendário + montagem em `page.tsx` (§6) [S24], consumidor web legado migrado (§4.3) [S25]. Sem referência morta a `mark_rent_paid`/`useMarkRentPaid` em `frontend/` (grep limpo). Único item de §4.3 não realizado — remoção de `mark_rent_paid` — registrado como **pendência de design** (saída B), não gap de implementação.
+> - **Verificação**: `npm run lint` (frontend inteiro) zero erros/avisos; `npm run type-check` (`tsc --noEmit`) limpo; `npm run test:unit` em `late-payments-alert.test.tsx` (5) + `use-dashboard.test.tsx` (10) = 15/15 verde. Backend não rodado (não tocado nesta sessão). Sem `# noqa`/`eslint-disable`/`@ts-ignore`.
 
 ---
 
