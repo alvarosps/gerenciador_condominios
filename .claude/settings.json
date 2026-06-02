@@ -1,36 +1,39 @@
 {
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "env": {
-    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
     "DJANGO_SETTINGS_MODULE": "condominios_manager.settings"
   },
   "permissions": {
     "allow": [
       "Bash(python manage.py runserver:*)",
-      "Bash(python manage.py migrate:*)",
       "Bash(python manage.py makemigrations:*)",
+      "Bash(python manage.py showmigrations:*)",
       "Bash(python manage.py createsuperuser:*)",
       "Bash(python manage.py shell:*)",
+      "Bash(python manage.py collectstatic:*)",
       "Bash(python -m pytest:*)",
       "Bash(pre-commit run:*)",
       "Bash(ruff:*)",
-      "Bash(ruff check:*)",
-      "Bash(ruff format:*)",
       "Bash(mypy:*)",
-      "Bash(cd frontend && npm run dev:*)",
-      "Bash(cd frontend && npm run build:*)",
-      "Bash(cd frontend && npm run lint:*)",
-      "Bash(cd frontend && npm run type-check:*)",
-      "Bash(cd frontend && npm run test:*)",
-      "Bash(cd frontend && npm install:*)",
+      "Bash(pyright:*)",
+      "Bash(npx pyright:*)",
+      "Bash(python scripts/backup_db.py:*)",
+      "Bash(python scripts/generate_metrics.py:*)",
       "Bash(npm run dev:*)",
       "Bash(npm run build:*)",
       "Bash(npm run lint:*)",
       "Bash(npm run type-check:*)",
       "Bash(npm run test:*)",
       "Bash(npm install:*)",
+      "Bash(docker compose up:*)",
+      "Bash(docker compose down:*)",
+      "Bash(docker compose ps:*)",
+      "Bash(docker compose logs:*)",
       "Bash(git status:*)",
       "Bash(git diff:*)",
       "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(git blame:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(git branch:*)",
@@ -40,16 +43,19 @@
       "Bash(git merge:*)",
       "Bash(git rebase:*)",
       "Bash(git fetch:*)",
-      "Bash(git remote -v:*)",
+      "Bash(git remote:*)",
       "Bash(git worktree:*)",
-      "Bash(docker-compose up:*)",
-      "Bash(docker-compose down:*)",
-      "Bash(docker-compose logs:*)",
-      "Bash(docker-compose ps:*)",
-      "Bash(python scripts/backup_db.py:*)",
-      "Bash(python scripts/generate_metrics.py:*)",
+      "Bash(git tag:*)",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(head:*)",
+      "Bash(tail:*)",
       "Bash(wc:*)",
-      "Bash(ls:*)"
+      "Bash(find:*)",
+      "Bash(rg:*)",
+      "Bash(which:*)",
+      "Bash(pwd:*)",
+      "Bash(node:*)"
     ],
     "deny": [
       "Bash(rm -rf:*)",
@@ -57,24 +63,40 @@
       "Bash(git push --force:*)",
       "Bash(git push -f:*)",
       "Bash(git clean -f:*)",
-      "Edit(file_path=*node_modules*)",
-      "Edit(file_path=*dist*)",
-      "Edit(file_path=*.next*)",
-      "Edit(file_path=*__pycache__*)",
-      "Edit(file_path=*.lock)",
-      "Edit(file_path=*package-lock.json)",
-      "Read(file_path=*.env)",
-      "Read(file_path=*.env.local)"
+      "Bash(python manage.py flush:*)",
+      "Bash(python manage.py sqlflush:*)",
+      "Bash(python manage.py sqlclear:*)",
+      "Bash(python manage.py reset_db:*)",
+      "Bash(python manage.py dbshell:*)",
+      "Read(.env)",
+      "Read(.env.local)",
+      "Read(.env.*.local)"
+    ],
+    "ask": [
+      "Bash(git push:*)",
+      "Bash(python manage.py migrate:*)"
     ]
   },
   "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash",
+            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/session-start.sh"]
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "Edit|Write",
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/hooks/pre-edit-scope.sh"
+            "command": "bash",
+            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/pre-edit-scope.sh"]
           }
         ]
       },
@@ -83,18 +105,13 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/hooks/pre-commit-conventional.sh"
-          }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": "Edit|Write",
-        "hooks": [
+            "command": "node",
+            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/conventional-commit.cjs"]
+          },
           {
             "type": "command",
-            "command": "bash .claude/hooks/post-edit-lint.sh"
+            "command": "bash",
+            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/pre-db-push-guard.sh"]
           }
         ]
       }

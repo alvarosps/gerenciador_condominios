@@ -1,8 +1,8 @@
 ---
 name: tester
-description: Writes and fixes tests. Use when tests need creation, are failing, or coverage needs improvement.
+description: Use PROACTIVELY when tests need creation, are failing, or coverage needs improvement.
 tools: Read, Write, Edit, Bash, Grep, Glob
-model: sonnet
+model: inherit
 isolation: worktree
 memory: project
 ---

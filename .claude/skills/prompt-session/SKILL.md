@@ -1,12 +1,12 @@
 ---
 name: prompt-session
-description: Use when executing a numbered implementation session (prompts/01-*.md through prompts/15-*.md). Loads the prompt, checks prerequisites, guides execution with TDD, and runs audit at the end.
+description: Use when executing a numbered implementation session (prompts/NN-*.md). Loads the prompt, checks prerequisites, guides execution with TDD, and runs the audit at the end.
 argument-hint: "[session-number, e.g. 03]"
 ---
 
 # Prompt Session Execution
 
-Session state: !`cat prompts/SESSION_STATE.md | head -30`
+Session state: !`head -30 prompts/SESSION_STATE.md`
 Current branch: !`git branch --show-current`
 
 ## Session Lifecycle
@@ -39,7 +39,7 @@ Read: prompts/00-prompt-standard.md     → Exemplar reference
 - If a prerequisite is "pendente", STOP and inform the user
 
 **Context loading:**
-- Read the design doc: `docs/plans/2026-03-21-financial-module-design.md` (only sections relevant to this session)
+- Read the design doc referenced by the prompt / SESSION_STATE.md (only the sections relevant to this session)
 - Read exemplar files referenced in the prompt (specific line ranges)
 - Load domain skill: `/financial` or `/admin` depending on scope
 
@@ -101,9 +101,11 @@ With all tests green:
 Run the complete verification:
 
 ```bash
-# Backend
+# Backend (canonical gate — see .claude/rules/coding-standards.md)
 ruff check
 ruff format --check
+mypy core/
+pyright
 python -m pytest tests/ -v --tb=short -x
 
 # Frontend (if this session touches frontend)
@@ -159,4 +161,5 @@ Audit: all acceptance criteria verified"
 For sessions that span backend + frontend (e.g., session 09):
 - Use `@implementer` agent (worktree-isolated) for backend
 - Use another `@implementer` for frontend
-- Each works in its own worktree, changes merged after both pass
+- Each works in its own worktree (branched from the DEFAULT branch, not the current feature branch)
+- Merge mechanics: after both pass, the parent reviews each worktree's diff and re-applies/cherry-picks it onto the feature branch. For tightly-coupled backend+frontend changes that must share one branch, prefer SEQUENTIAL execution to avoid divergent-base merge conflicts.

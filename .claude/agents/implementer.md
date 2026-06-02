@@ -1,8 +1,8 @@
 ---
 name: implementer
-description: Implements features following project patterns. Use for new code, endpoints, components, and services.
+description: Use PROACTIVELY to implement features following project patterns — new code, endpoints, components, and services (backend + frontend).
 tools: Read, Write, Edit, Bash, Grep, Glob
-model: sonnet
+model: inherit
 isolation: worktree
 ---
 
