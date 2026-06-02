@@ -19,7 +19,7 @@
 | 21 | Backend: `RentScheduleService` + refactor DRY do `DailyControlService` | concluída | `prompts/21-backend-rent-schedule-service.md` |
 | 22 | Backend: endpoints `rent_calendar` + `toggle_rent_payment` | concluída | `prompts/22-backend-rent-calendar-endpoints.md` |
 | 23 | Frontend: hooks `use-rent-calendar` (optimistic) + query-keys + MSW | concluída | `prompts/23-frontend-rent-calendar-hooks.md` |
-| 24 | Frontend: UI (5 componentes, grid date-fns) + montagem no dashboard | pendente | `prompts/24-frontend-rent-calendar-ui.md` |
+| 24 | Frontend: UI (5 componentes, grid date-fns) + montagem no dashboard | concluída | `prompts/24-frontend-rent-calendar-ui.md` |
 | 25 | Refator `late-payments-alert` → toggle unificado + remover `mark_rent_paid` + audit | pendente | `prompts/25-refactor-consumer-and-audit.md` |
 
 > Reaproveita `RentPayment` (pago = registro existe), `FeeCalculatorService` (multa) e `DateCalculatorService`. Sem novo model/migration. Calendário admin-only; respeita `MonthSnapshot` finalizado.
@@ -60,6 +60,23 @@
 > - Optimistic update v5 sobre **toda** a área `rentCalendar.all` via `getQueriesData`/`setQueryData` — a mutation **não** conhece year/month/buildingId; `onMutate` cancela + snapshota + faz flip imutável (`flipPaidByLease`), `onError` restaura o snapshot, `onSettled` invalida `rentCalendar` + `dashboard.latePaymentSummary` + `dashboard.financialSummary`.
 > - **Teste de flip determinístico sem mock de internals**: `createTestQueryClient` tem `gcTime:0`, então dado semeado via `setQueryData` sem observador é coletado num tick. Solução correta (exercita o caminho real query→cache→mutation): o handler GET popula o cache e um `useRentCalendar` montado mantém a entrada viva; o POST é sobrescrito com `delay(200)` para abrir a janela e o flip é asserido via `waitFor` lendo `queryClient.getQueryData(...)`. No teste de rollback, o refetch do `onSettled` é adiado (`delay`) e retorna `is_paid:true` (1º GET=false, GETs seguintes=true) — assim o `false` observado após o erro só pode vir do rollback, não do refetch; depois aguarda o refetch settlar para não deixar request pendente no teardown.
 > - `useMarkRentPaid` (`use-dashboard.ts`) e o endpoint `mark_rent_paid` permanecem **intactos** — removidos só na Sessão 25 (sem backward-compat shim; remoção deliberadamente adiada para manter todas as sessões verdes). Nenhuma UI nesta sessão. 6 testes passando; `type-check` e `lint` limpos.
+
+### Sessão 24 — Arquivos Criados
+- `frontend/app/(dashboard)/_components/rent-calendar/rent-calendar-section.tsx` — container `'use client'` (estado `{year,month}` + dia selecionado derivado de `data.today`, filtro de prédio via `useBuildings`, grid `grid-cols-1 lg:grid-cols-[1fr_1.5fr_1fr]`); único componente que consome hooks (`useRentCalendar`/`useToggleRentPayment`); deriva `reference_month` = `"YYYY-MM-01"` do mês carregado; sucesso → `toast.success`, erro → `handleError`.
+- `frontend/app/(dashboard)/_components/rent-calendar/rent-month-grid.tsx` — grade custom `date-fns` (`startOfMonth`/`getDay`/`getDaysInMonth`), células `role="gridcell"` com `aria-label`/`aria-selected`, chips por status, hoje (badge primary) e selecionado destacados, nav de mês, legenda.
+- `frontend/app/(dashboard)/_components/rent-calendar/rent-day-panel.tsx` — itens do dia (StatusChip pago/a vencer/em atraso com ícone+rótulo), highlight de atraso + multa, "Pago em DD/MM" via split ISO, `RentPaymentToggle` por item (deriva `disabledReason`), botões "Hoje"/"Próx. vencimento", empty state, `TooltipProvider` na árvore.
+- `frontend/app/(dashboard)/_components/rent-calendar/rent-stats-panel.tsx` — 4 cards (Mês via `formatMonthYear`, Recebido, A receber c/ trecho de atraso condicional, Kitnets vagos).
+- `frontend/app/(dashboard)/_components/rent-calendar/rent-payment-toggle.tsx` — Radix Switch apresentacional + Tooltip com `disabledReason` (aria-label) quando bloqueado.
+- `frontend/app/(dashboard)/_components/rent-calendar/__tests__/*.test.tsx` — 5 arquivos, 28 testes (toggle, day-panel, month-grid, stats, section). Section mocka só a fronteira de dados (`useRentCalendar`/`useToggleRentPayment`/`useBuildings`) via `vi.spyOn`.
+
+### Sessão 24 — Arquivos Modificados
+- `frontend/app/(dashboard)/page.tsx` — `<RentCalendarSection />` montado no topo da `<div className="space-y-6">`, acima de `<FinancialSummaryWidget />`.
+
+> **Nota Sessão 24**:
+> - **`formatMonthYear` retorna "Junho de 2026" (com " de "), não "Junho/2026"** neste ambiente (ICU do Node/jsdom). O prompt previa barra; a regra do projeto manda asserir a saída real. Os testes asseram `formatMonthYear(year, month)` (DRY/robusto a build de ICU) em vez de string literal.
+> - **Acessibilidade da grade**: células de dia são `role="gridcell"` dentro de `role="grid"`; seleção via `aria-selected` (não `aria-pressed`, inválido em gridcell). Status nunca só por cor — sempre ícone + rótulo.
+> - `late-payments-alert.tsx`, `use-dashboard.ts`/`useMarkRentPaid` e o endpoint backend `mark_rent_paid` permanecem **intactos** — refator do consumidor unificado + remoção do `mark_rent_paid` é a **Sessão 25**.
+> - Verificação: `npx vitest run "app/(dashboard)/_components/rent-calendar"` 28/28 verde; `tsc --noEmit` sem erros nos arquivos tocados; `eslint` zero erros/avisos. Sem `# noqa`/`eslint-disable`/`@ts-ignore`; sem `as`/`!` em produção (apenas em helpers de fixture de teste, conforme carve-out).
 
 ---
 
