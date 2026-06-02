@@ -13,7 +13,7 @@ Ler antes de escrever qualquer código:
 - **Design doc (ler §4.1, §4.2, §4.3, §4.4, §4.5, §5 inteiras)**: `@docs/plans/2026-06-02-rent-payment-calendar-design.md`
 - **Padrão de prompts/TDD**: `@prompts/00-prompt-standard.md`
 - **Estado das sessões**: `@prompts/SESSION_STATE.md`
-- **Regras do projeto**: `CLAUDE.md`, `.claude/rules/architecture.md`, `.claude/rules/coding-standards.md`, `.claude/rules/testing.md`, `.claude/rules/design-principles.md`
+- **Regras do projeto**: `CLAUDE.md`, `.claude/rules/architecture.md`, `.claude/rules/coding-standards.md`, `tests/CLAUDE.md`, `.claude/rules/design-principles.md`
 
 ### Exemplares (arquivo:linha — ler antes de codar)
 
@@ -186,7 +186,7 @@ Implicações obrigatórias:
 
 ## TDD — ciclo obrigatório (Red → Green → Refactor → Verify)
 
-> Mock policy (`.claude/rules/testing.md`): **mockar APENAS fronteiras externas**. Aqui isso significa **somente `freezegun`** para congelar a data (relógio do sistema). **NUNCA** mockar ORM, services internos, `FeeCalculatorService`, `DateCalculatorService` ou código de biblioteca. Banco real via `--reuse-db`. Dados via factories (`model-bakery`).
+> Mock policy (`tests/CLAUDE.md`): **mockar APENAS fronteiras externas**. Aqui isso significa **somente `freezegun`** para congelar a data (relógio do sistema). **NUNCA** mockar ORM, services internos, `FeeCalculatorService`, `DateCalculatorService` ou código de biblioteca. Banco real via `--reuse-db`. Dados via factories (`model-bakery`).
 
 ### 1. RED — escrever os testes primeiro
 

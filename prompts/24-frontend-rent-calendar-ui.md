@@ -11,7 +11,7 @@ Ler antes de tocar em qualquer arquivo:
 - Padrão de prompts (estrutura/exemplares): `@prompts/00-prompt-standard.md`
 - Estado das sessões: `@prompts/SESSION_STATE.md` (confirmar que Sessão 23 está concluída antes de começar)
 - Mockup visual (light + dark, layout das 3 colunas, estados de status, chips, cards): `@docs/mockups/rent-calendar-mockup.html`
-- Regras do projeto: `CLAUDE.md`, `frontend/CLAUDE.md`, `.claude/rules/frontend.md`, `.claude/rules/coding-standards.md`, `.claude/rules/testing.md`, `.claude/rules/design-principles.md`
+- Regras do projeto: `CLAUDE.md`, `frontend/CLAUDE.md`, `frontend/CLAUDE.md`, `.claude/rules/coding-standards.md`, `tests/CLAUDE.md`, `.claude/rules/design-principles.md`
 
 ### Exemplares (arquivo:linha — exemplar > descrição, abrir e seguir)
 - **Estilos/tokens, lucide, sonner, `formatCurrency`, `handleError`, parsing de data ISO sem timezone**:
@@ -65,7 +65,7 @@ do módulo** — nunca recriar/duplicar os tipos aqui (DRY, sem re-export).
 
 ## Especificação
 
-Direção de dados (regra `.claude/rules/frontend.md`): os componentes **recebem props** ou consomem hooks
+Direção de dados (regra `frontend/CLAUDE.md`): os componentes **recebem props** ou consomem hooks
 da Sessão 23. **Nenhum componente chama `apiClient`/axios diretamente.** Apenas `rent-calendar-section.tsx`
 chama os hooks (`useRentCalendar`, `useToggleRentPayment`, `useBuildings`); os demais são puros (props in, callbacks out).
 

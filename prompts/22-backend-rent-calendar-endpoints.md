@@ -8,7 +8,7 @@ Ler **antes de tocar em código**:
 - Design completo: @docs/plans/2026-06-02-rent-payment-calendar-design.md — focar em §4.3 (endpoints), §4.4 (regras do toggle), §4.5 (cálculo de stats), §3 (premissas A1–A5).
 - Estado das sessões: @prompts/SESSION_STATE.md (confirmar que a sessão 21 está concluída — `RentScheduleService` existe e seus unit tests passam).
 - Padrão de prompts: @prompts/00-prompt-standard.md.
-- Regras do projeto: @CLAUDE.md, @.claude/rules/architecture.md, @.claude/rules/coding-standards.md, @.claude/rules/testing.md, @.claude/rules/design-principles.md, @.claude/rules/api-design.md, @.claude/rules/security.md.
+- Regras do projeto: @CLAUDE.md, @.claude/rules/architecture.md, @.claude/rules/coding-standards.md, @tests/CLAUDE.md, @.claude/rules/design-principles.md, @.claude/rules/architecture.md, @.claude/rules/security.md.
 
 Exemplares concretos (ler estes — exemplar > descrição):
 - **`DashboardViewSet` + padrão `@action`**: `core/views.py:578-789`. Estrutura do ViewSet (`viewsets.ViewSet`, `permission_classes = [IsAdminUser]` em `:598`), actions GET (`late_payment_summary` `:668-696`, `building_statistics` `:644-666`) e a action POST a unificar mais tarde (`mark_rent_paid` `:722-775`).
@@ -93,7 +93,7 @@ Cenários a cobrir (mínimo):
 - `lease_id` ausente → `400`; `reference_month` ausente/inválido (ex.: `"2026-13-01"`) → `400`.
 - Não autenticado → `401`; não-admin → `403`.
 
-**Mock policy** (`.claude/rules/testing.md`): mockar **apenas** boundaries externos. Tempo via `freezegun`. **NUNCA** mockar `RentScheduleService`, ORM, serializers, ou DRF — exercitar o caminho real View → Service → Model com banco de teste (`--reuse-db`). `model-bakery` para dados; nada de criação manual com ORM cru fora dos helpers.
+**Mock policy** (`tests/CLAUDE.md`): mockar **apenas** boundaries externos. Tempo via `freezegun`. **NUNCA** mockar `RentScheduleService`, ORM, serializers, ou DRF — exercitar o caminho real View → Service → Model com banco de teste (`--reuse-db`). `model-bakery` para dados; nada de criação manual com ORM cru fora dos helpers.
 
 Rodar (devem falhar — actions ainda não existem):
 ```bash

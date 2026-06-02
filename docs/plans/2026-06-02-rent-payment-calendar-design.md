@@ -199,7 +199,7 @@ Servidor **sempre revalida** (defesa em profundidade); mensagens de erro em PT.
 - Skeletons no loading; empty states ("Nenhum vencimento neste dia" / "Todos alugados").
 - `formatCurrency`/`handleError` (`lib/utils/`), datas DD/MM/YYYY (`date-fns` + ptBR). PT no usuário, EN nos logs.
 
-## 7. Testes (regras `.claude/rules/testing.md`)
+## 7. Testes (regras `tests/CLAUDE.md`)
 
 - **Backend unit** (`tests/unit/test_financial/test_rent_schedule_service.py`): clamping (31→fev/abr); valor efetivo c/ aumento pendente; `collectible_leases` (exclui owner/offset/prepaid; janela de datas); toggle cria+soft-delete; guards (pago+dia-passou recusa; mês finalizado bloqueia); stats (received/to_receive/vacant). `model-bakery` + `freezegun`.
 - **Backend integração** (`tests/integration/test_rent_calendar_api.py`): `rent_calendar` (dias/stats), toggle cria↔apaga, permissão (non-admin 403), filtro por prédio. + regressão `DailyControlService`.
