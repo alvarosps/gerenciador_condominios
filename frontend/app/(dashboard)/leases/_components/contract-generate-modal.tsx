@@ -44,7 +44,6 @@ export function ContractGenerateModal({ open, lease, onClose }: Props) {
 
   const handleDownload = () => {
     if (pdfPath) {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8008/api';
       // Extract relative path from full Windows/Linux path (e.g., "C:\...\contracts\836\file.pdf" -> "contracts/836/file.pdf")
       // In production, the path might be "/opt/render/.../media/file.pdf", so we match either contracts/ or media/
       const relativePath = pdfPath.replace(/\\/g, '/').replace(/^.*?(contracts\/|media\/)/, '$1');
