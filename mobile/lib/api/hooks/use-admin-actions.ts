@@ -9,10 +9,15 @@ interface PaginatedResponse<T> {
   results: T[];
 }
 
-interface MarkRentPaidInput {
+interface ToggleRentPaymentInput {
   lease_id: number;
   reference_month: string;
-  amount_paid: string;
+}
+
+interface ToggleRentPaymentResult {
+  status: string;
+  is_paid: boolean;
+  message: string;
 }
 
 interface ReviewProofInput {
@@ -34,12 +39,15 @@ interface LateFeeResult {
   message?: string;
 }
 
-export function useMarkRentPaid() {
+export function useToggleRentPayment() {
   const qc = useQueryClient();
-  return useMutation<void, Error, MarkRentPaidInput>({
+  return useMutation<ToggleRentPaymentResult, Error, ToggleRentPaymentInput>({
     mutationFn: async (input) => {
-      // Note: backend always books current month. reference_month is sent for future support.
-      await apiClient.post("/dashboard/mark_rent_paid/", input);
+      const response = await apiClient.post<ToggleRentPaymentResult>(
+        "/dashboard/toggle_rent_payment/",
+        input,
+      );
+      return response.data;
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["admin", "dashboard"] });

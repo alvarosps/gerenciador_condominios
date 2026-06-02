@@ -11,8 +11,8 @@
 
 **Design Doc**: `docs/plans/2026-06-02-rent-payment-calendar-design.md`
 **Mockup**: `docs/mockups/rent-calendar-mockup.html` (light + dark)
-**Status**: **web concluída** (sessões 21–25). Remoção do backend `mark_rent_paid` **bloqueada** (saída B — ver Sessão 25): app `mobile/` é consumidor vivo, fora do escopo do design doc e inverificável.
-**Ordem**: 21 → 22 → 23 → 24 → 25 (sequencial; `mark_rent_paid` só seria removido na 25, mas ficou bloqueado pela tensão mobile)
+**Status**: **CONCLUÍDA** (sessões 21–25 + unificação final). Web e mobile migrados para o toggle unificado; `mark_rent_paid` removido do backend.
+**Ordem**: 21 → 22 → 23 → 24 → 25 (sequencial). Pós-25: consumidor `mobile/` (`use-admin-actions.ts` → `useToggleRentPayment` + tela `mark-paid.tsx`) migrado para `toggle_rent_payment`; `mark_rent_paid` e o import órfão `RentPayment` removidos de `core/views.py`. Verificado: ruff/format ok, 19 testes de API verdes, `tsc --noEmit` limpo nos arquivos mobile editados, zero referências remanescentes.
 
 | # | Sessão | Status | Arquivo |
 |---|--------|--------|---------|
@@ -20,7 +20,7 @@
 | 22 | Backend: endpoints `rent_calendar` + `toggle_rent_payment` | concluída | `prompts/22-backend-rent-calendar-endpoints.md` |
 | 23 | Frontend: hooks `use-rent-calendar` (optimistic) + query-keys + MSW | concluída | `prompts/23-frontend-rent-calendar-hooks.md` |
 | 24 | Frontend: UI (5 componentes, grid date-fns) + montagem no dashboard | concluída | `prompts/24-frontend-rent-calendar-ui.md` |
-| 25 | Refator `late-payments-alert` → toggle unificado + audit (remoção de `mark_rent_paid` **bloqueada** — saída B) | concluída | `prompts/25-refactor-consumer-and-audit.md` |
+| 25 | Refator consumidores (web `late-payments-alert` + mobile `mark-paid`) → toggle unificado; `mark_rent_paid` removido do backend + audit | concluída | `prompts/25-refactor-consumer-and-audit.md` |
 
 > Reaproveita `RentPayment` (pago = registro existe), `FeeCalculatorService` (multa) e `DateCalculatorService`. Sem novo model/migration. Calendário admin-only; respeita `MonthSnapshot` finalizado.
 
