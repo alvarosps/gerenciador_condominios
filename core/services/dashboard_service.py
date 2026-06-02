@@ -20,6 +20,7 @@ from django.db.models import Count, DateField, Q, Sum
 from django.db.models.expressions import RawSQL
 from django.db.models.functions import Coalesce
 from django.utils import timezone
+from django.conf import settings
 
 from core.cache import cache_result
 from core.models import Apartment, Building, Dependent, Lease, RentPayment, Tenant
@@ -112,7 +113,7 @@ class DashboardService:
         # Calculate occupancy rate and revenue per apartment
         occupancy_rate = (rented_apartments / total_apartments * 100) if total_apartments > 0 else 0
         revenue_per_apartment = (
-            (total_revenue / rented_apartments) if rented_apartments > 0 else Decimal("0.00")
+            (total_income / rented_apartments) if rented_apartments > 0 else Decimal("0.00")
         )
 
         summary = {
@@ -228,24 +229,37 @@ class DashboardService:
             - total_revenue: Total monthly revenue from building
 
         Example:
-            >>> stats = DashboardService.get_building_statistics()
-            >>> for building_stat in stats:
-            ...     print(
-            ...         f"Building {building_stat['building_number']}: "
-            ...         f"{building_stat['occupancy_rate']}% occupied"
-            ...     )
+        Get aggregated statistics per building.
+        Returns total/rented/vacant apartments and revenue per building.
+        Cached for 5 minutes as it requires complex aggregation.
         """
         logger.info("Calculating building statistics")
 
-        # Use annotations for efficient aggregation - single query instead of N+1
+        # Get building counts
         buildings = Building.objects.annotate(
-            total_apartments=Count("apartments"),
-            rented_apartments=Count("apartments", filter=Q(apartments__is_rented=True)),
-            total_revenue=Coalesce(
-                Sum("apartments__rental_value", filter=Q(apartments__is_rented=True)),
-                Decimal("0.00"),
+            total_apartments=Count("apartments", distinct=True),
+            rented_apartments=Count(
+                "apartments", filter=Q(apartments__is_rented=True), distinct=True
             ),
-        ).values("id", "street_number", "total_apartments", "rented_apartments", "total_revenue")
+        ).values("id", "street_number", "total_apartments", "rented_apartments")
+
+        # Get revenue per building including fees
+        revenue_per_building = (
+            Lease.objects.filter(apartment__is_rented=True, is_deleted=False)
+            .values("apartment__building_id")
+            .annotate(
+                sum_rental=Coalesce(Sum("rental_value"), Decimal("0.00")),
+                sum_cleaning=Coalesce(Sum("apartment__cleaning_fee"), Decimal("0.00")),
+                sum_tag=Coalesce(Sum("tag_fee"), Decimal("0.00")),
+            )
+        )
+
+        revenue_map = {
+            item["apartment__building_id"]: item["sum_rental"]
+            + item["sum_cleaning"]
+            + item["sum_tag"]
+            for item in revenue_per_building
+        }
 
         building_stats = []
 
@@ -257,7 +271,7 @@ class DashboardService:
             occupancy_rate = (
                 (rented_apartments / total_apartments * 100) if total_apartments > 0 else 0
             )
-            total_revenue = building["total_revenue"] or Decimal("0.00")
+            total_revenue = revenue_map.get(building["id"], Decimal("0.00"))
 
             building_stats.append(
                 {
@@ -299,60 +313,74 @@ class DashboardService:
 
         today = timezone.now().date()
         month_start = today.replace(day=1)
-        _, days_in_month = cal.monthrange(today.year, today.month)
 
         late_leases = []
         total_late_fees = Decimal("0.00")
         total_late_days = 0
 
-        # Check active leases, excluding special cases (same filters as daily_control_service)
+        # Check active leases, excluding special cases
         active_leases = (
-            Lease.objects.filter(apartment__is_rented=True)
+            Lease.objects.filter(apartment__is_rented=True, is_deleted=False)
             .exclude(apartment__owner__isnull=False)
             .exclude(prepaid_until__gte=month_start)
             .exclude(is_salary_offset=True)
             .select_related("apartment", "apartment__building", "responsible_tenant")
         )
 
-        # Get rent payments for the current month to check which leases are already paid
-        paid_lease_ids = set(
-            RentPayment.objects.filter(reference_month=month_start).values_list(
-                "lease_id", flat=True
-            )
-        )
+        # Fetch all rent payments to build a ledger up to the current month
+        all_payments = RentPayment.objects.filter(
+            lease__in=active_leases,
+            reference_month__lte=month_start
+        ).values("lease_id", "reference_month", "payment_date")
 
-        # Get last payment for each lease (most recent before current month)
+        payments_by_lease = {}
         last_payments: dict[int, date] = {}
-        for rp in (
-            RentPayment.objects.filter(
-                lease__in=active_leases,
-            )
-            .order_by("lease_id", "-reference_month")
-            .distinct("lease_id")
-            .values("lease_id", "payment_date")
-        ):
-            last_payments[rp["lease_id"]] = rp["payment_date"]
+        for p in all_payments:
+            lid = p["lease_id"]
+            payments_by_lease.setdefault(lid, set()).add(p["reference_month"])
+
+            existing_last = last_payments.get(lid)
+            if not existing_last or p["payment_date"] > existing_last:
+                last_payments[lid] = p["payment_date"]
 
         for lease in active_leases:
-            # Skip leases that already have a payment for this month
-            if lease.id in paid_lease_ids:
+            lease_payments = payments_by_lease.get(lease.id, set())
+            start_month = lease.start_date.replace(day=1)
+
+            if start_month > month_start:
                 continue
 
-            due_day = min(lease.responsible_tenant.due_day, days_in_month)
+            curr_month_iter = start_month
+            lease_late_months_count = 0
+            lease_total_late_fee = Decimal("0.00")
+            lease_total_late_days = 0
 
-            # Calculate if payment is late
-            result = FeeCalculatorService.calculate_late_fee(
-                rental_value=lease.rental_value,
-                due_day=due_day,
-                current_date=today,
-            )
+            while curr_month_iter <= month_start:
+                if curr_month_iter not in lease_payments:
+                    _, days_in_curr_month = cal.monthrange(
+                        curr_month_iter.year, curr_month_iter.month
+                    )
+                    due_day = min(lease.responsible_tenant.due_day, days_in_curr_month)
+                    due_date = curr_month_iter.replace(day=due_day)
 
-            if result["is_late"]:
-                late_days = cast(int, result["late_days"])
-                late_fee = cast(Decimal, result["late_fee"])
-                total_late_fees += late_fee
-                total_late_days += late_days
+                    if today > due_date:
+                        late_days = (today - due_date).days
+                        daily_rate = FeeCalculatorService.calculate_daily_rate(lease.rental_value)
+                        late_fee_percentage = Decimal(str(settings.LATE_FEE_PERCENTAGE))
+                        late_fee = daily_rate * late_days * late_fee_percentage
 
+                        lease_late_months_count += 1
+                        lease_total_late_fee += late_fee
+                        lease_total_late_days += late_days
+
+                from core.services.date_calculator import DateCalculatorService
+                curr_month_iter = DateCalculatorService.next_month_start(
+                    curr_month_iter.year, curr_month_iter.month
+                )
+
+            if lease_late_months_count > 0:
+                total_late_fees += lease_total_late_fee
+                total_late_days += lease_total_late_days
                 last_payment_date = last_payments.get(lease.id)
 
                 late_leases.append(
@@ -362,21 +390,22 @@ class DashboardService:
                         "building_number": lease.apartment.building.street_number,
                         "tenant_name": lease.responsible_tenant.name,
                         "rental_value": str(lease.rental_value),
-                        "due_day": due_day,
-                        "late_days": late_days,
-                        "late_fee": str(late_fee.quantize(Decimal("0.01"))),
+                        "due_day": lease.responsible_tenant.due_day,
+                        "late_days": lease_total_late_days,
+                        "late_fee": str(lease_total_late_fee.quantize(Decimal("0.01"))),
+                        "late_months": lease_late_months_count,
                         "last_payment_date": (
                             last_payment_date.isoformat() if last_payment_date else None
                         ),
                     }
                 )
 
-        average_late_days = total_late_days / len(late_leases) if late_leases else 0
+        average_late_days = (total_late_days / len(late_leases)) if late_leases else 0
 
         summary = {
             "total_late_leases": len(late_leases),
             "total_late_fees": str(total_late_fees.quantize(Decimal("0.01"))),
-            "average_late_days": round(average_late_days, 1),
+            "average_late_days": round(float(average_late_days), 1),
             "late_leases": late_leases,
         }
 
@@ -411,22 +440,37 @@ class DashboardService:
         logger.info("Calculating tenant statistics")
 
         # Aggregate tenant counts
-        tenant_stats = Tenant.objects.aggregate(
+        tenant_stats = Tenant.objects.filter(
+            Q(leases_responsible__is_deleted=False) | Q(leases__is_deleted=False)
+        ).distinct().aggregate(
             total_tenants=Count("id"),
             individual_tenants=Count("id", filter=Q(is_company=False)),
             company_tenants=Count("id", filter=Q(is_company=True)),
         )
 
         # Count tenants with dependents
-        tenants_with_dependents = Tenant.objects.filter(dependents__isnull=False).distinct().count()
+        tenants_with_dependents = (
+            Tenant.objects.filter(
+                Q(leases_responsible__is_deleted=False) | Q(leases__is_deleted=False),
+                dependents__isnull=False,
+            )
+            .distinct()
+            .count()
+        )
 
-        # Count total dependents
-
-        total_dependents = Dependent.objects.count()
+        # Count total dependents of active tenants
+        total_dependents = Dependent.objects.filter(
+            tenant__in=Tenant.objects.filter(
+                Q(leases_responsible__is_deleted=False) | Q(leases__is_deleted=False)
+            )
+        ).count()
 
         # Get marital status distribution using values().annotate() - single query
         marital_status_qs = (
-            Tenant.objects.filter(is_company=False)
+            Tenant.objects.filter(
+                Q(leases_responsible__is_deleted=False) | Q(leases__is_deleted=False),
+                is_company=False,
+            )
             .values("marital_status")
             .annotate(count=Count("id"))
         )

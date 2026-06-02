@@ -11,7 +11,7 @@
 - Ler design doc por inteiro: @docs/plans/2026-06-02-rent-payment-calendar-design.md — em especial §2 (Escopo: `:25-40`), §4.3 (Endpoints / unificação de `mark_rent_paid`: `:134,:138`), §4.4 (Regras do toggle) e §8 (Sessões: `:213-216`, linha de hooks/componente `:227-228`).
 - Ler padrão de prompts: @prompts/00-prompt-standard.md
 - Ler estado anterior: @prompts/SESSION_STATE.md e @prompts/ROADMAP.md
-- Regras do projeto (precedência sobre tudo): @CLAUDE.md, @.claude/rules/architecture.md, @.claude/rules/coding-standards.md, @.claude/rules/testing.md, @.claude/rules/design-principles.md, @.claude/rules/api-design.md, @.claude/rules/security.md
+- Regras do projeto (precedência sobre tudo): @CLAUDE.md, @.claude/rules/architecture.md, @.claude/rules/coding-standards.md, @tests/CLAUDE.md, @.claude/rules/design-principles.md, @.claude/rules/architecture.md, @.claude/rules/security.md
 
 ### Escopo definido pelo design doc (literal — não expandir)
 
@@ -138,7 +138,7 @@ Também grep por testes backend: `Grep "mark_rent_paid" tests/`.
 
 ### 2. Red — atualizar testes web primeiro
 - **Frontend (`late-payments-alert.test.tsx`)**: trocar a fonte do mock de `useMarkRentPaid` (`@/lib/api/hooks/use-dashboard`) para `useToggleRentPayment` (`@/lib/api/hooks/use-rent-calendar`). Ajustar o tipo do retorno mockado para `ReturnType<typeof rentCalendarHooks.useToggleRentPayment>`. Adicionar/garantir um teste de **regressão**: ao clicar em "Pago", `toggle.mutate` é chamado com `{ lease_id, reference_month }` onde `reference_month` termina em `-01` (primeiro dia do mês). Rodar — deve **falhar** (componente ainda usa `useMarkRentPaid`).
-- **Mock policy** (`.claude/rules/testing.md`): este teste de componente mocka o **hook de fronteira** via `vi.spyOn` (a fronteira de rede já é coberta por MSW nos testes de hook da sessão 23). Não mockar lógica interna do componente. Mantém o padrão já existente neste arquivo de teste (que faz spy no hook).
+- **Mock policy** (`tests/CLAUDE.md`): este teste de componente mocka o **hook de fronteira** via `vi.spyOn` (a fronteira de rede já é coberta por MSW nos testes de hook da sessão 23). Não mockar lógica interna do componente. Mantém o padrão já existente neste arquivo de teste (que faz spy no hook).
 
 ### 3. Green — implementar a migração web (e, sob saída A, a remoção backend)
 1. `late-payments-alert.tsx` → usar `useToggleRentPayment` com `{ lease_id, reference_month }`.
