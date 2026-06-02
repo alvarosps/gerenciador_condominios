@@ -7,6 +7,35 @@
 
 ---
 
+## Feature: Calendário de Controle de Aluguéis (Dashboard) — Sessões 21–25
+
+**Design Doc**: `docs/plans/2026-06-02-rent-payment-calendar-design.md`
+**Mockup**: `docs/mockups/rent-calendar-mockup.html` (light + dark)
+**Status**: planejada (prompts escritos, implementação pendente)
+**Ordem**: 21 → 22 → 23 → 24 → 25 (sequencial; `mark_rent_paid` só é removido na 25)
+
+| # | Sessão | Status | Arquivo |
+|---|--------|--------|---------|
+| 21 | Backend: `RentScheduleService` + refactor DRY do `DailyControlService` | concluída | `prompts/21-backend-rent-schedule-service.md` |
+| 22 | Backend: endpoints `rent_calendar` + `toggle_rent_payment` | pendente | `prompts/22-backend-rent-calendar-endpoints.md` |
+| 23 | Frontend: hooks `use-rent-calendar` (optimistic) + query-keys + MSW | pendente | `prompts/23-frontend-rent-calendar-hooks.md` |
+| 24 | Frontend: UI (5 componentes, grid date-fns) + montagem no dashboard | pendente | `prompts/24-frontend-rent-calendar-ui.md` |
+| 25 | Refator `late-payments-alert` → toggle unificado + remover `mark_rent_paid` + audit | pendente | `prompts/25-refactor-consumer-and-audit.md` |
+
+> Reaproveita `RentPayment` (pago = registro existe), `FeeCalculatorService` (multa) e `DateCalculatorService`. Sem novo model/migration. Calendário admin-only; respeita `MonthSnapshot` finalizado.
+
+### Sessão 21 — Arquivos Criados
+- `core/services/rent_schedule_service.py` — `RentScheduleService` (6 `@staticmethod`: `clamp_due_day`, `effective_rental_value`, `collectible_leases`, `get_month_schedule`, `get_month_stats`, `toggle_payment`) + `received_total` (definição canônica) + `DAYS_OF_WEEK_PT` (fonte única)
+- `tests/unit/test_financial/test_rent_schedule_service.py` — 34 testes unitários (clamp, valor efetivo, cobrabilidade date-aware, schedule/item, cross-month sem multa, stats, toggle + guards)
+
+### Sessão 21 — Arquivos Modificados
+- `core/services/daily_control_service.py` — `_collect_entries_by_day` (porção aluguel), `_get_expected_rent_total` e `_get_received_rent_total` delegam a `RentScheduleService`; `DAYS_OF_WEEK_PT` importado da fonte única; removido import morto `DateCalculatorService` e import não usado `Lease`
+- `tests/unit/test_financial/test_daily_control_service.py` — **apenas** `start_date` da fixture `lease` (de `2025-01-01` para `2025-06-01`) para a janela cobrir mar/2026 sob o filtro date-aware; nenhum corpo/assert alterado
+
+> **Nota Sessão 21**: Fonte única `RentScheduleService` (cobrabilidade date-aware, independe de `apartment.is_rented`); `DailyControlService` delega (DRY: `collectible_leases` + `received_total` único); fixture `lease` ajustada (`start_date`) para cobrir mar/2026; multa só no mês corrente (cross-month → `late_fee="0.00"`/`late_days=0`); 16 testes do DailyControl verdes; novo arquivo 100% mypy/pyright limpo; sem endpoints/frontend; `mark_rent_paid` removido apenas na Sessão 25. Falha pré-existente (não relacionada) em `tests/e2e/test_financial_workflow.py::test_daily_control_breakdown` (porção de installments/exits, fora do escopo desta sessão).
+
+---
+
 ## Progresso por Sessão
 
 | # | Sessão | Status | Notas |

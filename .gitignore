@@ -92,3 +92,6 @@ nul
 *.tmp
 *.bak
 *.cache
+
+# Visual Companion (brainstorming mockups)
+.superpowers/
