@@ -150,6 +150,21 @@ class TestGetMonthlyIncome:
         result = CashFlowService.get_monthly_income(2026, 3)
         assert len(result["rent_details"]) == 0
 
+    def test_prepaid_boundary_includes_month_whose_due_equals_prepaid_until(
+        self, lease: Lease
+    ) -> None:
+        """Pay-to-live: the month whose clamped due date equals prepaid_until is the NEXT
+        installment due and must be counted (regression for the month-start off-by-one).
+        Tenant due_day=10."""
+        lease.prepaid_until = date(2026, 6, 10)
+        lease.save()
+        # May: due 10/05 < prepaid_until 10/06 -> already paid -> excluded.
+        assert len(CashFlowService.get_monthly_income(2026, 5)["rent_details"]) == 0
+        # June: due 10/06 == prepaid_until -> next one due -> INCLUDED.
+        june = CashFlowService.get_monthly_income(2026, 6)
+        assert len(june["rent_details"]) == 1
+        assert june["rent_income"] == Decimal("1500.00")
+
     def test_excludes_salary_offset_lease(self, lease: Lease) -> None:
         lease.is_salary_offset = True
         lease.save()

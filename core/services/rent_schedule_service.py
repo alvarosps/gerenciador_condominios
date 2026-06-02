@@ -57,6 +57,23 @@ class RentScheduleService:
         return min(due_day, days_in_month)
 
     @staticmethod
+    def is_prepaid_for_month(lease: Lease, year: int, month: int) -> bool:
+        """Whether the month's rent installment is already covered by prepayment.
+
+        Pay-to-live: the installment due on the clamped due day of (year, month) covers
+        ``[due_date .. next month's due date]``. It is already paid only if
+        ``prepaid_until`` is strictly AFTER that due date. The installment falling exactly
+        on ``prepaid_until`` is the NEXT one due and is NOT prepaid. Compares against the
+        clamped due date, never the month start (which causes an off-by-one).
+        """
+        if lease.prepaid_until is None:
+            return False
+        clamped_due = RentScheduleService.clamp_due_day(
+            lease.responsible_tenant.due_day, year, month
+        )
+        return lease.prepaid_until > date(year, month, clamped_due)
+
+    @staticmethod
     def effective_rental_value(lease: Lease, reference_month: date) -> Decimal:
         """Effective rent for the month.
 
@@ -121,16 +138,11 @@ class RentScheduleService:
             )
             if end_date < reference_month:
                 continue
-            # Pay-to-live prepaid boundary: the month's installment (due on the clamped
-            # due day) is already paid only if prepaid_until is strictly AFTER that due
-            # date. The installment falling exactly on prepaid_until is the next one due
-            # and must stay collectible (off-by-one if compared against month start).
-            if lease.prepaid_until is not None:
-                clamped_due = RentScheduleService.clamp_due_day(
-                    lease.responsible_tenant.due_day, year, month
-                )
-                if lease.prepaid_until > date(year, month, clamped_due):
-                    continue
+            # Pay-to-live prepaid boundary (single source: is_prepaid_for_month). The month
+            # whose due date equals prepaid_until is the next installment due and stays
+            # collectible — comparing against month start would be an off-by-one.
+            if RentScheduleService.is_prepaid_for_month(lease, year, month):
+                continue
             collectible_ids.append(lease.pk)
         return queryset.filter(id__in=collectible_ids)
 
