@@ -17,7 +17,7 @@
 | # | Sessão | Status | Arquivo |
 |---|--------|--------|---------|
 | 21 | Backend: `RentScheduleService` + refactor DRY do `DailyControlService` | concluída | `prompts/21-backend-rent-schedule-service.md` |
-| 22 | Backend: endpoints `rent_calendar` + `toggle_rent_payment` | pendente | `prompts/22-backend-rent-calendar-endpoints.md` |
+| 22 | Backend: endpoints `rent_calendar` + `toggle_rent_payment` | concluída | `prompts/22-backend-rent-calendar-endpoints.md` |
 | 23 | Frontend: hooks `use-rent-calendar` (optimistic) + query-keys + MSW | pendente | `prompts/23-frontend-rent-calendar-hooks.md` |
 | 24 | Frontend: UI (5 componentes, grid date-fns) + montagem no dashboard | pendente | `prompts/24-frontend-rent-calendar-ui.md` |
 | 25 | Refator `late-payments-alert` → toggle unificado + remover `mark_rent_paid` + audit | pendente | `prompts/25-refactor-consumer-and-audit.md` |
@@ -33,6 +33,19 @@
 - `tests/unit/test_financial/test_daily_control_service.py` — **apenas** `start_date` da fixture `lease` (de `2025-01-01` para `2025-06-01`) para a janela cobrir mar/2026 sob o filtro date-aware; nenhum corpo/assert alterado
 
 > **Nota Sessão 21**: Fonte única `RentScheduleService` (cobrabilidade date-aware, independe de `apartment.is_rented`); `DailyControlService` delega (DRY: `collectible_leases` + `received_total` único); fixture `lease` ajustada (`start_date`) para cobrir mar/2026; multa só no mês corrente (cross-month → `late_fee="0.00"`/`late_days=0`); 16 testes do DailyControl verdes; novo arquivo 100% mypy/pyright limpo; sem endpoints/frontend; `mark_rent_paid` removido apenas na Sessão 25. Falha pré-existente (não relacionada) em `tests/e2e/test_financial_workflow.py::test_daily_control_breakdown` (porção de installments/exits, fora do escopo desta sessão).
+
+### Sessão 22 — Arquivos Criados
+- `tests/integration/test_rent_calendar_api.py` — 19 testes de integração (View → Service → Model, sem mock de internals): `TestRentCalendarRead` (shape top-level/day/item/stats, filtro `building_id`, params inválidos 400, 401/403) + `TestToggleRentPayment` (cria↔soft-delete, recusa pago+dia-passou, mês finalizado bloqueia, params inválidos, 401/403)
+
+### Sessão 22 — Arquivos Modificados
+- `core/views.py` — `DashboardViewSet` ganha 2 actions finas: `rent_calendar` (GET) → `RentScheduleService.get_month_schedule`; `toggle_rent_payment` (POST) → `RentScheduleService.toggle_payment`. Import direto `from .services.rent_schedule_service import RentScheduleService` (sem re-export/barrel). Constantes `MIN_MONTH`/`MAX_MONTH` extraídas (validação de mês). `mark_rent_paid` **permanece intacto** (remoção só na Sessão 25). Linter autofixou 3 issues de estilo pré-existentes na action `generate_contract` (W293 ×2, RET505) — não relacionadas a esta sessão.
+- `prompts/SESSION_STATE.md` — esta atualização.
+
+> **Nota Sessão 22**:
+> - `rent_calendar` e `toggle_rent_payment` expostos automaticamente pelo router (`core/urls.py` **inalterado**): `GET /api/dashboard/rent_calendar/?year=&month=&building_id=` e `POST /api/dashboard/toggle_rent_payment/` body `{lease_id, reference_month:"YYYY-MM-01"}`. Ambos admin-only (herdam `permission_classes=[IsAdminUser]` do ViewSet): não-admin → 403, não autenticado → 401.
+> - **Mecanismo de sinalização de erro do service (para a Sessão 25)**: `RentScheduleService.toggle_payment` **NÃO lança exceção** — retorna sempre um `dict {status, is_paid, message}`. Recusa ⇒ `status == "error"` (mês finalizado / lease não-cobrável ou inexistente / pago+dia-passou). A view mapeia `status == "error"` → **HTTP 400** `{"error": result["message"]}` (mensagens em PT); sucesso → **HTTP 200** com o dict completo. Não há caso 404 dedicado: lease inexistente cai em "não é cobrável" → 400 (conforme o service sinaliza). `get_month_schedule` apenas retorna `dict` (sem erros de negócio).
+> - **Throttling em testes**: DRF liga `SimpleRateThrottle.timer = time.time` como atributo de classe; sob `freezegun` é chamado como método ligado (`fake_time(self)`) e quebra. Fixture autouse `_disable_throttling` em `test_rent_calendar_api.py` desabilita throttle (boundary de infra externa) via `override_settings(REST_FRAMEWORK=...)` preservando auth. Mesma incompatibilidade afeta tests pré-existentes que combinam `@freeze_time` + API client (ex.: `tests/e2e/test_financial_lifecycle.py`) — fora do escopo desta sessão.
+> - Erros pré-existentes (não relacionados) ao rodar lint/type em `core/views.py`: pyright/mypy apontam `generate_contract_pdf.delay(...)` (celery `shared_task` sem stubs) na action `generate_contract` — presentes no HEAD antes desta sessão; o código novo (`rent_calendar`/`toggle_rent_payment`) é 100% limpo.
 
 ---
 
