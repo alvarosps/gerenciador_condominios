@@ -66,7 +66,7 @@ cd frontend && npm run lint && npm run type-check  # Frontend
 
 ## Criando uma Nova Feature
 
-Use o skill `/new-feature` no Claude Code ou siga o workflow em `.claude/skills/new-feature.md`.
+Use o skill `/new-feature` no Claude Code ou siga o workflow em `.claude/skills/new-feature/SKILL.md`.
 
 Resumo:
 1. Branch: `git checkout -b feat/<nome>`
@@ -77,22 +77,24 @@ Resumo:
 
 ## Usando Claude Code Neste Projeto
 
-### Agentes disponíveis
-- **implementer** (sonnet): Para implementar features seguindo os padrões
-- **reviewer** (opus): Para code review antes de commits/PRs
-- **tester** (sonnet): Para criar/corrigir testes
+### Agentes disponíveis (`.claude/agents/`)
+- **implementer**: Para implementar features seguindo os padrões
+- **reviewer**: Para code review antes de commits/PRs (read-only: sem Write/Edit)
+- **tester**: Para criar/corrigir testes
+- Modelo: `inherit` (usam o modelo da sessão atual)
 
-### Skills disponíveis
-- `/new-feature`: Workflow completo de nova feature
-- `/debug`: Debugging sistemático
-- `/refactor`: Refactoring seguro com testes como rede de segurança
+### Skills disponíveis (`.claude/skills/`)
+- `/new-feature`, `/admin`, `/financial`, `/audit`, `/brainstorming`, `/prompt-writing`, `/prompt-session`
+- Debugging e refactoring usam os skills do plugin Superpowers (`superpowers:systematic-debugging`, fluxo de refactor + TDD)
+- Workflows multi-agente (`.claude/workflows/`): `/review-diff`, `/coverage-sweep`
 
-### Hooks ativos
-- **Auto-lint:** Black/isort (Python) e ESLint (TypeScript) rodam automaticamente após edições
-- **Conventional commits:** Commits são validados automaticamente
-- **Scope guard:** Edições em node_modules, migrations existentes, e lockfiles são bloqueadas
+### Hooks ativos (`.claude/hooks/` via settings.json)
+- **SessionStart:** lembretes de data-safety (backup antes de migrate destrutivo, soft-delete, cache)
+- **Scope guard (PreToolUse Edit/Write):** bloqueia edição de node_modules/build, lockfiles e migrations já versionadas
+- **Conventional commits (PreToolUse Bash):** valida `git commit -m` (script Node)
+- **DB-safety guard (PreToolUse Bash):** bloqueia flush/reset_db/dbshell/migrate-zero e SQL destrutivo
+- Lint/format NÃO roda em hook do Claude — roda no pre-commit (husky + lint-staged: Ruff/ESLint)
 
-### MCP Servers
-- **context7:** Documentação atualizada de libraries (adicione "use context7" ao prompt)
-- **github:** Integração com issues e PRs
-- **sequential-thinking:** Raciocínio estruturado para decisões complexas
+### MCP Servers (`.mcp.json`)
+- **github:** servidor remoto oficial (`https://api.githubcopilot.com/mcp/`, OAuth via `/mcp`) — issues, PRs, code search
+- Context7 (docs de libraries) está disponível como plugin global, não configurado no projeto

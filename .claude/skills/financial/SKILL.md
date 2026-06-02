@@ -29,7 +29,7 @@ Before writing any financial logic, internalize these business rules:
 | Tipo | Regra |
 |------|-------|
 | Repasse ao owner | Aluguel de apt com owner vai como saída (obrigação mensal) |
-| Estipêndio fixo | Rodrigo R$1.100, Junior R$1.100 — `PersonIncome(type=fixed_stipend)` |
+| Estipêndio fixo | Estipêndios mensais a familiares — `PersonIncome(type=fixed_stipend)` (valores/pessoas vêm dos dados, não fixar aqui) |
 | Cartões de crédito | Parcelas via `ExpenseInstallment`, due_date calculada com `CreditCard.due_day` |
 | Empréstimos bancários | Parcelas fixas com juros, em nome dos filhos/genro |
 | Empréstimos pessoais | Informais, podem ser parcelados ou valor único |
@@ -83,11 +83,12 @@ All services are stateless functions in `core/services/`. Use Django ORM aggrega
 
 ## Models Reference
 
-10 financial models (migration 0012):
+Modelos financeiros principais (ver `core/models.py` para a lista completa e atual):
 - `Person`, `CreditCard`, `ExpenseCategory`
-- `Expense` (9 types via TextChoices), `ExpenseInstallment`
-- `PersonIncome` (apartment_rent, fixed_stipend)
-- `Income`, `RentPayment`, `EmployeePayment`
+- `Expense` (tipos via `ExpenseType` TextChoices), `ExpenseInstallment`, `ExpenseMonthSkip`
+- `PersonIncome` (apartment_rent, fixed_stipend), `Income`, `RentPayment`
+- `PersonPayment`, `PersonPaymentSchedule`, `EmployeePayment`
+- `MonthSnapshot` (fechamento mensal imutável), `IPCAIndex` (reajuste), `RentAdjustment`
 - `FinancialSettings` (singleton, pk=1)
 
 Alterações em existentes:
@@ -103,7 +104,7 @@ When implementing financial logic:
 2. Verify `Expense.expense_type` — each type has required fields
 3. Installment generation: use `CreditCard.due_day` for card purchases
 4. Cash flow projection: real data for past, projected for future
-5. All monetary values: `DecimalField(max_digits=12, decimal_places=2)`
+5. Valores monetários: `DecimalField` com `decimal_places=2` (ver a definição exata nos models)
 6. Currency display: R$ 1.500,00 (Brazilian format)
 7. Date display: DD/MM/YYYY
 8. Error messages in Portuguese for user-facing, English for logs

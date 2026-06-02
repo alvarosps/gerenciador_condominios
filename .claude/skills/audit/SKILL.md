@@ -172,27 +172,24 @@ In EVERY audit, verify compliance with SOLID, DRY, KISS, YAGNI, and Clean Code. 
 ### How to Run Design Principles Check
 
 ```bash
-# Search for re-exports in Python
-rg "from .+ import .+" --glob "**/__init__.py" | grep -v "^#"
+# Scope EVERY check to files changed in this session (matches the Fix Protocol's
+# "if you touched the file, fix it" — avoids drowning in pre-existing repo-wide noise).
+FILES=$(git diff --name-only HEAD; git diff --name-only --cached)
 
-# Search for workaround/hack comments
-rg -i "workaround|hack|temporary|quick.?fix|FIXME|TODO|XXX|HACK" --glob "*.py" --glob "*.ts" --glob "*.tsx"
+# Workaround/hack/TODO markers in changed files
+echo "$FILES" | grep -E '\.(py|ts|tsx)$' | xargs -r rg -i "workaround|hack|temporary|quick.?fix|FIXME|TODO|XXX|HACK" || true
 
-# Search for dead imports
-ruff check --select F401
+# Re-exports / barrel files in changed files
+echo "$FILES" | grep -E '__init__\.py$' | xargs -r rg "from .+ import .+" || true
+echo "$FILES" | grep -E '\.(ts|tsx)$' | xargs -r rg "export \{.*\} from|export \*" || true
 
-# Search for duplicated code patterns
-# Manual review: look for similar blocks across files touched in this session
+# Dead imports in changed Python files
+echo "$FILES" | grep -E '\.py$' | xargs -r ruff check --select F401 || true
 
-# Search for re-exports in TypeScript (barrel files)
-rg "export \{.*\} from" --glob "*.ts" --glob "*.tsx" | grep "index\."
-rg "export \*" --glob "*.ts" --glob "*.tsx"
-
-# Verify new dependencies are registered in ALL places
-# For each new third-party import in changed files, check it exists in:
-# 1. requirements.txt (runtime) or requirements-dev.txt (dev/test)
-# 2. pyproject.toml [project.dependencies] or [project.optional-dependencies.dev]
-# If missing from ANY file, add it.
+# Verify new dependencies are registered in ALL places (manual):
+# For each new third-party import in changed files, confirm it exists in BOTH:
+#   1. requirements.txt (runtime) or requirements-dev.txt (dev/test)
+#   2. pyproject.toml [project.dependencies] or [project.optional-dependencies.dev]
 ```
 
 ### Fix Protocol

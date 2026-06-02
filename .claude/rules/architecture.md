@@ -18,6 +18,12 @@
 - `core/signals.py`: Automatic invalidation on model save/delete
 - When adding new models: add signal handlers for cache invalidation
 
+## API & Serializers (DRF)
+- Serializer dual pattern — read: nested (`building = BuildingSerializer(read_only=True)`); write: `_id` via `PrimaryKeyRelatedField(write_only=True, source='building')`; M2M write uses `_ids` (`furniture_ids`, `tenant_ids`).
+- ViewSets: `ModelViewSet` for CRUD; `@action(detail=True)` for instance actions, `@action(detail=False)` for collection; business logic stays in services, never in the viewset.
+- Responses: list endpoints are paginated with a `results` array; errors use DRF standard shape (`detail`, `non_field_errors`, field-level errors); export via `/export/excel/` and `/export/csv/` on each resource.
+- URLs: plural resources (`buildings/`, `apartments/`, `tenants/`, `leases/`, `furnitures/`); custom actions use underscores (`generate_contract/`, `calculate_late_fee/`, `change_due_date/`).
+
 ## Frontend Layers
 - **Pages** (`app/`): Route components, use hooks, minimal logic
 - **Components** (`components/`): Reusable UI, receive props, no direct API calls

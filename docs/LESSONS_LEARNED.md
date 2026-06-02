@@ -215,12 +215,18 @@ python scripts/import_financial_data.py scripts/data/financial_data_template.jso
 
 ```
 0001-0011: Models base (Building, Apartment, Tenant, Lease, etc.)
-0012: Módulo financeiro (10 models + campos em Apartment/Lease)
-0013: ExpenseCategory.parent (subcategorias)
-0014: Expense.is_offset (descontos)
-0015: PersonPayment (pagamentos a pessoas)
-0016: Expense.end_date (data fim gastos fixos)
+0012-0016: Módulo financeiro (10 models, ExpenseCategory.parent, is_offset, PersonPayment, Expense.end_date)
+0017-0022: Refactor de domínio (single source of truth), Lease↔Apartment FK, Person.initial_balance, occupancy pricing
+0023-0029: RentAdjustment, Lease.last_rent_increase_date, IPCAIndex (reajuste por índice IBGE), Lease.pending_rental_value
+0030-0031: PersonPaymentSchedule, MonthSnapshot (fechamento mensal imutável)
+0032-0034: Modelos mobile (DeviceToken, Notification, PaymentProof, WhatsAppVerification)
+0035-0040: Integridade de dados (PROTECT/cascade, índices, unique constraints com soft-delete, check constraints)
+0041-0042: OAuthExchangeCode (auth mobile), índices em Expense
 ```
+
+> Estado atual: rode `python manage.py showmigrations core` — não fixar o número máximo aqui (apodrece).
+
+> ⚠️ **Esta doc precede vários módulos.** Adicionados depois e ainda SEM regras de negócio detalhadas aqui — precisam de revisão de domínio: **RentAdjustment + IPCAIndex** (reajuste anual por índice), **PersonPaymentSchedule** (cronograma de pagamentos por pessoa/mês), **MonthSnapshot** (fechamento mensal / saldo acumulado), **Landlord + ContractRule** (locador singleton + regras de contrato), e os modelos **mobile/auth** (PaymentProof, Notification, DeviceToken, WhatsAppVerification, OAuthExchangeCode).
 
 ---
 

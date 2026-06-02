@@ -31,6 +31,21 @@ store/auth-store.ts           # Zustand auth state
 - Error handling: usar `getErrorMessage()` e `handleError()` de `lib/utils/error-handler.ts`
 - Auth: JWT + refresh token via Axios interceptors em `lib/api/client.ts`
 
+## UI: Ant Design + Tailwind + Shadcn
+- Ant Design para componentes data-heavy (Table, Select, DatePicker, layout); Tailwind para spacing/cores/layouts custom; Shadcn/ui (Radix) para dialogs, sheets, tooltips. NÃO misturar — um sistema por tipo de componente.
+- Tabelas: `DataTable` de `components/tables/`. Delete: `DeleteConfirmDialog`. Páginas do dashboard envolvem em `MainLayout`.
+- Charts: Recharts (`ComposedChart` para bar+line, `PieChart` para breakdowns). Cada widget do dashboard é um componente independente com seu próprio hook.
+
+## Comunicação com API
+- Todas as chamadas via instância Axios `lib/api/client.ts` — nunca chamar axios direto de componentes; criar hooks TanStack Query em `lib/api/hooks/`.
+- Mutations DEVEM invalidar as queries relevantes no sucesso: `void queryClient.invalidateQueries(...)`.
+
+## Módulo Financeiro (frontend)
+- Form de despesa adapta campos conforme `expense_type` — conditional rendering com `watch()`.
+- Filtros em cascata: person → credit card (opções de cartão filtram pela pessoa selecionada).
+- Installments: visualizar em Sheet/Drawer, `mark_paid` via ação PATCH.
+- Moeda: `formatCurrency()` de `lib/utils/formatters.ts` (R$ 1.500,00); data DD/MM/YYYY via date-fns (locale pt-BR).
+
 ## Testes
 
 ```bash
