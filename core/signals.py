@@ -40,6 +40,7 @@ from .models import (
     PaymentProof,
     PersonPayment,
     PersonPaymentSchedule,
+    RentPayment,
     Tenant,
 )
 
@@ -347,6 +348,32 @@ def invalidate_expense_month_skip_cache_on_delete(
     sender: type[ExpenseMonthSkip], instance: ExpenseMonthSkip, **kwargs: Any
 ) -> None:
     _invalidate_financial_caches("ExpenseMonthSkip", instance.pk)
+
+
+def _invalidate_rent_payment_caches(pk: int) -> None:
+    """A RentPayment create / soft-delete (rent toggle) changes received rent, overdue
+    status and the late-payment summary — invalidate the financial AND dashboard caches.
+
+    Soft-delete goes through SoftDeleteMixin.delete() -> save(), so post_save covers both
+    create and unmark; post_delete covers the rare hard delete.
+    """
+    _invalidate_financial_caches("RentPayment", pk)
+    CacheManager.invalidate_pattern("dashboard-late-payment*")
+    CacheManager.invalidate_pattern("dashboard-financial-summary*")
+
+
+@receiver(post_save, sender=RentPayment)
+def invalidate_rent_payment_cache_on_save(
+    sender: type[RentPayment], instance: RentPayment, **kwargs: Any
+) -> None:
+    _invalidate_rent_payment_caches(instance.pk)
+
+
+@receiver(post_delete, sender=RentPayment)
+def invalidate_rent_payment_cache_on_delete(
+    sender: type[RentPayment], instance: RentPayment, **kwargs: Any
+) -> None:
+    _invalidate_rent_payment_caches(instance.pk)
 
 
 @receiver(post_save, sender=Expense)

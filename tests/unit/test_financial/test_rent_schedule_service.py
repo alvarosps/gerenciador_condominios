@@ -562,8 +562,18 @@ class TestGetMonthStats:
         assert Decimal(stats["overdue_total_fee"]) > Decimal("0.00")
 
     @freeze_time("2026-06-15")
-    def test_overdue_fee_not_accrued_for_non_current_month(self, lease) -> None:
+    def test_overdue_count_accrued_but_fee_zero_for_past_month(self, lease) -> None:
+        # Past month (April viewed from June): the item is overdue (counted) but the fee is
+        # only computed for the current month.
         stats = RentScheduleService.get_month_stats(2026, 4)
+        assert stats["overdue_count"] == 1
+        assert stats["overdue_total_fee"] == "0.00"
+
+    @freeze_time("2026-03-20")
+    def test_no_overdue_for_future_month(self, lease) -> None:
+        # Future month (May viewed from March): nothing is overdue yet.
+        stats = RentScheduleService.get_month_stats(2026, 5)
+        assert stats["overdue_count"] == 0
         assert stats["overdue_total_fee"] == "0.00"
 
 
