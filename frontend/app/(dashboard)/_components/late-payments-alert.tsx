@@ -58,7 +58,7 @@ export function LatePaymentsAlert() {
         onError: (error) => {
           handleError(error, 'Erro ao marcar como pago');
         },
-      },
+      }
     );
   }
 
@@ -104,9 +104,7 @@ export function LatePaymentsAlert() {
                     </span>
                     <span>
                       <span className="text-muted-foreground">Último pagamento: </span>
-                      <span className="font-medium">
-                        {formatDate(item.last_payment_date)}
-                      </span>
+                      <span className="font-medium">{formatDate(item.last_payment_date)}</span>
                     </span>
                     <span>
                       <span className="text-muted-foreground">Multa: </span>
