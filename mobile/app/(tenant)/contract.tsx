@@ -1,7 +1,7 @@
 import { Alert, ScrollView, StyleSheet } from "react-native";
 import { Button, Card, Text } from "react-native-paper";
 import { useState } from "react";
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import { useTenantMe } from "@/lib/api/hooks/use-tenant";
 import { useAuthStore } from "@/store/auth-store";

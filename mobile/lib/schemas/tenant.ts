@@ -95,7 +95,7 @@ export const TenantNotificationSchema = z.object({
   is_read: z.boolean(),
   read_at: z.string().nullable(),
   sent_at: z.string(),
-  data: z.record(z.unknown()).nullable(),
+  data: z.record(z.string(), z.unknown()).nullable(),
 });
 
 export const PaginatedResponseSchema = <T extends z.ZodTypeAny>(itemSchema: T) =>

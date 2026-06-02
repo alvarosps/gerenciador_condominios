@@ -40,7 +40,7 @@ export default function DailyControlScreen() {
       {
         item_id: id,
         item_type: type,
-        payment_date: new Date().toISOString().split("T")[0],
+        payment_date: new Date().toISOString().slice(0, 10),
       },
       {
         onError: () => Alert.alert("Erro", "Não foi possível marcar como pago."),
