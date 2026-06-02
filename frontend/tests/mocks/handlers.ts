@@ -25,6 +25,7 @@ import {
   mockPersons,
   mockTenants,
 } from './data';
+import { createMockRentCalendar } from './data/rent-calendar';
 
 const API_BASE = 'http://localhost:8008/api';
 
@@ -1482,6 +1483,28 @@ const dailyControlHandlers = [
 ];
 
 /**
+ * Rent calendar handlers
+ */
+const rentCalendarHandlers = [
+  http.get(`${API_BASE}/dashboard/rent_calendar/`, ({ request }) => {
+    const params = new URL(request.url).searchParams;
+    const year = Number(params.get('year') ?? '2026');
+    const month = Number(params.get('month') ?? '6');
+    return HttpResponse.json(createMockRentCalendar({ year, month }));
+  }),
+
+  http.post(`${API_BASE}/dashboard/toggle_rent_payment/`, async ({ request }) => {
+    await delay(100);
+    const body = (await request.json()) as { lease_id: number; reference_month: string };
+    return HttpResponse.json({
+      status: 'paid',
+      is_paid: body.lease_id > 0,
+      message: 'Aluguel marcado como pago',
+    });
+  }),
+];
+
+/**
  * Employee payment handlers (extended)
  */
 const employeePaymentExtendedHandlers = [
@@ -2072,6 +2095,7 @@ export const handlers = [
   ...contractRuleHandlers,
   ...creditCardHandlers,
   ...dailyControlHandlers,
+  ...rentCalendarHandlers,
   ...expenseCategoryHandlers,
   ...financialSettingsHandlers,
   ...landlordHandlers,
