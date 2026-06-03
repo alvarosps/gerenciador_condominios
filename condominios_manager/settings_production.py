@@ -136,6 +136,13 @@ MANAGERS = ADMINS
 # LOGGING CONFIGURATION
 # ============================================================
 
+# Django configures logging during setup(); the RotatingFileHandlers below open their
+# streams immediately, so the directory must exist or setup() raises FileNotFoundError
+# (e.g. on a fresh Render container with no logs/ dir). Create it up front — same as
+# logging_config.py. On ephemeral PaaS filesystems these files are transient; the console
+# handler (captured by the platform) and Sentry are the durable error sinks.
+(BASE_DIR / "logs").mkdir(parents=True, exist_ok=True)
+
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
