@@ -117,11 +117,11 @@ A comprehensive property management system for rental properties in Brazil, buil
 ## Tech Stack
 
 ### Backend
-- **Django 5.0.2** with Django REST Framework 3.14
+- **Django 5.2** with Django REST Framework 3.15
 - **PostgreSQL 15+** database
 - **JWT Authentication** with SimpleJWT
 - **Google OAuth2** integration
-- **Pyppeteer** for PDF generation (Chrome headless)
+- **Playwright** (headless Chromium) for PDF generation
 
 ### Frontend
 - **Next.js 14** with App Router

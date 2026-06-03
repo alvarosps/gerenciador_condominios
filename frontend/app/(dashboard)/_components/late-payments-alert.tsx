@@ -1,6 +1,6 @@
 'use client';
 
-import { AlertTriangle, CheckCircle2, Check, Eye } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Eye } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Accordion,
@@ -10,14 +10,9 @@ import {
 } from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  useDashboardLatePayments,
-  useMarkRentPaid,
-} from '@/lib/api/hooks/use-dashboard';
+import { useDashboardLatePayments } from '@/lib/api/hooks/use-dashboard';
 import { formatCurrency } from '@/lib/utils/formatters';
-import { handleError } from '@/lib/utils/error-handler';
 import Link from 'next/link';
-import { toast } from 'sonner';
 
 function formatDate(dateStr: string | null): string {
   if (!dateStr) return 'Nenhum';
@@ -27,7 +22,6 @@ function formatDate(dateStr: string | null): string {
 
 export function LatePaymentsAlert() {
   const { data, isLoading } = useDashboardLatePayments();
-  const markPaid = useMarkRentPaid();
 
   if (isLoading) return null;
 
@@ -44,17 +38,6 @@ export function LatePaymentsAlert() {
   }
 
   const totalLateFees = parseFloat(data.total_late_fees) || 0;
-
-  function handleMarkPaid(leaseId: number) {
-    markPaid.mutate(leaseId, {
-      onSuccess: (result) => {
-        toast.success(result.message);
-      },
-      onError: (error) => {
-        handleError(error, 'Erro ao marcar como pago');
-      },
-    });
-  }
 
   return (
     <Accordion type="single" collapsible>
@@ -75,6 +58,10 @@ export function LatePaymentsAlert() {
           </div>
         </AccordionTrigger>
         <AccordionContent className="px-6 pb-4">
+          <p className="text-muted-foreground mb-3 text-sm">
+            Para registrar pagamentos por mês, use o <strong>Controle de Aluguéis do Mês</strong> no
+            topo do dashboard (navegue até o mês em atraso e marque como pago).
+          </p>
           <div className="space-y-3">
             {data.late_leases.map((item) => (
               <div
@@ -98,9 +85,7 @@ export function LatePaymentsAlert() {
                     </span>
                     <span>
                       <span className="text-muted-foreground">Último pagamento: </span>
-                      <span className="font-medium">
-                        {formatDate(item.last_payment_date)}
-                      </span>
+                      <span className="font-medium">{formatDate(item.last_payment_date)}</span>
                     </span>
                     <span>
                       <span className="text-muted-foreground">Multa: </span>
@@ -111,15 +96,6 @@ export function LatePaymentsAlert() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button
-                    variant="default"
-                    size="sm"
-                    onClick={() => handleMarkPaid(item.lease_id)}
-                    disabled={markPaid.isPending}
-                  >
-                    <Check className="mr-1 h-4 w-4" />
-                    Pago
-                  </Button>
                   <Link href="/leases">
                     <Button variant="ghost" size="sm">
                       <Eye className="mr-2 h-4 w-4" />

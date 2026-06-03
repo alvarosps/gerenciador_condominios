@@ -5,6 +5,7 @@ import { LeaseMetricsWidget } from './_components/lease-metrics-widget';
 import { BuildingStatisticsChart } from './_components/building-statistics-chart';
 import { LatePaymentsAlert } from './_components/late-payments-alert';
 import { RentAdjustmentAlerts } from './_components/rent-adjustment-alerts';
+import { RentCalendarSection } from './_components/rent-calendar/rent-calendar-section';
 import { TenantStatisticsWidget } from './_components/tenant-statistics-widget';
 
 export default function DashboardPage() {
@@ -18,6 +19,9 @@ export default function DashboardPage() {
       </div>
 
       <div className="space-y-6">
+        {/* Rent Calendar - Top */}
+        <RentCalendarSection />
+
         {/* Financial Summary - Top Row */}
         <FinancialSummaryWidget />
 

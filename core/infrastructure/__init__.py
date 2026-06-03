@@ -13,7 +13,6 @@ from .pdf_generator import (
     IPDFGenerator,
     PDFGenerationError,
     PlaywrightPDFGenerator,
-    PyppeteerPDFGenerator,
 )
 from .storage import FileSystemDocumentStorage, IDocumentStorage, S3DocumentStorage, StorageError
 
@@ -23,7 +22,6 @@ __all__ = [
     "IPDFGenerator",
     "PDFGenerationError",
     "PlaywrightPDFGenerator",
-    "PyppeteerPDFGenerator",
     "S3DocumentStorage",
     "StorageError",
 ]

@@ -46,6 +46,7 @@ __pycache__/
 *.py[cod]
 *$py.class
 *.so
+*.egg-info/
 .Python
 venv/
 .venv/
@@ -92,3 +93,6 @@ nul
 *.tmp
 *.bak
 *.cache
+
+# Visual Companion (brainstorming mockups)
+.superpowers/

@@ -9,6 +9,7 @@ from freezegun import freeze_time
 from core.models import (
     Apartment,
     Building,
+    CreditCard,
     EmployeePayment,
     Expense,
     ExpenseInstallment,
@@ -150,11 +151,53 @@ class TestGetMonthlyIncome:
         result = CashFlowService.get_monthly_income(2026, 3)
         assert len(result["rent_details"]) == 0
 
+    def test_prepaid_boundary_includes_month_whose_due_equals_prepaid_until(
+        self, lease: Lease
+    ) -> None:
+        """Pay-to-live: the month whose clamped due date equals prepaid_until is the NEXT
+        installment due and must be counted (regression for the month-start off-by-one).
+        Tenant due_day=10."""
+        lease.prepaid_until = date(2026, 6, 10)
+        lease.save()
+        # May: due 10/05 < prepaid_until 10/06 -> already paid -> excluded.
+        assert len(CashFlowService.get_monthly_income(2026, 5)["rent_details"]) == 0
+        # June: due 10/06 == prepaid_until -> next one due -> INCLUDED.
+        june = CashFlowService.get_monthly_income(2026, 6)
+        assert len(june["rent_details"]) == 1
+        assert june["rent_income"] == Decimal("1500.00")
+
     def test_excludes_salary_offset_lease(self, lease: Lease) -> None:
         lease.is_salary_offset = True
         lease.save()
         result = CashFlowService.get_monthly_income(2026, 3)
         assert len(result["rent_details"]) == 0
+
+    def test_excludes_lease_whose_window_ended_even_if_is_rented(self, building: Building) -> None:
+        """Date-aware single source of truth: a lease whose validity window ended before the
+        queried month is excluded from income even though apartment.is_rented is still True."""
+        apt = Apartment.objects.create(
+            building=building, number=303, rental_value=Decimal("1000.00"), max_tenants=1
+        )
+        t = Tenant.objects.create(
+            name="Contrato Encerrado",
+            cpf_cnpj="11144477735",
+            phone="11900000003",
+            marital_status="Solteiro(a)",
+            profession="Dev",
+            due_day=10,
+        )
+        # Window 2024-01 .. 2025-01 does not cover March 2026; the lease creation still
+        # flips apartment.is_rented to True via signal.
+        Lease.objects.create(
+            apartment=apt,
+            responsible_tenant=t,
+            start_date=date(2024, 1, 1),
+            validity_months=12,
+            rental_value=Decimal("1000.00"),
+        )
+        result = CashFlowService.get_monthly_income(2026, 3)
+        apt_ids = [d["apartment_id"] for d in result["rent_details"]]
+        assert apt.pk not in apt_ids
 
     def test_includes_recurring_income(self) -> None:
         Income.objects.create(
@@ -218,8 +261,6 @@ class TestGetMonthlyExpenses:
             assert key in result
 
     def test_card_installments_counted(self, person: Person) -> None:
-        from core.models import CreditCard
-
         cc = CreditCard.objects.create(
             person=person,
             nickname="CF Card",
@@ -282,8 +323,6 @@ class TestGetMonthlyExpenses:
         assert result["one_time_expenses"] >= Decimal("300.00")
 
     def test_is_offset_excluded_from_card_installments(self, person: Person) -> None:
-        from core.models import CreditCard
-
         cc = CreditCard.objects.create(
             person=person,
             nickname="Offset Card",
@@ -451,8 +490,6 @@ class TestGetPersonSummary:
         assert "net_amount" in result
 
     def test_card_total_includes_card_installments(self, person: Person) -> None:
-        from core.models import CreditCard
-
         cc = CreditCard.objects.create(
             person=person,
             nickname="Summary Card",
@@ -482,8 +519,6 @@ class TestGetPersonSummary:
         assert result["card_total"] >= Decimal("200.00")
 
     def test_net_amount_subtracts_expenses(self, person: Person) -> None:
-        from core.models import CreditCard
-
         cc = CreditCard.objects.create(
             person=person,
             nickname="Net Card",

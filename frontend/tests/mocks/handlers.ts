@@ -25,6 +25,7 @@ import {
   mockPersons,
   mockTenants,
 } from './data';
+import { createMockRentCalendar } from './data/rent-calendar';
 
 const API_BASE = 'http://localhost:8008/api';
 
@@ -545,15 +546,20 @@ const dashboardHandlers = [
     await delay(50);
     return HttpResponse.json({
       total_late_leases: 1,
-      total_late_fees: 75.0,
+      total_late_fees: '75.00',
+      average_late_days: 5,
       late_leases: [
         {
           lease_id: 1,
-          tenant_name: 'João Silva',
-          building: 'Building A',
           apartment_number: 101,
+          building_number: '836',
+          tenant_name: 'João Silva',
+          rental_value: '1200.00',
+          due_day: 5,
           late_days: 5,
-          late_fee: 75.0,
+          late_months: 1,
+          late_fee: '75.00',
+          last_payment_date: '2026-04-05',
         },
       ],
     });
@@ -1482,6 +1488,28 @@ const dailyControlHandlers = [
 ];
 
 /**
+ * Rent calendar handlers
+ */
+const rentCalendarHandlers = [
+  http.get(`${API_BASE}/dashboard/rent_calendar/`, ({ request }) => {
+    const params = new URL(request.url).searchParams;
+    const year = Number(params.get('year') ?? '2026');
+    const month = Number(params.get('month') ?? '6');
+    return HttpResponse.json(createMockRentCalendar({ year, month }));
+  }),
+
+  http.post(`${API_BASE}/dashboard/toggle_rent_payment/`, async ({ request }) => {
+    await delay(100);
+    const body = (await request.json()) as { lease_id: number; reference_month: string };
+    return HttpResponse.json({
+      status: 'paid',
+      is_paid: body.lease_id > 0,
+      message: 'Aluguel marcado como pago',
+    });
+  }),
+];
+
+/**
  * Employee payment handlers (extended)
  */
 const employeePaymentExtendedHandlers = [
@@ -2072,6 +2100,7 @@ export const handlers = [
   ...contractRuleHandlers,
   ...creditCardHandlers,
   ...dailyControlHandlers,
+  ...rentCalendarHandlers,
   ...expenseCategoryHandlers,
   ...financialSettingsHandlers,
   ...landlordHandlers,

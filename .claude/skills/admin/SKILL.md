@@ -72,7 +72,7 @@ Furniture ↔ Tenant (M2M)
 
 | Service | Responsibility |
 |---------|---------------|
-| `ContractService` | PDF generation via Pyppeteer + Jinja2 |
+| `ContractService` | PDF generation via Playwright (headless Chromium) + Jinja2 |
 | `FeeCalculatorService` | Tag fee and late fee calculations |
 | `DateCalculatorService` | Due date logic, lease expiration, rent increase dates |
 | `TemplateManagementService` | Template save, restore, backup versioning |

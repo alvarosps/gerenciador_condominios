@@ -37,9 +37,20 @@ Apartment.owner → Person (kitnets com owner = receita repassada, não do condo
 Lease.prepaid_until, Lease.is_salary_offset — casos especiais de aluguel
 Expense.is_offset — descontos (subtraídos do total da pessoa, SEMPRE filtrar com is_offset=False)
 Expense.end_date — data fim para gastos fixos recorrentes
+ExpenseMonthSkip — marca despesa como não cobrada em mês específico (sem SoftDelete)
+
+--- Reajuste / Locador / Contrato ---
+Lease → RentAdjustment (1:N) — reajustes anuais; IPCAIndex (índice IBGE mensal, sem mixins) alimenta o reajuste
+Landlord — locador (singleton, get_active()); ContractRule — regras de condomínio exibidas nos contratos
+PersonPaymentSchedule (1:N ← Person) — cronograma de pagamentos por pessoa/mês
+MonthSnapshot — snapshot imutável do fechamento mensal (AuditMixin, SEM SoftDelete)
+
+--- Mobile / Auth / Notificações ---
+Lease → PaymentProof (1:N) — comprovante PIX do inquilino (status pending/approved/rejected)
+Notification, DeviceToken (Expo push), WhatsAppVerification, OAuthExchangeCode (TTL 60s) — app mobile + auth
 ```
 
-**Mixins em todos os models:** `AuditMixin` (created/updated_at/by), `SoftDeleteMixin` (is_deleted, deleted_at/by)
+**Mixins (maioria dos models):** `AuditMixin` (created/updated_at/by), `SoftDeleteMixin` (is_deleted, deleted_at/by). Sem SoftDelete: `IPCAIndex`, `MonthSnapshot`, `FinancialSettings`, `Notification`, `DeviceToken`, `WhatsAppVerification`, `OAuthExchangeCode`, `ExpenseMonthSkip`.
 - `Model.objects.all()` exclui deletados; `.with_deleted()` inclui; `.deleted_only()` só deletados
 
 ## Comandos
@@ -70,20 +81,15 @@ npm run lint && npm run type-check            # ESLint + TypeScript
 - CRITICAL: Default querysets excluem soft-deleted records — usar `with_deleted()` quando necessário
 - IMPORTANT: Redis cache com invalidação automática via signals — ao mudar models/signals, verificar impacto no cache
 - IMPORTANT: `CacheManager.invalidate_model(name, pk)` e `invalidate_pattern(pattern)` — cache invalida automaticamente em save/delete via signals
-- Tag fee: R$50 para 1 tenant, R$80 para 2+ — lógica em `contract_service.py`
+- Tag fee: R$50 (1 tenant) / R$80 (2+) — `FeeCalculatorService.calculate_tag_fee` em `core/services/fee_calculator.py` (valores via `settings.DEFAULT_TAG_FEE_SINGLE/MULTIPLE`)
 - Late fee: 5% ao dia × (rental_value ÷ 30) × days_late — lógica em `fee_calculator.py`
 - Furniture no contrato = Apartment furniture − Tenant furniture
 - PDFs salvos em: `contracts/{building_number}/contract_apto_{apt_number}_{lease_id}.pdf`
 
 ## Princípios de Design — OBRIGATÓRIO
 
-- CRITICAL: **SOLID, DRY, KISS, YAGNI, Clean Code** — sempre, sem exceções, sem preguiça
-- CRITICAL: **Sem workarounds** — corrija o problema na raiz, corretamente
-- CRITICAL: **Sem quick wins** — toda mudança deve ser feita da forma correta, mesmo que leve mais tempo
-- CRITICAL: **Sem backwards compatibility** — código legado não é mantido; ao refatorar, atualize TODOS os consumidores e efeitos colaterais
-- CRITICAL: **Sem re-exports** — importe da fonte, nunca crie barrel files ou wrappers de re-exportação
-- CRITICAL: **Refatoração completa** — ao mudar uma interface/assinatura/padrão, atualize TODOS os usos no codebase inteiro
-- Ver regras completas em `.claude/rules/design-principles.md`
+- CRITICAL: **SOLID, DRY, KISS, YAGNI, Clean Code** — sem workarounds, sem quick wins, sem backwards-compat, sem re-exports, refatoração sempre completa (todos os consumidores atualizados).
+- Fonte canônica (mandatória, não repetida aqui): `.claude/rules/design-principles.md`.
 
 ## Convenções
 
@@ -108,8 +114,7 @@ npm run lint && npm run type-check            # ESLint + TypeScript
 
 ## Migrations
 
-Sequenciais: 0001 (initial) → 0016 (expense end_date). `LeaseTenant` usa `db_table='core_lease_tenant_details'`.
-Financeiro: 0012 (financial module) → 0013 (category parent) → 0014 (is_offset) → 0015 (person payment) → 0016 (end_date)
+Sequenciais. Rode `python manage.py showmigrations core` para o estado atual — NÃO fixar números aqui (apodrecem). `LeaseTenant` usa `db_table='core_lease_tenant_details'` — NÃO renomear. Hooks bloqueiam edição de migrations existentes; crie novas via `makemigrations`. **Backup antes de qualquer migrate destrutivo:** `python scripts/backup_db.py`.
 
 ## Env Vars
 
@@ -126,7 +131,6 @@ Financeiro: 0012 (financial module) → 0013 (category parent) → 0014 (is_offs
 | `superpowers:brainstorming` | `/brainstorming` (architecture gate com regras Django/DRF) |
 | `superpowers:writing-plans` | `/prompt-writing` (TDD, context engineering, exemplar index) |
 | `superpowers:executing-plans` | `/prompt-session` (TDD + audit + SESSION_STATE.md) |
-| `superpowers:systematic-debugging` | `/debug` (com regras de mock policy, soft delete, cache) |
 | `superpowers:verification-before-completion` | `/audit` (verifica completude contra plano) |
 | `superpowers:test-driven-development` | TDD integrado em `/prompt-session` e `/new-feature` |
 
@@ -134,7 +138,7 @@ Financeiro: 0012 (financial module) → 0013 (category parent) → 0014 (is_offs
 
 - **LEIA PRIMEIRO**: `docs/LESSONS_LEARNED.md` — contexto completo do negócio, todas as regras, armadilhas, e decisões arquiteturais
 - Design doc: `docs/plans/2026-03-21-financial-module-design.md`
-- Prompts de sessão: `prompts/01-*.md` a `prompts/20-*.md`
+- Prompts de sessão: arquivos numerados em `prompts/` (ver `SESSION_STATE.md` para o intervalo/estado atual)
 - Estado das sessões: `prompts/SESSION_STATE.md`
 - Dados iniciais: `scripts/data/financial_data_template.json`
 - Script importação: `scripts/import_financial_data.py` (suporta `--dry-run` e `--clear-first`)

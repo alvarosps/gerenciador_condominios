@@ -36,11 +36,13 @@ export default function DailyControlScreen() {
   }
 
   function handleMarkPaid(id: number, type: string): void {
+    const now = new Date();
+    const paymentDate = `${String(now.getFullYear())}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
     markPaid.mutate(
       {
         item_id: id,
         item_type: type,
-        payment_date: new Date().toISOString().split("T")[0],
+        payment_date: paymentDate,
       },
       {
         onError: () => Alert.alert("Erro", "Não foi possível marcar como pago."),
