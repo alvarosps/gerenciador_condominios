@@ -1,6 +1,6 @@
 ---
 name: new-feature
-description: Structured workflow for implementing a new feature end-to-end (backend + frontend)
+description: Use when implementing a new feature end-to-end (backend + frontend) — models, migration, serializer, service, views, hooks, page, and tests, following project layering.
 argument-hint: "[feature-description]"
 ---
 
@@ -30,7 +30,7 @@ Before starting, decide the execution strategy:
 6. **URLs** — Register in `core/urls.py`
 7. **Cache signals** — Add invalidation in `core/signals.py`
 8. **Tests** — Integration tests in `tests/integration/`, unit for complex logic in `tests/unit/`
-9. **Verify** — `ruff check && ruff format --check && mypy core/ && python -m pytest`
+9. **Verify** — `ruff check && ruff format --check && mypy core/ && pyright && python -m pytest`
 
 ## 3. Frontend
 1. **Types** — Define in Zod schema at `frontend/lib/schemas/<resource>.ts`

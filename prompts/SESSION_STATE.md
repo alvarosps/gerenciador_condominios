@@ -7,6 +7,93 @@
 
 ---
 
+## Feature: Calendário de Controle de Aluguéis (Dashboard) — Sessões 21–25
+
+**Design Doc**: `docs/plans/2026-06-02-rent-payment-calendar-design.md`
+**Mockup**: `docs/mockups/rent-calendar-mockup.html` (light + dark)
+**Status**: **CONCLUÍDA** (sessões 21–25 + unificação final). Web e mobile migrados para o toggle unificado; `mark_rent_paid` removido do backend.
+**Ordem**: 21 → 22 → 23 → 24 → 25 (sequencial). Pós-25: consumidor `mobile/` (`use-admin-actions.ts` → `useToggleRentPayment` + tela `mark-paid.tsx`) migrado para `toggle_rent_payment`; `mark_rent_paid` e o import órfão `RentPayment` removidos de `core/views.py`. Verificado: ruff/format ok, 19 testes de API verdes, `tsc --noEmit` limpo nos arquivos mobile editados, zero referências remanescentes.
+
+| # | Sessão | Status | Arquivo |
+|---|--------|--------|---------|
+| 21 | Backend: `RentScheduleService` + refactor DRY do `DailyControlService` | concluída | `prompts/21-backend-rent-schedule-service.md` |
+| 22 | Backend: endpoints `rent_calendar` + `toggle_rent_payment` | concluída | `prompts/22-backend-rent-calendar-endpoints.md` |
+| 23 | Frontend: hooks `use-rent-calendar` (optimistic) + query-keys + MSW | concluída | `prompts/23-frontend-rent-calendar-hooks.md` |
+| 24 | Frontend: UI (5 componentes, grid date-fns) + montagem no dashboard | concluída | `prompts/24-frontend-rent-calendar-ui.md` |
+| 25 | Refator consumidores (web `late-payments-alert` + mobile `mark-paid`) → toggle unificado; `mark_rent_paid` removido do backend + audit | concluída | `prompts/25-refactor-consumer-and-audit.md` |
+
+> Reaproveita `RentPayment` (pago = registro existe), `FeeCalculatorService` (multa) e `DateCalculatorService`. Sem novo model/migration. Calendário admin-only; respeita `MonthSnapshot` finalizado.
+
+### Sessão 21 — Arquivos Criados
+- `core/services/rent_schedule_service.py` — `RentScheduleService` (6 `@staticmethod`: `clamp_due_day`, `effective_rental_value`, `collectible_leases`, `get_month_schedule`, `get_month_stats`, `toggle_payment`) + `received_total` (definição canônica) + `DAYS_OF_WEEK_PT` (fonte única)
+- `tests/unit/test_financial/test_rent_schedule_service.py` — 34 testes unitários (clamp, valor efetivo, cobrabilidade date-aware, schedule/item, cross-month sem multa, stats, toggle + guards)
+
+### Sessão 21 — Arquivos Modificados
+- `core/services/daily_control_service.py` — `_collect_entries_by_day` (porção aluguel), `_get_expected_rent_total` e `_get_received_rent_total` delegam a `RentScheduleService`; `DAYS_OF_WEEK_PT` importado da fonte única; removido import morto `DateCalculatorService` e import não usado `Lease`
+- `tests/unit/test_financial/test_daily_control_service.py` — **apenas** `start_date` da fixture `lease` (de `2025-01-01` para `2025-06-01`) para a janela cobrir mar/2026 sob o filtro date-aware; nenhum corpo/assert alterado
+
+> **Nota Sessão 21**: Fonte única `RentScheduleService` (cobrabilidade date-aware, independe de `apartment.is_rented`); `DailyControlService` delega (DRY: `collectible_leases` + `received_total` único); fixture `lease` ajustada (`start_date`) para cobrir mar/2026; multa só no mês corrente (cross-month → `late_fee="0.00"`/`late_days=0`); 16 testes do DailyControl verdes; novo arquivo 100% mypy/pyright limpo; sem endpoints/frontend; `mark_rent_paid` removido apenas na Sessão 25. Falha pré-existente (não relacionada) em `tests/e2e/test_financial_workflow.py::test_daily_control_breakdown` (porção de installments/exits, fora do escopo desta sessão).
+
+### Sessão 22 — Arquivos Criados
+- `tests/integration/test_rent_calendar_api.py` — 19 testes de integração (View → Service → Model, sem mock de internals): `TestRentCalendarRead` (shape top-level/day/item/stats, filtro `building_id`, params inválidos 400, 401/403) + `TestToggleRentPayment` (cria↔soft-delete, recusa pago+dia-passou, mês finalizado bloqueia, params inválidos, 401/403)
+
+### Sessão 22 — Arquivos Modificados
+- `core/views.py` — `DashboardViewSet` ganha 2 actions finas: `rent_calendar` (GET) → `RentScheduleService.get_month_schedule`; `toggle_rent_payment` (POST) → `RentScheduleService.toggle_payment`. Import direto `from .services.rent_schedule_service import RentScheduleService` (sem re-export/barrel). Constantes `MIN_MONTH`/`MAX_MONTH` extraídas (validação de mês). `mark_rent_paid` **permanece intacto** (remoção só na Sessão 25). Linter autofixou 3 issues de estilo pré-existentes na action `generate_contract` (W293 ×2, RET505) — não relacionadas a esta sessão.
+- `prompts/SESSION_STATE.md` — esta atualização.
+
+> **Nota Sessão 22**:
+> - `rent_calendar` e `toggle_rent_payment` expostos automaticamente pelo router (`core/urls.py` **inalterado**): `GET /api/dashboard/rent_calendar/?year=&month=&building_id=` e `POST /api/dashboard/toggle_rent_payment/` body `{lease_id, reference_month:"YYYY-MM-01"}`. Ambos admin-only (herdam `permission_classes=[IsAdminUser]` do ViewSet): não-admin → 403, não autenticado → 401.
+> - **Mecanismo de sinalização de erro do service (para a Sessão 25)**: `RentScheduleService.toggle_payment` **NÃO lança exceção** — retorna sempre um `dict {status, is_paid, message}`. Recusa ⇒ `status == "error"` (mês finalizado / lease não-cobrável ou inexistente / pago+dia-passou). A view mapeia `status == "error"` → **HTTP 400** `{"error": result["message"]}` (mensagens em PT); sucesso → **HTTP 200** com o dict completo. Não há caso 404 dedicado: lease inexistente cai em "não é cobrável" → 400 (conforme o service sinaliza). `get_month_schedule` apenas retorna `dict` (sem erros de negócio).
+> - **Throttling em testes**: DRF liga `SimpleRateThrottle.timer = time.time` como atributo de classe; sob `freezegun` é chamado como método ligado (`fake_time(self)`) e quebra. Fixture autouse `_disable_throttling` em `test_rent_calendar_api.py` desabilita throttle (boundary de infra externa) via `override_settings(REST_FRAMEWORK=...)` preservando auth. Mesma incompatibilidade afeta tests pré-existentes que combinam `@freeze_time` + API client (ex.: `tests/e2e/test_financial_lifecycle.py`) — fora do escopo desta sessão.
+> - Erros pré-existentes (não relacionados) ao rodar lint/type em `core/views.py`: pyright/mypy apontam `generate_contract_pdf.delay(...)` (celery `shared_task` sem stubs) na action `generate_contract` — presentes no HEAD antes desta sessão; o código novo (`rent_calendar`/`toggle_rent_payment`) é 100% limpo.
+
+### Sessão 23 — Arquivos Criados
+- `frontend/lib/api/hooks/use-rent-calendar.ts` — `useRentCalendar(year, month, buildingId?)` (`useQuery`, `staleTime` 30s, repassa `building_id` só quando definido) + `useToggleRentPayment()` (`useMutation` optimistic v5) + tipos TS hand-written (`RentCalendar`, `RentCalendarDay`, `RentCalendarItem`, `RentCalendarStats`, `ToggleRentPaymentRequest`, `ToggleRentPaymentResponse`) exportados via `export type`. Função pura `flipPaidByLease` (flip imutável reutilizado no optimistic update).
+- `frontend/lib/api/hooks/__tests__/use-rent-calendar.test.tsx` — 6 testes Vitest+MSW (fetch/shape com os 9 campos de stats; `building_id` repassado na query string; optimistic flip observável; rollback no erro discriminante; invalidação no settle das 3 keys).
+- `frontend/tests/mocks/data/rent-calendar.ts` — `createMockRentCalendar` + `createMockRentCalendarItem` (importam os tipos do hook; **não** entram no barrel `data/index.ts`).
+
+### Sessão 23 — Arquivos Modificados
+- `frontend/lib/api/query-keys.ts` — grupo `rentCalendar` (`all: ['rent-calendar']` + `month(year, month, buildingId?)` com `buildingId ?? null` para estabilizar a key).
+- `frontend/tests/mocks/handlers.ts` — `rentCalendarHandlers` (`GET /dashboard/rent_calendar/` lendo `year`/`month`/`building_id`; `POST /dashboard/toggle_rent_payment/` com `await delay(100)` e mensagem PT), importando `createMockRentCalendar` direto de `./data/rent-calendar`; incluído `...rentCalendarHandlers` no array `handlers`.
+
+> **Nota Sessão 23**:
+> - Optimistic update v5 sobre **toda** a área `rentCalendar.all` via `getQueriesData`/`setQueryData` — a mutation **não** conhece year/month/buildingId; `onMutate` cancela + snapshota + faz flip imutável (`flipPaidByLease`), `onError` restaura o snapshot, `onSettled` invalida `rentCalendar` + `dashboard.latePaymentSummary` + `dashboard.financialSummary`.
+> - **Teste de flip determinístico sem mock de internals**: `createTestQueryClient` tem `gcTime:0`, então dado semeado via `setQueryData` sem observador é coletado num tick. Solução correta (exercita o caminho real query→cache→mutation): o handler GET popula o cache e um `useRentCalendar` montado mantém a entrada viva; o POST é sobrescrito com `delay(200)` para abrir a janela e o flip é asserido via `waitFor` lendo `queryClient.getQueryData(...)`. No teste de rollback, o refetch do `onSettled` é adiado (`delay`) e retorna `is_paid:true` (1º GET=false, GETs seguintes=true) — assim o `false` observado após o erro só pode vir do rollback, não do refetch; depois aguarda o refetch settlar para não deixar request pendente no teardown.
+> - `useMarkRentPaid` (`use-dashboard.ts`) e o endpoint `mark_rent_paid` permanecem **intactos** — removidos só na Sessão 25 (sem backward-compat shim; remoção deliberadamente adiada para manter todas as sessões verdes). Nenhuma UI nesta sessão. 6 testes passando; `type-check` e `lint` limpos.
+
+### Sessão 24 — Arquivos Criados
+- `frontend/app/(dashboard)/_components/rent-calendar/rent-calendar-section.tsx` — container `'use client'` (estado `{year,month}` + dia selecionado derivado de `data.today`, filtro de prédio via `useBuildings`, grid `grid-cols-1 lg:grid-cols-[1fr_1.5fr_1fr]`); único componente que consome hooks (`useRentCalendar`/`useToggleRentPayment`); deriva `reference_month` = `"YYYY-MM-01"` do mês carregado; sucesso → `toast.success`, erro → `handleError`.
+- `frontend/app/(dashboard)/_components/rent-calendar/rent-month-grid.tsx` — grade custom `date-fns` (`startOfMonth`/`getDay`/`getDaysInMonth`), células `role="gridcell"` com `aria-label`/`aria-selected`, chips por status, hoje (badge primary) e selecionado destacados, nav de mês, legenda.
+- `frontend/app/(dashboard)/_components/rent-calendar/rent-day-panel.tsx` — itens do dia (StatusChip pago/a vencer/em atraso com ícone+rótulo), highlight de atraso + multa, "Pago em DD/MM" via split ISO, `RentPaymentToggle` por item (deriva `disabledReason`), botões "Hoje"/"Próx. vencimento", empty state, `TooltipProvider` na árvore.
+- `frontend/app/(dashboard)/_components/rent-calendar/rent-stats-panel.tsx` — 4 cards (Mês via `formatMonthYear`, Recebido, A receber c/ trecho de atraso condicional, Kitnets vagos).
+- `frontend/app/(dashboard)/_components/rent-calendar/rent-payment-toggle.tsx` — Radix Switch apresentacional + Tooltip com `disabledReason` (aria-label) quando bloqueado.
+- `frontend/app/(dashboard)/_components/rent-calendar/__tests__/*.test.tsx` — 5 arquivos, 28 testes (toggle, day-panel, month-grid, stats, section). Section mocka só a fronteira de dados (`useRentCalendar`/`useToggleRentPayment`/`useBuildings`) via `vi.spyOn`.
+
+### Sessão 24 — Arquivos Modificados
+- `frontend/app/(dashboard)/page.tsx` — `<RentCalendarSection />` montado no topo da `<div className="space-y-6">`, acima de `<FinancialSummaryWidget />`.
+
+> **Nota Sessão 24**:
+> - **`formatMonthYear` retorna "Junho de 2026" (com " de "), não "Junho/2026"** neste ambiente (ICU do Node/jsdom). O prompt previa barra; a regra do projeto manda asserir a saída real. Os testes asseram `formatMonthYear(year, month)` (DRY/robusto a build de ICU) em vez de string literal.
+> - **Acessibilidade da grade**: células de dia são `role="gridcell"` dentro de `role="grid"`; seleção via `aria-selected` (não `aria-pressed`, inválido em gridcell). Status nunca só por cor — sempre ícone + rótulo.
+> - `late-payments-alert.tsx`, `use-dashboard.ts`/`useMarkRentPaid` e o endpoint backend `mark_rent_paid` permanecem **intactos** — refator do consumidor unificado + remoção do `mark_rent_paid` é a **Sessão 25**.
+> - Verificação: `npx vitest run "app/(dashboard)/_components/rent-calendar"` 28/28 verde; `tsc --noEmit` sem erros nos arquivos tocados; `eslint` zero erros/avisos. Sem `# noqa`/`eslint-disable`/`@ts-ignore`; sem `as`/`!` em produção (apenas em helpers de fixture de teste, conforme carve-out).
+
+### Sessão 25 — Arquivos Modificados
+- `frontend/app/(dashboard)/_components/late-payments-alert.tsx` — consumidor web migrado para o toggle unificado: importa `useToggleRentPayment` de `@/lib/api/hooks/use-rent-calendar` (não mais `useMarkRentPaid`); `handleMarkPaid` chama `toggle.mutate({ lease_id, reference_month })` com `reference_month` = primeiro dia do **mês corrente** (`YYYY-MM-01`, via helper `currentReferenceMonth()` — mesma semântica do antigo `mark_rent_paid`, que sempre lançava o mês corrente); `disabled={toggle.isPending}`. Sem invalidação duplicada (o hook já invalida `rentCalendar` + `latePaymentSummary` + `financialSummary` no `onSettled`).
+- `frontend/lib/api/hooks/use-dashboard.ts` — `useMarkRentPaid` (create-only, postava `/dashboard/mark_rent_paid/`) **removido** por completo, sem re-export/shim/alias; import trimado de `{ useMutation, useQuery, useQueryClient }` para apenas `{ useQuery }` (os 5 hooks restantes só usam `useQuery`); `queryKeys` mantido (ainda usado pelas queries). Nenhum import órfão.
+- `frontend/app/(dashboard)/_components/__tests__/late-payments-alert.test.tsx` — mocka `useToggleRentPayment` de `@/lib/api/hooks/use-rent-calendar` (fronteira de dados via `vi.spyOn`); novo teste de regressão expande o accordion e clica "Pago", asserindo `toggle.mutate` chamado com `{ lease_id: 1, reference_month }` casando `^\d{4}-\d{2}-01$`. 5 testes verdes.
+- `prompts/SESSION_STATE.md` / `prompts/ROADMAP.md` — esta atualização (feature web 21–25 + decisão saída B sobre o mobile).
+
+> **Nota Sessão 25 — Gate mobile (saída B escolhida)**:
+> - **Tensão de design escalada**: o app `mobile/` é um **consumidor vivo** do endpoint que esta sessão removeria — `mobile/lib/api/hooks/use-admin-actions.ts:37` (`useMarkRentPaid`) e `mobile/app/(admin)/actions/mark-paid.tsx:5,14` postam em `POST /dashboard/mark_rent_paid/` (com body `{ lease_id, reference_month, amount_paid }` — note `amount_paid`, que o endpoint `toggle_rent_payment` **não** aceita). O design doc (§2/§4.3/§8) **não escopou** o mobile, e `mobile/package.json` define apenas `start`/`android`/`ios`/`web` — **sem `type-check`/`lint`/test runner**, logo qualquer migração mobile seria **inverificável** (violaria o TDD Red→Green e a regra de zero-tolerância a warnings).
+> - **Decisão: saída (B)** — concluída **apenas** a migração web + auditoria. **`mark_rent_paid` (backend, `core/views.py`) e o consumidor mobile permanecem intactos.** A remoção de `mark_rent_paid` está **BLOQUEADA** por esta tensão. `core/views.py` **não foi tocado** nesta sessão; nenhum arquivo de `mobile/` foi tocado.
+> - **Risco documentado**: enquanto `mark_rent_paid` existir e o mobile não for migrado/verificado, há divergência (web usa `toggle_rent_payment`, mobile usa `mark_rent_paid`). O `mobile/` não tem rede de segurança automatizada (sem testes/type-check/lint), então uma migração futura **deve primeiro** configurar verificação em `mobile/package.json`.
+> - **Destravamento (saída A futura)**: emendar o design doc (§2 incluir o consumidor mobile, §4.3 descrever a migração, §8 criar sessão dedicada) **e** configurar `type-check`/`lint`/test runner em `mobile/package.json`; só então uma sessão escopada migra o mobile para `toggle_rent_payment` e remove `mark_rent_paid` do backend (+ limpeza de imports mortos `RentPayment`/`cast`/`User` em `core/views.py`).
+> - **Audit (design §2/§8, escopo web)**: feature web completa — `RentScheduleService` (§4.1) + refactor DRY `DailyControlService` (§4.2) [S21], endpoints `rent_calendar`/`toggle_rent_payment` (§4.3) [S22], `use-rent-calendar` (hook + toggle optimistic) + grupo `rentCalendar` em query-keys (§6) [S23], 5 componentes do calendário + montagem em `page.tsx` (§6) [S24], consumidor web legado migrado (§4.3) [S25]. Sem referência morta a `mark_rent_paid`/`useMarkRentPaid` em `frontend/` (grep limpo). Único item de §4.3 não realizado — remoção de `mark_rent_paid` — registrado como **pendência de design** (saída B), não gap de implementação.
+> - **Verificação**: `npm run lint` (frontend inteiro) zero erros/avisos; `npm run type-check` (`tsc --noEmit`) limpo; `npm run test:unit` em `late-payments-alert.test.tsx` (5) + `use-dashboard.test.tsx` (10) = 15/15 verde. Backend não rodado (não tocado nesta sessão). Sem `# noqa`/`eslint-disable`/`@ts-ignore`.
+
+---
+
 ## Progresso por Sessão
 
 | # | Sessão | Status | Notas |

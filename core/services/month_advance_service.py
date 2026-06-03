@@ -17,7 +17,6 @@ from core.models import (
     Expense,
     ExpenseInstallment,
     FinancialSettings,
-    Lease,
     MonthSnapshot,
     Person,
     PersonPayment,
@@ -25,6 +24,7 @@ from core.models import (
     RentPayment,
 )
 from core.services.cash_flow_service import CashFlowService
+from core.services.rent_schedule_service import RentScheduleService
 
 _DECEMBER = 12
 
@@ -196,15 +196,10 @@ class MonthAdvanceService:
 
     def _check_unpaid_rent(self, month_start: date) -> list[dict]:
         """Check for active leases without RentPayment for this month."""
-        active_leases = (
-            Lease.objects.filter(
-                apartment__is_rented=True,
-                apartment__owner__isnull=True,
-            )
-            .exclude(prepaid_until__gte=month_start)
-            .exclude(is_salary_offset=True)
-            .select_related("apartment", "apartment__building", "responsible_tenant")
-        )
+        # Collectible rent for the month — single source of truth (date-aware window +
+        # pay-to-live prepaid boundary), consistent with the rent calendar that gates on
+        # the MonthSnapshot this advance produces. Avoids finalizing a still-due month.
+        active_leases = RentScheduleService.collectible_leases(month_start)
 
         unpaid = []
         for lease in active_leases:
@@ -530,16 +525,8 @@ class MonthAdvanceService:
             .count()
         )
 
-        # Expected rent
-        expected_rent_count = (
-            Lease.objects.filter(
-                apartment__is_rented=True,
-                apartment__owner__isnull=True,
-            )
-            .exclude(prepaid_until__gte=month_start)
-            .exclude(is_salary_offset=True)
-            .count()
-        )
+        # Expected rent — collectible leases (single source of truth)
+        expected_rent_count = RentScheduleService.collectible_leases(month_start).count()
 
         reminders = [
             "Adicionar conta de água do mês",

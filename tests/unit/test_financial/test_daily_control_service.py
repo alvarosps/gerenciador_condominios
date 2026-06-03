@@ -11,13 +11,9 @@ from django.core.exceptions import ObjectDoesNotExist
 from freezegun import freeze_time
 
 from core.models import (
-    Expense,
-    ExpenseInstallment,
     ExpenseType,
-    Income,
     Lease,
     Person,
-    RentPayment,
 )
 from core.services.daily_control_service import DailyControlService
 from tests.factories import (
@@ -40,7 +36,13 @@ def building():
 
 @pytest.fixture
 def apartment(building):
-    return make_apartment(building=building, number=101, rental_value=Decimal("1200.00"), max_tenants=2, is_rented=True)
+    return make_apartment(
+        building=building,
+        number=101,
+        rental_value=Decimal("1200.00"),
+        max_tenants=2,
+        is_rented=True,
+    )
 
 
 @pytest.fixture
@@ -53,7 +55,7 @@ def lease(apartment, tenant):
     return make_lease(
         apartment=apartment,
         tenant=tenant,
-        start_date=date(2025, 1, 1),
+        start_date=date(2025, 6, 1),
         validity_months=12,
         tag_fee=Decimal("50.00"),
         rental_value=Decimal("1200.00"),
@@ -87,6 +89,17 @@ class TestDailyBreakdown:
         assert len(rent_entries) == 1
         assert rent_entries[0]["amount"] == 1200.0
         assert rent_entries[0]["paid"] is False
+
+    def test_rent_entry_uses_effective_value_during_pending_increase(self, lease: Lease) -> None:
+        """Daily-control rent amount honors a pending increase (effective value), consistent
+        with the rent calendar and the recorded RentPayment."""
+        lease.pending_rental_value = Decimal("1500.00")
+        lease.pending_rental_value_date = date(2026, 3, 1)
+        lease.save(update_fields=["pending_rental_value", "pending_rental_value_date"])
+        result = DailyControlService.get_daily_breakdown(2026, 3)
+        rent_entries = [e for day in result for e in day["entries"] if e["type"] == "rent"]
+        assert len(rent_entries) == 1
+        assert rent_entries[0]["amount"] == 1500.0
 
     def test_recurring_income_on_correct_day(self) -> None:
         """Recurring income should appear on its income_date day of month."""

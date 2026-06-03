@@ -138,9 +138,5 @@ class PlaywrightPDFGenerator(IPDFGenerator):
             raise PDFGenerationError(msg) from e
 
 
-# Backward compatibility alias
-PyppeteerPDFGenerator = PlaywrightPDFGenerator
-
-
 class PDFGenerationError(Exception):
     """Exception raised when PDF generation fails."""

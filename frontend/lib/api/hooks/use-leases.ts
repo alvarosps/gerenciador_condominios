@@ -135,7 +135,7 @@ export function usePatchLease() {
 
 /**
  * Hook to generate a contract PDF for a lease
- * This calls the backend to generate the PDF using pyppeteer
+ * This calls the backend to generate the PDF using Playwright (headless Chromium)
  */
 export function useGenerateContract() {
   const queryClient = useQueryClient();

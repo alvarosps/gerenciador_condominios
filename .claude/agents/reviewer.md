@@ -1,8 +1,8 @@
 ---
 name: reviewer
-description: Reviews code for quality, security, patterns, and correctness. Use for code review before commits or PRs.
+description: Use PROACTIVELY to review code for quality, security, patterns, and correctness before commits or PRs.
 tools: Read, Grep, Glob, Bash
-model: opus
+model: inherit
 permissionMode: plan
 memory: project
 ---

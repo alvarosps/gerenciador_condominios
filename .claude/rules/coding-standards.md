@@ -29,7 +29,10 @@
 - CRITICAL: Never use `# noqa`, `# type: ignore`, `eslint-disable`, or `@ts-ignore` — always fix the actual code
 - CRITICAL: Never mock internal application methods or library code in tests — mock only external boundaries
 - CRITICAL: Zero tolerance for warnings — all linter, type-checker, and test warnings must be resolved. Warnings can hide bugs and fail silently. This applies to Ruff, mypy, Pyright, ESLint, TypeScript, and pytest warnings.
-- CRITICAL: No re-exports — import from the source module, never create barrel files or re-export wrappers
-- CRITICAL: No backwards compatibility shims — when refactoring, update all consumers and remove old code completely
-- CRITICAL: No workarounds or quick wins — fix problems at the root cause, properly and completely
-- CRITICAL: Follow SOLID, DRY, KISS, YAGNI, and Clean Code at all times — see `.claude/rules/design-principles.md`
+- CRITICAL: All design principles (SOLID/DRY/KISS/YAGNI, Clean Code, no workarounds, no backwards-compat shims, no re-exports, complete refactors) are MANDATORY — see `.claude/rules/design-principles.md` (single canonical source; not restated here).
+
+## Verification Gate (canonical — skills/agents reference this, don't restate subsets)
+
+- Backend, before claiming any change complete: `ruff check && ruff format --check && mypy core/ && pyright && python -m pytest`
+- Frontend, before claiming any change complete: `cd frontend && npm run lint && npm run type-check && npm run test:unit`
+- Zero errors AND zero warnings across Ruff, mypy, Pyright, ESLint, TypeScript, and pytest.

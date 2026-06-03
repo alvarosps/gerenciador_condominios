@@ -84,7 +84,7 @@ export function useNotificationDeepLinking(): void {
 
     return () => {
       if (responseListener.current) {
-        Notifications.removeNotificationSubscription(responseListener.current);
+        responseListener.current.remove();
       }
     };
   }, [router]);

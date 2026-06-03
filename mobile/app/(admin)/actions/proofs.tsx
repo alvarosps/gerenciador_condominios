@@ -1,6 +1,6 @@
 import { FlatList, StyleSheet, View } from "react-native";
 import { Alert } from "react-native";
-import { Button, Card, Chip, Divider, Text, TextInput } from "react-native-paper";
+import { Button, Chip, Divider, Text, TextInput } from "react-native-paper";
 import { useState } from "react";
 import { useAdminProofs, useReviewProof } from "@/lib/api/hooks/use-admin-actions";
 import type { PaymentProofAdmin } from "@/lib/schemas/admin";

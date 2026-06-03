@@ -32,6 +32,7 @@ from core.models import (
     RentPayment,
 )
 from core.services.date_calculator import DateCalculatorService
+from core.services.rent_schedule_service import RentScheduleService
 
 MONTHS_IN_YEAR = 12
 UTILITY_LOOKBACK_MONTHS = 3
@@ -47,19 +48,14 @@ class CashFlowService:
 
         Excludes:
         - Apartments with owner (rent goes to owner, not condominium)
-        - Leases with prepaid_until >= queried month
+        - Leases already prepaid past the month's due date (pay-to-live boundary)
         - Leases with is_salary_offset=True
         """
         reference_date = date(year, month, 1)
 
-        # Active leases excluding owner apartments, prepaid, and salary offset
-        leases = (
-            Lease.objects.filter(apartment__is_rented=True)
-            .filter(apartment__owner__isnull=True)
-            .exclude(prepaid_until__gte=reference_date)
-            .exclude(is_salary_offset=True)
-            .select_related("apartment", "apartment__building", "responsible_tenant")
-        )
+        # Collectible condo rent for the month — single source of truth (date-aware window
+        # + pay-to-live prepaid boundary; excludes owner pass-through and salary offset).
+        leases = RentScheduleService.collectible_leases(reference_date)
 
         # Get rent payments for this month
         rent_payments = {
@@ -159,14 +155,19 @@ class CashFlowService:
                 apartment__owner__isnull=False,
             )
             .filter(start_date__lte=month_start)
-            .exclude(prepaid_until__gte=month_start)
             .exclude(is_salary_offset=True)
-            .select_related("apartment", "apartment__owner", "apartment__building")
+            .select_related(
+                "apartment", "apartment__owner", "apartment__building", "responsible_tenant"
+            )
         )
 
         owner_repayments = Decimal("0.00")
         details = []
         for lease in owner_leases:
+            if RentScheduleService.is_prepaid_for_month(
+                lease, month_start.year, month_start.month
+            ):
+                continue
             owner_repayments += lease.rental_value
             owner = lease.apartment.owner
             details.append(
@@ -643,17 +644,9 @@ class CashFlowService:
     @staticmethod
     def _get_projected_income(year: int, month: int) -> Decimal:
         """Calculate projected income for a future month."""
-        reference_date = date(year, month, 1)
-
-        # Active leases (same exclusions as get_monthly_income, but no payment check)
+        # Collectible condo rent (single source of truth — same set as get_monthly_income).
         rent_income = Decimal("0.00")
-        leases = (
-            Lease.objects.filter(apartment__is_rented=True)
-            .filter(apartment__owner__isnull=True)
-            .exclude(prepaid_until__gte=reference_date)
-            .exclude(is_salary_offset=True)
-        )
-        for lease in leases:
+        for lease in RentScheduleService.collectible_leases(date(year, month, 1)):
             rent_income += lease.rental_value
 
         # Recurring extra income
@@ -679,10 +672,12 @@ class CashFlowService:
                 apartment__is_rented=True,
                 apartment__owner__isnull=False,
             )
-            .exclude(prepaid_until__gte=month_start)
             .exclude(is_salary_offset=True)
+            .select_related("responsible_tenant")
         )
         for lease in owner_leases:
+            if RentScheduleService.is_prepaid_for_month(lease, year, month):
+                continue
             owner_total += lease.rental_value
         total += owner_total
 

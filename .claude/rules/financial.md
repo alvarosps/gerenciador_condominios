@@ -1,9 +1,11 @@
 ---
 paths:
   - "core/services/cash_flow_service.py"
-  - "core/services/dashboard_service.py"
-  - "core/models.py"
-  - "core/serializers.py"
+  - "core/services/financial_dashboard_service.py"
+  - "core/services/simulation_service.py"
+  - "core/services/expense_service.py"
+  - "core/services/daily_control_service.py"
+  - "core/services/rent_schedule_service.py"
 ---
 
 # Financial Module Rules
@@ -16,7 +18,7 @@ paths:
 - Date display: DD/MM/YYYY
 
 ## Financial Models Patterns
-- Expense types: 9 types (TextChoices) — each type has specific required fields
+- Expense types: `ExpenseType` TextChoices in `core/models.py` (source of truth) — each type has specific required fields
 - ExpenseInstallment: auto-generated from Expense when is_installment=True
 - CreditCard due_day affects installment due dates
 - PersonIncome: apartment_rent or fixed_stipend types

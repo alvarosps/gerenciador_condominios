@@ -16,7 +16,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 
-from .models import Apartment, Building, Furniture, Lease, RentPayment, Tenant
+from .models import Apartment, Building, Furniture, Lease, Tenant
 from .permissions import (
     CanGenerateContract,
     CanModifyLease,
@@ -35,8 +35,14 @@ from .serializers import (
 from .services import DashboardService, FeeCalculatorService
 from .services.lease_service import change_tenant_due_day, terminate_lease, transfer_lease
 from .services.rent_adjustment_service import RentAdjustmentService
+from .services.rent_schedule_service import RentScheduleService
 
 logger = logging.getLogger(__name__)
+
+MIN_MONTH = 1
+MAX_MONTH = 12
+MIN_YEAR = 2000
+MAX_YEAR = 2100
 
 
 @api_view(["GET"])
@@ -695,6 +701,107 @@ class DashboardViewSet(viewsets.ViewSet):
         return Response(summary, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=["get"])
+    def rent_calendar(self, request: Request) -> Response:
+        """
+        Get the monthly rent collection calendar.
+
+        GET /api/dashboard/rent_calendar/?year=&month=&building_id=
+
+        Returns the full month structure (year, month, today, next_due_date,
+        days[] with items[], stats{}) produced by RentScheduleService. The view
+        only parses/validates query params and delegates; all business logic
+        lives in the service.
+        """
+        try:
+            year = int(request.query_params["year"])
+            month = int(request.query_params["month"])
+        except (KeyError, TypeError, ValueError):
+            return Response(
+                {"error": "Parâmetros 'year' e 'month' são obrigatórios e numéricos."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not MIN_MONTH <= month <= MAX_MONTH:
+            return Response(
+                {"error": "O mês deve estar entre 1 e 12."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not MIN_YEAR <= year <= MAX_YEAR:
+            return Response(
+                {"error": "O ano deve estar entre 2000 e 2100."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        building_id_raw = request.query_params.get("building_id")
+        try:
+            building_id = int(building_id_raw) if building_id_raw is not None else None
+        except (TypeError, ValueError):
+            return Response(
+                {"error": "O parâmetro 'building_id' deve ser numérico."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        schedule = RentScheduleService.get_month_schedule(year, month, building_id)
+        return Response(schedule, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["post"], url_path="toggle_rent_payment")
+    def toggle_rent_payment(self, request: Request) -> Response:
+        """
+        Toggle a lease's rent payment for a reference month (mark / unmark paid).
+
+        POST /api/dashboard/toggle_rent_payment/
+
+        Body:
+            {
+                "lease_id": 1,
+                "reference_month": "2026-06-01"
+            }
+
+        Delegates to RentScheduleService.toggle_payment, which revalidates
+        collectibility, month finalization and the unpay guard. A service refusal
+        (status="error") is mapped to HTTP 400 with a Portuguese message.
+        """
+        lease_id = request.data.get("lease_id")
+        if not lease_id:
+            return Response(
+                {"error": "lease_id é obrigatório."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            lease_id = int(lease_id)
+        except (TypeError, ValueError):
+            return Response(
+                {"error": "lease_id deve ser numérico."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        reference_month_raw = request.data.get("reference_month")
+        if not isinstance(reference_month_raw, str):
+            return Response(
+                {"error": "reference_month é obrigatório e deve estar no formato YYYY-MM-DD."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            reference_month = date.fromisoformat(reference_month_raw)
+        except ValueError:
+            return Response(
+                {"error": "reference_month deve estar no formato YYYY-MM-DD."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        user = cast(User, request.user)
+        result = RentScheduleService.toggle_payment(lease_id, reference_month, user)
+
+        if result["status"] == "error":
+            return Response(
+                {"error": result["message"]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return Response(result, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["get"])
     def tenant_statistics(self, request: Request) -> Response:
         """
         Get tenant statistics and demographics.
@@ -717,61 +824,6 @@ class DashboardViewSet(viewsets.ViewSet):
         """
         statistics = DashboardService.get_tenant_statistics()
         return Response(statistics, status=status.HTTP_200_OK)
-
-    @action(detail=False, methods=["post"], url_path="mark_rent_paid")
-    def mark_rent_paid(self, request: Request) -> Response:
-        """
-        Mark rent as paid for a lease in the current month.
-
-        POST /api/dashboard/mark_rent_paid/
-
-        Body:
-            {
-                "lease_id": 1,
-                "amount_paid": "1500.00"  (optional, defaults to rental_value)
-            }
-        """
-        lease_id = request.data.get("lease_id")
-        if not lease_id:
-            return Response({"error": "lease_id é obrigatório"}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            lease = Lease.objects.select_related("apartment", "apartment__building").get(
-                id=lease_id
-            )
-        except Lease.DoesNotExist:
-            return Response({"error": "Locação não encontrada"}, status=status.HTTP_404_NOT_FOUND)
-
-        today = timezone.now().date()
-        reference_month = today.replace(day=1)
-
-        # Check if already paid
-        if RentPayment.objects.filter(lease=lease, reference_month=reference_month).exists():
-            return Response(
-                {"error": "Aluguel deste mês já foi registrado como pago"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        amount_str = request.data.get("amount_paid")
-        try:
-            amount_paid = Decimal(amount_str) if amount_str else lease.rental_value
-        except (InvalidOperation, TypeError):
-            return Response({"error": "Valor inválido"}, status=status.HTTP_400_BAD_REQUEST)
-
-        user = cast(User, request.user)
-        RentPayment.objects.create(
-            lease=lease,
-            reference_month=reference_month,
-            amount_paid=amount_paid,
-            payment_date=today,
-            created_by=user,
-            updated_by=user,
-        )
-
-        return Response(
-            {"message": f"Aluguel do Apto {lease.apartment.number} marcado como pago"},
-            status=status.HTTP_201_CREATED,
-        )
 
     @action(detail=False, methods=["get"])
     def rent_adjustment_alerts(self, request: Request) -> Response:

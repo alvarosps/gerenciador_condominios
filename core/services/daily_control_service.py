@@ -22,23 +22,13 @@ from core.models import (
     ExpenseType,
     FinancialSettings,
     Income,
-    Lease,
     MonthSnapshot,
     PersonPayment,
     PersonPaymentSchedule,
     RentPayment,
 )
 from core.services.person_payment_schedule_service import PersonPaymentScheduleService
-
-DAYS_OF_WEEK_PT = {
-    0: "Segunda",
-    1: "Terça",
-    2: "Quarta",
-    3: "Quinta",
-    4: "Sexta",
-    5: "Sábado",
-    6: "Domingo",
-}
+from core.services.rent_schedule_service import DAYS_OF_WEEK_PT, RentScheduleService
 
 
 class DailyControlService:
@@ -138,7 +128,7 @@ class DailyControlService:
         )
 
         # Expected income: rent from active leases + recurring income + one-time income in month
-        expected_rent = _get_expected_rent_total(year, month, month_start)
+        expected_rent = _get_expected_rent_total(month_start)
         expected_extra = _get_expected_extra_income(month_start, next_month_start)
         total_expected_income = expected_rent + expected_extra
 
@@ -333,29 +323,23 @@ def _collect_entries_by_day(
     """Collect all income entries grouped by day of month."""
     entries: dict[int, list[dict[str, Any]]] = {}
 
-    # 1. Rent payments expected (from active leases with due_day in this month)
-    leases = (
-        Lease.objects.filter(apartment__is_rented=True)
-        .exclude(apartment__owner__isnull=False)
-        .exclude(prepaid_until__gte=month_start)
-        .exclude(is_salary_offset=True)
-        .select_related("apartment", "apartment__building", "responsible_tenant")
-    )
+    _, days_in_month = calendar.monthrange(year, month)
+
+    # 1. Rent payments expected (collectible leases — single source of truth)
+    leases = RentScheduleService.collectible_leases(month_start)
 
     rent_payments = {
-        rp.lease_id: rp
+        rp.lease.pk: rp
         for rp in RentPayment.objects.filter(reference_month=month_start).select_related("lease")
     }
 
-    _, days_in_month = calendar.monthrange(year, month)
-
     for lease in leases:
-        due = min(lease.responsible_tenant.due_day, days_in_month)
-        payment = rent_payments.get(lease.id)
+        due = RentScheduleService.clamp_due_day(lease.responsible_tenant.due_day, year, month)
+        payment = rent_payments.get(lease.pk)
         entry = {
             "type": "rent",
             "description": f"Aluguel Apto {lease.apartment.number}/{lease.apartment.building.street_number}",
-            "amount": float(lease.rental_value),
+            "amount": float(RentScheduleService.effective_rental_value(lease, month_start)),
             "expected": True,
             "paid": payment is not None,
         }
@@ -665,17 +649,11 @@ def _collect_person_schedule_exits(
         exits.setdefault(day, []).append(exit_item)
 
 
-def _get_expected_rent_total(year: int, month: int, month_start: date) -> Decimal:
-    """Total expected rent income from active leases."""
-    leases = (
-        Lease.objects.filter(apartment__is_rented=True)
-        .exclude(apartment__owner__isnull=False)
-        .exclude(prepaid_until__gte=month_start)
-        .exclude(is_salary_offset=True)
-    )
+def _get_expected_rent_total(month_start: date) -> Decimal:
+    """Total expected rent income from collectible leases (single source of truth)."""
     total = Decimal("0.00")
-    for lease in leases:
-        total += lease.rental_value
+    for lease in RentScheduleService.collectible_leases(month_start):
+        total += RentScheduleService.effective_rental_value(lease, month_start)
     return total
 
 
@@ -701,12 +679,8 @@ def _get_expected_extra_income(month_start: date, next_month_start: date) -> Dec
 
 
 def _get_received_rent_total(month_start: date) -> Decimal:
-    """Total received rent payments for the month."""
-    payments = RentPayment.objects.filter(reference_month=month_start)
-    total = Decimal("0.00")
-    for rp in payments:
-        total += rp.amount_paid
-    return total
+    """Total received rent payments for the month (canonical received_total)."""
+    return RentScheduleService.received_total(month_start)
 
 
 def _get_received_extra_income(month_start: date, next_month_start: date) -> Decimal:
