@@ -358,8 +358,9 @@ def _invalidate_rent_payment_caches(pk: int) -> None:
     create and unmark; post_delete covers the rare hard delete.
     """
     _invalidate_financial_caches("RentPayment", pk)
+    # Only the late-payment summary depends on RentPayment; get_financial_summary derives
+    # revenue from leases (not payments), so it is intentionally NOT invalidated here.
     CacheManager.invalidate_pattern("dashboard-late-payment*")
-    CacheManager.invalidate_pattern("dashboard-financial-summary*")
 
 
 @receiver(post_save, sender=RentPayment)
