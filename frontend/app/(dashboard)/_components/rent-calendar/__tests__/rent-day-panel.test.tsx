@@ -67,6 +67,17 @@ describe('RentDayPanel', () => {
     expect(screen.getByRole('switch')).toBeDisabled();
   });
 
+  it('disables only the toggle of the lease that is currently pending', () => {
+    const { unmount } = render(
+      <RentDayPanel {...baseProps} pendingLeaseId={1} items={[makeItem({ lease_id: 1 })]} />,
+    );
+    expect(screen.getByRole('switch')).toBeDisabled();
+    unmount();
+    // A different lease (not the pending one) keeps its toggle enabled.
+    render(<RentDayPanel {...baseProps} pendingLeaseId={1} items={[makeItem({ lease_id: 2 })]} />);
+    expect(screen.getByRole('switch')).not.toBeDisabled();
+  });
+
   it('renders an overdue item with label, late days, and formatted late fee', () => {
     render(
       <RentDayPanel
