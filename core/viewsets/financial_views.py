@@ -195,6 +195,8 @@ class ExpenseViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"])
     def mark_paid(self, request: Request, pk: str | None = None) -> Response:
+        if pk is None:
+            return Response(status=status.HTTP_404_NOT_FOUND)
         paid_date = request.data.get("paid_date", timezone.now().date())
         with transaction.atomic():
             expense = Expense.objects.select_for_update().get(pk=pk)
@@ -339,6 +341,8 @@ class ExpenseInstallmentViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"])
     def mark_paid(self, request: Request, pk: str | None = None) -> Response:
+        if pk is None:
+            return Response(status=status.HTTP_404_NOT_FOUND)
         paid_date = request.data.get("paid_date", timezone.now().date())
         with transaction.atomic():
             installment = ExpenseInstallment.objects.select_for_update().get(pk=pk)
@@ -423,6 +427,8 @@ class IncomeViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"])
     def mark_received(self, request: Request, pk: str | None = None) -> Response:
+        if pk is None:
+            return Response(status=status.HTTP_404_NOT_FOUND)
         received_date = request.data.get("received_date", timezone.now().date())
         with transaction.atomic():
             income = Income.objects.select_for_update().get(pk=pk)
@@ -512,6 +518,8 @@ class EmployeePaymentViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"])
     def mark_paid(self, request: Request, pk: str | None = None) -> Response:
+        if pk is None:
+            return Response(status=status.HTTP_404_NOT_FOUND)
         payment_date = request.data.get("payment_date", timezone.now().date())
         with transaction.atomic():
             payment = EmployeePayment.objects.select_for_update().get(pk=pk)

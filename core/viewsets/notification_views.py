@@ -24,6 +24,8 @@ class AdminNotificationViewSet(ViewSet):
     permission_classes = [IsAdminUser]
 
     def list(self, request: Request) -> Response:
+        if request.user.pk is None:
+            return Response(status=status.HTTP_401_UNAUTHORIZED)
         queryset = Notification.objects.filter(recipient=request.user).order_by("-sent_at")
         paginator = CustomPageNumberPagination()
         page = paginator.paginate_queryset(queryset, request)
@@ -32,6 +34,12 @@ class AdminNotificationViewSet(ViewSet):
 
     @action(detail=True, methods=["patch"], url_path="read")
     def mark_read(self, request: Request, pk: int | None = None) -> Response:
+        if pk is None:
+            return Response(
+                {"error": "Notificação não encontrada"}, status=status.HTTP_404_NOT_FOUND
+            )
+        if request.user.pk is None:
+            return Response(status=status.HTTP_401_UNAUTHORIZED)
         try:
             notif = Notification.objects.get(pk=pk, recipient=request.user)
         except Notification.DoesNotExist:
@@ -46,6 +54,8 @@ class AdminNotificationViewSet(ViewSet):
 
     @action(detail=False, methods=["post"], url_path="read-all")
     def mark_all_read(self, request: Request) -> Response:
+        if request.user.pk is None:
+            return Response(status=status.HTTP_401_UNAUTHORIZED)
         count = Notification.objects.filter(recipient=request.user, is_read=False).update(
             is_read=True, read_at=timezone.now()
         )

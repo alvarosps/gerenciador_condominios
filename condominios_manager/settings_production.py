@@ -6,6 +6,7 @@ Use this by setting: DJANGO_SETTINGS_MODULE=condominios_manager.settings_product
 """
 
 from datetime import timedelta
+from typing import Any, cast
 
 # pyrefly: ignore [missing-import]
 import dj_database_url
@@ -237,7 +238,8 @@ CACHE_MIDDLEWARE_SECONDS = 900
 
 # Template caching
 TEMPLATES[0]["APP_DIRS"] = False
-TEMPLATES[0]["OPTIONS"]["loaders"] = [
+_template_options = cast(dict[str, Any], TEMPLATES[0]["OPTIONS"])
+_template_options["loaders"] = [
     (
         "django.template.loaders.cached.Loader",
         [

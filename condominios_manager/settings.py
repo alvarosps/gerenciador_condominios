@@ -18,8 +18,6 @@ from pathlib import Path
 
 from decouple import Csv, config
 
-from .logging_config import LOGGING
-
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -465,7 +463,7 @@ def _detect_chrome_executable() -> str:
     if chrome_in_path:
         return chrome_in_path
 
-    # Se não encontrou no sistema, retorna vazio para que o Playwright 
+    # Se não encontrou no sistema, retorna vazio para que o Playwright
     # tente usar seu próprio binário instalado (caso exista).
     # Em produção (Render), não forçar /usr/bin/chromium se ele não existe.
     return ""
@@ -494,7 +492,4 @@ TWILIO_TEMPLATE_GENERIC = config("TWILIO_TEMPLATE_GENERIC", default="")
 # Celery Configuration
 CELERY_BROKER_URL = config("CELERY_BROKER_URL", default=None)
 # If no broker is provided (like in basic Render deployments), run tasks synchronously
-if CELERY_BROKER_URL:
-    CELERY_TASK_ALWAYS_EAGER = False
-else:
-    CELERY_TASK_ALWAYS_EAGER = True
+CELERY_TASK_ALWAYS_EAGER = not CELERY_BROKER_URL

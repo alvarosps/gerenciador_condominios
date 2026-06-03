@@ -12,11 +12,10 @@ import logging
 from datetime import date, timedelta
 from typing import Any
 
-DECEMBER = 12
-
 from dateutil.relativedelta import relativedelta
 from django.utils import timezone
 
+DECEMBER = 12
 FEBRUARY = 2
 LEAP_DAY = 29
 LAST_DAY_OF_FEB_NON_LEAP = 28

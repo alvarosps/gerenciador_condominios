@@ -9,7 +9,6 @@ from core.infrastructure import (
     StorageError,
 )
 
-
 # =============================================================================
 # FileSystemDocumentStorage tests
 # =============================================================================
@@ -226,10 +225,9 @@ class TestS3DocumentStorage:
 
     @pytest.fixture
     def mock_boto3(self, mocker):
-        """Patch boto3 and HAS_BOTO3 so S3DocumentStorage can be instantiated."""
+        """Patch boto3 (external boundary) so S3DocumentStorage can be instantiated."""
         mock_b3 = mocker.MagicMock()
         mocker.patch("core.infrastructure.storage.boto3", mock_b3)
-        mocker.patch("core.infrastructure.storage.HAS_BOTO3", True)
         return mock_b3
 
     @pytest.fixture
@@ -251,14 +249,6 @@ class TestS3DocumentStorage:
             aws_access_key_id="AKID",
             aws_secret_access_key="SECRET",
         )
-
-    def test_init_raises_when_boto3_not_installed(self, mocker):
-        """Covers line 305-307: S3DocumentStorage raises StorageError if boto3 missing."""
-        from core.infrastructure.storage import S3DocumentStorage, StorageError
-
-        mocker.patch("core.infrastructure.storage.HAS_BOTO3", False)
-        with pytest.raises(StorageError, match="boto3 not installed"):
-            S3DocumentStorage(bucket_name="x")
 
     def test_init_with_credentials_passes_to_boto3(self, s3_storage_with_credentials, mock_boto3):
         """Covers lines 313-319: credential kwargs passed to boto3.client."""
@@ -288,9 +278,9 @@ class TestS3DocumentStorage:
 
     def test_retrieve_returns_bytes(self, s3_storage):
         """Covers lines 370-384: retrieve reads Body from S3 response."""
-        mock_body = mocker.MagicMock() if False else None
-        # Build a proper mock response
-        s3_storage.s3_client.get_object.return_value = {"Body": type("B", (), {"read": lambda self: b"pdf data"})()}
+        s3_storage.s3_client.get_object.return_value = {
+            "Body": type("B", (), {"read": lambda self: b"pdf data"})()
+        }
         result = s3_storage.retrieve("doc.pdf")
         assert result == b"pdf data"
 
