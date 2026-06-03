@@ -323,8 +323,17 @@ module = [
     "botocore.*",
     "django_redis.*",
     "twilio.*",
+    "dj_database_url",
 ]
 ignore_missing_imports = true
+
+# Celery ships no py.typed marker / stubs, so mypy emits import-untyped at each import
+# site (ignore_missing_imports only covers import-not-found; follow_untyped_imports would
+# surface no-untyped-call under strict mode). Disable that code in the modules that
+# integrate Celery, leaving its symbols as Any.
+[[tool.mypy.overrides]]
+module = ["condominios_manager.celery", "core.tasks", "core.views"]
+disable_error_code = ["import-untyped"]
 
 # =============================================================================
 # PYTEST — config in pytest.ini (ini format required for env vars)

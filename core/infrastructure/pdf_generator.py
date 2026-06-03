@@ -14,6 +14,7 @@ Usage:
 """
 
 import logging
+import os
 import tempfile
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -82,7 +83,6 @@ class PlaywrightPDFGenerator(IPDFGenerator):
                 temp_html_path = temp_html.name
 
             try:
-                import os
                 os.environ["PLAYWRIGHT_BROWSERS_PATH"] = "0"
                 with sync_playwright() as p:
                     launch_args: dict = {
