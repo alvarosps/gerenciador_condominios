@@ -112,7 +112,7 @@ export function ContractGenerateModal({ open, lease, onClose }: Props) {
                     <div className="flex justify-between py-2 border-b">
                       <dt className="font-medium text-sm text-muted-foreground">Total de Inquilinos</dt>
                       <dd className="text-sm text-foreground">
-                        {lease.tenants?.length || 0}
+                        {lease.number_of_tenants ?? lease.tenants?.length ?? 0}
                       </dd>
                     </div>
                     <div className="flex justify-between py-2 border-b">
@@ -130,7 +130,7 @@ export function ContractGenerateModal({ open, lease, onClose }: Props) {
                     <div className="flex justify-between py-2 border-b">
                       <dt className="font-medium text-sm text-muted-foreground">Valor do Aluguel</dt>
                       <dd className="text-sm text-foreground">
-                        {formatCurrency(lease.apartment?.rental_value ?? 0)}
+                        {formatCurrency(lease.rental_value ?? lease.apartment?.rental_value ?? 0)}
                       </dd>
                     </div>
                     <div className="flex justify-between py-2 border-b">

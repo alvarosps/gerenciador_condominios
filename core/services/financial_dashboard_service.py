@@ -454,8 +454,8 @@ class FinancialDashboardService:
         Returns dict keyed by "YYYY-MM" with {expense_total, allocated_paid, pending} per month.
         Only considers months from FinancialSettings.initial_balance_date onwards.
         """
-        # Determine start date from FinancialSettings
-        settings = financial_settings
+        # Determine start date from FinancialSettings (fetch the singleton if not provided)
+        settings = financial_settings or FinancialSettings.objects.first()
         start_date = (
             settings.initial_balance_date if settings else date(current_year, current_month, 1)
         )

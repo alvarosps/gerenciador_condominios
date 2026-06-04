@@ -69,6 +69,7 @@ class TestPropertyLifecycleE2E:
                 "building_id": building_id,
                 "number": 101,
                 "rental_value": "1500.00",
+                "rental_value_double": "1800.00",
                 "cleaning_fee": "200.00",
                 "max_tenants": 2,
             },
@@ -151,7 +152,7 @@ class TestPropertyLifecycleE2E:
             {"new_due_day": 15},
         )
         assert change_resp.status_code == status.HTTP_200_OK
-        assert "fee" in change_resp.data
+        assert "change_fee" in change_resp.data
 
         # Verify tenant due_day was updated
         tenant_detail = client.get(f"/api/tenants/{tenant_id}/")
@@ -182,6 +183,7 @@ class TestPropertyLifecycleE2E:
                 "building_id": building_id,
                 "number": 102,
                 "rental_value": "1200.00",
+                "rental_value_double": "1450.00",
                 "cleaning_fee": "150.00",
                 "max_tenants": 2,
             },
@@ -386,6 +388,7 @@ class TestFurnitureManagementWorkflow:
                 "building_id": building.pk,
                 "number": 301,
                 "rental_value": "900.00",
+                "rental_value_double": "1100.00",
                 "cleaning_fee": "100.00",
                 "max_tenants": 2,
                 "furniture_ids": [fridge_id, stove_id, bed_id],
@@ -433,14 +436,18 @@ class TestFurnitureManagementWorkflow:
         assert lease_resp.status_code == status.HTTP_201_CREATED
         lease_id = lease_resp.data["id"]
 
-        # Verify lease detail includes apartment furniture and tenant furniture
+        # Verify lease detail includes apartment furniture (nested ApartmentSerializer).
+        # The lease's nested tenants use the lightweight TenantSummarySerializer (no
+        # furnitures); tenant furniture is read from the tenant detail endpoint, which
+        # uses the full TenantSerializer.
         lease_detail = client.get(f"/api/leases/{lease_id}/")
         assert lease_detail.status_code == status.HTTP_200_OK
 
+        tenant_detail = client.get(f"/api/tenants/{tenant_id}/")
+        assert tenant_detail.status_code == status.HTTP_200_OK
+
         apt_furniture_in_lease = {f["name"] for f in lease_detail.data["apartment"]["furnitures"]}
-        tenant_furniture_in_lease = {
-            f["name"] for f in lease_detail.data["tenants"][0]["furnitures"]
-        }
+        tenant_furniture_in_lease = {f["name"] for f in tenant_detail.data["furnitures"]}
 
         # Apartment has all 3 furniture items
         assert "Geladeira Teste" in apt_furniture_in_lease
@@ -684,6 +691,7 @@ class TestSoftDeleteCascadeBehavior:
                 "building_id": building.pk,
                 "number": 502,
                 "rental_value": "1100.00",
+                "rental_value_double": "1300.00",
                 "cleaning_fee": "120.00",
                 "max_tenants": 2,
             },
@@ -773,6 +781,7 @@ class TestAuthAndPermissionWorkflow:
                 "building_id": building_id,
                 "number": 601,
                 "rental_value": "1000.00",
+                "rental_value_double": "1200.00",
                 "cleaning_fee": "100.00",
                 "max_tenants": 2,
             },

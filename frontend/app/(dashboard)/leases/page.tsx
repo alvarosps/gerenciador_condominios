@@ -471,6 +471,7 @@ export default function LeasesPage() {
                   rowSelection={crud.bulkOps.rowSelection}
                   defaultSortKey="apartment"
                   defaultSortDirection="asc"
+                  pagination={false}
                 />
               </AccordionContent>
             </AccordionItem>

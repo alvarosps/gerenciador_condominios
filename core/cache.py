@@ -228,6 +228,10 @@ class CacheManager:
             5
         """
         if not _is_redis_backend():
+            # In-process backends (LocMemCache, used in tests/dev) expose no key-scan API,
+            # so selective pattern deletion is not possible — clear the whole cache instead
+            # of silently no-op'ing (which left financial caches stale). Production uses Redis.
+            cache.clear()
             return 0
         try:
             redis_client = get_redis_connection("default")
