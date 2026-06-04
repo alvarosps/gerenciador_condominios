@@ -16,6 +16,8 @@ export function createMockRentCalendarItem(
     can_toggle: true,
     late_fee: '0.00',
     late_days: 0,
+    is_collectible: true,
+    non_collectible_reason: null,
     ...overrides,
   };
 }

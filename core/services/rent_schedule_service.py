@@ -4,21 +4,25 @@ Rent schedule service for Condomínios Manager.
 Single source of truth for "rent due this month" logic:
 - Clamping the due day to the actual number of days in the month.
 - Effective rental value honoring pending rent increases.
-- Collectible leases (date-aware window, excluding owner/salary-offset/prepaid).
+- Collectible leases (excluding owner/salary-offset/prepaid). A non-deleted lease is
+  active by definition: Brazilian residential leases auto-renew (Lei 8.245/91 art. 46-47)
+  and tenant move-out is modeled by soft-delete + the ``unique_active_lease_per_apartment``
+  constraint, NOT by the original term elapsing — so there is no upper date bound.
+- Displayable leases (collectible plus the surfaced non-collectible owner/salary-offset
+  reasons) for the rent calendar classification layer.
 - Month schedule (day-by-day items) and month stats for the rent calendar.
 - Toggling a monthly rent payment (create / soft-delete) with full revalidation.
 
 Money uses Decimal; serialized values are returned as str. Date arithmetic is
 pure (all relevant fields are DateField). User-facing messages are in Portuguese;
-logs are in English. Late fee is reused from FeeCalculatorService and lease end
-date from DateCalculatorService (no duplication).
+logs are in English. Late fee is reused from FeeCalculatorService (no duplication).
 """
 
 import logging
 from calendar import monthrange
 from datetime import date
 from decimal import Decimal
-from typing import Any
+from typing import Any, Literal, NamedTuple
 
 from django.contrib.auth.models import User
 from django.db import transaction
@@ -26,7 +30,6 @@ from django.db.models import Count, QuerySet, Sum
 from django.utils import timezone
 
 from core.models import Apartment, Lease, MonthSnapshot, RentPayment
-from core.services.date_calculator import DateCalculatorService
 from core.services.fee_calculator import FeeCalculatorService
 
 logger = logging.getLogger(__name__)
@@ -42,6 +45,17 @@ DAYS_OF_WEEK_PT = {
 }
 
 ZERO = Decimal("0.00")
+
+NonCollectibleReason = Literal["owner_repass", "salary_offset"]
+
+
+class _MonthContext(NamedTuple):
+    """Month-level scalars shared by every day-item of a schedule (computed once)."""
+
+    reference_month: date
+    today: date
+    is_current_month: bool
+    month_finalized: bool
 
 
 class RentScheduleService:
@@ -74,6 +88,15 @@ class RentScheduleService:
         return lease.prepaid_until > date(year, month, clamped_due)
 
     @staticmethod
+    def is_collectible_for_month(lease: Lease, year: int, month: int) -> bool:
+        """Whether this lease's rent is collectible in (year, month): it had started by the
+        last day of the month and is not prepaid for that month. Owner/salary-offset exclusions
+        are structural and handled by collectible_leases, not here."""
+        _, days_in_month = monthrange(year, month)
+        started = lease.start_date <= date(year, month, days_in_month)
+        return started and not RentScheduleService.is_prepaid_for_month(lease, year, month)
+
+    @staticmethod
     def effective_rental_value(lease: Lease, reference_month: date) -> Decimal:
         """Effective rent for the month.
 
@@ -96,10 +119,14 @@ class RentScheduleService:
     def collectible_leases(
         reference_month: date, building_id: int | None = None
     ) -> QuerySet[Lease]:
-        """Collectible leases that cover the month (single source of truth).
+        """Collectible leases for the month (single source of truth).
 
-        Collectibility is purely date-aware (it does NOT depend on the
-        ``apartment.is_rented`` boolean):
+        A non-deleted lease is active by definition: Brazilian residential leases auto-renew
+        (Lei 8.245/91 art. 46-47) and tenant move-out is modeled by soft-delete + the
+        ``unique_active_lease_per_apartment`` constraint, NOT by the original term elapsing.
+        There is therefore NO upper date bound — only ``start_date <= last day of month``,
+        minus the structural and prepaid exclusions. Collectibility does NOT depend on the
+        ``apartment.is_rented`` boolean:
         - not soft-deleted (default ``Lease.objects`` manager),
         - ``apartment.owner`` is null (owner repass is not condominium revenue),
         - ``is_salary_offset=False``,
@@ -109,13 +136,10 @@ class RentScheduleService:
           M/D. The installment due exactly on ``prepaid_until`` is the NEXT one due and
           stays collectible (e.g. prepaid_until=2026-09-29, due_day=29 → Aug excluded,
           Sep collectible).
-        - the window ``start_date..end_date`` intersects the month, where
-          ``end_date = DateCalculatorService.calculate_final_date(start_date, validity_months)``.
 
         ORM-expressible filters (owner, salary offset, building,
-        ``start_date <= last day of month``) stay in the queryset; the prepaid boundary and
-        the end-date upper bound (both need the clamped due date / computed end date) are
-        applied in Python over the already-reduced queryset.
+        ``start_date <= last day of month``) stay in the queryset; the prepaid boundary
+        (which needs the clamped due date) is applied in Python over the reduced queryset.
         """
         year, month = reference_month.year, reference_month.month
         _, days_in_month = monthrange(year, month)
@@ -133,11 +157,6 @@ class RentScheduleService:
 
         collectible_ids = []
         for lease in queryset:
-            end_date = DateCalculatorService.calculate_final_date(
-                lease.start_date, lease.validity_months
-            )
-            if end_date < reference_month:
-                continue
             # Pay-to-live prepaid boundary (single source: is_prepaid_for_month). The month
             # whose due date equals prepaid_until is the next installment due and stays
             # collectible — comparing against month start would be an off-by-one.
@@ -145,6 +164,48 @@ class RentScheduleService:
                 continue
             collectible_ids.append(lease.pk)
         return queryset.filter(id__in=collectible_ids)
+
+    @staticmethod
+    def displayable_leases(
+        reference_month: date, building_id: int | None = None
+    ) -> list[tuple[Lease, bool, str | None]]:
+        """Leases to display in the rent calendar, classified for collectibility.
+
+        Returns every non-deleted lease that had started by the last day of the month
+        (+ optional building filter), as ``(lease, is_collectible, non_collectible_reason)``:
+        - collectible leases → ``(lease, True, None)``;
+        - owner-repass leases → ``(lease, False, "owner_repass")`` (surfaced, not toggleable);
+        - salary-offset leases → ``(lease, False, "salary_offset")`` (surfaced, not toggleable).
+
+        Prepaid leases are intentionally NOT surfaced — they stay hidden, exactly as the
+        collectible set already hides them. That is why ``NonCollectibleReason`` has only the
+        owner-repass and salary-offset literals.
+        """
+        year, month = reference_month.year, reference_month.month
+        _, days_in_month = monthrange(year, month)
+        month_end = date(year, month, days_in_month)
+
+        collectible_ids = {
+            lease.pk
+            for lease in RentScheduleService.collectible_leases(reference_month, building_id)
+        }
+
+        queryset = Lease.objects.filter(start_date__lte=month_end).select_related(
+            "apartment", "apartment__building", "responsible_tenant"
+        )
+        if building_id is not None:
+            queryset = queryset.filter(apartment__building_id=building_id)
+
+        result: list[tuple[Lease, bool, str | None]] = []
+        for lease in queryset:
+            if lease.pk in collectible_ids:
+                result.append((lease, True, None))
+            elif lease.apartment.owner_id is not None:
+                result.append((lease, False, "owner_repass"))
+            elif lease.is_salary_offset:
+                result.append((lease, False, "salary_offset"))
+            # else: excluded only because prepaid → stays hidden (not surfaced).
+        return result
 
     @staticmethod
     def get_month_schedule(year: int, month: int, building_id: int | None = None) -> dict[str, Any]:
@@ -156,17 +217,21 @@ class RentScheduleService:
         """
         reference_month = date(year, month, 1)
         today = timezone.now().date()
-        is_current_month = (year, month) == (today.year, today.month)
-        month_finalized = RentScheduleService._is_month_finalized(reference_month)
+        context = _MonthContext(
+            reference_month=reference_month,
+            today=today,
+            is_current_month=(year, month) == (today.year, today.month),
+            month_finalized=RentScheduleService._is_month_finalized(reference_month),
+        )
 
         _, days_in_month = monthrange(year, month)
-        leases = list(RentScheduleService.collectible_leases(reference_month, building_id))
+        leases = RentScheduleService.displayable_leases(reference_month, building_id)
         payments = RentScheduleService._active_payments_by_lease(reference_month)
 
         items_by_day: dict[int, list[dict[str, Any]]] = {}
         next_due_date: date | None = None
 
-        for lease in leases:
+        for lease, is_collectible, non_collectible_reason in leases:
             clamped_due = RentScheduleService.clamp_due_day(
                 lease.responsible_tenant.due_day, year, month
             )
@@ -174,18 +239,18 @@ class RentScheduleService:
             payment = payments.get(lease.pk)
             item = RentScheduleService._build_item(
                 lease=lease,
-                reference_month=reference_month,
                 clamped_due=clamped_due,
                 clamped_due_date=clamped_due_date,
                 payment=payment,
-                today=today,
-                is_current_month=is_current_month,
-                month_finalized=month_finalized,
+                context=context,
+                is_collectible=is_collectible,
+                non_collectible_reason=non_collectible_reason,
             )
             items_by_day.setdefault(clamped_due, []).append(item)
 
             if (
-                not item["is_paid"]
+                is_collectible
+                and not item["is_paid"]
                 and clamped_due_date >= today
                 and (next_due_date is None or clamped_due_date < next_due_date)
             ):
@@ -353,25 +418,28 @@ class RentScheduleService:
     @staticmethod
     def _build_item(
         lease: Lease,
-        reference_month: date,
         clamped_due: int,
         clamped_due_date: date,
         payment: RentPayment | None,
-        today: date,
-        is_current_month: bool,
-        month_finalized: bool,
+        context: _MonthContext,
+        *,
+        is_collectible: bool,
+        non_collectible_reason: str | None,
     ) -> dict[str, Any]:
         """Build a single day item dict for the schedule."""
-        effective_value = RentScheduleService.effective_rental_value(lease, reference_month)
+        today = context.today
+        effective_value = RentScheduleService.effective_rental_value(lease, context.reference_month)
         is_paid = payment is not None
         day_passed = clamped_due_date < today
-        is_current_or_past = reference_month <= today.replace(day=1)
+        is_current_or_past = context.reference_month <= today.replace(day=1)
         is_overdue = (not is_paid) and day_passed and is_current_or_past
-        can_toggle = (not month_finalized) and not (is_paid and day_passed)
+        can_toggle = (
+            (not context.month_finalized) and not (is_paid and day_passed) and is_collectible
+        )
 
         late_fee = ZERO
         late_days = 0
-        if is_overdue and is_current_month:
+        if is_overdue and context.is_current_month:
             fee = FeeCalculatorService.calculate_late_fee(effective_value, clamped_due, today)
             late_fee = _as_decimal(fee["late_fee"])
             late_days = int(fee["late_days"])
@@ -389,6 +457,8 @@ class RentScheduleService:
             "can_toggle": can_toggle,
             "late_fee": str(late_fee),
             "late_days": late_days,
+            "is_collectible": is_collectible,
+            "non_collectible_reason": non_collectible_reason,
         }
 
     @staticmethod

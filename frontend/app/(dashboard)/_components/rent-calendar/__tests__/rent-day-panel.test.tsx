@@ -17,6 +17,8 @@ function makeItem(overrides: Partial<RentCalendarItem>): RentCalendarItem {
     can_toggle: true,
     late_fee: '0.00',
     late_days: 0,
+    is_collectible: true,
+    non_collectible_reason: null,
     ...overrides,
   };
 }
@@ -147,5 +149,36 @@ describe('RentDayPanel', () => {
   it('disables the "Próx. vencimento" button when nextDueDate is null', () => {
     render(<RentDayPanel {...baseProps} items={[makeItem({})]} nextDueDate={null} />);
     expect(screen.getByRole('button', { name: 'Próx. vencimento' })).toBeDisabled();
+  });
+
+  it('renders non-collectible items in a separate section with the reason label and no toggle', () => {
+    render(
+      <RentDayPanel
+        {...baseProps}
+        items={[
+          makeItem({ lease_id: 1, tenant_name: 'Collectible Tenant', is_collectible: true }),
+          makeItem({
+            lease_id: 2,
+            tenant_name: 'Owner Repass Tenant',
+            is_collectible: false,
+            non_collectible_reason: 'owner_repass',
+          }),
+        ]}
+      />,
+    );
+
+    // Section heading + reason chip for the non-collectible item.
+    expect(screen.getByText('Não-cobrável')).toBeInTheDocument();
+    expect(screen.getByText('Repasse ao proprietário')).toBeInTheDocument();
+    expect(screen.getByText('Owner Repass Tenant')).toBeInTheDocument();
+
+    // Exactly one toggle: the collectible item keeps it, the non-collectible one has none.
+    expect(screen.getAllByRole('switch')).toHaveLength(1);
+    expect(screen.getByText('Collectible Tenant')).toBeInTheDocument();
+  });
+
+  it('omits the "Não-cobrável" section when all items are collectible', () => {
+    render(<RentDayPanel {...baseProps} items={[makeItem({ is_collectible: true })]} />);
+    expect(screen.queryByText('Não-cobrável')).not.toBeInTheDocument();
   });
 });
