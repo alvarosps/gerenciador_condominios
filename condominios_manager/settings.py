@@ -411,6 +411,13 @@ ACCOUNT_LOGOUT_REDIRECT_URL = FRONTEND_URL
 # Origins trusted for CSRF (the OAuth callback POST/redirect flow hits the backend host).
 CSRF_TRUSTED_ORIGINS = config("CSRF_TRUSTED_ORIGINS", default="http://localhost:8008", cast=Csv())
 
+# SameSite policy for the auth (access/refresh) cookies. "Lax" works when frontend and
+# backend share a site (dev, or single-domain prod). For a split-domain prod where the
+# frontend (e.g. Vercel) and backend (e.g. Render) are on different sites, the browser
+# only sends the auth cookies on cross-site XHR when this is "None" (which also requires
+# Secure cookies — guaranteed in production via DEBUG=False).
+AUTH_COOKIE_SAMESITE = config("AUTH_COOKIE_SAMESITE", default="Lax")
+
 
 # PDF Generation Configuration
 def _detect_chrome_executable() -> str:
