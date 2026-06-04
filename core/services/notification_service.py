@@ -1,22 +1,30 @@
 """
 Notification service for push and in-app notifications.
 
-Handles creating Notification records and dispatching push notifications
-to tenant and admin devices via the Expo Push API.
+Handles creating Notification records and dispatching push notifications to
+tenant and admin devices via two channels: the Expo Push API (mobile app) and
+Web Push / VAPID (browser PWA).
 """
 
+import json
 import logging
 
 import requests as http_requests
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.utils import timezone
+from pywebpush import WebPushException, webpush
 
-from core.models import DeviceToken, Notification, PaymentProof
+from core.models import DeviceToken, Notification, PaymentProof, WebPushSubscription
 
 logger = logging.getLogger(__name__)
 
 _EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send"
 _EXPO_REQUEST_TIMEOUT = 10
+
+# Web Push endpoints respond with these statuses when a subscription is gone
+# (unsubscribed/expired) — deactivate it so we stop sending to it.
+_GONE_STATUS_CODES = (404, 410)
 
 
 def create_notification(
@@ -51,11 +59,26 @@ def send_push_notification(
     data: dict | None = None,
 ) -> None:
     """
-    Dispatch push notifications to all active devices for the user.
+    Dispatch a notification to the user across all push channels.
+
+    Sends via both the Expo Push API (mobile) and Web Push (browser PWA).
+    Failures in either channel are logged and silently ignored — the
+    notification is already persisted in the database.
+    """
+    send_expo_push(user, title, body, data)
+    send_web_push(user, title, body, data)
+
+
+def send_expo_push(
+    user: User,
+    title: str,
+    body: str,
+    data: dict | None = None,
+) -> None:
+    """
+    Dispatch push notifications to all active Expo devices for the user.
 
     Makes a single batch request to the Expo Push API.
-    Failures are logged and silently ignored — the notification is
-    already persisted in the database.
     """
     push_ids = list(
         DeviceToken.objects.filter(user=user, is_active=True).values_list("token", flat=True)
@@ -77,6 +100,38 @@ def send_push_notification(
         )
     except http_requests.RequestException:
         logger.warning("Failed to send push notification to user %s", user.pk)
+
+
+def send_web_push(
+    user: User,
+    title: str,
+    body: str,
+    data: dict | None = None,
+) -> None:
+    """
+    Dispatch Web Push (VAPID) notifications to all active browser subscriptions.
+
+    Subscriptions reported as gone (HTTP 404/410) are deactivated. Any other
+    WebPushException is logged and ignored.
+    """
+    payload = json.dumps({"title": title, "body": body, "data": data or {}})
+    for sub in WebPushSubscription.objects.filter(user=user, is_active=True):
+        subscription_info: dict[str, str | bytes | dict[str, str | bytes]] = {
+            "endpoint": sub.endpoint,
+            "keys": {"p256dh": sub.p256dh, "auth": sub.auth},
+        }
+        try:
+            webpush(
+                subscription_info=subscription_info,
+                data=payload,
+                vapid_private_key=settings.VAPID_PRIVATE_KEY,
+                vapid_claims={"sub": settings.VAPID_SUBJECT},
+            )
+        except WebPushException as exc:
+            if exc.response is not None and exc.response.status_code in _GONE_STATUS_CODES:
+                sub.is_active = False
+                sub.save(update_fields=["is_active"])
+            logger.warning("Failed web push to user %s: %s", user.pk, exc)
 
 
 def is_notification_sent_today(user: User, notification_type: str) -> bool:

@@ -11,13 +11,13 @@ import { TAG_FEES, LATE_FEE_RATE, DAYS_PER_MONTH } from '../constants';
 describe('calculateTagFee', () => {
   it('returns SINGLE fee for 1 tenant', () => {
     expect(calculateTagFee(1)).toBe(TAG_FEES.SINGLE);
-    expect(calculateTagFee(1)).toBe(50);
+    expect(calculateTagFee(1)).toBe(20);
   });
 
   it('returns MULTIPLE fee for 2 or more tenants', () => {
     expect(calculateTagFee(2)).toBe(TAG_FEES.MULTIPLE);
     expect(calculateTagFee(5)).toBe(TAG_FEES.MULTIPLE);
-    expect(calculateTagFee(2)).toBe(80);
+    expect(calculateTagFee(2)).toBe(40);
   });
 });
 

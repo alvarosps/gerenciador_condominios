@@ -2076,6 +2076,20 @@ const tenantPortalHandlers = [
 ];
 
 /**
+ * Web push (VAPID) handlers
+ */
+const webPushHandlers = [
+  http.get('*/web-push/vapid-public-key/', () =>
+    HttpResponse.json({ publicKey: 'BPtestVapidPublicKeyExample' }),
+  ),
+  http.post('*/web-push/subscribe/', async ({ request }) => {
+    const body = await request.json();
+    return HttpResponse.json(body, { status: 201 });
+  }),
+  http.post('*/web-push/unsubscribe/', () => new HttpResponse(null, { status: 204 })),
+];
+
+/**
  * All handlers combined
  */
 export const handlers = [
@@ -2107,4 +2121,5 @@ export const handlers = [
   ...rentPaymentHandlers,
   ...templateHandlers,
   ...tenantPortalHandlers,
+  ...webPushHandlers,
 ];

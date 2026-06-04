@@ -176,6 +176,8 @@ class ContractService:
         # Use FeeCalculatorService for fee calculations
         num_tenants = lease.number_of_tenants
         valor_tags = FeeCalculatorService.calculate_tag_fee(num_tenants)
+        # Price of a single access tag — used as the cost to replace a lost tag
+        tag_unit_price = FeeCalculatorService.calculate_tag_fee(1)
         valor_total = FeeCalculatorService.calculate_total_value(
             rental_value=lease.rental_value,
             cleaning_fee=lease.apartment.cleaning_fee,
@@ -209,6 +211,7 @@ class ContractService:
             "rules": rules,
             "lease": lease,
             "valor_tags": valor_tags,
+            "tag_unit_price": tag_unit_price,
         }
 
         logger.info(f"Prepared contract context for lease {lease.id}")

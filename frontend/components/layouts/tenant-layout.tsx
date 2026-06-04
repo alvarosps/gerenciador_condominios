@@ -7,6 +7,7 @@ import { Home, CreditCard, FileText, Bell, User, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/store/auth-store';
 import { useLogout } from '@/lib/api/hooks/use-auth';
+import { OfflineBanner } from '@/components/offline-banner';
 
 interface TenantPortalLayoutProps {
   children: ReactNode;
@@ -31,6 +32,7 @@ export function TenantPortalLayout({ children }: TenantPortalLayoutProps) {
 
   return (
     <div className="min-h-screen flex flex-col bg-muted/30">
+      <OfflineBanner />
       {/* Header */}
       <header className="sticky top-0 z-50 bg-card border-b px-4 py-3 flex items-center justify-between">
         <div>

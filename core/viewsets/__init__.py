@@ -35,6 +35,7 @@ from .month_advance_views import MonthAdvanceViewSet
 from .proof_views import AdminProofViewSet
 from .rule_views import ContractRuleViewSet
 from .template_views import ContractTemplateViewSet
+from .web_push_views import WebPushViewSet
 
 __all__ = [
     "AdminProofViewSet",
@@ -59,4 +60,5 @@ __all__ = [
     "PersonPaymentViewSet",
     "PersonViewSet",
     "RentPaymentViewSet",
+    "WebPushViewSet",
 ]

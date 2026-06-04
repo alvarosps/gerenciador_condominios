@@ -4,7 +4,8 @@ import logging
 from typing import Any, Literal, cast
 
 from django.conf import settings
-from django.contrib.auth import get_user_model
+from django.contrib.auth.models import User
+from django.core.exceptions import ImproperlyConfigured
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -16,21 +17,36 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 logger = logging.getLogger(__name__)
 
-User = get_user_model()
-
 ACCESS_TOKEN_MAX_AGE = 60 * 60  # 1 hour
 REFRESH_TOKEN_MAX_AGE = 7 * 24 * 60 * 60  # 7 days
-COOKIE_SAMESITE: Literal["Lax"] = "Lax"
+
+
+def _cookie_samesite() -> Literal["Lax", "Strict", "None"]:
+    """Resolve the auth-cookie SameSite policy from settings, validating the value.
+
+    "None" enables cross-site delivery (split frontend/backend domains) and requires
+    Secure cookies, which production guarantees via DEBUG=False.
+    """
+    value = settings.AUTH_COOKIE_SAMESITE
+    if value == "Lax":
+        return "Lax"
+    if value == "Strict":
+        return "Strict"
+    if value == "None":
+        return "None"
+    msg = f"AUTH_COOKIE_SAMESITE must be 'Lax', 'Strict', or 'None', got {value!r}"
+    raise ImproperlyConfigured(msg)
 
 
 def _set_auth_cookies(response: Response, access: str, refresh: str | None = None) -> None:
     is_secure = not settings.DEBUG
+    samesite = _cookie_samesite()
     response.set_cookie(
         key="access_token",
         value=access,
         httponly=True,
         secure=is_secure,
-        samesite=COOKIE_SAMESITE,
+        samesite=samesite,
         max_age=ACCESS_TOKEN_MAX_AGE,
         path="/",
     )
@@ -40,7 +56,7 @@ def _set_auth_cookies(response: Response, access: str, refresh: str | None = Non
             value=refresh,
             httponly=True,
             secure=is_secure,
-            samesite=COOKIE_SAMESITE,
+            samesite=samesite,
             max_age=REFRESH_TOKEN_MAX_AGE,
             path="/",
         )
@@ -49,15 +65,16 @@ def _set_auth_cookies(response: Response, access: str, refresh: str | None = Non
         value="1",
         httponly=False,
         secure=is_secure,
-        samesite=COOKIE_SAMESITE,
+        samesite=samesite,
         max_age=ACCESS_TOKEN_MAX_AGE,
         path="/",
     )
 
 
 def _clear_auth_cookies(response: Response) -> None:
+    samesite = _cookie_samesite()
     for name in ("access_token", "refresh_token", "is_authenticated"):
-        response.delete_cookie(name, path="/", samesite=COOKIE_SAMESITE)
+        response.delete_cookie(name, path="/", samesite=samesite)
 
 
 class CookieTokenObtainPairView(TokenObtainPairView):

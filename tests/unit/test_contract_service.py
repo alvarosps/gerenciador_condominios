@@ -9,6 +9,7 @@ from django.conf import settings
 
 from core.models import Landlord
 from core.services.contract_service import ContractService
+from core.utils import format_currency
 from tests.factories import (
     make_apartment,
     make_building,
@@ -74,7 +75,7 @@ def lease(apartment, tenant, admin_user):
         user=admin_user,
         start_date="2026-01-01",
         validity_months=12,
-        tag_fee=Decimal("50.00"),
+        tag_fee=Decimal("20.00"),
         rental_value=Decimal("1500.00"),
     )
     l.tenants.add(tenant)
@@ -163,11 +164,16 @@ class TestPrepareContractContext:
             "valor_total",
             "lease",
             "valor_tags",
+            "tag_unit_price",
             "rules",
             "landlord",
         ]
         for key in required_keys:
             assert key in context, f"Missing key: {key}"
+
+    def test_tag_unit_price_is_single_tag_fee(self, lease):
+        context = ContractService.prepare_contract_context(lease)
+        assert context["tag_unit_price"] == Decimal(str(settings.DEFAULT_TAG_FEE_SINGLE))
 
     def test_tenant_is_responsible_tenant(self, lease, tenant, landlord):
         context = ContractService.prepare_contract_context(lease)
@@ -220,6 +226,21 @@ class TestRenderContractTemplate:
         context = ContractService.prepare_contract_context(lease)
         html = ContractService.render_contract_template(context)
         assert "<html" in html or "<body" in html or len(html) > 10
+
+    def test_renders_tag_as_tenant_property_not_caucao(self, lease, landlord):
+        """The tag is the tenant's non-refundable property; old caução wording is gone."""
+        context = ContractService.prepare_contract_context(lease)
+        html = ContractService.render_contract_template(context)
+
+        # New rule: the tag becomes the tenant's property (non-refundable)
+        assert "propriedade do LOCATÁRIO" in html
+        assert "não reembolsável" in html
+        # Lost-tag replacement price renders from tag_unit_price (= single-tag fee)
+        assert format_currency(Decimal(str(settings.DEFAULT_TAG_FEE_SINGLE))) in html
+
+        # Old refundable-caução tag wording must be absent (regression guard)
+        assert "caução da(s) tag" not in html
+        assert "devolvê-las" not in html
 
 
 @pytest.mark.unit

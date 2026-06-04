@@ -228,7 +228,7 @@ export default function ApartmentsPage() {
 
   return (
     <div>
-      <div className="mb-4 flex justify-between items-center">
+      <div className="mb-4 flex justify-between items-center flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold">Apartamentos</h1>
           <p className="text-muted-foreground mt-1">
@@ -275,7 +275,7 @@ export default function ApartmentsPage() {
       )}
 
       {crud.bulkOps.hasSelection && (
-        <div className="mb-4 p-4 bg-primary/5 border border-primary/20 rounded flex justify-between items-center">
+        <div className="mb-4 p-4 bg-primary/5 border border-primary/20 rounded flex justify-between items-center flex-wrap gap-3">
           <span className="text-primary font-medium">
             {crud.bulkOps.selectionCount}{' '}
             {crud.bulkOps.selectionCount === 1 ? 'apartamento selecionado' : 'apartamentos selecionados'}
