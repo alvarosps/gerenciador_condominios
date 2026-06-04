@@ -1,10 +1,11 @@
 'use client';
 
-import { User, Home, Users } from 'lucide-react';
+import { User, Home, Users, Bell } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useTenantProfile } from '@/lib/api/hooks/use-tenant-portal';
+import { PushToggle } from '@/components/notifications/push-toggle';
 
 function ProfileSkeleton() {
   return (
@@ -55,6 +56,19 @@ export default function TenantProfilePage() {
   return (
     <div className="space-y-4">
       <h2 className="text-xl font-bold">Meu Perfil</h2>
+
+      {/* Notifications */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Bell className="h-4 w-4" />
+            Notificações
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <PushToggle />
+        </CardContent>
+      </Card>
 
       {/* Personal data */}
       <Card>

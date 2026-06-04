@@ -35,6 +35,7 @@ from .viewsets import (
     PersonPaymentViewSet,
     PersonViewSet,
     RentPaymentViewSet,
+    WebPushViewSet,
 )
 from .viewsets.auth_views import SetPasswordViewSet, WhatsAppAuthViewSet
 from .viewsets.notification_views import AdminNotificationViewSet
@@ -77,6 +78,7 @@ router.register(r"admin/proofs", AdminProofViewSet, basename="admin-proofs")
 router.register(r"admin/notifications", AdminNotificationViewSet, basename="admin-notifications")
 router.register(r"admin/users", UserAdminViewSet, basename="admin-users")
 router.register(r"devices", DeviceTokenViewSet, basename="devices")
+router.register(r"web-push", WebPushViewSet, basename="web-push")
 router.register(r"rent-adjustments", RentAdjustmentViewSet, basename="rent-adjustments")
 
 _whatsapp_auth = WhatsAppAuthViewSet.as_view({"post": "request_code"})

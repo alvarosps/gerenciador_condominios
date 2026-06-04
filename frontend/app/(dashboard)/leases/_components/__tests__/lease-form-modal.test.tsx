@@ -109,7 +109,7 @@ describe('LeaseFormModal', () => {
       rental_value: 1200,
       start_date: '2024-01-01',
       validity_months: 12,
-      tag_fee: 50,
+      tag_fee: 20,
       contract_generated: false,
     };
     renderWithProviders(<LeaseFormModal {...defaultProps} lease={lease as never} />);
@@ -133,7 +133,7 @@ describe('LeaseFormModal', () => {
   it('renders payment confirmation checkboxes', () => {
     renderWithProviders(<LeaseFormModal {...defaultProps} />);
     expect(screen.getByText('Taxa de Limpeza Paga')).toBeInTheDocument();
-    expect(screen.getByText('Depósito de Tag Pago')).toBeInTheDocument();
+    expect(screen.getByText('Taxa de Tag Paga')).toBeInTheDocument();
   });
 
   it('renders cancel and submit buttons', () => {

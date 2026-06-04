@@ -163,11 +163,14 @@ class FeeCalculatorService:
     @staticmethod
     def calculate_tag_fee(num_tenants: int) -> Decimal:
         """
-        Calculate tag deposit fee based on number of tenants.
+        Calculate tag fee based on number of tenants.
+
+        The tag fee covers the access tag(s), which become the tenant's property
+        (non-refundable). It is not a deposit.
 
         Fee structure:
-        - 1 tenant: DEFAULT_TAG_FEE_SINGLE (typically R$50.00)
-        - 2+ tenants: DEFAULT_TAG_FEE_MULTIPLE (typically R$80.00)
+        - 1 tenant: DEFAULT_TAG_FEE_SINGLE (typically R$20.00)
+        - 2+ tenants: DEFAULT_TAG_FEE_MULTIPLE (typically R$40.00)
 
         Args:
             num_tenants: Number of tenants in the lease
@@ -180,11 +183,11 @@ class FeeCalculatorService:
 
         Examples:
             >>> FeeCalculatorService.calculate_tag_fee(1)
-            Decimal('50.00')
+            Decimal('20.00')
             >>> FeeCalculatorService.calculate_tag_fee(2)
-            Decimal('80.00')
+            Decimal('40.00')
             >>> FeeCalculatorService.calculate_tag_fee(3)
-            Decimal('80.00')
+            Decimal('40.00')
         """
         if num_tenants < 1:
             msg = "Number of tenants must be at least 1"
@@ -207,15 +210,15 @@ class FeeCalculatorService:
         Args:
             rental_value: Monthly rental value
             cleaning_fee: One-time cleaning fee
-            tag_fee: Tag deposit fee
+            tag_fee: Tag fee (non-refundable)
 
         Returns:
             Total amount due for first payment
 
         Examples:
             >>> FeeCalculatorService.calculate_total_value(
-            ...     Decimal("1500.00"), Decimal("200.00"), Decimal("80.00")
+            ...     Decimal("1500.00"), Decimal("200.00"), Decimal("40.00")
             ... )
-            Decimal('1780.00')
+            Decimal('1740.00')
         """
         return rental_value + cleaning_fee + tag_fee

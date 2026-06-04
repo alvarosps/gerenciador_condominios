@@ -47,6 +47,12 @@
   },
   "overrides": [
     {
+      "files": ["app/sw.ts"],
+      "parserOptions": {
+        "project": "./tsconfig.sw.json"
+      }
+    },
+    {
       "files": ["tailwind.config.ts"],
       "rules": {
         "@typescript-eslint/no-require-imports": "off"

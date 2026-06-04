@@ -355,6 +355,16 @@ ACCOUNT_USERNAME_REQUIRED = True  # Username is required (Django default User mo
 SOCIALACCOUNT_AUTO_SIGNUP = True  # Auto-create accounts from social login
 SOCIALACCOUNT_EMAIL_VERIFICATION = "optional"  # Skip email verification for social accounts
 
+# Redirect straight to the provider on GET /accounts/google/login/ instead of
+# stalling on allauth's confirmation page (allauth 0.63.6 defaults this to False).
+SOCIALACCOUNT_LOGIN_ON_GET = True
+
+# Custom adapter: promote allowlisted Google emails to admin on signup/login.
+SOCIALACCOUNT_ADAPTER = "core.adapters.AdminAllowlistSocialAccountAdapter"
+
+# Comma-separated Google emails that should be promoted to is_staff + is_superuser.
+ADMIN_GOOGLE_EMAILS = config("ADMIN_GOOGLE_EMAILS", default="", cast=Csv())
+
 # Google OAuth Provider Settings
 SOCIALACCOUNT_PROVIDERS = {
     "google": {
@@ -393,9 +403,20 @@ SOCIALACCOUNT_PROVIDERS = {
 FRONTEND_URL = config("FRONTEND_URL", default="http://localhost:6000")
 FRONTEND_AUTH_CALLBACK_PATH = config("FRONTEND_AUTH_CALLBACK_PATH", default="/auth/callback")
 
-# Redirect after OAuth login (will be overridden by custom callback view)
-LOGIN_REDIRECT_URL = f"{FRONTEND_URL}{FRONTEND_AUTH_CALLBACK_PATH}"
+# After allauth completes login, hand off to our backend callback, which creates a
+# one-time exchange code and redirects to the frontend callback page.
+LOGIN_REDIRECT_URL = "/api/auth/oauth/google/callback/"
 ACCOUNT_LOGOUT_REDIRECT_URL = FRONTEND_URL
+
+# Origins trusted for CSRF (the OAuth callback POST/redirect flow hits the backend host).
+CSRF_TRUSTED_ORIGINS = config("CSRF_TRUSTED_ORIGINS", default="http://localhost:8008", cast=Csv())
+
+# SameSite policy for the auth (access/refresh) cookies. "Lax" works when frontend and
+# backend share a site (dev, or single-domain prod). For a split-domain prod where the
+# frontend (e.g. Vercel) and backend (e.g. Render) are on different sites, the browser
+# only sends the auth cookies on cross-site XHR when this is "None" (which also requires
+# Secure cookies — guaranteed in production via DEBUG=False).
+AUTH_COOKIE_SAMESITE = config("AUTH_COOKIE_SAMESITE", default="Lax")
 
 
 # PDF Generation Configuration
@@ -476,8 +497,8 @@ PDF_OUTPUT_DIR = config("PDF_OUTPUT_DIR", default="contracts")
 PDF_GENERATION_TIMEOUT = config("PDF_GENERATION_TIMEOUT", default=30, cast=int)
 
 # Application Constants
-DEFAULT_TAG_FEE_SINGLE = config("DEFAULT_TAG_FEE_SINGLE", default=50.00, cast=float)
-DEFAULT_TAG_FEE_MULTIPLE = config("DEFAULT_TAG_FEE_MULTIPLE", default=80.00, cast=float)
+DEFAULT_TAG_FEE_SINGLE = config("DEFAULT_TAG_FEE_SINGLE", default=20.00, cast=float)
+DEFAULT_TAG_FEE_MULTIPLE = config("DEFAULT_TAG_FEE_MULTIPLE", default=40.00, cast=float)
 LATE_FEE_PERCENTAGE = config("LATE_FEE_PERCENTAGE", default=0.05, cast=float)
 DAYS_PER_MONTH = config("DAYS_PER_MONTH", default=30, cast=int)
 
@@ -488,6 +509,11 @@ TWILIO_WHATSAPP_FROM = config("TWILIO_WHATSAPP_FROM", default="")
 TWILIO_TEMPLATE_VERIFICATION = config("TWILIO_TEMPLATE_VERIFICATION", default="")
 TWILIO_TEMPLATE_RENT_ADJUSTMENT = config("TWILIO_TEMPLATE_RENT_ADJUSTMENT", default="")
 TWILIO_TEMPLATE_GENERIC = config("TWILIO_TEMPLATE_GENERIC", default="")
+
+# Web Push (VAPID) settings
+VAPID_PUBLIC_KEY = config("VAPID_PUBLIC_KEY", default="")
+VAPID_PRIVATE_KEY = config("VAPID_PRIVATE_KEY", default="")
+VAPID_SUBJECT = config("VAPID_SUBJECT", default="mailto:admin@example.com")
 
 # Celery Configuration
 CELERY_BROKER_URL = config("CELERY_BROKER_URL", default=None)

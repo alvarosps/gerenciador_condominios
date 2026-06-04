@@ -19,6 +19,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PAGINATION } from '@/lib/utils/constants';
+import { renderCellContent } from './cell-value';
+import { DataTableCards } from './data-table-cards';
 
 export interface Column<T> {
   title: string;
@@ -31,6 +33,9 @@ export interface Column<T> {
   onFilter?: (value: unknown, record: T) => boolean;
   fixed?: 'left' | 'right';
   align?: 'left' | 'center' | 'right';
+  primary?: boolean;
+  hideOnCard?: boolean;
+  isActions?: boolean;
 }
 
 interface RowSelection<T> {
@@ -135,23 +140,6 @@ export function DataTable<T extends object>({
     paginationConfig.onChange?.(1, size);
   };
 
-  const getCellValue = (record: T, column: Column<T>): unknown => {
-    if (!column.dataIndex) return undefined;
-
-    const path = String(column.dataIndex).split('.');
-    let value: unknown = record;
-
-    for (const key of path) {
-      if (value && typeof value === 'object' && key in value) {
-        value = (value as Record<string, unknown>)[key];
-      } else {
-        return undefined;
-      }
-    }
-
-    return value;
-  };
-
   const handleSelectAll = (checked: boolean): void => {
     if (!rowSelection?.onChange) return;
 
@@ -222,8 +210,8 @@ export function DataTable<T extends object>({
   }
 
   return (
-    <div className="space-y-4">
-      <div className="rounded-md border overflow-x-auto">
+    <div className="@container space-y-4">
+      <div className="rounded-md border overflow-x-auto hidden @md:block">
         <Table>
           <TableHeader>
             <TableRow>
@@ -305,14 +293,11 @@ export function DataTable<T extends object>({
                         />
                       </TableCell>
                     )}
-                    {columns.map((column) => {
-                      const value = getCellValue(record, column);
-                      const content = column.render
-                        ? column.render(value, record, index)
-                        : value === null || value === undefined ? '' : typeof value === 'object' ? JSON.stringify(value) : String(value as string | number | boolean | bigint);
-
-                      return <TableCell key={column.key}>{content}</TableCell>;
-                    })}
+                    {columns.map((column) => (
+                      <TableCell key={column.key}>
+                        {renderCellContent(column, record, index)}
+                      </TableCell>
+                    ))}
                   </TableRow>
                 );
               })
@@ -320,6 +305,13 @@ export function DataTable<T extends object>({
           </TableBody>
         </Table>
       </div>
+
+      <DataTableCards
+        columns={columns}
+        data={paginatedData}
+        rowKey={getRowKey}
+        className="@md:hidden"
+      />
 
       {showPagination && dataSource.length > 0 && (
         <div className="flex flex-col sm:flex-row items-center justify-between gap-2">

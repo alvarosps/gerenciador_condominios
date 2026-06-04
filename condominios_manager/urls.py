@@ -27,7 +27,6 @@ from core.auth import (
     current_user,
     exchange_oauth_code,
     google_oauth_callback,
-    link_oauth_account,
     oauth_status,
 )
 from core.throttles import AuthRateThrottle
@@ -64,7 +63,6 @@ urlpatterns = [
     # Custom OAuth endpoints
     path("api/auth/oauth/google/callback/", google_oauth_callback, name="google_oauth_callback"),
     path("api/auth/oauth/exchange/", exchange_oauth_code, name="exchange_oauth_code"),
-    path("api/auth/oauth/link/", link_oauth_account, name="link_oauth_account"),
     path("api/auth/oauth/status/", oauth_status, name="oauth_status"),
     # Django-allauth OAuth endpoints (Google OAuth)
     path("accounts/", include("allauth.urls")),

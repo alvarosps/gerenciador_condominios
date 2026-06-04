@@ -1,7 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { del } from 'idb-keyval';
 import { apiClient } from '../client';
 import { useAuthStore, type User } from '@/store/auth-store';
 import { queryKeys } from '@/lib/api/query-keys';
+import { QUERY_CACHE_IDB_KEY } from '@/lib/config/persister';
 
 /**
  * Login credentials interface
@@ -84,12 +86,16 @@ export function useLogout() {
     onSuccess: () => {
       clearAuth();
       queryClient.clear();
+      // Clear the persisted cache so one user's business data does not leak to
+      // another on a shared device (read-only offline cache is per-session).
+      void del(QUERY_CACHE_IDB_KEY);
       window.location.href = '/login';
     },
     onError: () => {
       // Even if backend logout fails, clear client state
       clearAuth();
       queryClient.clear();
+      void del(QUERY_CACHE_IDB_KEY);
       window.location.href = '/login';
     },
   });
@@ -113,12 +119,40 @@ export function useCurrentUser() {
 }
 
 /**
+ * Code exchange payload for the OAuth callback flow
+ */
+export interface OAuthExchangePayload {
+  code: string;
+}
+
+/**
  * Hook to initiate Google OAuth login
- * Returns a function that redirects to Google OAuth
+ * Returns a function that redirects to the django-allauth login-start endpoint.
+ * allauth lives at the backend origin under /accounts/ (NOT under the /api prefix),
+ * so the origin is derived by stripping a trailing /api from NEXT_PUBLIC_API_URL.
  */
 export function useGoogleLogin() {
   return () => {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8008/api';
-    window.location.href = `${apiUrl}/auth/google/`;
+    const origin = apiUrl.replace(/\/api\/?$/, '');
+    window.location.href = `${origin}/accounts/google/login/`;
   };
+}
+
+/**
+ * Hook to exchange a short-lived OAuth code (returned to the frontend callback)
+ * for an authenticated session — tokens land in HttpOnly cookies, user in body.
+ */
+export function useExchangeOAuthCode() {
+  const setAuth = useAuthStore((state) => state.setAuth);
+
+  return useMutation({
+    mutationFn: async (payload: OAuthExchangePayload) => {
+      const { data } = await apiClient.post<AuthResponse>('/auth/oauth/exchange/', payload);
+      return data;
+    },
+    onSuccess: (data) => {
+      setAuth(data.user);
+    },
+  });
 }

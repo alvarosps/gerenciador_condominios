@@ -6,19 +6,28 @@
  * Uses the real Zustand auth store — reset between tests with clearAuth().
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
+import { del } from 'idb-keyval';
 import {
   useLogin,
   useRegister,
   useCurrentUser,
   useLogout,
   useGoogleLogin,
+  useExchangeOAuthCode,
 } from '../use-auth';
+import { QUERY_CACHE_IDB_KEY } from '@/lib/config/persister';
 import { createWrapper } from '@/tests/test-utils';
 import { server } from '@/tests/mocks/server';
 import { useAuthStore } from '@/store/auth-store';
+
+vi.mock('idb-keyval', () => ({
+  get: vi.fn(),
+  set: vi.fn(),
+  del: vi.fn().mockResolvedValue(undefined),
+}));
 
 const API_BASE = 'http://localhost:8008/api';
 
@@ -35,6 +44,7 @@ describe('useAuth hooks', () => {
   beforeEach(() => {
     // Reset real Zustand store before each test
     useAuthStore.getState().clearAuth();
+    vi.mocked(del).mockClear();
 
     // Mock window.location for redirect assertions
     Object.defineProperty(window, 'location', {
@@ -218,10 +228,35 @@ describe('useAuth hooks', () => {
       expect(storeState.isAuthenticated).toBe(false);
       expect(storeState.user).toBeNull();
     });
+
+    it('clears the persisted query cache from IndexedDB on logout', async () => {
+      useAuthStore.getState().setAuth({
+        id: 1,
+        email: 'test@example.com',
+        first_name: 'Test',
+        last_name: 'User',
+        is_staff: false,
+      });
+
+      const { result } = renderHook(() => useLogout(), {
+        wrapper: createWrapper(),
+      });
+
+      result.current.mutate();
+
+      await waitFor(
+        () => {
+          expect(result.current.isPending).toBe(false);
+        },
+        { timeout: 5000 },
+      );
+
+      expect(del).toHaveBeenCalledWith(QUERY_CACHE_IDB_KEY);
+    });
   });
 
   describe('useGoogleLogin', () => {
-    it('should return a function that redirects to Google OAuth URL', () => {
+    it('should redirect to the django-allauth login-start URL on the backend origin', () => {
       const { result } = renderHook(() => useGoogleLogin(), {
         wrapper: createWrapper(),
       });
@@ -230,7 +265,51 @@ describe('useAuth hooks', () => {
 
       result.current();
 
-      expect(window.location.href).toContain('/auth/google/');
+      expect(window.location.href).toContain('/accounts/google/login/');
+      expect(window.location.href).not.toContain('/api/auth/google/');
+      expect(window.location.href).not.toContain('/api/accounts/');
+    });
+  });
+
+  describe('useExchangeOAuthCode', () => {
+    it('should store auth state on successful code exchange', async () => {
+      // Set a valid href so MSW can resolve the request URL when intercepting
+      window.location.href = 'http://localhost:4000/auth/callback?code=abc123';
+
+      server.use(
+        http.post(`${API_BASE}/auth/oauth/exchange/`, async ({ request }) => {
+          const body = (await request.json()) as { code: string };
+          expect(body.code).toBe('abc123');
+          return HttpResponse.json({
+            user: {
+              id: 7,
+              email: 'oauth@example.com',
+              first_name: 'OAuth',
+              last_name: 'User',
+              is_staff: false,
+            },
+          });
+        }),
+      );
+
+      const { result } = renderHook(() => useExchangeOAuthCode(), {
+        wrapper: createWrapper(),
+      });
+
+      result.current.mutate({ code: 'abc123' });
+
+      await waitFor(
+        () => {
+          expect(result.current.isPending).toBe(false);
+          expect(result.current.isIdle).toBe(false);
+        },
+        { timeout: 5000 },
+      );
+
+      expect(result.current.isSuccess).toBe(true);
+      const storeState = useAuthStore.getState();
+      expect(storeState.isAuthenticated).toBe(true);
+      expect(storeState.user?.email).toBe('oauth@example.com');
     });
   });
 });

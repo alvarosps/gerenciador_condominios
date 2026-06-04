@@ -161,7 +161,13 @@ const TEMPLATE_VARIABLES: VariableDefinition[] = [
   {
     name: 'valor_tags',
     label: 'Valor das Tags',
-    description: '50 ou 80',
+    description: '20 ou 40',
+    category: 'locacao',
+  },
+  {
+    name: 'tag_unit_price',
+    label: 'Valor de 1 Tag',
+    description: 'Custo de reposição por tag',
     category: 'locacao',
   },
   {
