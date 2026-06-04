@@ -12,7 +12,7 @@ import { useFurniture } from '@/lib/api/hooks/use-furniture';
 import { type StepProps } from './types';
 
 export function FurnitureStep({ formMethods }: StepProps) {
-  const { data: furniture } = useFurniture();
+  const { data: furniture, isLoading } = useFurniture();
 
   return (
     <div>
@@ -27,37 +27,43 @@ export function FurnitureStep({ formMethods }: StepProps) {
         name="furniture_ids"
         render={() => (
           <FormItem>
-            <div className="grid max-h-[340px] grid-cols-2 gap-4 overflow-y-auto rounded-md border p-4">
-              {furniture?.map((item) => (
-                <FormField
-                  key={item.id}
-                  control={formMethods.control}
-                  name="furniture_ids"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                      <FormControl>
-                        <Checkbox
-                          checked={item.id !== undefined && field.value?.includes(item.id)}
-                          onCheckedChange={(checked) => {
-                            const current = field.value ?? [];
-                            if (checked && item.id !== undefined) {
-                              field.onChange([...current, item.id]);
-                            } else {
-                              field.onChange(
-                                current.filter((id) => id !== item.id)
-                              );
-                            }
-                          }}
-                        />
-                      </FormControl>
-                      <FormLabel className="font-normal cursor-pointer">
-                        {item.name}
-                      </FormLabel>
-                    </FormItem>
-                  )}
-                />
-              ))}
-            </div>
+            {isLoading && (
+              <p className="text-sm text-muted-foreground">Carregando móveis...</p>
+            )}
+            {!isLoading && !furniture?.length && (
+              <p className="text-sm text-muted-foreground">Nenhum móvel cadastrado.</p>
+            )}
+            {!isLoading && furniture && furniture.length > 0 && (
+              <div className="grid max-h-[340px] grid-cols-2 gap-4 overflow-y-auto rounded-md border p-4">
+                {furniture.map((item) => (
+                  <FormField
+                    key={item.id}
+                    control={formMethods.control}
+                    name="furniture_ids"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                        <FormControl>
+                          <Checkbox
+                            checked={item.id !== undefined && field.value?.includes(item.id)}
+                            onCheckedChange={(checked) => {
+                              const current = field.value ?? [];
+                              if (checked && item.id !== undefined) {
+                                field.onChange([...current, item.id]);
+                              } else {
+                                field.onChange(current.filter((id) => id !== item.id));
+                              }
+                            }}
+                          />
+                        </FormControl>
+                        <FormLabel className="font-normal cursor-pointer">
+                          {item.name}
+                        </FormLabel>
+                      </FormItem>
+                    )}
+                  />
+                ))}
+              </div>
+            )}
             <FormMessage />
           </FormItem>
         )}

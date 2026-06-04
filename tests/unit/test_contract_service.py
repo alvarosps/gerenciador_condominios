@@ -9,6 +9,7 @@ from django.conf import settings
 
 from core.models import Landlord
 from core.services.contract_service import ContractService
+from core.utils import format_currency
 from tests.factories import (
     make_apartment,
     make_building,
@@ -225,6 +226,21 @@ class TestRenderContractTemplate:
         context = ContractService.prepare_contract_context(lease)
         html = ContractService.render_contract_template(context)
         assert "<html" in html or "<body" in html or len(html) > 10
+
+    def test_renders_tag_as_tenant_property_not_caucao(self, lease, landlord):
+        """The tag is the tenant's non-refundable property; old caução wording is gone."""
+        context = ContractService.prepare_contract_context(lease)
+        html = ContractService.render_contract_template(context)
+
+        # New rule: the tag becomes the tenant's property (non-refundable)
+        assert "propriedade do LOCATÁRIO" in html
+        assert "não reembolsável" in html
+        # Lost-tag replacement price renders from tag_unit_price (= single-tag fee)
+        assert format_currency(Decimal(str(settings.DEFAULT_TAG_FEE_SINGLE))) in html
+
+        # Old refundable-caução tag wording must be absent (regression guard)
+        assert "caução da(s) tag" not in html
+        assert "devolvê-las" not in html
 
 
 @pytest.mark.unit

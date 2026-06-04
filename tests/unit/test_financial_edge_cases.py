@@ -90,6 +90,14 @@ class TestFeeCalculatorEdgeCases:
         fee = FeeCalculatorService.calculate_tag_fee(10)
         assert fee == Decimal(str(settings.DEFAULT_TAG_FEE_MULTIPLE))
 
+    def test_tag_fee_single_strictly_cheaper_than_multiple(self) -> None:
+        """Single-tag fee must stay strictly below the multiple-tag fee.
+
+        tag_unit_price (the lost-tag buy-back price) is the single-tag tier, so an
+        inverted/equal config would silently break the contract's replacement pricing.
+        """
+        assert FeeCalculatorService.calculate_tag_fee(1) < FeeCalculatorService.calculate_tag_fee(2)
+
     def test_tag_fee_zero_raises(self) -> None:
         """Zero tenants raises ValueError."""
         with pytest.raises(ValueError, match="at least 1"):

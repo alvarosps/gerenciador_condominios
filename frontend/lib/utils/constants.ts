@@ -38,8 +38,8 @@ export const DATE_FORMAT = {
 };
 
 export const TAG_FEES = {
-  SINGLE: 50,
-  MULTIPLE: 80,
+  SINGLE: 20,
+  MULTIPLE: 40,
 };
 
 export const LATE_FEE_RATE = 0.05; // 5% per day

@@ -51,10 +51,8 @@ import { type Tenant } from '@/lib/schemas/tenant.schema';
 import { type Dependent } from '@/lib/schemas/tenant.schema';
 import { type Lease } from '@/lib/schemas/lease.schema';
 import { formatCpfCnpj, formatCurrency } from '@/lib/utils/formatters';
+import { calculateTagFee } from '@/lib/utils/helpers';
 import { apiClient } from '@/lib/api/client';
-
-const TAG_FEE_SINGLE = 20;
-const TAG_FEE_DOUBLE = 40;
 
 /** Parse yyyy-MM-dd as local date (avoids UTC timezone shift) */
 function parseLocalDate(dateStr: string): Date {
@@ -123,7 +121,7 @@ export function TenantLeaseModal({
       resident_dependent_id: null,
       start_date: undefined,
       validity_months: 12,
-      tag_fee: TAG_FEE_SINGLE,
+      tag_fee: calculateTagFee(1),
       deposit_amount: null,
       cleaning_fee_paid: false,
       tag_deposit_paid: false,
@@ -154,7 +152,7 @@ export function TenantLeaseModal({
         resident_dependent_id: null,
         start_date: new Date(),
         validity_months: 12,
-        tag_fee: TAG_FEE_SINGLE,
+        tag_fee: calculateTagFee(1),
         deposit_amount: null,
         cleaning_fee_paid: false,
         tag_deposit_paid: false,
@@ -173,7 +171,7 @@ export function TenantLeaseModal({
     if (!selectedApartment) return;
     formMethods.setValue('number_of_tenants', 1);
     formMethods.setValue('rental_value', selectedApartment.rental_value);
-    formMethods.setValue('tag_fee', TAG_FEE_SINGLE);
+    formMethods.setValue('tag_fee', calculateTagFee(1));
     formMethods.setValue('resident_dependent_id', null);
     setShowNewDependentForm(false);
     setNewDependentForm({ name: '', cpf_cnpj: '', phone: '' });
@@ -186,15 +184,14 @@ export function TenantLeaseModal({
     setNewDependentForm({ name: '', cpf_cnpj: '', phone: '' });
 
     if (selectedApartment) {
+      formMethods.setValue('tag_fee', calculateTagFee(value));
       if (value === 2) {
         formMethods.setValue(
           'rental_value',
           selectedApartment.rental_value_double ?? selectedApartment.rental_value
         );
-        formMethods.setValue('tag_fee', TAG_FEE_DOUBLE);
       } else {
         formMethods.setValue('rental_value', selectedApartment.rental_value);
-        formMethods.setValue('tag_fee', TAG_FEE_SINGLE);
       }
     }
   };
