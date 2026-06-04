@@ -1097,7 +1097,10 @@ class Expense(AuditMixin, SoftDeleteMixin, models.Model):
         ]
         constraints = [
             models.CheckConstraint(
-                condition=models.Q(total_amount__gt=0),
+                # Non-negative: an expense may legitimately be 0 (a recurring bill not yet
+                # billed that uses expected_monthly_amount, or a zero-value charge such as a
+                # 0 IPTU). Migration 0040 had tightened this to > 0, regressing those cases.
+                condition=models.Q(total_amount__gte=0),
                 name="expense_total_amount_positive",
             ),
         ]

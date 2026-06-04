@@ -363,17 +363,17 @@ class TestFinancialWorkflowE2E:
         dash_resp = non_admin.get("/api/financial-dashboard/overview/")
         assert dash_resp.status_code == status.HTTP_200_OK
 
-        # Non-admin CAN read cash flow (IsAuthenticated)
+        # Non-admin CANNOT read cash flow (CashFlowViewSet is admin-only — IsAdminUser)
         cf_resp = non_admin.get("/api/cash-flow/monthly/", {"year": 2026, "month": 3})
-        assert cf_resp.status_code == status.HTTP_200_OK
+        assert cf_resp.status_code == status.HTTP_403_FORBIDDEN
 
-        # Non-admin CAN use simulate (IsAuthenticated on CashFlowViewSet)
+        # Non-admin CANNOT use simulate (IsAdminUser on CashFlowViewSet)
         sim_resp = non_admin.post(
             "/api/cash-flow/simulate/",
             {"scenarios": [{"type": "add_fixed_expense", "amount": 100, "description": "Test"}]},
             format="json",
         )
-        assert sim_resp.status_code == status.HTTP_200_OK
+        assert sim_resp.status_code == status.HTTP_403_FORBIDDEN
 
         # Non-admin CAN read financial settings (FinancialReadOnly — read OK)
         settings_resp = non_admin.get("/api/financial-settings/current/")
@@ -801,11 +801,16 @@ class TestFinancialWorkflowE2E:
         rent_entries = [e for e in day_10["entries"] if e["type"] == "rent"]
         assert len(rent_entries) > 0
 
-        # Day 15 (index 14) — should have installment in exits
+        # Day 15 (index 14) — card installments are grouped into a single credit_card exit
         day_15 = days[14]
         assert day_15["date"] == "2026-03-15"
-        installment_exits = [e for e in day_15["exits"] if e["type"] == "installment"]
-        assert len(installment_exits) > 0
+        card_exits = [
+            e
+            for e in day_15["exits"]
+            if e["type"] == "credit_card" and e["card"] == "Daily Card"
+        ]
+        assert len(card_exits) > 0
+        assert len(card_exits[0]["installment_ids"]) > 0
 
     def test_subcategory_expense(self, authenticated_api_client):
         """Expenses with subcategories should appear in category breakdown."""

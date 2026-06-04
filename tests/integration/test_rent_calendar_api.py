@@ -19,7 +19,7 @@ from freezegun import freeze_time
 from model_bakery import baker
 from rest_framework import status
 
-from core.models import MonthSnapshot, RentPayment
+from core.models import Apartment, Building, Lease, MonthSnapshot, RentPayment, Tenant
 
 # DRF binds ``SimpleRateThrottle.timer = time.time`` as a class attribute, so under
 # freezegun it is called as a bound method (``fake_time(self)``) and raises. Throttling
@@ -49,9 +49,9 @@ RENT_CALENDAR_URL = "/api/dashboard/rent_calendar/"
 TOGGLE_URL = "/api/dashboard/toggle_rent_payment/"
 
 
-def _make_building(street_number: int) -> object:
+def _make_building(street_number: int) -> Building:
     return baker.make(
-        "core.Building",
+        Building,
         street_number=street_number,
         name="Test Building",
         address="Test Address",
@@ -59,12 +59,12 @@ def _make_building(street_number: int) -> object:
 
 
 def _make_apartment(
-    building: object,
+    building: Building,
     number: int = 101,
     rental_value: str = "1500.00",
-) -> object:
+) -> Apartment:
     return baker.make(
-        "core.Apartment",
+        Apartment,
         building=building,
         number=number,
         rental_value=Decimal(rental_value),
@@ -75,9 +75,9 @@ def _make_apartment(
     )
 
 
-def _make_tenant(cpf: str, name: str = "Test Tenant", due_day: int = 5) -> object:
+def _make_tenant(cpf: str, name: str = "Test Tenant", due_day: int = 5) -> Tenant:
     return baker.make(
-        "core.Tenant",
+        Tenant,
         name=name,
         cpf_cnpj=cpf,
         phone="11999990000",
@@ -88,14 +88,14 @@ def _make_tenant(cpf: str, name: str = "Test Tenant", due_day: int = 5) -> objec
 
 
 def _make_lease(
-    apartment: object,
-    tenant: object,
+    apartment: Apartment,
+    tenant: Tenant,
     rental_value: str = "1500.00",
     start_date: date = date(2026, 1, 1),
     validity_months: int = 24,
-) -> object:
+) -> Lease:
     return baker.make(
-        "core.Lease",
+        Lease,
         apartment=apartment,
         responsible_tenant=tenant,
         rental_value=Decimal(rental_value),
@@ -107,7 +107,7 @@ def _make_lease(
 
 
 @pytest.fixture
-def collectible_lease(admin_user) -> object:
+def collectible_lease(admin_user) -> Lease:
     """A single collectible lease due on day 5, in building 100."""
     building = _make_building(100)
     apartment = _make_apartment(building, number=101)
