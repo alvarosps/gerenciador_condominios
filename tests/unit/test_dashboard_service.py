@@ -12,6 +12,7 @@ from freezegun import freeze_time
 
 from core.models import Apartment, Building, Dependent, Lease, Tenant
 from core.services.dashboard_service import DashboardService
+from tests.factories import make_rent_payment
 
 # ---------------------------------------------------------------------------
 # Shared fixtures
@@ -108,6 +109,30 @@ def active_lease(apartment_rented, tenant_individual, admin_user):
         validity_months=24,
         tag_fee=Decimal("80.00"),
         rental_value=Decimal("1500.00"),
+        created_by=admin_user,
+        updated_by=admin_user,
+    )
+
+
+@pytest.fixture
+def active_lease_company(building, tenant_company, admin_user):
+    """A second active lease so tenant_company counts as an active tenant."""
+    apartment = Apartment.objects.create(
+        building=building,
+        number=403,
+        rental_value=Decimal("1000.00"),
+        cleaning_fee=Decimal("100.00"),
+        max_tenants=1,
+        created_by=admin_user,
+        updated_by=admin_user,
+    )
+    return Lease.objects.create(
+        apartment=apartment,
+        responsible_tenant=tenant_company,
+        start_date=date(2026, 1, 1),
+        validity_months=24,
+        tag_fee=Decimal("40.00"),
+        rental_value=Decimal("1000.00"),
         created_by=admin_user,
         updated_by=admin_user,
     )
@@ -301,7 +326,7 @@ class TestGetLatePaymentSummary:
         # tenant_individual.due_day = 10, today = 2026-03-15 → 5 days late
         summary = DashboardService.get_late_payment_summary()
         assert summary["total_late_leases"] >= 1
-        assert summary["total_late_fees"] > Decimal("0.00")
+        assert Decimal(summary["total_late_fees"]) > Decimal("0.00")
         late = summary["late_leases"][0]
         assert "lease_id" in late
         assert "tenant_name" in late
@@ -310,8 +335,12 @@ class TestGetLatePaymentSummary:
         assert late["late_days"] >= 1
 
     @freeze_time("2026-03-05")
-    def test_not_late_when_before_due_day(self, active_lease, apartment_rented, tenant_individual):
-        # due_day = 10, today = 2026-03-05 → not late
+    def test_not_late_when_before_due_day(
+        self, active_lease, apartment_rented, tenant_individual, admin_user
+    ):
+        # due_day = 10, today = 2026-03-05 → March not yet due; prior months are paid
+        make_rent_payment(lease=active_lease, user=admin_user, reference_month=date(2026, 1, 1))
+        make_rent_payment(lease=active_lease, user=admin_user, reference_month=date(2026, 2, 1))
         summary = DashboardService.get_late_payment_summary()
         # This particular lease should not be in late_leases
         late_lease_ids = [lease["lease_id"] for lease in summary["late_leases"]]
@@ -343,13 +372,15 @@ class TestGetTenantStatistics:
         }
         assert expected_keys.issubset(stats.keys())
 
-    def test_counts_individual_and_company_tenants(self, tenant_individual, tenant_company):
+    def test_counts_individual_and_company_tenants(self, active_lease, active_lease_company):
+        # Both tenants are active (each linked to a lease)
         stats = DashboardService.get_tenant_statistics()
         assert stats["individual_tenants"] >= 1
         assert stats["company_tenants"] >= 1
         assert stats["total_tenants"] >= 2
 
-    def test_counts_dependents(self, tenant_individual, admin_user):
+    def test_counts_dependents(self, active_lease, tenant_individual, admin_user):
+        # active_lease makes tenant_individual an active tenant
         Dependent.objects.create(
             tenant=tenant_individual,
             name="Dependente Dashboard",
