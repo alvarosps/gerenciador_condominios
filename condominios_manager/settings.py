@@ -476,8 +476,8 @@ PDF_OUTPUT_DIR = config("PDF_OUTPUT_DIR", default="contracts")
 PDF_GENERATION_TIMEOUT = config("PDF_GENERATION_TIMEOUT", default=30, cast=int)
 
 # Application Constants
-DEFAULT_TAG_FEE_SINGLE = config("DEFAULT_TAG_FEE_SINGLE", default=50.00, cast=float)
-DEFAULT_TAG_FEE_MULTIPLE = config("DEFAULT_TAG_FEE_MULTIPLE", default=80.00, cast=float)
+DEFAULT_TAG_FEE_SINGLE = config("DEFAULT_TAG_FEE_SINGLE", default=20.00, cast=float)
+DEFAULT_TAG_FEE_MULTIPLE = config("DEFAULT_TAG_FEE_MULTIPLE", default=40.00, cast=float)
 LATE_FEE_PERCENTAGE = config("LATE_FEE_PERCENTAGE", default=0.05, cast=float)
 DAYS_PER_MONTH = config("DAYS_PER_MONTH", default=30, cast=int)
 

@@ -118,7 +118,7 @@ describe('TenantLeaseModal', () => {
   it('renders payment confirmation checkboxes', () => {
     renderWithProviders(<TenantLeaseModal {...defaultProps} />);
     expect(screen.getByText('Taxa de Limpeza Paga')).toBeInTheDocument();
-    expect(screen.getByText('Depósito de Tag Pago')).toBeInTheDocument();
+    expect(screen.getByText('Taxa de Tag Paga')).toBeInTheDocument();
   });
 
   it('shows "Criar Contrato" submit button in create mode', () => {

@@ -551,10 +551,10 @@ class Lease(AuditMixin, SoftDeleteMixin, models.Model):
                           Must be <= apartment.max_tenants.
         start_date: Lease start date
         validity_months: Duration of lease in months
-        tag_fee: Tag/key deposit amount
+        tag_fee: Access tag fee (non-refundable; the tag becomes the tenant's property)
         deposit_amount: Security deposit amount paid by tenant
         cleaning_fee_paid: Whether the cleaning fee has been paid
-        tag_deposit_paid: Whether the tag deposit has been paid
+        tag_deposit_paid: Whether the tag fee has been paid
         contract_generated: Whether contract PDF has been generated
         contract_signed: Whether contract has been signed
         interfone_configured: Whether intercom has been configured
@@ -590,7 +590,10 @@ class Lease(AuditMixin, SoftDeleteMixin, models.Model):
     validity_months = models.PositiveIntegerField(help_text="Validade do contrato em meses")
 
     tag_fee = models.DecimalField(
-        max_digits=10, decimal_places=2, help_text="Valor da caução da tag", default=0
+        max_digits=10,
+        decimal_places=2,
+        help_text="Valor cobrado pela(s) tag(s) de acesso (não reembolsável)",
+        default=0,
     )
     rental_value = models.DecimalField(
         max_digits=10,
@@ -604,7 +607,7 @@ class Lease(AuditMixin, SoftDeleteMixin, models.Model):
         max_digits=10, decimal_places=2, null=True, blank=True, help_text="Valor da caução"
     )
     cleaning_fee_paid = models.BooleanField(default=False, help_text="Taxa de limpeza paga")
-    tag_deposit_paid = models.BooleanField(default=False, help_text="Caução de tags paga")
+    tag_deposit_paid = models.BooleanField(default=False, help_text="Taxa de tag(s) paga")
 
     contract_generated = models.BooleanField(
         default=False, help_text="Indica se o contrato foi gerado"

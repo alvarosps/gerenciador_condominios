@@ -365,7 +365,8 @@ export default function ContractTemplatePage() {
                   <li><code className="bg-muted px-1 py-0.5 rounded text-sm">{'{{ next_month_date }}'}</code> - Data do próximo mês</li>
                   <li><code className="bg-muted px-1 py-0.5 rounded text-sm">{'{{ rental_value }}'}</code> - Valor do aluguel (número)</li>
                   <li><code className="bg-muted px-1 py-0.5 rounded text-sm">{'{{ cleaning_fee }}'}</code> - Taxa de limpeza</li>
-                  <li><code className="bg-muted px-1 py-0.5 rounded text-sm">{'{{ valor_tags }}'}</code> - Valor das tags (50 ou 80)</li>
+                  <li><code className="bg-muted px-1 py-0.5 rounded text-sm">{'{{ valor_tags }}'}</code> - Valor das tags (20 ou 40)</li>
+                  <li><code className="bg-muted px-1 py-0.5 rounded text-sm">{'{{ tag_unit_price }}'}</code> - Valor de reposição de 1 tag</li>
                   <li><code className="bg-muted px-1 py-0.5 rounded text-sm">{'{{ tenant.due_day }}'}</code> - Dia de vencimento</li>
                   <li><code className="bg-muted px-1 py-0.5 rounded text-sm">{'{{ lease.number_of_tenants }}'}</code> - Número de inquilinos</li>
                 </ul>

@@ -55,8 +55,8 @@ import { formatCurrency } from '@/lib/utils/formatters';
 import { apiClient } from '@/lib/api/client';
 import { handleError } from '@/lib/utils/error-handler';
 
-const TAG_FEE_SINGLE = 50;
-const TAG_FEE_DOUBLE = 80;
+const TAG_FEE_SINGLE = 20;
+const TAG_FEE_DOUBLE = 40;
 
 /** Parse yyyy-MM-dd as local date (avoids UTC timezone shift) */
 function parseLocalDate(dateStr: string): Date {
@@ -668,7 +668,7 @@ export function LeaseFormModal({ open, lease, onClose }: Props) {
                     </div>
                   </FormControl>
                   <FormDescription>
-                    R$ 50,00 para 1 pessoa, R$ 80,00 para 2 pessoas
+                    R$ 20,00 para 1 pessoa, R$ 40,00 para 2 pessoas
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -787,7 +787,7 @@ export function LeaseFormModal({ open, lease, onClose }: Props) {
               )}
             />
 
-            {/* Tag Deposit Paid */}
+            {/* Tag Fee Paid */}
             <FormField
               control={formMethods.control}
               name="tag_deposit_paid"
@@ -800,9 +800,9 @@ export function LeaseFormModal({ open, lease, onClose }: Props) {
                     />
                   </FormControl>
                   <div className="space-y-1 leading-none">
-                    <FormLabel>Depósito de Tag Pago</FormLabel>
+                    <FormLabel>Taxa de Tag Paga</FormLabel>
                     <FormDescription>
-                      Marque se o depósito da tag de acesso foi pago pelo inquilino
+                      Marque se a taxa da(s) tag(s) de acesso foi paga pelo inquilino
                     </FormDescription>
                   </div>
                 </FormItem>

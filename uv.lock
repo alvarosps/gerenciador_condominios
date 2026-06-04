@@ -490,6 +490,7 @@ dependencies = [
     { name = "boto3" },
     { name = "celery" },
     { name = "cryptography" },
+    { name = "dj-database-url" },
     { name = "django" },
     { name = "django-allauth", extra = ["socialaccount"] },
     { name = "django-cors-headers" },
@@ -554,6 +555,7 @@ requires-dist = [
     { name = "celery", specifier = ">=5.4.0,<6.0" },
     { name = "coverage", marker = "extra == 'dev'", specifier = ">=7.6.0,<8.0" },
     { name = "cryptography", specifier = ">=44.0.0,<47.0" },
+    { name = "dj-database-url", specifier = ">=2.1.0,<3.0" },
     { name = "django", specifier = ">=5.2.0,<6.0" },
     { name = "django-allauth", extras = ["socialaccount"], specifier = ">=0.63.0,<0.70" },
     { name = "django-cors-headers", specifier = ">=4.6.0,<5.0" },
@@ -759,6 +761,19 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/96/8e/709914eb2b5749865801041647dc7f4e6d00b549cfe88b65ca192995f07c/distlib-0.4.0.tar.gz", hash = "sha256:feec40075be03a04501a973d81f633735b4b69f98b05450592310c0f401a4e0d", size = 614605, upload-time = "2025-07-17T16:52:00.465Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/33/6b/e0547afaf41bf2c42e52430072fa5658766e3d65bd4b03a563d1b6336f57/distlib-0.4.0-py2.py3-none-any.whl", hash = "sha256:9659f7d87e46584a30b5780e43ac7a2143098441670ff0a49d5f9034c54a6c16", size = 469047, upload-time = "2025-07-17T16:51:58.613Z" },
+]
+
+[[package]]
+name = "dj-database-url"
+version = "2.3.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "django" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/98/9f/fc9905758256af4f68a55da94ab78a13e7775074edfdcaddd757d4921686/dj_database_url-2.3.0.tar.gz", hash = "sha256:ae52e8e634186b57e5a45e445da5dc407a819c2ceed8a53d1fac004cc5288787", size = 10980, upload-time = "2024-10-23T10:05:19.953Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e5/91/641a4e5c8903ed59f6cbcce571003bba9c5d2f731759c31db0ba83bb0bdb/dj_database_url-2.3.0-py3-none-any.whl", hash = "sha256:bb0d414ba0ac5cd62773ec7f86f8cc378a9dbb00a80884c2fc08cc570452521e", size = 7793, upload-time = "2024-10-23T10:05:41.254Z" },
 ]
 
 [[package]]
