@@ -19,6 +19,11 @@ from rest_framework.viewsets import ViewSet
 from core.models import WebPushSubscription
 
 
+def _as_str(value: object) -> str:
+    """Coerce request data to a trimmed string (non-strings/None -> '')."""
+    return value.strip() if isinstance(value, str) else ""
+
+
 class WebPushViewSet(ViewSet):
     """ViewSet for managing browser Web Push subscriptions."""
 
@@ -41,10 +46,11 @@ class WebPushViewSet(ViewSet):
         Register or update a Web Push subscription for the user.
         Body: {"endpoint": "...", "keys": {"p256dh": "...", "auth": "..."}}
         """
-        endpoint = request.data.get("endpoint", "").strip()
-        keys = request.data.get("keys") or {}
-        p256dh = keys.get("p256dh", "").strip()
-        auth = keys.get("auth", "").strip()
+        endpoint = _as_str(request.data.get("endpoint"))
+        keys_raw = request.data.get("keys")
+        keys = keys_raw if isinstance(keys_raw, dict) else {}
+        p256dh = _as_str(keys.get("p256dh"))
+        auth = _as_str(keys.get("auth"))
 
         if not endpoint or not p256dh or not auth:
             return Response(
@@ -84,7 +90,7 @@ class WebPushViewSet(ViewSet):
         Deactivate a Web Push subscription so it no longer receives notifications.
         Body: {"endpoint": "..."}
         """
-        endpoint = request.data.get("endpoint", "").strip()
+        endpoint = _as_str(request.data.get("endpoint"))
         if not endpoint:
             return Response(
                 {"error": "endpoint é obrigatório"},

@@ -12,6 +12,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Loader2, Trash2 } from 'lucide-react';
+import { useIsOnline } from '@/lib/hooks/use-is-online';
 
 interface DeleteConfirmDialogProps {
   /**
@@ -73,6 +74,7 @@ export function DeleteConfirmDialog({
   const [internalLoading, setInternalLoading] = useState(false);
 
   const actualLoading = isLoading || internalLoading;
+  const isOnline = useIsOnline();
 
   const defaultDescription = itemName
     ? `Tem certeza que deseja excluir "${itemName}"? Esta ação não pode ser desfeita.`
@@ -100,6 +102,11 @@ export function DeleteConfirmDialog({
             {description ?? defaultDescription}
           </AlertDialogDescription>
         </AlertDialogHeader>
+        {!isOnline && (
+          <p className="text-sm text-amber-600 dark:text-amber-400">
+            Indisponível offline — reconecte para excluir.
+          </p>
+        )}
         <AlertDialogFooter>
           <AlertDialogCancel disabled={actualLoading}>
             Cancelar
@@ -109,7 +116,7 @@ export function DeleteConfirmDialog({
               e.preventDefault();
               void handleConfirm();
             }}
-            disabled={actualLoading}
+            disabled={actualLoading || !isOnline}
             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
           >
             {actualLoading ? (
@@ -183,6 +190,7 @@ export function BulkDeleteConfirmDialog({
   const [internalLoading, setInternalLoading] = useState(false);
 
   const actualLoading = isLoading || internalLoading;
+  const isOnline = useIsOnline();
 
   const handleConfirm = async () => {
     try {
@@ -207,6 +215,11 @@ export function BulkDeleteConfirmDialog({
             Esta ação não pode ser desfeita.
           </AlertDialogDescription>
         </AlertDialogHeader>
+        {!isOnline && (
+          <p className="text-sm text-amber-600 dark:text-amber-400">
+            Indisponível offline — reconecte para excluir.
+          </p>
+        )}
         <AlertDialogFooter>
           <AlertDialogCancel disabled={actualLoading}>
             Cancelar
@@ -216,7 +229,7 @@ export function BulkDeleteConfirmDialog({
               e.preventDefault();
               void handleConfirm();
             }}
-            disabled={actualLoading}
+            disabled={actualLoading || !isOnline}
             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
           >
             {actualLoading ? (
