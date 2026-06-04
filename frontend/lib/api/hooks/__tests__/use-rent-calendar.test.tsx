@@ -85,6 +85,48 @@ describe('useRentCalendar', () => {
 
     await waitFor(() => expect(result.current.isError).toBe(true), { timeout: 5000 });
   });
+
+  it('exposes is_collectible and non_collectible_reason for each item', async () => {
+    server.use(
+      http.get(`${API_BASE}/dashboard/rent_calendar/`, () => {
+        return HttpResponse.json(
+          createMockRentCalendar({
+            days: [
+              {
+                day: 5,
+                date: '2026-06-05',
+                weekday: 'Sexta',
+                items: [
+                  createMockRentCalendarItem({
+                    lease_id: 1,
+                    is_collectible: true,
+                    non_collectible_reason: null,
+                  }),
+                  createMockRentCalendarItem({
+                    lease_id: 2,
+                    is_collectible: false,
+                    non_collectible_reason: 'owner_repass',
+                  }),
+                ],
+              },
+            ],
+          }),
+        );
+      }),
+    );
+
+    const { result } = renderHook(() => useRentCalendar(2026, 6), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true), { timeout: 5000 });
+
+    const items = result.current.data?.days?.[0]?.items;
+    expect(items?.[0]?.is_collectible).toBe(true);
+    expect(items?.[0]?.non_collectible_reason).toBeNull();
+    expect(items?.[1]?.is_collectible).toBe(false);
+    expect(items?.[1]?.non_collectible_reason).toBe('owner_repass');
+  });
 });
 
 function seedCalendarHandler() {
@@ -270,6 +312,77 @@ describe('useToggleRentPayment', () => {
       );
       expect(allData?.days?.[0]?.items?.[0]?.is_paid).toBe(true);
       expect(filteredData?.days?.[0]?.items?.[0]?.is_paid).toBe(true);
+    });
+
+    await waitFor(() => expect(result.current.toggle.isSuccess).toBe(true), { timeout: 5000 });
+  });
+
+  it('preserves is_collectible/non_collectible_reason through the optimistic flip', async () => {
+    // A day with a collectible item (the toggle target) and a non-collectible one that must
+    // keep its flags untouched through the optimistic update.
+    server.use(
+      http.get(`${API_BASE}/dashboard/rent_calendar/`, () => {
+        return HttpResponse.json(
+          createMockRentCalendar({
+            days: [
+              {
+                day: 5,
+                date: '2026-06-05',
+                weekday: 'Sexta',
+                items: [
+                  createMockRentCalendarItem({
+                    lease_id: 12,
+                    is_paid: false,
+                    is_collectible: true,
+                    non_collectible_reason: null,
+                  }),
+                  createMockRentCalendarItem({
+                    lease_id: 99,
+                    is_paid: false,
+                    is_collectible: false,
+                    non_collectible_reason: 'salary_offset',
+                  }),
+                ],
+              },
+            ],
+          }),
+        );
+      }),
+    );
+    const queryClient = createTestQueryClient();
+
+    const { result } = renderHook(
+      () => ({
+        calendar: useRentCalendar(2026, 6),
+        toggle: useToggleRentPayment(),
+      }),
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    await waitFor(() => expect(result.current.calendar.isSuccess).toBe(true), { timeout: 5000 });
+
+    server.use(
+      http.post(`${API_BASE}/dashboard/toggle_rent_payment/`, async () => {
+        await delay(200);
+        return HttpResponse.json({ status: 'paid', is_paid: true, message: 'ok' });
+      }),
+    );
+
+    result.current.toggle.mutate({ lease_id: 12, reference_month: '2026-06-01' });
+
+    await waitFor(() => {
+      const snapshot = queryClient.getQueryData<RentCalendar>(
+        queryKeys.rentCalendar.month(2026, 6),
+      );
+      const items = snapshot?.days?.[0]?.items;
+      // Targeted collectible item flips is_paid; its collectible flags are unchanged.
+      expect(items?.[0]?.is_paid).toBe(true);
+      expect(items?.[0]?.is_collectible).toBe(true);
+      expect(items?.[0]?.non_collectible_reason).toBeNull();
+      // Non-collectible item keeps every flag, including is_paid (not the toggle target).
+      expect(items?.[1]?.is_paid).toBe(false);
+      expect(items?.[1]?.is_collectible).toBe(false);
+      expect(items?.[1]?.non_collectible_reason).toBe('salary_offset');
     });
 
     await waitFor(() => expect(result.current.toggle.isSuccess).toBe(true), { timeout: 5000 });

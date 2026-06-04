@@ -17,6 +17,8 @@ function makeItem(overrides: Partial<RentCalendarItem>): RentCalendarItem {
     can_toggle: true,
     late_fee: '0.00',
     late_days: 0,
+    is_collectible: true,
+    non_collectible_reason: null,
     ...overrides,
   };
 }
@@ -67,6 +69,29 @@ describe('RentMonthGrid', () => {
     expect(screen.getByText('PaidTenant')).toHaveClass('bg-success/10');
     expect(screen.getByText('OverdueTenant')).toHaveClass('bg-destructive/10');
     expect(screen.getByText('DueTenant')).toHaveClass('bg-amber-500/10');
+  });
+
+  it('styles non-collectible chips as muted and labels them "não-cobrável"', () => {
+    const days: RentCalendarDay[] = [
+      {
+        day: 5,
+        date: '2026-06-05',
+        weekday: 'Sexta',
+        items: [
+          makeItem({
+            lease_id: 1,
+            tenant_name: 'RepassTenant',
+            is_collectible: false,
+            non_collectible_reason: 'owner_repass',
+          }),
+        ],
+      },
+    ];
+    render(<RentMonthGrid {...baseProps} days={days} />);
+    expect(screen.getByText('RepassTenant')).toHaveClass('bg-muted/60');
+    const cell = screen.getByRole('gridcell', { name: /^Dia 5/ });
+    expect(cell).toHaveAccessibleName(/RepassTenant \(não-cobrável\)/);
+    expect(screen.getByText('Não-cobrável')).toBeInTheDocument();
   });
 
   it('calls onSelectDay with the clicked day number', () => {
