@@ -330,6 +330,8 @@ module = [
     "dj_database_url",
     "pywebpush",
     "pywebpush.*",
+    "py_vapid",
+    "py_vapid.*",
 ]
 ignore_missing_imports = true
 
