@@ -123,7 +123,7 @@ export default function AdminUsersPage() {
 
   return (
     <div>
-      <div className="mb-4 flex justify-between items-center">
+      <div className="mb-4 flex justify-between items-center flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold">Usuários</h1>
           <p className="text-muted-foreground mt-1">Gerencie os usuários do sistema</p>
