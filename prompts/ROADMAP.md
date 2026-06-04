@@ -333,3 +333,54 @@ claude -n "session-13-dashboard"      # Terminal 3
 | Item | Bloqueio | Pré-requisito |
 |------|----------|---------------|
 | Migração do consumidor **mobile** (`mobile/lib/api/hooks/use-admin-actions.ts` + `mobile/app/(admin)/actions/mark-paid.tsx`) de `mark_rent_paid` → `toggle_rent_payment`, seguida da remoção do action backend `mark_rent_paid` | A Sessão 25 escolheu a **saída (B)**: mantém `mark_rent_paid` (backend) + consumidor mobile intactos, pois o app `mobile/` é um consumidor vivo **fora do escopo do design doc** e **inverificável** (sem `type-check`/`lint`/test runner em `mobile/package.json`). | Emendar o design doc (§2/§4.3/§8) para escopar o mobile **e** configurar verificação em `mobile/package.json` (`type-check`/`lint`/test runner). Só então uma sessão dedicada migra o mobile e remove `mark_rent_paid` do backend. |
+
+---
+
+# Roadmap — Feature: App Mobile Completo (Responsivo + PWA + Offline + Web Push)
+
+**Design Doc**: `docs/plans/2026-06-04-mobile-pwa-offline-design.md`
+**Branch**: `feat/mobile-pwa-offline`
+**Status**: prompts 26–33 escritos/revisados (crítico de consistência: zero divergências de contrato). Nenhuma sessão executada.
+
+## Grafo de Dependências
+
+```
+   FRONTEND                         BACKEND
+   ┌──────┐                         ┌──────┐
+   │  26  │ fundações responsiv.    │  31  │ model WebPushSubscription
+   └──┬───┘                         └──┬───┘
+   ┌──┴───┐                            ▼
+   ▼      ▼                         ┌──────┐
+┌──────┐┌──────┐                    │  32  │ sender dual-channel + endpoints
+│  27  ││  28  │ manifest+ícones    └──┬───┘
+└──────┘└──┬───┘                       │
+  cards    ▼                           │
+        ┌──────┐                       │
+        │  29  │ Serwist SW            │
+        └──┬───┘                       │
+       ┌───┴───┐                       │
+       ▼       ▼                       │
+   ┌──────┐  ┌──────┐◄─────────────────┘
+   │  30  │  │  33  │ Web Push UI (precisa de 29 + 32)
+   └──────┘  └──────┘
+   offline
+```
+
+## Waves
+
+| Wave | Sessões | Paralelismo | Observação |
+|------|---------|-------------|------------|
+| 1 | **26** (FE) + **31** (BE) | 2 trabalhadores | stacks diferentes, sem conflito |
+| 2 | **27** + **28** (FE) + **32** (BE) | 3 trabalhadores | 27 e 28 não compartilham arquivos (data-table vs manifest/layout); 32 depende de 31 |
+| 3 | **29** (FE) | 1 | depende de 28 (manifest) |
+| 4 | **30** (FE) | 1 | depende de 29 (SW p/ shell offline) |
+| 5 | **33** (FE) | 1 | depende de **29 (sw.ts) + 32 (endpoints)** |
+
+**Caminho crítico**: `26 → 28 → 29 → 33` (com `32` pronto antes de `33`). `30` ramifica de `29`. Backend `31 → 32` corre em paralelo ao frontend.
+
+## Conflitos de arquivo (atenção em execução paralela)
+
+- `app/layout.tsx`: criado/editado por **26** (viewport) e **28** (themeColor + appleWebApp) → **sequencial 26 antes de 28**.
+- `app/sw.ts`: criado por **29**, apenas **anexado** por **33** → 29 antes de 33.
+- `core/models.py` (31), `core/services/notification_service.py` + `core/viewsets/__init__.py` + `core/urls.py` (32) → 31 antes de 32.
+- `27` (data-table) e `28` (manifest/ícones/layout) tocam arquivos distintos → seguros em paralelo após 26.
