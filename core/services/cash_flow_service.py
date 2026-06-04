@@ -164,9 +164,7 @@ class CashFlowService:
         owner_repayments = Decimal("0.00")
         details = []
         for lease in owner_leases:
-            if RentScheduleService.is_prepaid_for_month(
-                lease, month_start.year, month_start.month
-            ):
+            if RentScheduleService.is_prepaid_for_month(lease, month_start.year, month_start.month):
                 continue
             owner_repayments += lease.rental_value
             owner = lease.apartment.owner

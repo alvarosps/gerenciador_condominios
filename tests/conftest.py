@@ -37,6 +37,24 @@ def configure_test_cache():
     }
 
 
+@pytest.fixture(autouse=True)
+def _clear_caches_between_tests():
+    """Clear all in-memory (locmem) caches before each test to prevent cross-test pollution.
+
+    LocMemCache keeps a per-LOCATION global store that is NOT rolled back like the database,
+    so cached values (e.g. @cache_result results, or @override_settings(CACHES=...) backends)
+    leak between tests unless explicitly cleared. Each LocMemCache instance captures a
+    reference to its inner store dict at init, so we must clear those dicts in place (clearing
+    the outer registry would orphan but not empty them).
+    """
+    from django.core.cache.backends import locmem
+
+    for store in locmem._caches.values():
+        store.clear()
+    for store in locmem._expire_info.values():
+        store.clear()
+
+
 @pytest.fixture(scope="session")
 def django_db_setup(django_db_setup, django_db_blocker):
     """

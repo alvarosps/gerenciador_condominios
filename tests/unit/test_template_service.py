@@ -1,8 +1,6 @@
 """Unit tests for core/services/template_management_service.py."""
 
 from decimal import Decimal
-from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 from django.conf import settings
@@ -67,7 +65,7 @@ def tenant(admin_user):
 
 @pytest.fixture
 def lease(apartment, tenant, admin_user):
-    l = Lease.objects.create(
+    lease_obj = Lease.objects.create(
         apartment=apartment,
         responsible_tenant=tenant,
         start_date="2026-01-01",
@@ -77,8 +75,8 @@ def lease(apartment, tenant, admin_user):
         created_by=admin_user,
         updated_by=admin_user,
     )
-    l.tenants.add(tenant)
-    return l
+    lease_obj.tenants.add(tenant)
+    return lease_obj
 
 
 @pytest.mark.unit

@@ -1,9 +1,9 @@
 """Unit tests for core/services/fee_calculator.py."""
 
-import pytest
 from datetime import date
 from decimal import Decimal
 
+import pytest
 from django.conf import settings
 
 from core.services.fee_calculator import FeeCalculatorService
@@ -22,12 +22,12 @@ class TestCalculateDailyRate:
         assert rate == Decimal("50.00")
 
     def test_zero_value_returns_zero(self):
-        rate = FeeCalculatorService.calculate_daily_rate(Decimal("0"))
-        assert rate == Decimal("0")
+        rate = FeeCalculatorService.calculate_daily_rate(Decimal(0))
+        assert rate == Decimal(0)
 
     def test_negative_value_raises(self):
         with pytest.raises(ValueError, match="non-negative"):
-            FeeCalculatorService.calculate_daily_rate(Decimal("-100"))
+            FeeCalculatorService.calculate_daily_rate(Decimal(-100))
 
 
 @pytest.mark.unit
@@ -85,7 +85,7 @@ class TestCalculateLateFee:
     def test_negative_rental_raises(self):
         with pytest.raises(ValueError, match="non-negative"):
             FeeCalculatorService.calculate_late_fee(
-                rental_value=Decimal("-100"),
+                rental_value=Decimal(-100),
                 due_day=10,
                 current_date=date(2025, 1, 15),
             )
@@ -98,7 +98,7 @@ class TestCalculateLateFee:
         )
         assert result["is_late"] is True
         assert isinstance(result["late_fee"], Decimal)
-        assert result["late_fee"] > Decimal("0")
+        assert result["late_fee"] > Decimal(0)
 
     def test_one_day_late(self):
         result = FeeCalculatorService.calculate_late_fee(
@@ -108,7 +108,7 @@ class TestCalculateLateFee:
         )
         assert result["is_late"] is True
         assert result["late_days"] == 1
-        assert result["late_fee"] > Decimal("0")
+        assert result["late_fee"] > Decimal(0)
 
 
 @pytest.mark.unit
@@ -174,11 +174,11 @@ class TestCalculateTagFee:
         assert fee == Decimal(str(settings.DEFAULT_TAG_FEE_MULTIPLE))
 
     def test_zero_tenants_raises(self):
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="at least 1"):
             FeeCalculatorService.calculate_tag_fee(0)
 
     def test_negative_tenants_raises(self):
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="at least 1"):
             FeeCalculatorService.calculate_tag_fee(-1)
 
     def test_single_fee_less_than_multiple_fee(self):
@@ -207,8 +207,8 @@ class TestCalculateTotalValue:
 
     def test_all_zero(self):
         total = FeeCalculatorService.calculate_total_value(
-            rental_value=Decimal("0"),
-            cleaning_fee=Decimal("0"),
-            tag_fee=Decimal("0"),
+            rental_value=Decimal(0),
+            cleaning_fee=Decimal(0),
+            tag_fee=Decimal(0),
         )
-        assert total == Decimal("0")
+        assert total == Decimal(0)

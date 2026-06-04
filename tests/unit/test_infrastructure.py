@@ -287,7 +287,7 @@ class TestS3DocumentStorage:
     def test_retrieve_raises_file_not_found_on_404(self, s3_storage):
         """Covers lines 375-378: NoSuchKey error raises FileNotFoundError."""
         error = OSError("NoSuchKey")
-        error.response = {"Error": {"Code": "NoSuchKey"}}  # type: ignore[attr-defined]
+        error.response = {"Error": {"Code": "NoSuchKey"}}
         s3_storage.s3_client.get_object.side_effect = error
         with pytest.raises(FileNotFoundError):
             s3_storage.retrieve("missing.pdf")
@@ -297,7 +297,7 @@ class TestS3DocumentStorage:
         from core.infrastructure.storage import StorageError
 
         error = OSError("network timeout")
-        error.response = {"Error": {"Code": "ServiceUnavailable"}}  # type: ignore[attr-defined]
+        error.response = {"Error": {"Code": "ServiceUnavailable"}}
         s3_storage.s3_client.get_object.side_effect = error
         with pytest.raises(StorageError, match="Failed to retrieve document from S3"):
             s3_storage.retrieve("doc.pdf")

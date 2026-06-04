@@ -233,7 +233,7 @@ def parse_fatura_text(text: str) -> FaturaData:
             continue
 
         # Ignorar linhas de header
-        if stripped.startswith("DATA") or stripped.startswith("RODRIGO") or not stripped:
+        if stripped.startswith(("DATA", "RODRIGO")) or not stripped:
             if pending_entry:
                 _finalize_entry(fatura, pending_entry, fatura_date)
                 pending_entry = None
@@ -297,8 +297,7 @@ def _finalize_entry(fatura: FaturaData, entry: dict, fatura_date: date) -> None:
 def _clean_description(desc: str) -> str:
     """Limpa a descrição removendo espaços extras."""
     # Remover espaços duplos
-    desc = re.sub(r"\s+", " ", desc).strip()
-    return desc
+    return re.sub(r"\s+", " ", desc).strip()
 
 
 def to_financial_json(

@@ -11,15 +11,12 @@ from core.models import (
     Apartment,
     Building,
     Expense,
-    ExpenseInstallment,
     ExpenseType,
     Income,
     Lease,
     Person,
-    RentPayment,
     Tenant,
 )
-
 
 # =============================================================================
 # Fixtures
@@ -29,16 +26,23 @@ from core.models import (
 @pytest.fixture
 def building(admin_user) -> Building:
     return Building.objects.create(
-        street_number=801, name="Dashboard Views", address="Rua DV, 801",
-        created_by=admin_user, updated_by=admin_user
+        street_number=801,
+        name="Dashboard Views",
+        address="Rua DV, 801",
+        created_by=admin_user,
+        updated_by=admin_user,
     )
 
 
 @pytest.fixture
 def apartment(building: Building, admin_user) -> Apartment:
     return Apartment.objects.create(
-        building=building, number=101, rental_value=Decimal("1500.00"), max_tenants=2,
-        created_by=admin_user, updated_by=admin_user
+        building=building,
+        number=101,
+        rental_value=Decimal("1500.00"),
+        max_tenants=2,
+        created_by=admin_user,
+        updated_by=admin_user,
     )
 
 
@@ -68,8 +72,7 @@ def lease(apartment: Apartment, tenant: Tenant) -> Lease:
 @pytest.fixture
 def person(admin_user) -> Person:
     return Person.objects.create(
-        name="DV Person", relationship="Filho",
-        created_by=admin_user, updated_by=admin_user
+        name="DV Person", relationship="Filho", created_by=admin_user, updated_by=admin_user
     )
 
 
@@ -144,9 +147,7 @@ class TestCashFlowProjectionView:
 class TestCashFlowPersonSummaryView:
     base_url = "/api/cash-flow"
 
-    def test_person_summary_missing_person_id_returns_400(
-        self, authenticated_api_client
-    ) -> None:
+    def test_person_summary_missing_person_id_returns_400(self, authenticated_api_client) -> None:
         response = authenticated_api_client.get(
             f"{self.base_url}/person_summary/?year=2026&month=3"
         )
@@ -160,17 +161,13 @@ class TestCashFlowPersonSummaryView:
         )
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
-    def test_person_summary_invalid_types_returns_400(
-        self, authenticated_api_client
-    ) -> None:
+    def test_person_summary_invalid_types_returns_400(self, authenticated_api_client) -> None:
         response = authenticated_api_client.get(
             f"{self.base_url}/person_summary/?person_id=abc&year=2026&month=3"
         )
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
-    def test_person_summary_not_found_returns_404(
-        self, authenticated_api_client
-    ) -> None:
+    def test_person_summary_not_found_returns_404(self, authenticated_api_client) -> None:
         response = authenticated_api_client.get(
             f"{self.base_url}/person_summary/?person_id=999999&year=2026&month=3"
         )
@@ -260,15 +257,11 @@ class TestDailyControlBreakdownView:
         assert len(response.data) == 31  # March has 31 days
 
     def test_breakdown_invalid_params_returns_400(self, authenticated_api_client) -> None:
-        response = authenticated_api_client.get(
-            f"{self.base_url}/breakdown/?year=abc&month=3"
-        )
+        response = authenticated_api_client.get(f"{self.base_url}/breakdown/?year=abc&month=3")
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
     def test_breakdown_invalid_month_returns_400(self, authenticated_api_client) -> None:
-        response = authenticated_api_client.get(
-            f"{self.base_url}/breakdown/?year=2026&month=13"
-        )
+        response = authenticated_api_client.get(f"{self.base_url}/breakdown/?year=2026&month=13")
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
     def test_breakdown_defaults_to_current_month(self, authenticated_api_client) -> None:
@@ -303,15 +296,11 @@ class TestDailyControlSummaryView:
         assert response.status_code == status.HTTP_200_OK
 
     def test_summary_invalid_month_returns_400(self, authenticated_api_client) -> None:
-        response = authenticated_api_client.get(
-            f"{self.base_url}/summary/?year=2026&month=0"
-        )
+        response = authenticated_api_client.get(f"{self.base_url}/summary/?year=2026&month=0")
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
     def test_summary_invalid_params_returns_400(self, authenticated_api_client) -> None:
-        response = authenticated_api_client.get(
-            f"{self.base_url}/summary/?year=notanint&month=3"
-        )
+        response = authenticated_api_client.get(f"{self.base_url}/summary/?year=notanint&month=3")
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
     def test_summary_unauthenticated_returns_401(self, api_client) -> None:
@@ -325,9 +314,7 @@ class TestDailyControlMarkPaidView:
     base_url = "/api/daily-control"
 
     def test_mark_paid_missing_fields_returns_400(self, authenticated_api_client) -> None:
-        response = authenticated_api_client.post(
-            f"{self.base_url}/mark_paid/", {}, format="json"
-        )
+        response = authenticated_api_client.post(f"{self.base_url}/mark_paid/", {}, format="json")
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
     def test_mark_paid_missing_payment_date_returns_400(self, authenticated_api_client) -> None:

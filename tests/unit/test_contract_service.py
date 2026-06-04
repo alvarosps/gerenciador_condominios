@@ -69,7 +69,7 @@ def second_tenant(admin_user):
 
 @pytest.fixture
 def lease(apartment, tenant, admin_user):
-    l = make_lease(
+    lease_obj = make_lease(
         apartment=apartment,
         tenant=tenant,
         user=admin_user,
@@ -78,8 +78,8 @@ def lease(apartment, tenant, admin_user):
         tag_fee=Decimal("20.00"),
         rental_value=Decimal("1500.00"),
     )
-    l.tenants.add(tenant)
-    return l
+    lease_obj.tenants.add(tenant)
+    return lease_obj
 
 
 @pytest.fixture
@@ -426,7 +426,8 @@ class TestGeneratePdfFromHtml:
         # Simulate generator writing a file then raising
         def gen_raises(html_content, output_path, options):
             Path(output_path).write_bytes(b"partial PDF")
-            raise RuntimeError("PDF generation failed")
+            msg = "PDF generation failed"
+            raise RuntimeError(msg)
 
         mock_gen.generate_pdf.side_effect = gen_raises
 

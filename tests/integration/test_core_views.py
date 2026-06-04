@@ -169,9 +169,7 @@ class TestBuildingViewSet:
             "name": "Não Permitido",
             "address": "Rua Bloqueada, 1",
         }
-        response = regular_authenticated_api_client.post(
-            "/api/buildings/", payload, format="json"
-        )
+        response = regular_authenticated_api_client.post("/api/buildings/", payload, format="json")
         assert response.status_code == status.HTTP_403_FORBIDDEN
 
     def test_update_building_admin(self, authenticated_api_client, building):
@@ -216,9 +214,7 @@ class TestFurnitureViewSet:
 
     def test_create_furniture_regular_user_forbidden(self, regular_authenticated_api_client):
         payload = {"name": "Sofá Bloqueado", "description": "Não deve criar"}
-        response = regular_authenticated_api_client.post(
-            "/api/furnitures/", payload, format="json"
-        )
+        response = regular_authenticated_api_client.post("/api/furnitures/", payload, format="json")
         assert response.status_code == status.HTTP_403_FORBIDDEN
 
     def test_retrieve_furniture(self, authenticated_api_client, furniture):
@@ -254,9 +250,7 @@ class TestApartmentViewSet:
             max_tenants=1,
             created_by=admin_user,
         )
-        response = authenticated_api_client.get(
-            f"/api/apartments/?building_id={building.id}"
-        )
+        response = authenticated_api_client.get(f"/api/apartments/?building_id={building.id}")
         assert response.status_code == status.HTTP_200_OK
         ids = get_ids(response)
         assert apartment.id in ids
@@ -276,18 +270,14 @@ class TestApartmentViewSet:
         assert response.status_code == status.HTTP_200_OK
         assert apartment.id in get_ids(response)
 
-    def test_filter_by_min_price(
-        self, authenticated_api_client, apartment, apartment_expensive
-    ):
+    def test_filter_by_min_price(self, authenticated_api_client, apartment, apartment_expensive):
         response = authenticated_api_client.get("/api/apartments/?min_price=2000")
         assert response.status_code == status.HTTP_200_OK
         ids = get_ids(response)
         assert apartment_expensive.id in ids
         assert apartment.id not in ids
 
-    def test_filter_by_max_price(
-        self, authenticated_api_client, apartment, apartment_expensive
-    ):
+    def test_filter_by_max_price(self, authenticated_api_client, apartment, apartment_expensive):
         response = authenticated_api_client.get("/api/apartments/?max_price=2000")
         assert response.status_code == status.HTTP_200_OK
         ids = get_ids(response)
@@ -316,9 +306,7 @@ class TestApartmentViewSet:
             "cleaning_fee": "100.00",
             "max_tenants": 1,
         }
-        response = regular_authenticated_api_client.post(
-            "/api/apartments/", payload, format="json"
-        )
+        response = regular_authenticated_api_client.post("/api/apartments/", payload, format="json")
         assert response.status_code == status.HTTP_403_FORBIDDEN
 
     def test_retrieve_apartment(self, authenticated_api_client, apartment):
@@ -343,27 +331,21 @@ class TestTenantViewSet:
         response = api_client.get("/api/tenants/")
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
-    def test_filter_by_is_company_true(
-        self, authenticated_api_client, tenant, tenant2
-    ):
+    def test_filter_by_is_company_true(self, authenticated_api_client, tenant, tenant2):
         response = authenticated_api_client.get("/api/tenants/?is_company=true")
         assert response.status_code == status.HTTP_200_OK
         ids = get_ids(response)
         assert tenant2.id in ids
         assert tenant.id not in ids
 
-    def test_filter_by_is_company_false(
-        self, authenticated_api_client, tenant, tenant2
-    ):
+    def test_filter_by_is_company_false(self, authenticated_api_client, tenant, tenant2):
         response = authenticated_api_client.get("/api/tenants/?is_company=false")
         assert response.status_code == status.HTTP_200_OK
         ids = get_ids(response)
         assert tenant.id in ids
         assert tenant2.id not in ids
 
-    def test_filter_by_has_dependents_true(
-        self, authenticated_api_client, tenant, admin_user
-    ):
+    def test_filter_by_has_dependents_true(self, authenticated_api_client, tenant, admin_user):
         Dependent.objects.create(
             tenant=tenant,
             name="Filho Teste",
@@ -374,25 +356,19 @@ class TestTenantViewSet:
         assert response.status_code == status.HTTP_200_OK
         assert tenant.id in get_ids(response)
 
-    def test_filter_by_has_dependents_false(
-        self, authenticated_api_client, tenant2
-    ):
+    def test_filter_by_has_dependents_false(self, authenticated_api_client, tenant2):
         # tenant2 has no dependents
         response = authenticated_api_client.get("/api/tenants/?has_dependents=false")
         assert response.status_code == status.HTTP_200_OK
         assert tenant2.id in get_ids(response)
 
-    def test_filter_by_has_furniture_true(
-        self, authenticated_api_client, tenant, furniture
-    ):
+    def test_filter_by_has_furniture_true(self, authenticated_api_client, tenant, furniture):
         tenant.furnitures.add(furniture)
         response = authenticated_api_client.get("/api/tenants/?has_furniture=true")
         assert response.status_code == status.HTTP_200_OK
         assert tenant.id in get_ids(response)
 
-    def test_filter_by_has_furniture_false(
-        self, authenticated_api_client, tenant2
-    ):
+    def test_filter_by_has_furniture_false(self, authenticated_api_client, tenant2):
         response = authenticated_api_client.get("/api/tenants/?has_furniture=false")
         assert response.status_code == status.HTTP_200_OK
         assert tenant2.id in get_ids(response)
@@ -405,9 +381,7 @@ class TestTenantViewSet:
         assert tenant2.id not in ids
 
     def test_search_by_cpf(self, authenticated_api_client, tenant):
-        response = authenticated_api_client.get(
-            f"/api/tenants/?search={tenant.cpf_cnpj[:6]}"
-        )
+        response = authenticated_api_client.get(f"/api/tenants/?search={tenant.cpf_cnpj[:6]}")
         assert response.status_code == status.HTTP_200_OK
         assert tenant.id in get_ids(response)
 
@@ -433,9 +407,7 @@ class TestTenantViewSet:
             "profession": "Dev",
             "due_day": 5,
         }
-        response = regular_authenticated_api_client.post(
-            "/api/tenants/", payload, format="json"
-        )
+        response = regular_authenticated_api_client.post("/api/tenants/", payload, format="json")
         assert response.status_code == status.HTTP_403_FORBIDDEN
 
 
@@ -459,21 +431,13 @@ class TestLeaseViewSetFilters:
         response = regular_authenticated_api_client.get("/api/leases/")
         assert response.status_code == status.HTTP_200_OK
 
-    def test_filter_by_apartment_id(
-        self, authenticated_api_client, lease, apartment
-    ):
-        response = authenticated_api_client.get(
-            f"/api/leases/?apartment_id={apartment.id}"
-        )
+    def test_filter_by_apartment_id(self, authenticated_api_client, lease, apartment):
+        response = authenticated_api_client.get(f"/api/leases/?apartment_id={apartment.id}")
         assert response.status_code == status.HTTP_200_OK
         assert lease.id in get_ids(response)
 
-    def test_filter_by_responsible_tenant_id(
-        self, authenticated_api_client, lease, tenant
-    ):
-        response = authenticated_api_client.get(
-            f"/api/leases/?responsible_tenant_id={tenant.id}"
-        )
+    def test_filter_by_responsible_tenant_id(self, authenticated_api_client, lease, tenant):
+        response = authenticated_api_client.get(f"/api/leases/?responsible_tenant_id={tenant.id}")
         assert response.status_code == status.HTTP_200_OK
         assert lease.id in get_ids(response)
 
@@ -510,9 +474,7 @@ class TestLeaseViewSetFilters:
             "validity_months": 12,
             "tag_fee": "50.00",
         }
-        response = regular_authenticated_api_client.post(
-            "/api/leases/", payload, format="json"
-        )
+        response = regular_authenticated_api_client.post("/api/leases/", payload, format="json")
         assert response.status_code == status.HTTP_403_FORBIDDEN
 
 
