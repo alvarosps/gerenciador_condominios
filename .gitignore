@@ -76,6 +76,8 @@ docs/_build/
 .vscode/
 .idea/
 .claude/settings.local.json
+.claude/agent-memory/
+.claude/worktrees/
 CLAUDE.local.md
 *.swp
 *.swo
