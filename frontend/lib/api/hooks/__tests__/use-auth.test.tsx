@@ -15,6 +15,7 @@ import {
   useCurrentUser,
   useLogout,
   useGoogleLogin,
+  useExchangeOAuthCode,
 } from '../use-auth';
 import { createWrapper } from '@/tests/test-utils';
 import { server } from '@/tests/mocks/server';
@@ -221,7 +222,7 @@ describe('useAuth hooks', () => {
   });
 
   describe('useGoogleLogin', () => {
-    it('should return a function that redirects to Google OAuth URL', () => {
+    it('should redirect to the django-allauth login-start URL on the backend origin', () => {
       const { result } = renderHook(() => useGoogleLogin(), {
         wrapper: createWrapper(),
       });
@@ -230,7 +231,51 @@ describe('useAuth hooks', () => {
 
       result.current();
 
-      expect(window.location.href).toContain('/auth/google/');
+      expect(window.location.href).toContain('/accounts/google/login/');
+      expect(window.location.href).not.toContain('/api/auth/google/');
+      expect(window.location.href).not.toContain('/api/accounts/');
+    });
+  });
+
+  describe('useExchangeOAuthCode', () => {
+    it('should store auth state on successful code exchange', async () => {
+      // Set a valid href so MSW can resolve the request URL when intercepting
+      window.location.href = 'http://localhost:4000/auth/callback?code=abc123';
+
+      server.use(
+        http.post(`${API_BASE}/auth/oauth/exchange/`, async ({ request }) => {
+          const body = (await request.json()) as { code: string };
+          expect(body.code).toBe('abc123');
+          return HttpResponse.json({
+            user: {
+              id: 7,
+              email: 'oauth@example.com',
+              first_name: 'OAuth',
+              last_name: 'User',
+              is_staff: false,
+            },
+          });
+        }),
+      );
+
+      const { result } = renderHook(() => useExchangeOAuthCode(), {
+        wrapper: createWrapper(),
+      });
+
+      result.current.mutate({ code: 'abc123' });
+
+      await waitFor(
+        () => {
+          expect(result.current.isPending).toBe(false);
+          expect(result.current.isIdle).toBe(false);
+        },
+        { timeout: 5000 },
+      );
+
+      expect(result.current.isSuccess).toBe(true);
+      const storeState = useAuthStore.getState();
+      expect(storeState.isAuthenticated).toBe(true);
+      expect(storeState.user?.email).toBe('oauth@example.com');
     });
   });
 });
