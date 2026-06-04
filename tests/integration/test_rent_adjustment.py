@@ -18,7 +18,7 @@ from model_bakery import baker
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from core.models import Lease, RentAdjustment
+from core.models import Apartment, Building, Lease, RentAdjustment, Tenant
 from core.services.rent_adjustment_service import RentAdjustmentService
 
 # Valid CPFs (checksum verified) — one per test to avoid unique constraint collisions
@@ -39,9 +39,9 @@ _CPF_14 = "56789123482"
 _CPF_15 = "67891234582"
 
 
-def _make_building(street_number: int) -> object:
+def _make_building(street_number: int) -> Building:
     return baker.make(
-        "core.Building",
+        Building,
         street_number=street_number,
         name="Test Building",
         address="Test Address",
@@ -49,13 +49,13 @@ def _make_building(street_number: int) -> object:
 
 
 def _make_apartment(
-    building: object,
+    building: Building,
     number: int = 101,
     rental_value: str = "1400.00",
     rental_value_double: str = "1500.00",
-) -> object:
+) -> Apartment:
     return baker.make(
-        "core.Apartment",
+        Apartment,
         building=building,
         number=number,
         rental_value=Decimal(rental_value),
@@ -65,9 +65,9 @@ def _make_apartment(
     )
 
 
-def _make_tenant(cpf: str, name: str = "Test Tenant") -> object:
+def _make_tenant(cpf: str, name: str = "Test Tenant") -> Tenant:
     return baker.make(
-        "core.Tenant",
+        Tenant,
         name=name,
         cpf_cnpj=cpf,
         phone="11999990000",
@@ -78,18 +78,18 @@ def _make_tenant(cpf: str, name: str = "Test Tenant") -> object:
 
 
 def _make_lease(
-    apartment: object,
-    tenant: object,
+    apartment: Apartment,
+    tenant: Tenant,
     rental_value: str = "1400.00",
     start_date: date | None = None,
     validity_months: int = 24,
     number_of_tenants: int = 1,
     is_salary_offset: bool = False,
-) -> object:
+) -> Lease:
     if start_date is None:
         start_date = date.today() - relativedelta(months=11)
     return baker.make(
-        "core.Lease",
+        Lease,
         apartment=apartment,
         responsible_tenant=tenant,
         rental_value=Decimal(rental_value),
@@ -342,7 +342,7 @@ class TestGetEligibleLeases:
 
         result = RentAdjustmentService.get_eligible_leases()
 
-        lease_ids_returned = [item["lease_id"] for item in result]
+        lease_ids_returned = [item["lease_id"] for item in result["alerts"]]
         assert lease.pk not in lease_ids_returned
 
     def test_get_eligible_leases_excludes_expired(self) -> None:
@@ -357,7 +357,7 @@ class TestGetEligibleLeases:
 
         result = RentAdjustmentService.get_eligible_leases()
 
-        lease_ids_returned = [item["lease_id"] for item in result]
+        lease_ids_returned = [item["lease_id"] for item in result["alerts"]]
         assert expired_lease.pk not in lease_ids_returned
 
     def test_get_eligible_leases_uses_last_adjustment_date(self) -> None:
@@ -378,7 +378,7 @@ class TestGetEligibleLeases:
 
         result = RentAdjustmentService.get_eligible_leases()
 
-        lease_ids_returned = [item["lease_id"] for item in result]
+        lease_ids_returned = [item["lease_id"] for item in result["alerts"]]
         assert lease.pk not in lease_ids_returned
 
 
@@ -400,9 +400,9 @@ class TestGetEligibleLeasesExtra:
 
         result = RentAdjustmentService.get_eligible_leases()
 
-        lease_ids_returned = [item["lease_id"] for item in result]
+        lease_ids_returned = [item["lease_id"] for item in result["alerts"]]
         assert lease.pk in lease_ids_returned
-        matching = next(item for item in result if item["lease_id"] == lease.pk)
+        matching = next(item for item in result["alerts"] if item["lease_id"] == lease.pk)
         assert matching["status"] in ("upcoming", "overdue")
         assert "eligible_date" in matching
         assert "rental_value" in matching
@@ -419,9 +419,9 @@ class TestGetEligibleLeasesExtra:
 
         result = RentAdjustmentService.get_eligible_leases()
 
-        lease_ids_returned = [item["lease_id"] for item in result]
+        lease_ids_returned = [item["lease_id"] for item in result["alerts"]]
         assert lease.pk in lease_ids_returned
-        matching = next(item for item in result if item["lease_id"] == lease.pk)
+        matching = next(item for item in result["alerts"] if item["lease_id"] == lease.pk)
         assert matching["status"] == "overdue"
         assert matching["days_until"] < 0
 
@@ -447,9 +447,9 @@ class TestGetEligibleLeasesExtra:
 
         result = RentAdjustmentService.get_eligible_leases()
 
-        lease_ids_returned = [item["lease_id"] for item in result]
+        lease_ids_returned = [item["lease_id"] for item in result["alerts"]]
         assert lease.pk in lease_ids_returned
-        matching = next(item for item in result if item["lease_id"] == lease.pk)
+        matching = next(item for item in result["alerts"] if item["lease_id"] == lease.pk)
         assert matching["last_adjustment"] is not None
         assert matching["last_adjustment"]["percentage"] == "5.00"
 
