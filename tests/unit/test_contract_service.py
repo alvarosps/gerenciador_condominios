@@ -242,6 +242,17 @@ class TestRenderContractTemplate:
         assert "caução da(s) tag" not in html
         assert "devolvê-las" not in html
 
+    def test_renders_tenant_due_day(self, lease, landlord):
+        """Due day is shown from the responsible tenant (the Lease model has no due_day field)."""
+        context = ContractService.prepare_contract_context(lease)
+        html = ContractService.render_contract_template(context)
+
+        due_day = lease.responsible_tenant.due_day
+        assert f"até o dia {due_day} de cada" in html
+        assert f"(dia {due_day})" in html
+        # Regression: the old {{ lease.due_day }} (no such field) rendered an empty "(dia )"
+        assert "(dia )" not in html
+
 
 @pytest.mark.unit
 class TestContractServiceInit:
