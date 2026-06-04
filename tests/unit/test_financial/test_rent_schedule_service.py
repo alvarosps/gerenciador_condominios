@@ -248,8 +248,10 @@ class TestCollectibleLeases:
         # Oct: due 10/10 > prepaid_until -> collectible.
         assert prepaid_lease in list(RentScheduleService.collectible_leases(date(2026, 10, 1)))
 
-    def test_excludes_lease_window_outside_month_even_if_rented(self, building) -> None:
-        """Date-aware: a rented apartment whose lease window is before the month is excluded."""
+    def test_includes_auto_renewing_lease_past_calculated_end_date(self, building) -> None:
+        """Brazilian residential leases auto-renew (Lei 8.245/91): a lease whose original
+        term elapsed long ago is still active (move-out = soft-delete, not term expiry), so
+        it stays collectible. Regression guard for the dropped-auto-renewed-leases bug."""
         apt = make_apartment(
             building=building,
             number=204,
@@ -258,8 +260,9 @@ class TestCollectibleLeases:
             is_rented=True,
         )
         tenant = make_tenant(cpf_cnpj="10000000019", name="Contrato Antigo", due_day=8)
-        # Window 2024-01-01 .. 2025-01-01 does NOT intersect March 2026.
-        expired_lease = make_lease(
+        # Original term 2024-01-01 + 12 months elapsed before March 2026, but the lease
+        # auto-renewed and was never soft-deleted -> still collectible.
+        auto_renewed_lease = make_lease(
             apartment=apt,
             tenant=tenant,
             start_date=date(2024, 1, 1),
@@ -267,7 +270,28 @@ class TestCollectibleLeases:
             rental_value=Decimal("1000.00"),
         )
         result = list(RentScheduleService.collectible_leases(date(2026, 3, 1)))
-        assert expired_lease not in result
+        assert auto_renewed_lease in result
+
+    def test_collectible_includes_lease_well_past_validity(self, building) -> None:
+        """A lease started 2022 with a 12-month term is still collectible in 2026 — no
+        upper date bound exists; only soft-delete deactivates a lease."""
+        apt = make_apartment(
+            building=building,
+            number=206,
+            rental_value=Decimal("1000.00"),
+            max_tenants=1,
+            is_rented=True,
+        )
+        tenant = make_tenant(cpf_cnpj="20000000108", name="Veterano", due_day=8)
+        old_lease = make_lease(
+            apartment=apt,
+            tenant=tenant,
+            start_date=date(2022, 1, 1),
+            validity_months=12,
+            rental_value=Decimal("1000.00"),
+        )
+        result = list(RentScheduleService.collectible_leases(date(2026, 6, 1)))
+        assert old_lease in result
 
     def test_includes_lease_covering_month_regardless_of_is_rented(self, building) -> None:
         """Date-aware: window covering the month is included even if is_rented=False."""
@@ -320,6 +344,88 @@ class TestCollectibleLeases:
         lease.delete()
         result = list(RentScheduleService.collectible_leases(date(2026, 3, 1)))
         assert lease not in result
+
+
+# ──────────────────────────────────────────
+# displayable_leases
+# ──────────────────────────────────────────
+
+
+@pytest.mark.django_db
+class TestDisplayableLeases:
+    def test_includes_owner_repass_lease_flagged(self, building) -> None:
+        owner = make_person(name="Proprietário")
+        apt = make_apartment(
+            building=building,
+            number=250,
+            rental_value=Decimal("900.00"),
+            max_tenants=1,
+            is_rented=True,
+            owner=owner,
+        )
+        tenant = make_tenant(cpf_cnpj="11144477735", name="Inquilino Repasse", due_day=10)
+        owned_lease = make_lease(
+            apartment=apt,
+            tenant=tenant,
+            start_date=date(2025, 6, 1),
+            validity_months=12,
+            rental_value=Decimal("900.00"),
+        )
+        result = RentScheduleService.displayable_leases(date(2026, 3, 1))
+        assert (owned_lease, False, "owner_repass") in result
+        assert owned_lease not in list(RentScheduleService.collectible_leases(date(2026, 3, 1)))
+
+    def test_includes_salary_offset_lease_flagged(self, building) -> None:
+        apt = make_apartment(
+            building=building,
+            number=251,
+            rental_value=Decimal("800.00"),
+            max_tenants=1,
+            is_rented=True,
+        )
+        tenant = make_tenant(cpf_cnpj="12345678909", name="Funcionário", due_day=5)
+        offset_lease = make_lease(
+            apartment=apt,
+            tenant=tenant,
+            start_date=date(2025, 6, 1),
+            validity_months=12,
+            rental_value=Decimal("800.00"),
+            is_salary_offset=True,
+        )
+        result = RentScheduleService.displayable_leases(date(2026, 3, 1))
+        assert (offset_lease, False, "salary_offset") in result
+        assert offset_lease not in list(RentScheduleService.collectible_leases(date(2026, 3, 1)))
+
+    def test_collectible_lease_flagged_true_none(self, lease) -> None:
+        result = RentScheduleService.displayable_leases(date(2026, 3, 1))
+        assert (lease, True, None) in result
+
+    def test_prepaid_lease_is_hidden(self, building) -> None:
+        apt = make_apartment(
+            building=building,
+            number=252,
+            rental_value=Decimal("1300.00"),
+            max_tenants=1,
+            is_rented=True,
+        )
+        tenant = make_tenant(cpf_cnpj="52998224725", name="Pré-pago", due_day=15)
+        # due 15/03 < prepaid_until 2026-09-01 -> prepaid for March -> hidden.
+        prepaid_lease = make_lease(
+            apartment=apt,
+            tenant=tenant,
+            start_date=date(2025, 6, 1),
+            validity_months=12,
+            rental_value=Decimal("1300.00"),
+            prepaid_until=date(2026, 9, 1),
+        )
+        displayed = [item[0] for item in RentScheduleService.displayable_leases(date(2026, 3, 1))]
+        assert prepaid_lease not in displayed
+        assert prepaid_lease not in list(RentScheduleService.collectible_leases(date(2026, 3, 1)))
+
+    def test_soft_deleted_lease_excluded(self, lease) -> None:
+        lease.delete()
+        displayed = [item[0] for item in RentScheduleService.displayable_leases(date(2026, 3, 1))]
+        assert lease not in displayed
 
 
 # ──────────────────────────────────────────
@@ -415,6 +521,85 @@ class TestGetMonthSchedule:
         """When every due date in the month is in the past, next_due_date is None
         (drives the disabled 'Próximo vencimento' button in the UI)."""
         schedule = RentScheduleService.get_month_schedule(2026, 3)
+        assert schedule["next_due_date"] is None
+
+    @freeze_time("2026-03-03")
+    def test_owner_repass_item_has_is_collectible_false_and_no_toggle(self, building) -> None:
+        owner = make_person(name="Proprietário")
+        apt = make_apartment(
+            building=building,
+            number=260,
+            rental_value=Decimal("900.00"),
+            max_tenants=1,
+            is_rented=True,
+            owner=owner,
+        )
+        tenant = make_tenant(cpf_cnpj="11144477735", name="Repasse", due_day=10)
+        owner_lease = make_lease(
+            apartment=apt,
+            tenant=tenant,
+            start_date=date(2025, 6, 1),
+            validity_months=12,
+            rental_value=Decimal("900.00"),
+        )
+        schedule = RentScheduleService.get_month_schedule(2026, 3)
+        item = _find_item(schedule, owner_lease.id)
+        assert item["is_collectible"] is False
+        assert item["non_collectible_reason"] == "owner_repass"
+        assert item["can_toggle"] is False
+
+    @freeze_time("2026-03-03")
+    def test_salary_offset_item_flagged(self, building) -> None:
+        apt = make_apartment(
+            building=building,
+            number=261,
+            rental_value=Decimal("800.00"),
+            max_tenants=1,
+            is_rented=True,
+        )
+        tenant = make_tenant(cpf_cnpj="12345678909", name="Funcionário", due_day=5)
+        offset_lease = make_lease(
+            apartment=apt,
+            tenant=tenant,
+            start_date=date(2025, 6, 1),
+            validity_months=12,
+            rental_value=Decimal("800.00"),
+            is_salary_offset=True,
+        )
+        schedule = RentScheduleService.get_month_schedule(2026, 3)
+        item = _find_item(schedule, offset_lease.id)
+        assert item["is_collectible"] is False
+        assert item["non_collectible_reason"] == "salary_offset"
+        assert item["can_toggle"] is False
+
+    @freeze_time("2026-03-03")
+    def test_collectible_item_has_is_collectible_true(self, lease) -> None:
+        schedule = RentScheduleService.get_month_schedule(2026, 3)
+        item = _find_item(schedule, lease.id)
+        assert item["is_collectible"] is True
+        assert item["non_collectible_reason"] is None
+
+    @freeze_time("2026-03-03")
+    def test_next_due_date_ignores_non_collectible_items(self, building) -> None:
+        """A month with only a non-collectible (owner-repass) item has no next_due_date."""
+        owner = make_person(name="Proprietário")
+        apt = make_apartment(
+            building=building,
+            number=262,
+            rental_value=Decimal("900.00"),
+            max_tenants=1,
+            is_rented=True,
+            owner=owner,
+        )
+        tenant = make_tenant(cpf_cnpj="11144477735", name="Repasse", due_day=20)
+        make_lease(
+            apartment=apt,
+            tenant=tenant,
+            start_date=date(2025, 6, 1),
+            validity_months=12,
+            rental_value=Decimal("900.00"),
+        )
+        schedule = RentScheduleService.get_month_schedule(2026, 3, building_id=building.id)
         assert schedule["next_due_date"] is None
 
 
@@ -576,6 +761,30 @@ class TestGetMonthStats:
         assert stats["overdue_count"] == 0
         assert stats["overdue_total_fee"] == "0.00"
 
+    @freeze_time("2026-03-03")
+    def test_due_count_excludes_non_collectible_leases(self, building, lease) -> None:
+        """Stats are computed over collectible leases only: an owner-repass lease is
+        surfaced in the calendar but never counted as due."""
+        owner = make_person(name="Proprietário")
+        apt = make_apartment(
+            building=building,
+            number=270,
+            rental_value=Decimal("900.00"),
+            max_tenants=1,
+            is_rented=True,
+            owner=owner,
+        )
+        tenant = make_tenant(cpf_cnpj="11144477735", name="Repasse", due_day=10)
+        make_lease(
+            apartment=apt,
+            tenant=tenant,
+            start_date=date(2025, 6, 1),
+            validity_months=12,
+            rental_value=Decimal("900.00"),
+        )
+        stats = RentScheduleService.get_month_stats(2026, 3)
+        assert stats["due_count"] == 1
+
 
 # ──────────────────────────────────────────
 # toggle_payment
@@ -695,6 +904,74 @@ class TestTogglePayment:
         result = RentScheduleService.toggle_payment(lease.id, date(2026, 3, 15), admin_user)
         assert result["status"] == "ok"
         assert RentPayment.objects.filter(lease=lease, reference_month=date(2026, 3, 1)).exists()
+
+    @freeze_time("2026-03-03")
+    def test_refuses_owner_repass_lease(self, building, admin_user) -> None:
+        """An owner-repass lease is surfaced but not collectible — toggling is refused."""
+        owner = make_person(name="Proprietário")
+        apt = make_apartment(
+            building=building,
+            number=241,
+            rental_value=Decimal("900.00"),
+            max_tenants=1,
+            is_rented=True,
+            owner=owner,
+        )
+        tenant = make_tenant(cpf_cnpj="11144477735", name="Repasse", due_day=10)
+        owner_lease = make_lease(
+            apartment=apt,
+            tenant=tenant,
+            start_date=date(2025, 6, 1),
+            validity_months=12,
+            rental_value=Decimal("900.00"),
+        )
+        result = RentScheduleService.toggle_payment(owner_lease.id, date(2026, 3, 1), admin_user)
+        assert result["status"] == "error"
+
+
+# ──────────────────────────────────────────
+# is_collectible_for_month
+# ──────────────────────────────────────────
+
+
+@pytest.mark.django_db
+class TestIsCollectibleForMonth:
+    def test_not_started(self, apartment) -> None:
+        tenant = make_tenant(cpf_cnpj="52998224725", name="Futuro", due_day=10)
+        lease = make_lease(
+            apartment=apartment,
+            tenant=tenant,
+            start_date=date(2026, 5, 1),
+            validity_months=12,
+            rental_value=Decimal("1000.00"),
+        )
+        assert RentScheduleService.is_collectible_for_month(lease, 2026, 4) is False
+
+    def test_started(self, apartment) -> None:
+        tenant = make_tenant(cpf_cnpj="11144477735", name="Ativo", due_day=10)
+        lease = make_lease(
+            apartment=apartment,
+            tenant=tenant,
+            start_date=date(2026, 3, 1),
+            validity_months=12,
+            rental_value=Decimal("1000.00"),
+        )
+        assert RentScheduleService.is_collectible_for_month(lease, 2026, 3) is True
+        assert RentScheduleService.is_collectible_for_month(lease, 2026, 4) is True
+
+    def test_prepaid(self, apartment) -> None:
+        tenant = make_tenant(cpf_cnpj="12345678909", name="Pré-pago", due_day=10)
+        # due 10/03 < prepaid_until 2026-03-11 -> March prepaid; due 10/04 > -> April collectible.
+        lease = make_lease(
+            apartment=apartment,
+            tenant=tenant,
+            start_date=date(2026, 1, 1),
+            validity_months=12,
+            rental_value=Decimal("1000.00"),
+            prepaid_until=date(2026, 3, 11),
+        )
+        assert RentScheduleService.is_collectible_for_month(lease, 2026, 3) is False
+        assert RentScheduleService.is_collectible_for_month(lease, 2026, 4) is True
 
 
 def _find_item(schedule: dict, lease_id: int) -> dict:

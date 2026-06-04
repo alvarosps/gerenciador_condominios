@@ -10,12 +10,12 @@ Provides:
 - Tenant analytics
 """
 
-import calendar as cal
 import logging
 from datetime import date, timedelta
 from decimal import Decimal
 from typing import Any
 
+from dateutil.relativedelta import relativedelta
 from django.conf import settings
 from django.db.models import Count, DateField, Q, Sum
 from django.db.models.expressions import RawSQL
@@ -24,7 +24,7 @@ from django.utils import timezone
 
 from core.cache import cache_result
 from core.models import Apartment, Building, Dependent, Lease, RentPayment, Tenant
-from core.services.date_calculator import DateCalculatorService
+from core.services.rent_schedule_service import RentScheduleService
 
 from .fee_calculator import FeeCalculatorService
 
@@ -319,18 +319,13 @@ class DashboardService:
         total_late_fees = Decimal("0.00")
         total_late_days = 0
 
-        # Check active leases, excluding special cases
-        active_leases = (
-            Lease.objects.filter(apartment__is_rented=True, is_deleted=False)
-            .exclude(apartment__owner__isnull=False)
-            .exclude(prepaid_until__gte=month_start)
-            .exclude(is_salary_offset=True)
-            .select_related("apartment", "apartment__building", "responsible_tenant")
-        )
+        # Collectible leases for the current month (single source of truth): excludes
+        # soft-deleted, owner-repass, salary-offset and prepaid-for-month leases.
+        collectible_leases = list(RentScheduleService.collectible_leases(month_start))
 
         # Fetch all rent payments to build a ledger up to the current month
         all_payments = RentPayment.objects.filter(
-            lease__in=active_leases, reference_month__lte=month_start
+            lease__in=collectible_leases, reference_month__lte=month_start
         ).values("lease_id", "reference_month", "payment_date")
 
         payments_by_lease: dict[int, set[date]] = {}
@@ -343,12 +338,9 @@ class DashboardService:
             if not existing_last or p["payment_date"] > existing_last:
                 last_payments[lid] = p["payment_date"]
 
-        for lease in active_leases:
+        for lease in collectible_leases:
             lease_payments = payments_by_lease.get(lease.id, set())
             start_month = lease.start_date.replace(day=1)
-
-            if start_month > month_start:
-                continue
 
             curr_month_iter = start_month
             lease_late_months_count = 0
@@ -356,16 +348,25 @@ class DashboardService:
             lease_total_late_days = 0
 
             while curr_month_iter <= month_start:
+                if not RentScheduleService.is_collectible_for_month(
+                    lease, curr_month_iter.year, curr_month_iter.month
+                ):
+                    curr_month_iter = curr_month_iter + relativedelta(months=1)
+                    continue
+
                 if curr_month_iter not in lease_payments:
-                    _, days_in_curr_month = cal.monthrange(
-                        curr_month_iter.year, curr_month_iter.month
+                    due_day = RentScheduleService.clamp_due_day(
+                        lease.responsible_tenant.due_day,
+                        curr_month_iter.year,
+                        curr_month_iter.month,
                     )
-                    due_day = min(lease.responsible_tenant.due_day, days_in_curr_month)
                     due_date = curr_month_iter.replace(day=due_day)
 
                     if today > due_date:
                         late_days = (today - due_date).days
-                        daily_rate = FeeCalculatorService.calculate_daily_rate(lease.rental_value)
+                        daily_rate = FeeCalculatorService.calculate_daily_rate(
+                            RentScheduleService.effective_rental_value(lease, curr_month_iter)
+                        )
                         late_fee_percentage = Decimal(str(settings.LATE_FEE_PERCENTAGE))
                         late_fee = daily_rate * late_days * late_fee_percentage
 
@@ -373,9 +374,7 @@ class DashboardService:
                         lease_total_late_fee += late_fee
                         lease_total_late_days += late_days
 
-                curr_month_iter = DateCalculatorService.next_month_start(
-                    curr_month_iter.year, curr_month_iter.month
-                )
+                curr_month_iter = curr_month_iter + relativedelta(months=1)
 
             if lease_late_months_count > 0:
                 total_late_fees += lease_total_late_fee
@@ -388,7 +387,9 @@ class DashboardService:
                         "apartment_number": lease.apartment.number,
                         "building_number": lease.apartment.building.street_number,
                         "tenant_name": lease.responsible_tenant.name,
-                        "rental_value": str(lease.rental_value),
+                        "rental_value": str(
+                            RentScheduleService.effective_rental_value(lease, month_start)
+                        ),
                         "due_day": lease.responsible_tenant.due_day,
                         "late_days": lease_total_late_days,
                         "late_fee": str(lease_total_late_fee.quantize(Decimal("0.01"))),

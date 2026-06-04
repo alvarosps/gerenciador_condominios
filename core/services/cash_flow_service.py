@@ -53,7 +53,7 @@ class CashFlowService:
         """
         reference_date = date(year, month, 1)
 
-        # Collectible condo rent for the month — single source of truth (date-aware window
+        # Collectible condo rent for the month — single source of truth (start-date floor
         # + pay-to-live prepaid boundary; excludes owner pass-through and salary offset).
         leases = RentScheduleService.collectible_leases(reference_date)
 
