@@ -54,6 +54,9 @@ celery>=5.4.0,<6.0
 # WhatsApp / SMS
 twilio>=9.0.0,<10.0
 
+# Web Push (VAPID)
+pywebpush>=2.0.0,<3.0
+
 # Production Server (Linux only - ignored on Windows)
 gunicorn>=23.0.0,<26.0; sys_platform != "win32"
 

@@ -1583,6 +1583,23 @@ class DeviceToken(AuditMixin, models.Model):
         return f"{self.platform} token for {self.user}"
 
 
+class WebPushSubscription(AuditMixin, models.Model):
+    """Web Push (VAPID) subscriptions for browser push notifications."""
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="web_push_subscriptions",
+    )
+    endpoint = models.TextField(unique=True)
+    p256dh = models.CharField(max_length=255)
+    auth = models.CharField(max_length=255)
+    is_active = models.BooleanField(default=True)
+
+    def __str__(self) -> str:
+        return f"Web push for {self.user}"
+
+
 class PaymentProof(AuditMixin, SoftDeleteMixin, models.Model):
     """Proof of payment uploaded by tenants (photo/PDF of PIX receipt)."""
 
