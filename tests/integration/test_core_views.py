@@ -11,10 +11,13 @@ from datetime import date
 from decimal import Decimal
 
 import pytest
+from dateutil.relativedelta import relativedelta
+from django.utils import timezone
 from freezegun import freeze_time
 from rest_framework import status
 
 from core.models import Apartment, Building, Dependent, Furniture, Lease, Tenant
+from tests.factories import make_person
 
 
 def get_ids(response):
@@ -527,6 +530,102 @@ class TestDashboardViewSet:
         assert "total_late_fees" in data
         assert "average_late_days" in data
         assert "late_leases" in data
+
+    def test_late_payment_summary_owner_excluded(
+        self, authenticated_api_client, building, admin_user
+    ):
+        # Owner-occupied (kitnet) lease: rent is repassed to the owner, not condominium
+        # revenue, so it must never surface in the late-payment summary. The lease starts
+        # clearly in the past so it would otherwise be flagged late regardless of today.
+        # No freeze_time: the DRF endpoint is throttled and freezegun rebinds the throttle
+        # timer into a bound method, which 500s. Owner exclusion is date-independent.
+        owner = make_person(user=admin_user, relationship="Proprietário")
+        owned_apt = Apartment.objects.create(
+            building=building,
+            number=950,
+            rental_value=Decimal("1000.00"),
+            cleaning_fee=Decimal("100.00"),
+            max_tenants=1,
+            owner=owner,
+            created_by=admin_user,
+            updated_by=admin_user,
+        )
+        owner_tenant = Tenant.objects.create(
+            name="Owner Endpoint Tenant",
+            cpf_cnpj="71428793860",
+            phone="11955550001",
+            marital_status="Solteiro(a)",
+            profession="Dev",
+            due_day=10,
+            created_by=admin_user,
+            updated_by=admin_user,
+        )
+        owner_lease = Lease.objects.create(
+            apartment=owned_apt,
+            responsible_tenant=owner_tenant,
+            start_date=date(2020, 1, 1),
+            validity_months=24,
+            tag_fee=Decimal("80.00"),
+            rental_value=Decimal("1000.00"),
+            created_by=admin_user,
+            updated_by=admin_user,
+        )
+
+        response = authenticated_api_client.get("/api/dashboard/late_payment_summary/")
+
+        assert response.status_code == status.HTTP_200_OK
+        late_ids = [item["lease_id"] for item in response.data["late_leases"]]
+        assert owner_lease.id not in late_ids
+
+    def test_late_payment_summary_effective_value_used(
+        self, authenticated_api_client, building, admin_user
+    ):
+        # Pending adjustment in effect for every scanned month: the late fee and the
+        # reported rental_value must reflect the effective (higher) value, not the raw one.
+        # No freeze_time (throttle/freezegun incompatibility): dates are computed relative
+        # to real today, with 3 fully-past months that are always late regardless of today's
+        # day-of-month.
+        today = timezone.now().date()
+        start = today.replace(day=1) - relativedelta(months=3)
+        apt = Apartment.objects.create(
+            building=building,
+            number=951,
+            rental_value=Decimal("1000.00"),
+            cleaning_fee=Decimal("100.00"),
+            max_tenants=1,
+            created_by=admin_user,
+            updated_by=admin_user,
+        )
+        tenant = Tenant.objects.create(
+            name="Effective Endpoint Tenant",
+            cpf_cnpj="15782647825",
+            phone="11955550002",
+            marital_status="Solteiro(a)",
+            profession="Dev",
+            due_day=10,
+            created_by=admin_user,
+            updated_by=admin_user,
+        )
+        lease = Lease.objects.create(
+            apartment=apt,
+            responsible_tenant=tenant,
+            start_date=start,
+            validity_months=24,
+            tag_fee=Decimal("80.00"),
+            rental_value=Decimal("1000.00"),
+            pending_rental_value=Decimal("1200.00"),
+            pending_rental_value_date=start,
+            created_by=admin_user,
+            updated_by=admin_user,
+        )
+
+        response = authenticated_api_client.get("/api/dashboard/late_payment_summary/")
+
+        assert response.status_code == status.HTTP_200_OK
+        late = next(item for item in response.data["late_leases"] if item["lease_id"] == lease.id)
+        assert late["rental_value"] == "1200.00"
+        assert Decimal(late["late_fee"]) > 0
+        assert late["late_months"] >= 3
 
     def test_tenant_statistics_admin(
         self,
