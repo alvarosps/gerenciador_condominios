@@ -132,9 +132,7 @@ class TestFixedExpenseEndDate:
     """Fix 3: Fixed expenses must respect end_date and appear in person summary."""
 
     @freeze_time("2026-03-15")
-    def test_fixed_expense_with_end_date_excluded_after(
-        self, category_pessoal
-    ) -> None:
+    def test_fixed_expense_with_end_date_excluded_after(self, category_pessoal) -> None:
         """A fixed expense with end_date=2026-02-28 should NOT appear in March cash flow."""
         make_expense(
             description="Seguro antigo",
@@ -150,9 +148,7 @@ class TestFixedExpenseEndDate:
         assert result["fixed_expenses"] == Decimal("0.00")
 
     @freeze_time("2026-03-15")
-    def test_fixed_expense_without_end_date_projects_forever(
-        self, category_pessoal
-    ) -> None:
+    def test_fixed_expense_without_end_date_projects_forever(self, category_pessoal) -> None:
         """A fixed expense with end_date=None should always appear."""
         make_expense(
             description="Internet",

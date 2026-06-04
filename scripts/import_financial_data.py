@@ -116,45 +116,45 @@ class FinancialDataImporter:
 
     def _get_building(self, street_number: int) -> Building:
         if street_number not in self.buildings:
-            raise ValueError(f"Prédio com street_number={street_number} não encontrado no banco.")
+            msg = f"Prédio com street_number={street_number} não encontrado no banco."
+            raise ValueError(msg)
         return self.buildings[street_number]
 
     def _get_apartment(self, street_number: int, apt_number: int) -> Apartment:
         building = self._get_building(street_number)
         try:
             return Apartment.objects.get(building=building, number=apt_number)
-        except Apartment.DoesNotExist:
-            raise ValueError(f"Apartamento {apt_number} do prédio {street_number} não encontrado.")
+        except Apartment.DoesNotExist as e:
+            msg = f"Apartamento {apt_number} do prédio {street_number} não encontrado."
+            raise ValueError(msg) from e
 
     def _get_lease(self, street_number: int, apt_number: int) -> Lease:
         apt = self._get_apartment(street_number, apt_number)
         try:
             return Lease.objects.get(apartment=apt)
-        except Lease.DoesNotExist:
-            raise ValueError(
-                f"Lease não encontrado para apartamento {apt_number} do prédio {street_number}."
-            )
+        except Lease.DoesNotExist as e:
+            msg = f"Lease não encontrado para apartamento {apt_number} do prédio {street_number}."
+            raise ValueError(msg) from e
 
     def _get_person(self, nome: str) -> Person:
         if nome not in self.persons:
-            raise ValueError(
-                f"Pessoa '{nome}' não encontrada. Verifique se está definida em 'pessoas'."
-            )
+            msg = f"Pessoa '{nome}' não encontrada. Verifique se está definida em 'pessoas'."
+            raise ValueError(msg)
         return self.persons[nome]
 
     def _get_card(self, pessoa: str, apelido: str) -> CreditCard:
         key = f"{pessoa}|{apelido}"
         if key not in self.cards:
-            raise ValueError(f"Cartão '{apelido}' da pessoa '{pessoa}' não encontrado.")
+            msg = f"Cartão '{apelido}' da pessoa '{pessoa}' não encontrado."
+            raise ValueError(msg)
         return self.cards[key]
 
     def _get_category(self, nome: str | None) -> ExpenseCategory | None:
         if not nome:
             return None
         if nome not in self.categories:
-            raise ValueError(
-                f"Categoria '{nome}' não encontrada. Verifique se está definida em 'categorias'."
-            )
+            msg = f"Categoria '{nome}' não encontrada. Verifique se está definida em 'categorias'."
+            raise ValueError(msg)
         return self.categories[nome]
 
     def _parse_date(self, date_str: str | None) -> date | None:
@@ -165,7 +165,8 @@ class FinancialDataImporter:
     def _require_date(self, date_str: str | None, field_name: str, context: str) -> date:
         result = self._parse_date(date_str)
         if result is None:
-            raise ValueError(f"Campo '{field_name}' é obrigatório para {context}.")
+            msg = f"Campo '{field_name}' é obrigatório para {context}."
+            raise ValueError(msg)
         return result
 
     # =========================================================================
@@ -192,10 +193,7 @@ class FinancialDataImporter:
     def _import_categories(self):
         section = self.data.get("categorias", {})
         # Suporta formato antigo (lista) e novo (dict com items)
-        if isinstance(section, list):
-            items = section
-        else:
-            items = section.get("items", [])
+        items = section if isinstance(section, list) else section.get("items", [])
         if not items:
             return
 
@@ -604,9 +602,8 @@ class FinancialDataImporter:
             if not expense_date and next_date:
                 expense_date = self._add_months(next_date, -(item["parcela_atual"]))
             elif not expense_date:
-                raise ValueError(
-                    f"Compra '{item['descricao']}': informe data_compra ou data_proxima_parcela."
-                )
+                msg = f"Compra '{item['descricao']}': informe data_compra ou data_proxima_parcela."
+                raise ValueError(msg)
 
             expenses, installments = self._create_expense_with_installments(
                 description=item["descricao"],
@@ -652,9 +649,8 @@ class FinancialDataImporter:
             if not expense_date and next_date:
                 expense_date = self._add_months(next_date, -(item["parcela_atual"]))
             elif not expense_date:
-                raise ValueError(
-                    f"Empréstimo '{item['descricao']}': informe data_inicio ou data_proxima_parcela."
-                )
+                msg = f"Empréstimo '{item['descricao']}': informe data_inicio ou data_proxima_parcela."
+                raise ValueError(msg)
 
             expenses, installments = self._create_expense_with_installments(
                 description=item["descricao"],
@@ -698,9 +694,8 @@ class FinancialDataImporter:
             if not expense_date and next_date:
                 expense_date = self._add_months(next_date, -(item["parcela_atual"]))
             elif not expense_date:
-                raise ValueError(
-                    f"Empréstimo '{item['descricao']}': informe data_inicio ou data_proxima_parcela."
-                )
+                msg = f"Empréstimo '{item['descricao']}': informe data_inicio ou data_proxima_parcela."
+                raise ValueError(msg)
 
             expenses, installments = self._create_expense_with_installments(
                 description=item["descricao"],
@@ -745,9 +740,10 @@ class FinancialDataImporter:
             if not expense_date and next_date:
                 expense_date = self._add_months(next_date, -(item["parcela_atual"]))
             elif not expense_date:
-                raise ValueError(
+                msg = (
                     f"Desconto '{item['descricao']}': informe data_inicio ou data_proxima_parcela."
                 )
+                raise ValueError(msg)
 
             if not self.dry_run:
                 expense = Expense.objects.create(
@@ -926,9 +922,8 @@ class FinancialDataImporter:
                 if not expense_date and next_date:
                     expense_date = self._add_months(next_date, -(item["parcela_atual"]))
                 elif not expense_date:
-                    raise ValueError(
-                        f"Parcelamento '{item['descricao']}': informe data_inicio ou data_proxima_parcela."
-                    )
+                    msg = f"Parcelamento '{item['descricao']}': informe data_inicio ou data_proxima_parcela."
+                    raise ValueError(msg)
 
                 expenses, installments = self._create_expense_with_installments(
                     description=item["descricao"],
@@ -1353,11 +1348,11 @@ def main():
 
     if not json_path.exists():
         print(f"Arquivo não encontrado: {json_path}")
-        print(f"\nCopie o template e preencha com seus dados:")
-        print(f"  cp scripts/data/financial_data_template.json scripts/data/financial_data.json")
+        print("\nCopie o template e preencha com seus dados:")
+        print("  cp scripts/data/financial_data_template.json scripts/data/financial_data.json")
         sys.exit(1)
 
-    with open(json_path, "r", encoding="utf-8") as f:
+    with json_path.open(encoding="utf-8") as f:
         data = json.load(f)
 
     if args.clear_first:

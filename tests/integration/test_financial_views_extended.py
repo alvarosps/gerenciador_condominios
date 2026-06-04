@@ -16,7 +16,6 @@ from core.models import (
     Person,
 )
 
-
 # =============================================================================
 # Shared fixtures
 # =============================================================================
@@ -176,7 +175,9 @@ class TestFinancialSettingsMissingBranches:
 class TestExpenseFilters:
     url = "/api/expenses/"
 
-    def test_filter_by_is_installment_true(self, authenticated_api_client, installment_expense, expense):
+    def test_filter_by_is_installment_true(
+        self, authenticated_api_client, installment_expense, expense
+    ):
         response = authenticated_api_client.get(f"{self.url}?is_installment=true")
         assert response.status_code == status.HTTP_200_OK
         ids = [r["id"] for r in response.data["results"]]
@@ -215,7 +216,9 @@ class TestExpenseFilters:
         assert response.status_code == status.HTTP_200_OK
         assert response.data["count"] >= 1
 
-    def test_filter_by_credit_card_id(self, authenticated_api_client, installment_expense, credit_card):
+    def test_filter_by_credit_card_id(
+        self, authenticated_api_client, installment_expense, credit_card
+    ):
         response = authenticated_api_client.get(f"{self.url}?credit_card_id={credit_card.pk}")
         assert response.status_code == status.HTTP_200_OK
         assert response.data["count"] >= 1
@@ -291,9 +294,7 @@ class TestExpenseRebuild:
             updated_by=admin_user,
         )
         url = f"/api/expenses/{installment_expense.pk}/rebuild/"
-        response = authenticated_api_client.post(
-            url, {"installments": []}, format="json"
-        )
+        response = authenticated_api_client.post(url, {"installments": []}, format="json")
         assert response.status_code == status.HTTP_200_OK
         assert ExpenseInstallment.objects.filter(expense=installment_expense).count() == 0
 
@@ -363,9 +364,7 @@ class TestExpenseGenerateInstallmentsEdgeCases:
 class TestBulkMarkPaidEdgeCases:
     url = "/api/expense-installments/bulk_mark_paid/"
 
-    def test_bulk_mark_paid_missing_installments_returns_400(
-        self, authenticated_api_client
-    ):
+    def test_bulk_mark_paid_missing_installments_returns_400(self, authenticated_api_client):
         """Covers line 373-376: count mismatch."""
         response = authenticated_api_client.post(
             self.url,
@@ -377,9 +376,7 @@ class TestBulkMarkPaidEdgeCases:
 
     def test_bulk_mark_paid_empty_ids_returns_400(self, authenticated_api_client):
         """Covers line 366-370: empty installment_ids."""
-        response = authenticated_api_client.post(
-            self.url, {"installment_ids": []}, format="json"
-        )
+        response = authenticated_api_client.post(self.url, {"installment_ids": []}, format="json")
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
     def test_check_and_complete_expense_when_all_paid(

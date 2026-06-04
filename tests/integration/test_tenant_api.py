@@ -70,7 +70,7 @@ def tenant_client(tenant_user):
 @pytest.mark.django_db
 class TestTenantMe:
     def test_get_own_data(self, tenant_client, tenant_user):
-        tenant, _, _ = tenant_user
+        _tenant, _, _ = tenant_user
         response = tenant_client.get("/api/tenant/me/")
         assert response.status_code == 200
         assert response.data["name"] == "Maria Portal"

@@ -69,7 +69,7 @@ def second_tenant(admin_user):
 
 @pytest.fixture
 def lease(apartment, tenant, admin_user):
-    l = make_lease(
+    lease_obj = make_lease(
         apartment=apartment,
         tenant=tenant,
         user=admin_user,
@@ -78,8 +78,8 @@ def lease(apartment, tenant, admin_user):
         tag_fee=Decimal("20.00"),
         rental_value=Decimal("1500.00"),
     )
-    l.tenants.add(tenant)
-    return l
+    lease_obj.tenants.add(tenant)
+    return lease_obj
 
 
 @pytest.fixture
@@ -241,6 +241,17 @@ class TestRenderContractTemplate:
         # Old refundable-caução tag wording must be absent (regression guard)
         assert "caução da(s) tag" not in html
         assert "devolvê-las" not in html
+
+    def test_renders_tenant_due_day(self, lease, landlord):
+        """Due day is shown from the responsible tenant (the Lease model has no due_day field)."""
+        context = ContractService.prepare_contract_context(lease)
+        html = ContractService.render_contract_template(context)
+
+        due_day = lease.responsible_tenant.due_day
+        assert f"até o dia {due_day} de cada" in html
+        assert f"(dia {due_day})" in html
+        # Regression: the old {{ lease.due_day }} (no such field) rendered an empty "(dia )"
+        assert "(dia )" not in html
 
 
 @pytest.mark.unit
@@ -426,7 +437,8 @@ class TestGeneratePdfFromHtml:
         # Simulate generator writing a file then raising
         def gen_raises(html_content, output_path, options):
             Path(output_path).write_bytes(b"partial PDF")
-            raise RuntimeError("PDF generation failed")
+            msg = "PDF generation failed"
+            raise RuntimeError(msg)
 
         mock_gen.generate_pdf.side_effect = gen_raises
 

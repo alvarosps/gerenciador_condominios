@@ -1,11 +1,11 @@
 """Unit tests for core/services/ipca_service.py."""
 
 import re
+from datetime import date
+from decimal import Decimal
 
 import pytest
 import responses as responses_lib
-from datetime import date
-from decimal import Decimal
 
 from core.models import IPCAIndex
 from core.services.ipca_service import IPCAService
@@ -17,7 +17,7 @@ _SIDRA_URL_PATTERN = re.compile(r"https://apisidra\.ibge\.gov\.br/values/t/1737/
 def _make_sidra_response(entries: list[dict]) -> list[dict]:
     """Build a SIDRA-formatted response: header row + data rows."""
     header = {"D3C": "Período", "V": "Valor"}
-    return [header] + entries
+    return [header, *entries]
 
 
 @pytest.mark.unit
@@ -27,10 +27,12 @@ class TestIPCAServiceFetchLatest:
         responses_lib.add(
             responses_lib.GET,
             _SIDRA_URL_PATTERN,
-            json=_make_sidra_response([
-                {"D3C": "202301", "V": "5965.53"},
-                {"D3C": "202302", "V": "5992.31"},
-            ]),
+            json=_make_sidra_response(
+                [
+                    {"D3C": "202301", "V": "5965.53"},
+                    {"D3C": "202302", "V": "5992.31"},
+                ]
+            ),
             status=200,
         )
 
@@ -83,11 +85,13 @@ class TestIPCAServiceFetchLatest:
         responses_lib.add(
             responses_lib.GET,
             _SIDRA_URL_PATTERN,
-            json=_make_sidra_response([
-                {"D3C": "999999", "V": "..."},     # invalid period + placeholder value
-                {"D3C": "202303", "V": "-"},        # dash placeholder
-                {"D3C": "202304", "V": "6020.00"},  # valid
-            ]),
+            json=_make_sidra_response(
+                [
+                    {"D3C": "999999", "V": "..."},  # invalid period + placeholder value
+                    {"D3C": "202303", "V": "-"},  # dash placeholder
+                    {"D3C": "202304", "V": "6020.00"},  # valid
+                ]
+            ),
             status=200,
         )
 
@@ -151,7 +155,7 @@ class TestIPCAServiceGetAdjustmentFactor:
     def test_returns_none_when_start_index_is_zero(self):
         IPCAIndex.objects.update_or_create(
             reference_month=date(2022, 5, 1),
-            defaults={"value": Decimal("0")},
+            defaults={"value": Decimal(0)},
         )
         IPCAIndex.objects.get_or_create(
             reference_month=date(2022, 8, 1),

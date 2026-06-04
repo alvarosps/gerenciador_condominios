@@ -1,16 +1,17 @@
 import subprocess
 import sys
 
+
 def install(package):
     subprocess.check_call([sys.executable, "-m", "pip", "install", package])
+
 
 try:
     from fpdf import FPDF
 except ImportError:
-    install('fpdf2')
+    install("fpdf2")
     from fpdf import FPDF
 
-import datetime
 
 # Create instance of FPDF class
 pdf = FPDF()
@@ -64,5 +65,3 @@ pdf.multi_cell(0, 7, text)
 # Save the pdf
 output_filename = "Notificacao_Reajuste_Kitnet_205.pdf"
 pdf.output(output_filename)
-
-print(f"PDF successfully generated at {output_filename}")

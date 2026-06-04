@@ -128,7 +128,12 @@ class TestChangeDueDate:
         daily_rate=1250/30=41.67, fee=round(41.67*15)=round(625.05)=625
         total_due=1250+625=1875
         """
-        building = make_building(street_number=9900, user=admin_user, name="Edifício Round Test", address="Rua Round, 9900")
+        building = make_building(
+            street_number=9900,
+            user=admin_user,
+            name="Edifício Round Test",
+            address="Rua Round, 9900",
+        )
         apt = make_apartment(
             building=building,
             number=204,

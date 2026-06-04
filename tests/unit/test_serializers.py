@@ -16,7 +16,6 @@ from core.models import (
     Furniture,
     Income,
     Person,
-    RentPayment,
     Tenant,
 )
 from core.serializers import (
@@ -30,7 +29,6 @@ from core.serializers import (
     RentPaymentSerializer,
     TenantSerializer,
 )
-
 
 # =============================================================================
 # Fixtures
@@ -151,9 +149,7 @@ class TestApartmentSerializer:
 
     def test_update_furniture_ids(self, apartment: Apartment) -> None:
         f1 = Furniture.objects.create(name="TV Serializer")
-        serializer = ApartmentSerializer(
-            apartment, data={"furniture_ids": [f1.pk]}, partial=True
-        )
+        serializer = ApartmentSerializer(apartment, data={"furniture_ids": [f1.pk]}, partial=True)
         assert serializer.is_valid(), serializer.errors
         serializer.save()
         assert apartment.furnitures.filter(pk=f1.pk).exists()
@@ -162,9 +158,7 @@ class TestApartmentSerializer:
         f1 = Furniture.objects.create(name="Microwave Serializer")
         apartment.furnitures.set([f1])
         # Update without furniture_ids — should keep existing
-        serializer = ApartmentSerializer(
-            apartment, data={"rental_value": "1700.00"}, partial=True
-        )
+        serializer = ApartmentSerializer(apartment, data={"rental_value": "1700.00"}, partial=True)
         assert serializer.is_valid(), serializer.errors
         serializer.save()
         assert apartment.furnitures.filter(pk=f1.pk).exists()
@@ -246,9 +240,7 @@ class TestTenantSerializer:
     def test_update_removes_deleted_dependents(self, tenant: Tenant) -> None:
         from core.models import Dependent
 
-        dep = Dependent.objects.create(
-            tenant=tenant, name="Old Dep", phone="11987654399"
-        )
+        dep = Dependent.objects.create(tenant=tenant, name="Old Dep", phone="11987654399")
         # Update providing empty dependents list — should remove old
         serializer = TenantSerializer(
             tenant,
@@ -262,14 +254,10 @@ class TestTenantSerializer:
     def test_update_existing_dependent(self, tenant: Tenant) -> None:
         from core.models import Dependent
 
-        dep = Dependent.objects.create(
-            tenant=tenant, name="Existing Dep", phone="11987654399"
-        )
+        dep = Dependent.objects.create(tenant=tenant, name="Existing Dep", phone="11987654399")
         serializer = TenantSerializer(
             tenant,
-            data={
-                "dependents": [{"id": dep.pk, "name": "Updated Dep", "phone": "11987654399"}]
-            },
+            data={"dependents": [{"id": dep.pk, "name": "Updated Dep", "phone": "11987654399"}]},
             partial=True,
         )
         assert serializer.is_valid(), serializer.errors
@@ -334,7 +322,9 @@ class TestExpenseSerializer:
         assert not serializer.is_valid()
         assert "building_id" in serializer.errors
 
-    def test_installment_requires_total_installments(self, person: Person, credit_card: CreditCard) -> None:
+    def test_installment_requires_total_installments(
+        self, person: Person, credit_card: CreditCard
+    ) -> None:
         payload = {
             "description": "Parcelado sem total",
             "expense_type": "card_purchase",
@@ -374,16 +364,28 @@ class TestExpenseSerializer:
             total_installments=3,
         )
         ExpenseInstallment.objects.create(
-            expense=expense, installment_number=1, total_installments=3,
-            amount=Decimal("100.00"), due_date=date(2026, 2, 1), is_paid=True
+            expense=expense,
+            installment_number=1,
+            total_installments=3,
+            amount=Decimal("100.00"),
+            due_date=date(2026, 2, 1),
+            is_paid=True,
         )
         ExpenseInstallment.objects.create(
-            expense=expense, installment_number=2, total_installments=3,
-            amount=Decimal("100.00"), due_date=date(2026, 3, 1), is_paid=False
+            expense=expense,
+            installment_number=2,
+            total_installments=3,
+            amount=Decimal("100.00"),
+            due_date=date(2026, 3, 1),
+            is_paid=False,
         )
         ExpenseInstallment.objects.create(
-            expense=expense, installment_number=3, total_installments=3,
-            amount=Decimal("100.00"), due_date=date(2026, 4, 1), is_paid=False
+            expense=expense,
+            installment_number=3,
+            total_installments=3,
+            amount=Decimal("100.00"),
+            due_date=date(2026, 4, 1),
+            is_paid=False,
         )
         data = ExpenseSerializer(expense).data
         assert data["remaining_installments"] == 2
@@ -423,8 +425,12 @@ class TestExpenseInstallmentSerializer:
             total_installments=1,
         )
         inst = ExpenseInstallment.objects.create(
-            expense=expense, installment_number=1, total_installments=1,
-            amount=Decimal("100.00"), due_date=date(2020, 1, 1), is_paid=False
+            expense=expense,
+            installment_number=1,
+            total_installments=1,
+            amount=Decimal("100.00"),
+            due_date=date(2020, 1, 1),
+            is_paid=False,
         )
         data = ExpenseInstallmentSerializer(inst).data
         assert data["is_overdue"] is True
@@ -441,9 +447,13 @@ class TestExpenseInstallmentSerializer:
             total_installments=1,
         )
         inst = ExpenseInstallment.objects.create(
-            expense=expense, installment_number=1, total_installments=1,
-            amount=Decimal("100.00"), due_date=date(2020, 1, 1),
-            is_paid=True, paid_date=date(2020, 1, 10)
+            expense=expense,
+            installment_number=1,
+            total_installments=1,
+            amount=Decimal("100.00"),
+            due_date=date(2020, 1, 1),
+            is_paid=True,
+            paid_date=date(2020, 1, 10),
         )
         data = ExpenseInstallmentSerializer(inst).data
         assert data["is_overdue"] is False
@@ -460,8 +470,12 @@ class TestExpenseInstallmentSerializer:
             total_installments=1,
         )
         inst = ExpenseInstallment.objects.create(
-            expense=expense, installment_number=1, total_installments=1,
-            amount=Decimal("100.00"), due_date=date(2099, 12, 31), is_paid=False
+            expense=expense,
+            installment_number=1,
+            total_installments=1,
+            amount=Decimal("100.00"),
+            due_date=date(2099, 12, 31),
+            is_paid=False,
         )
         data = ExpenseInstallmentSerializer(inst).data
         assert data["is_overdue"] is False
@@ -478,9 +492,7 @@ class TestExpenseCategorySerializer:
         data = ExpenseCategorySerializer(category).data
         assert data["subcategories"] == []
 
-    def test_subcategories_returned_for_parent(
-        self, category: ExpenseCategory, admin_user
-    ) -> None:
+    def test_subcategories_returned_for_parent(self, category: ExpenseCategory, admin_user) -> None:
         sub = ExpenseCategory.objects.create(
             name="Sub Alimentação",
             color="#FF0000",
@@ -504,9 +516,7 @@ class TestExpenseCategorySerializer:
 
 @pytest.mark.unit
 class TestRentPaymentSerializer:
-    def test_reference_month_must_be_first_day(
-        self, apartment: Apartment, tenant: Tenant
-    ) -> None:
+    def test_reference_month_must_be_first_day(self, apartment: Apartment, tenant: Tenant) -> None:
         from core.models import Lease
 
         lease = Lease.objects.create(
@@ -526,9 +536,7 @@ class TestRentPaymentSerializer:
         assert not serializer.is_valid()
         assert "reference_month" in serializer.errors
 
-    def test_valid_reference_month(
-        self, apartment: Apartment, tenant: Tenant
-    ) -> None:
+    def test_valid_reference_month(self, apartment: Apartment, tenant: Tenant) -> None:
         from core.models import Lease
 
         lease = Lease.objects.create(

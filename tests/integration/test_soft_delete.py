@@ -1,6 +1,5 @@
 """Integration tests for soft delete behavior across Building, Apartment, Tenant."""
 
-from datetime import date
 from decimal import Decimal
 
 import pytest
@@ -49,32 +48,24 @@ def tenant(admin_user):
 
 @pytest.mark.integration
 class TestBuildingSoftDelete:
-    def test_soft_delete_building_excluded_from_list(
-        self, authenticated_api_client, building
-    ):
+    def test_soft_delete_building_excluded_from_list(self, authenticated_api_client, building):
         authenticated_api_client.delete(f"/api/buildings/{building.id}/")
         response = authenticated_api_client.get("/api/buildings/")
         assert response.status_code == status.HTTP_200_OK
         ids = [item["id"] for item in response.data["results"]]
         assert building.id not in ids
 
-    def test_soft_delete_building_excluded_from_retrieve(
-        self, authenticated_api_client, building
-    ):
+    def test_soft_delete_building_excluded_from_retrieve(self, authenticated_api_client, building):
         authenticated_api_client.delete(f"/api/buildings/{building.id}/")
         response = authenticated_api_client.get(f"/api/buildings/{building.id}/")
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
-    def test_soft_delete_building_record_remains_in_db(
-        self, authenticated_api_client, building
-    ):
+    def test_soft_delete_building_record_remains_in_db(self, authenticated_api_client, building):
         authenticated_api_client.delete(f"/api/buildings/{building.id}/")
         # Record still exists with is_deleted=True
         assert Building.all_objects.filter(id=building.id, is_deleted=True).exists()
 
-    def test_soft_delete_building_audit_fields_set(
-        self, authenticated_api_client, building
-    ):
+    def test_soft_delete_building_audit_fields_set(self, authenticated_api_client, building):
         authenticated_api_client.delete(f"/api/buildings/{building.id}/")
         building.refresh_from_db()
         assert building.is_deleted is True
@@ -83,18 +74,14 @@ class TestBuildingSoftDelete:
 
 @pytest.mark.integration
 class TestApartmentSoftDelete:
-    def test_soft_delete_apartment_excluded_from_list(
-        self, authenticated_api_client, apartment
-    ):
+    def test_soft_delete_apartment_excluded_from_list(self, authenticated_api_client, apartment):
         authenticated_api_client.delete(f"/api/apartments/{apartment.id}/")
         response = authenticated_api_client.get("/api/apartments/")
         assert response.status_code == status.HTTP_200_OK
         ids = [item["id"] for item in response.data["results"]]
         assert apartment.id not in ids
 
-    def test_soft_delete_apartment_record_remains_in_db(
-        self, authenticated_api_client, apartment
-    ):
+    def test_soft_delete_apartment_record_remains_in_db(self, authenticated_api_client, apartment):
         authenticated_api_client.delete(f"/api/apartments/{apartment.id}/")
         assert Apartment.all_objects.filter(id=apartment.id, is_deleted=True).exists()
 
@@ -108,32 +95,24 @@ class TestApartmentSoftDelete:
 
 @pytest.mark.integration
 class TestTenantSoftDelete:
-    def test_soft_delete_tenant_excluded_from_list(
-        self, authenticated_api_client, tenant
-    ):
+    def test_soft_delete_tenant_excluded_from_list(self, authenticated_api_client, tenant):
         authenticated_api_client.delete(f"/api/tenants/{tenant.id}/")
         response = authenticated_api_client.get("/api/tenants/")
         assert response.status_code == status.HTTP_200_OK
         ids = [item["id"] for item in response.data["results"]]
         assert tenant.id not in ids
 
-    def test_soft_delete_tenant_record_remains_in_db(
-        self, authenticated_api_client, tenant
-    ):
+    def test_soft_delete_tenant_record_remains_in_db(self, authenticated_api_client, tenant):
         authenticated_api_client.delete(f"/api/tenants/{tenant.id}/")
         assert Tenant.all_objects.filter(id=tenant.id, is_deleted=True).exists()
 
-    def test_soft_delete_tenant_audit_fields_set(
-        self, authenticated_api_client, tenant
-    ):
+    def test_soft_delete_tenant_audit_fields_set(self, authenticated_api_client, tenant):
         authenticated_api_client.delete(f"/api/tenants/{tenant.id}/")
         tenant.refresh_from_db()
         assert tenant.is_deleted is True
         assert tenant.deleted_at is not None
 
-    def test_new_tenant_not_affected_by_deleted_records(
-        self, authenticated_api_client, tenant
-    ):
+    def test_new_tenant_not_affected_by_deleted_records(self, authenticated_api_client, tenant):
         authenticated_api_client.delete(f"/api/tenants/{tenant.id}/")
 
         # Create a new tenant — should not interfere with deleted one
@@ -146,9 +125,7 @@ class TestTenantSoftDelete:
             "profession": "Eng",
             "due_day": 5,
         }
-        create_response = authenticated_api_client.post(
-            "/api/tenants/", payload, format="json"
-        )
+        create_response = authenticated_api_client.post("/api/tenants/", payload, format="json")
         assert create_response.status_code == status.HTTP_201_CREATED
 
         list_response = authenticated_api_client.get("/api/tenants/")

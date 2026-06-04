@@ -19,7 +19,7 @@ from freezegun import freeze_time
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from core.models import Apartment, Building, Furniture, Lease, Tenant
+from core.models import Apartment, Building, Lease, Tenant
 
 pytestmark = pytest.mark.integration
 
@@ -28,14 +28,14 @@ pytestmark = pytest.mark.integration
 # must use a different CPF to avoid unique constraint violations.
 # All values verified against the Brazilian CPF checksum algorithm.
 # ---------------------------------------------------------------------------
-CPF_JOAO = "529.982.247-25"   # from conftest.py sample_tenant_data
-CPF_MARIA = "05257794187"     # from test_financial_workflow.py
-CPF_PEDRO = "24843803480"     # from test_financial_workflow.py
-CPF_ANA = "15782647825"       # from test_financial_workflow.py
-CPF_CARLOS = "71428793860"    # from test_financial_workflow.py
+CPF_JOAO = "529.982.247-25"  # from conftest.py sample_tenant_data
+CPF_MARIA = "05257794187"  # from test_financial_workflow.py
+CPF_PEDRO = "24843803480"  # from test_financial_workflow.py
+CPF_ANA = "15782647825"  # from test_financial_workflow.py
+CPF_CARLOS = "71428793860"  # from test_financial_workflow.py
 CPF_FERNANDA = "72604350203"  # from test_financial_workflow.py
-CPF_LUCAS = "10433218100"     # generated — verified valid
-CPF_SOFIA = "32505476462"     # generated — verified valid
+CPF_LUCAS = "10433218100"  # generated — verified valid
+CPF_SOFIA = "32505476462"  # generated — verified valid
 
 
 class TestPropertyLifecycleE2E:
@@ -143,7 +143,7 @@ class TestPropertyLifecycleE2E:
             # Should be late because day 15 > due_day 10
             if late_fee_resp.data.get("late_days") is not None:
                 assert late_fee_resp.data["late_days"] >= 5
-                assert Decimal(str(late_fee_resp.data["late_fee"])) > Decimal("0")
+                assert Decimal(str(late_fee_resp.data["late_fee"])) > Decimal(0)
 
         # Step 7: Change due date and verify updated
         change_resp = client.post(
@@ -170,7 +170,7 @@ class TestPropertyLifecycleE2E:
         # Step 9: Verify soft-deleted lease excluded from default list
         lease_list_after = client.get("/api/leases/")
         assert lease_list_after.status_code == status.HTTP_200_OK
-        deleted_ids = [l["id"] for l in lease_list_after.data["results"]]
+        deleted_ids = [lease["id"] for lease in lease_list_after.data["results"]]
         assert lease_id not in deleted_ids
 
         # Step 10: Create a new apartment and lease — proves is_rented signal works correctly
@@ -552,7 +552,7 @@ class TestDashboardDataAccuracy:
         assert data["total_apartments"] >= 3
         assert data["rented_apartments"] >= 2
         assert data["vacant_apartments"] >= 1
-        assert Decimal(str(data["total_revenue"])) >= Decimal("0")
+        assert Decimal(str(data["total_revenue"])) >= Decimal(0)
 
         # GET /api/dashboard/lease_metrics/
         lease_resp = client.get("/api/dashboard/lease_metrics/")
@@ -581,9 +581,7 @@ class TestDashboardDataAccuracy:
         assert len(buildings_data) >= 2
 
         # Verify per-building structure
-        building_a_stat = next(
-            (b for b in buildings_data if b["building_number"] == 400), None
-        )
+        building_a_stat = next((b for b in buildings_data if b["building_number"] == 400), None)
         assert building_a_stat is not None
         assert "total_apartments" in building_a_stat
         assert "rented_apartments" in building_a_stat
@@ -602,7 +600,7 @@ class TestDashboardDataAccuracy:
             assert "late_leases" in late_data
             # With due_day=10 and frozen date=20, both leases should be late
             assert late_data["total_late_leases"] >= 2
-            assert Decimal(str(late_data["total_late_fees"])) > Decimal("0")
+            assert Decimal(str(late_data["total_late_fees"])) > Decimal(0)
 
 
 class TestSoftDeleteCascadeBehavior:
@@ -899,10 +897,7 @@ class TestSearchAndFilterChains:
         with_deps_ids = [t["id"] for t in with_deps.data["results"]]
         assert individual_id in with_deps_ids
 
-        # Combined: is_company=false + search
-        combined = client.get(
-            "/api/tenants/", {"is_company": "false", "search": "Individual"}
-        )
+        combined = client.get("/api/tenants/", {"is_company": "false", "search": "Individual"})
         assert combined.status_code == status.HTTP_200_OK
         combined_ids = [t["id"] for t in combined.data["results"]]
         assert individual_id in combined_ids
@@ -985,7 +980,6 @@ class TestSearchAndFilterChains:
         assert apt_mid.pk in max_ids
         assert apt_expensive.pk not in max_ids
 
-        # Combined: building_id + is_rented=false + min_price
         combined = client.get(
             "/api/apartments/",
             {"building_id": building_x.pk, "is_rented": "false", "min_price": "700"},
@@ -1059,16 +1053,14 @@ class TestSearchAndFilterChains:
         # Filter by apartment_id
         apt_filter = client.get("/api/leases/", {"apartment_id": apt_a.pk})
         assert apt_filter.status_code == status.HTTP_200_OK
-        apt_filter_ids = [l["id"] for l in apt_filter.data["results"]]
+        apt_filter_ids = [lease["id"] for lease in apt_filter.data["results"]]
         assert active_lease.pk in apt_filter_ids
         assert expired_lease.pk not in apt_filter_ids
 
         # Filter by responsible_tenant_id
-        tenant_filter = client.get(
-            "/api/leases/", {"responsible_tenant_id": tenant_a.pk}
-        )
+        tenant_filter = client.get("/api/leases/", {"responsible_tenant_id": tenant_a.pk})
         assert tenant_filter.status_code == status.HTTP_200_OK
-        tenant_filter_ids = [l["id"] for l in tenant_filter.data["results"]]
+        tenant_filter_ids = [lease["id"] for lease in tenant_filter.data["results"]]
         assert active_lease.pk in tenant_filter_ids
         assert expired_lease.pk not in tenant_filter_ids
 
@@ -1076,7 +1068,7 @@ class TestSearchAndFilterChains:
         with freeze_time("2026-03-24"):
             active_filter = client.get("/api/leases/", {"is_active": "true"})
             assert active_filter.status_code == status.HTTP_200_OK
-            active_ids = [l["id"] for l in active_filter.data["results"]]
+            active_ids = [lease["id"] for lease in active_filter.data["results"]]
             assert active_lease.pk in active_ids
             assert expired_lease.pk not in active_ids
 
@@ -1084,6 +1076,6 @@ class TestSearchAndFilterChains:
         with freeze_time("2026-03-24"):
             expired_filter = client.get("/api/leases/", {"is_expired": "true"})
             assert expired_filter.status_code == status.HTTP_200_OK
-            expired_ids = [l["id"] for l in expired_filter.data["results"]]
+            expired_ids = [lease["id"] for lease in expired_filter.data["results"]]
             assert expired_lease.pk in expired_ids
             assert active_lease.pk not in expired_ids

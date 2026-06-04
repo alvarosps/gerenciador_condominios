@@ -11,17 +11,14 @@ from core.models import (
     Building,
     CreditCard,
     EmployeePayment,
-    Expense,
     ExpenseCategory,
     Income,
     Lease,
     Person,
     PersonIncome,
-    PersonPayment,
     RentPayment,
     Tenant,
 )
-
 
 # =============================================================================
 # Shared fixtures
@@ -233,9 +230,7 @@ class TestCreditCardUpdateDelete:
 class TestExpenseCategoryHierarchy:
     url = "/api/expense-categories/"
 
-    def test_create_child_category_with_parent_id(
-        self, authenticated_api_client, parent_category
-    ):
+    def test_create_child_category_with_parent_id(self, authenticated_api_client, parent_category):
         payload = {
             "name": "Condomínio",
             "description": "Taxa de condomínio",
@@ -329,9 +324,7 @@ class TestIncomeUpdateDelete:
 class TestRentPaymentUpdateDelete:
     url = "/api/rent-payments/"
 
-    def test_update_rent_payment(
-        self, authenticated_api_client, rent_payment_obj, lease
-    ):
+    def test_update_rent_payment(self, authenticated_api_client, rent_payment_obj, lease):
         payload = {
             "lease_id": lease.pk,
             "reference_month": "2026-03-01",
@@ -345,9 +338,7 @@ class TestRentPaymentUpdateDelete:
         assert response.data["amount_paid"] == "1450.00"
         assert response.data["payment_date"] == "2026-03-12"
 
-    def test_partial_update_rent_payment(
-        self, authenticated_api_client, rent_payment_obj
-    ):
+    def test_partial_update_rent_payment(self, authenticated_api_client, rent_payment_obj):
         response = authenticated_api_client.patch(
             f"{self.url}{rent_payment_obj.pk}/",
             {"notes": "Pago com atraso"},
@@ -356,9 +347,7 @@ class TestRentPaymentUpdateDelete:
         assert response.status_code == status.HTTP_200_OK
         assert response.data["notes"] == "Pago com atraso"
 
-    def test_delete_rent_payment_soft_deletes(
-        self, authenticated_api_client, rent_payment_obj
-    ):
+    def test_delete_rent_payment_soft_deletes(self, authenticated_api_client, rent_payment_obj):
         response = authenticated_api_client.delete(f"{self.url}{rent_payment_obj.pk}/")
         assert response.status_code == status.HTTP_204_NO_CONTENT
         assert not RentPayment.objects.filter(pk=rent_payment_obj.pk).exists()
@@ -374,9 +363,7 @@ class TestRentPaymentUpdateDelete:
 class TestEmployeePaymentMarkPaid:
     url = "/api/employee-payments/"
 
-    def test_mark_paid_with_date(
-        self, authenticated_api_client, employee_payment_obj
-    ):
+    def test_mark_paid_with_date(self, authenticated_api_client, employee_payment_obj):
         response = authenticated_api_client.post(
             f"{self.url}{employee_payment_obj.pk}/mark_paid/",
             {"payment_date": "2026-03-28"},
@@ -404,12 +391,8 @@ class TestEmployeePaymentMarkPaid:
         assert response.status_code == status.HTTP_200_OK
         assert response.data["base_salary"] == "950.00"
 
-    def test_delete_employee_payment(
-        self, authenticated_api_client, employee_payment_obj
-    ):
-        response = authenticated_api_client.delete(
-            f"{self.url}{employee_payment_obj.pk}/"
-        )
+    def test_delete_employee_payment(self, authenticated_api_client, employee_payment_obj):
+        response = authenticated_api_client.delete(f"{self.url}{employee_payment_obj.pk}/")
         assert response.status_code == status.HTTP_204_NO_CONTENT
         assert not EmployeePayment.objects.filter(pk=employee_payment_obj.pk).exists()
 
@@ -442,15 +425,11 @@ class TestPersonIncomeUpdateDelete:
             "start_date": "2026-01-01",
             "is_active": True,
         }
-        response = authenticated_api_client.put(
-            f"{self.url}{pi.pk}/", payload, format="json"
-        )
+        response = authenticated_api_client.put(f"{self.url}{pi.pk}/", payload, format="json")
         assert response.status_code == status.HTTP_200_OK
         assert response.data["fixed_amount"] == "1200.00"
 
-    def test_partial_update_person_income(
-        self, authenticated_api_client, person_income_obj
-    ):
+    def test_partial_update_person_income(self, authenticated_api_client, person_income_obj):
         response = authenticated_api_client.patch(
             f"{self.url}{person_income_obj.pk}/",
             {"is_active": False},
@@ -459,9 +438,7 @@ class TestPersonIncomeUpdateDelete:
         assert response.status_code == status.HTTP_200_OK
         assert response.data["is_active"] is False
 
-    def test_delete_person_income_soft_deletes(
-        self, authenticated_api_client, person_income_obj
-    ):
+    def test_delete_person_income_soft_deletes(self, authenticated_api_client, person_income_obj):
         response = authenticated_api_client.delete(f"{self.url}{person_income_obj.pk}/")
         assert response.status_code == status.HTTP_204_NO_CONTENT
         assert not PersonIncome.objects.filter(pk=person_income_obj.pk).exists()

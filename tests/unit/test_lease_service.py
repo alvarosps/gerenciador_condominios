@@ -137,9 +137,7 @@ class TestTransferLease:
         assert new_lease.contract_signed is False
         assert new_lease.interfone_configured is False
 
-    def test_transfer_assigns_tenants_to_new_lease(
-        self, active_lease, new_apt, tenant, staff_user
-    ):
+    def test_transfer_assigns_tenants_to_new_lease(self, active_lease, new_apt, tenant, staff_user):
         new_lease = transfer_lease(
             lease_id=active_lease.id,
             payload={
