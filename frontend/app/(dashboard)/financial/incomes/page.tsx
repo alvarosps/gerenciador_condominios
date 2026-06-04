@@ -260,7 +260,7 @@ export default function IncomesPage() {
   return (
     <div>
       {/* Header */}
-      <div className="mb-4 flex justify-between items-center">
+      <div className="mb-4 flex justify-between items-center flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold">Receitas</h1>
           <p className="text-muted-foreground mt-1">

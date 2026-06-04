@@ -120,7 +120,7 @@ export default function PersonsPage() {
 
   return (
     <div>
-      <div className="mb-4 flex justify-between items-center">
+      <div className="mb-4 flex justify-between items-center flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold">Pessoas</h1>
           <p className="text-muted-foreground mt-1">Gerencie pessoas, proprietários e seus cartões de crédito</p>
