@@ -6,9 +6,10 @@
  * Uses the real Zustand auth store — reset between tests with clearAuth().
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
+import { del } from 'idb-keyval';
 import {
   useLogin,
   useRegister,
@@ -17,9 +18,16 @@ import {
   useGoogleLogin,
   useExchangeOAuthCode,
 } from '../use-auth';
+import { QUERY_CACHE_IDB_KEY } from '@/lib/config/persister';
 import { createWrapper } from '@/tests/test-utils';
 import { server } from '@/tests/mocks/server';
 import { useAuthStore } from '@/store/auth-store';
+
+vi.mock('idb-keyval', () => ({
+  get: vi.fn(),
+  set: vi.fn(),
+  del: vi.fn().mockResolvedValue(undefined),
+}));
 
 const API_BASE = 'http://localhost:8008/api';
 
@@ -36,6 +44,7 @@ describe('useAuth hooks', () => {
   beforeEach(() => {
     // Reset real Zustand store before each test
     useAuthStore.getState().clearAuth();
+    vi.mocked(del).mockClear();
 
     // Mock window.location for redirect assertions
     Object.defineProperty(window, 'location', {
@@ -218,6 +227,31 @@ describe('useAuth hooks', () => {
       const storeState = useAuthStore.getState();
       expect(storeState.isAuthenticated).toBe(false);
       expect(storeState.user).toBeNull();
+    });
+
+    it('clears the persisted query cache from IndexedDB on logout', async () => {
+      useAuthStore.getState().setAuth({
+        id: 1,
+        email: 'test@example.com',
+        first_name: 'Test',
+        last_name: 'User',
+        is_staff: false,
+      });
+
+      const { result } = renderHook(() => useLogout(), {
+        wrapper: createWrapper(),
+      });
+
+      result.current.mutate();
+
+      await waitFor(
+        () => {
+          expect(result.current.isPending).toBe(false);
+        },
+        { timeout: 5000 },
+      );
+
+      expect(del).toHaveBeenCalledWith(QUERY_CACHE_IDB_KEY);
     });
   });
 

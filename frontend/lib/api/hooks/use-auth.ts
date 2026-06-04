@@ -1,7 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { del } from 'idb-keyval';
 import { apiClient } from '../client';
 import { useAuthStore, type User } from '@/store/auth-store';
 import { queryKeys } from '@/lib/api/query-keys';
+import { QUERY_CACHE_IDB_KEY } from '@/lib/config/persister';
 
 /**
  * Login credentials interface
@@ -84,12 +86,16 @@ export function useLogout() {
     onSuccess: () => {
       clearAuth();
       queryClient.clear();
+      // Clear the persisted cache so one user's business data does not leak to
+      // another on a shared device (read-only offline cache is per-session).
+      void del(QUERY_CACHE_IDB_KEY);
       window.location.href = '/login';
     },
     onError: () => {
       // Even if backend logout fails, clear client state
       clearAuth();
       queryClient.clear();
+      void del(QUERY_CACHE_IDB_KEY);
       window.location.href = '/login';
     },
   });

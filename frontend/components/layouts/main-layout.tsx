@@ -11,6 +11,7 @@ import type { User } from '@/store/auth-store';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { ErrorBoundary } from '@/components/shared/error-boundary';
+import { OfflineBanner } from '@/components/offline-banner';
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -31,6 +32,7 @@ export function MainLayout({ children }: MainLayoutProps) {
 
   return (
     <div className="min-h-screen">
+      <OfflineBanner />
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:p-4 focus:bg-background focus:text-foreground"
