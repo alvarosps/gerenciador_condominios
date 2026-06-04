@@ -44,7 +44,7 @@ class RentAdjustmentService:
             Tuple of (RentAdjustment, warning_dict | None).
 
         Raises:
-            ValidationError: If percentage is zero.
+            ValidationError: If percentage is zero or the lease has already ended.
         """
         if percentage == 0:
             msg = "O percentual de reajuste não pode ser zero."
@@ -54,6 +54,10 @@ class RentAdjustmentService:
         lease = Lease.objects.select_for_update().get(pk=lease.pk)
 
         today = timezone.now().date()
+        if today > lease.start_date + relativedelta(months=lease.validity_months):
+            msg = "A locação está encerrada e não pode ser reajustada."
+            raise ValidationError(msg)
+
         adjustment_date = renewal_date or today
 
         multiplier = Decimal(1) + percentage / Decimal(100)
@@ -235,6 +239,9 @@ class RentAdjustmentService:
         alerts: list[dict[str, Any]] = []
 
         for lease in leases:
+            # Skip leases whose contract has already ended — they are not adjustable.
+            if today > lease.start_date + relativedelta(months=lease.validity_months):
+                continue
             reference_date: date = lease.last_rent_increase_date or lease.start_date
             eligible_date = reference_date + relativedelta(months=_ADJUSTMENT_INTERVAL_MONTHS)
 
