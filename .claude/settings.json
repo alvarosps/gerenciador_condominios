@@ -84,7 +84,9 @@
           {
             "type": "command",
             "command": "bash",
-            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/session-start.sh"]
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/.claude/hooks/session-start.sh"
+            ]
           }
         ]
       }
@@ -96,7 +98,9 @@
           {
             "type": "command",
             "command": "bash",
-            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/pre-edit-scope.sh"]
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/.claude/hooks/pre-edit-scope.sh"
+            ]
           }
         ]
       },
@@ -106,15 +110,22 @@
           {
             "type": "command",
             "command": "node",
-            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/conventional-commit.cjs"]
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/.claude/hooks/conventional-commit.cjs"
+            ]
           },
           {
             "type": "command",
             "command": "bash",
-            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/pre-db-push-guard.sh"]
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/.claude/hooks/pre-db-push-guard.sh"
+            ]
           }
         ]
       }
     ]
+  },
+  "enabledPlugins": {
+    "supabase@claude-plugins-official": true
   }
 }
