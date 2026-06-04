@@ -196,7 +196,7 @@ class MonthAdvanceService:
 
     def _check_unpaid_rent(self, month_start: date) -> list[dict]:
         """Check for active leases without RentPayment for this month."""
-        # Collectible rent for the month — single source of truth (date-aware window +
+        # Collectible rent for the month — single source of truth (start-date floor +
         # pay-to-live prepaid boundary), consistent with the rent calendar that gates on
         # the MonthSnapshot this advance produces. Avoids finalizing a still-due month.
         active_leases = RentScheduleService.collectible_leases(month_start)
