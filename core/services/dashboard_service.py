@@ -419,9 +419,12 @@ class DashboardService:
         """
         Calculate tenant statistics and demographics.
 
+        Only ACTIVE tenants — those linked to a non-deleted lease — are counted;
+        registered tenants without a current lease are excluded.
+
         Returns:
             Dictionary containing:
-            - total_tenants: Total number of tenants
+            - total_tenants: Total number of active tenants
             - individual_tenants: Number of individual (non-company) tenants
             - company_tenants: Number of company tenants
             - tenants_with_dependents: Number of tenants with dependents
@@ -438,7 +441,7 @@ class DashboardService:
         """
         logger.info("Calculating tenant statistics")
 
-        # Aggregate tenant counts
+        # Aggregate tenant counts — only ACTIVE tenants (those with a non-deleted lease)
         tenant_stats = (
             Tenant.objects.filter(
                 Q(leases_responsible__is_deleted=False) | Q(leases__is_deleted=False)
