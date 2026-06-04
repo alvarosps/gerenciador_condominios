@@ -10,6 +10,7 @@ import type { RentCalendarDay, RentCalendarItem } from '@/lib/api/hooks/use-rent
 const WEEKDAY_HEADERS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'] as const;
 
 function chipClass(item: RentCalendarItem): string {
+  if (!item.is_collectible) return 'bg-muted/60 text-muted-foreground';
   if (item.is_paid) return 'bg-success/10 text-success';
   if (item.is_overdue) return 'bg-destructive/10 text-destructive';
   return 'bg-amber-500/10 text-amber-600 dark:text-amber-400';
@@ -24,6 +25,7 @@ interface DayCellProps {
 }
 
 function statusLabel(item: RentCalendarItem): string {
+  if (!item.is_collectible) return 'não-cobrável';
   if (item.is_paid) return 'pago';
   if (item.is_overdue) return 'em atraso';
   return 'a vencer';
@@ -158,6 +160,7 @@ export function RentMonthGrid({
         <LegendItem className="bg-success" label="Pago" />
         <LegendItem className="bg-amber-500" label="A vencer" />
         <LegendItem className="bg-destructive" label="Em atraso" />
+        <LegendItem className="bg-muted" label="Não-cobrável" />
         <span className="inline-flex items-center gap-1">
           <span className="inline-flex h-3 w-3 items-center justify-center rounded-full bg-primary text-[8px] text-primary-foreground" />
           Hoje

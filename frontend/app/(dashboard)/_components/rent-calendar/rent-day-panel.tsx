@@ -1,6 +1,7 @@
 'use client';
 
-import { CalendarClock, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { useMemo } from 'react';
+import { CalendarClock, CheckCircle2, AlertTriangle, Ban } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { formatCurrency } from '@/lib/utils/formatters';
@@ -11,6 +12,11 @@ import { RentPaymentToggle } from './rent-payment-toggle';
 const PAID_DAY_PASSED_REASON =
   'Pagamento confirmado — o dia já passou, não é possível desmarcar';
 const MONTH_FINALIZED_REASON = 'Mês finalizado — não é possível alterar';
+
+const NON_COLLECTIBLE_REASON_LABELS: Record<string, string> = {
+  owner_repass: 'Repasse ao proprietário',
+  salary_offset: 'Desconto salário',
+};
 
 function formatDayMonth(dateStr: string | null): string {
   if (!dateStr) return '';
@@ -100,6 +106,35 @@ function DayItemCard({ item, isPending, onToggle }: DayItemCardProps) {
   );
 }
 
+function NonCollectibleItemCard({ item }: { item: RentCalendarItem }) {
+  const label =
+    item.non_collectible_reason !== null
+      ? (NON_COLLECTIBLE_REASON_LABELS[item.non_collectible_reason] ?? item.non_collectible_reason)
+      : '';
+
+  return (
+    <div className="rounded-lg border border-muted bg-muted/30 p-3">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="truncate font-medium text-muted-foreground">{item.tenant_name}</div>
+          <div className="text-xs text-muted-foreground">
+            Apto {item.apartment_number} · Préd. {item.building_number}
+          </div>
+        </div>
+        <span className="inline-flex items-center gap-1 rounded-full border border-muted bg-muted px-2 py-1 text-xs font-medium text-muted-foreground">
+          <Ban className="h-3 w-3" />
+          {label}
+        </span>
+      </div>
+      <div className="mt-3">
+        <span className="text-base font-semibold text-muted-foreground">
+          {formatCurrency(item.rental_value)}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 interface RentDayPanelProps {
   items: RentCalendarItem[];
   dayLabel: string;
@@ -119,6 +154,9 @@ export function RentDayPanel({
   onGoToday,
   onGoNextDue,
 }: RentDayPanelProps) {
+  const collectibleItems = useMemo(() => items.filter((i) => i.is_collectible), [items]);
+  const nonCollectibleItems = useMemo(() => items.filter((i) => !i.is_collectible), [items]);
+
   return (
     <TooltipProvider>
       <div className="flex flex-col gap-3">
@@ -147,15 +185,29 @@ export function RentDayPanel({
             Nenhum vencimento neste dia
           </p>
         ) : (
-          <div className="space-y-3">
-            {items.map((item) => (
-              <DayItemCard
-                key={item.lease_id}
-                item={item}
-                isPending={pendingLeaseId === item.lease_id}
-                onToggle={onToggle}
-              />
-            ))}
+          <div className="space-y-4">
+            {collectibleItems.length > 0 && (
+              <div className="space-y-3">
+                {collectibleItems.map((item) => (
+                  <DayItemCard
+                    key={item.lease_id}
+                    item={item}
+                    isPending={pendingLeaseId === item.lease_id}
+                    onToggle={onToggle}
+                  />
+                ))}
+              </div>
+            )}
+            {nonCollectibleItems.length > 0 && (
+              <div className="space-y-3">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Não-cobrável
+                </p>
+                {nonCollectibleItems.map((item) => (
+                  <NonCollectibleItemCard key={item.lease_id} item={item} />
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>

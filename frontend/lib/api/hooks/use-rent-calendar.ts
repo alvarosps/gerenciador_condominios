@@ -18,6 +18,8 @@ interface RentCalendarItem {
   can_toggle: boolean;
   late_fee: string;
   late_days: number;
+  is_collectible: boolean;
+  non_collectible_reason: string | null;
 }
 
 interface RentCalendarDay {
