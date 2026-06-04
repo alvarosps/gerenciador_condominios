@@ -20,5 +20,11 @@ export const queryClient = new QueryClient({
       },
       refetchOnWindowFocus: true,
     },
+    mutations: {
+      // Offline is read-only: 'always' makes mutations fail fast when offline
+      // (surfacing an error) instead of pausing into a write queue, honoring
+      // the no-offline-writes decision.
+      networkMode: 'always',
+    },
   },
 });

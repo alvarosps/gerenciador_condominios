@@ -109,6 +109,30 @@ class TestWebPushAPI:
         )
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
+    def test_subscribe_null_endpoint_returns_400(self, authenticated_api_client):
+        response = authenticated_api_client.post(
+            self.subscribe_url,
+            {"endpoint": None, "keys": {"p256dh": "p256dh-key", "auth": "auth-secret"}},
+            format="json",
+        )
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    def test_subscribe_null_keys_returns_400(self, authenticated_api_client):
+        response = authenticated_api_client.post(
+            self.subscribe_url,
+            {"endpoint": _ENDPOINT, "keys": None},
+            format="json",
+        )
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    def test_unsubscribe_null_endpoint_returns_400(self, authenticated_api_client):
+        response = authenticated_api_client.post(
+            self.unsubscribe_url,
+            {"endpoint": None},
+            format="json",
+        )
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
     def test_subscribe_requires_authentication(self, api_client):
         response = api_client.post(
             self.subscribe_url,
