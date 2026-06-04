@@ -14,16 +14,17 @@ import calendar as cal
 import logging
 from datetime import date, timedelta
 from decimal import Decimal
-from typing import Any, cast
+from typing import Any
 
+from django.conf import settings
 from django.db.models import Count, DateField, Q, Sum
 from django.db.models.expressions import RawSQL
 from django.db.models.functions import Coalesce
 from django.utils import timezone
-from django.conf import settings
 
 from core.cache import cache_result
 from core.models import Apartment, Building, Dependent, Lease, RentPayment, Tenant
+from core.services.date_calculator import DateCalculatorService
 
 from .fee_calculator import FeeCalculatorService
 
@@ -329,11 +330,10 @@ class DashboardService:
 
         # Fetch all rent payments to build a ledger up to the current month
         all_payments = RentPayment.objects.filter(
-            lease__in=active_leases,
-            reference_month__lte=month_start
+            lease__in=active_leases, reference_month__lte=month_start
         ).values("lease_id", "reference_month", "payment_date")
 
-        payments_by_lease = {}
+        payments_by_lease: dict[int, set[date]] = {}
         last_payments: dict[int, date] = {}
         for p in all_payments:
             lid = p["lease_id"]
@@ -373,7 +373,6 @@ class DashboardService:
                         lease_total_late_fee += late_fee
                         lease_total_late_days += late_days
 
-                from core.services.date_calculator import DateCalculatorService
                 curr_month_iter = DateCalculatorService.next_month_start(
                     curr_month_iter.year, curr_month_iter.month
                 )
@@ -440,12 +439,16 @@ class DashboardService:
         logger.info("Calculating tenant statistics")
 
         # Aggregate tenant counts
-        tenant_stats = Tenant.objects.filter(
-            Q(leases_responsible__is_deleted=False) | Q(leases__is_deleted=False)
-        ).distinct().aggregate(
-            total_tenants=Count("id"),
-            individual_tenants=Count("id", filter=Q(is_company=False)),
-            company_tenants=Count("id", filter=Q(is_company=True)),
+        tenant_stats = (
+            Tenant.objects.filter(
+                Q(leases_responsible__is_deleted=False) | Q(leases__is_deleted=False)
+            )
+            .distinct()
+            .aggregate(
+                total_tenants=Count("id"),
+                individual_tenants=Count("id", filter=Q(is_company=False)),
+                company_tenants=Count("id", filter=Q(is_company=True)),
+            )
         )
 
         # Count tenants with dependents

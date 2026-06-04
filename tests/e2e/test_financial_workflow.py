@@ -561,9 +561,7 @@ class TestFinancialWorkflowE2E:
         """Expenses with is_offset=True reduce the person's net_amount."""
         client = authenticated_api_client
 
-        person_resp = client.post(
-            "/api/persons/", {"name": "Offset Test", "relationship": "genro"}
-        )
+        person_resp = client.post("/api/persons/", {"name": "Offset Test", "relationship": "genro"})
         assert person_resp.status_code == status.HTTP_201_CREATED
         person_id = person_resp.data["id"]
 
@@ -792,9 +790,7 @@ class TestFinancialWorkflowE2E:
         assert gen_resp.status_code == status.HTTP_200_OK
 
         # Query daily breakdown for March 2026
-        breakdown_resp = client.get(
-            "/api/daily-control/breakdown/", {"year": 2026, "month": 3}
-        )
+        breakdown_resp = client.get("/api/daily-control/breakdown/", {"year": 2026, "month": 3})
         assert breakdown_resp.status_code == status.HTTP_200_OK
         days = breakdown_resp.data  # Returns list of day objects directly
         assert len(days) == 31  # March has 31 days

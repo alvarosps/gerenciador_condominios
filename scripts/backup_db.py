@@ -32,11 +32,11 @@ sys.path.insert(0, str(project_root))
 
 # Import Django settings
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "condominios_manager.settings")
-import django  # noqa: E402
+import django
 
 django.setup()
 
-from django.conf import settings  # noqa: E402
+from django.conf import settings
 
 
 def verify_utf8_encoding(file_path):

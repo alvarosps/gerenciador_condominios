@@ -69,7 +69,9 @@ def lease(apartment, tenant, admin_user):
 
 
 def _make_proof_file():
-    return SimpleUploadedFile("proof.jpg", BytesIO(b"fake-image-data").read(), content_type="image/jpeg")
+    return SimpleUploadedFile(
+        "proof.jpg", BytesIO(b"fake-image-data").read(), content_type="image/jpeg"
+    )
 
 
 @pytest.fixture

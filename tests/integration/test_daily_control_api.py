@@ -98,9 +98,7 @@ class TestDailyControlBreakdown:
         assert "day_balance" in first_day
         assert "cumulative_balance" in first_day
 
-    def test_breakdown_includes_installment_in_exits(
-        self, authenticated_api_client, installment
-    ):
+    def test_breakdown_includes_installment_in_exits(self, authenticated_api_client, installment):
         response = authenticated_api_client.get(self.url, {"year": 2026, "month": 3})
         assert response.status_code == status.HTTP_200_OK
         # Day 15 is index 14
@@ -108,9 +106,7 @@ class TestDailyControlBreakdown:
         exit_types = [e["type"] for e in day_15["exits"]]
         assert "installment" in exit_types
 
-    def test_breakdown_includes_income_in_entries(
-        self, authenticated_api_client, income_obj
-    ):
+    def test_breakdown_includes_income_in_entries(self, authenticated_api_client, income_obj):
         response = authenticated_api_client.get(self.url, {"year": 2026, "month": 3})
         assert response.status_code == status.HTTP_200_OK
         # Day 5 is index 4

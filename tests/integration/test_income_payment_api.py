@@ -6,7 +6,6 @@ from decimal import Decimal
 import pytest
 from rest_framework import status
 
-from core.models import EmployeePayment, Income, PersonIncome, RentPayment
 from tests.factories import (
     make_apartment,
     make_building,

@@ -7,7 +7,7 @@ import pytest
 from freezegun import freeze_time
 from rest_framework import status
 
-from core.models import Expense, ExpenseInstallment
+from core.models import Expense
 from tests.factories import (
     make_building,
     make_credit_card,
@@ -46,7 +46,9 @@ def credit_card(person, admin_user):
 
 @pytest.fixture
 def building(admin_user):
-    return make_building(street_number=836, user=admin_user, name="Edifício Teste", address="Rua Teste, 836")
+    return make_building(
+        street_number=836, user=admin_user, name="Edifício Teste", address="Rua Teste, 836"
+    )
 
 
 @pytest.fixture

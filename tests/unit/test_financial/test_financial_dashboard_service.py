@@ -659,7 +659,9 @@ class TestDebtByTypeExtended:
 
     @pytest.mark.unit
     @freeze_time("2026-03-15")
-    def test_total_is_sum_of_all_types(self, person_rodrigo: Person, credit_card: CreditCard) -> None:
+    def test_total_is_sum_of_all_types(
+        self, person_rodrigo: Person, credit_card: CreditCard
+    ) -> None:
         _create_expense_with_installments(
             description="Cartão",
             expense_type=ExpenseType.CARD_PURCHASE,
@@ -681,12 +683,21 @@ class TestDebtByTypeExtended:
         )
 
         result = FinancialDashboardService.get_debt_by_type()
-        expected_total = result["card_purchases"] + result["bank_loans"] + result["personal_loans"] + result["water_debt"] + result["electricity_debt"] + result["property_tax_debt"]
+        expected_total = (
+            result["card_purchases"]
+            + result["bank_loans"]
+            + result["personal_loans"]
+            + result["water_debt"]
+            + result["electricity_debt"]
+            + result["property_tax_debt"]
+        )
         assert result["total"] == expected_total
 
     @pytest.mark.unit
     @freeze_time("2026-03-15")
-    def test_offset_excluded_from_debt(self, person_rodrigo: Person, credit_card: CreditCard) -> None:
+    def test_offset_excluded_from_debt(
+        self, person_rodrigo: Person, credit_card: CreditCard
+    ) -> None:
         _create_expense_with_installments(
             description="Desconto (offset)",
             expense_type=ExpenseType.CARD_PURCHASE,
@@ -1396,7 +1407,6 @@ class TestGetPersonMonthExpenses:
             credit_card=credit_card,
             is_installment=False,
         )
-        # Offset (discount)
         Expense.objects.create(
             description="Desconto para outros",
             expense_type=ExpenseType.CARD_PURCHASE,
@@ -1528,9 +1538,7 @@ class TestGetPersonWaterfall:
 
     @pytest.mark.unit
     @freeze_time("2026-03-15")
-    def test_waterfall_respects_financial_settings_start_date(
-        self, person_rodrigo: Person
-    ) -> None:
+    def test_waterfall_respects_financial_settings_start_date(self, person_rodrigo: Person) -> None:
         FinancialSettings.objects.update_or_create(
             pk=1,
             defaults={
@@ -1595,9 +1603,7 @@ class TestGetExpenseDetail:
     @pytest.mark.unit
     @freeze_time("2026-03-15")
     def test_person_detail_returns_full_breakdown(self, person_rodrigo: Person) -> None:
-        result = FinancialDashboardService.get_expense_detail(
-            "person", person_rodrigo.pk, 2026, 3
-        )
+        result = FinancialDashboardService.get_expense_detail("person", person_rodrigo.pk, 2026, 3)
 
         assert result["detail_type"] == "person"
         assert result["person_id"] == person_rodrigo.pk

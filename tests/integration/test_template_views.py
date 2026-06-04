@@ -16,9 +16,7 @@ def template_dir(tmp_path, monkeypatch):
     template_path = tmp_path / "core" / "templates"
     template_path.mkdir(parents=True)
     template_file = template_path / "contract_template.html"
-    template_file.write_text(
-        "<html><body>Test Contract Template</body></html>", encoding="utf-8"
-    )
+    template_file.write_text("<html><body>Test Contract Template</body></html>", encoding="utf-8")
     monkeypatch.setattr(settings, "BASE_DIR", str(tmp_path))
     return template_path
 
@@ -63,7 +61,7 @@ def tenant(admin_user):
 
 @pytest.fixture
 def lease(apartment, tenant, admin_user):
-    l = Lease.objects.create(
+    lease_obj = Lease.objects.create(
         apartment=apartment,
         responsible_tenant=tenant,
         start_date="2026-02-01",
@@ -73,8 +71,8 @@ def lease(apartment, tenant, admin_user):
         created_by=admin_user,
         updated_by=admin_user,
     )
-    l.tenants.add(tenant)
-    return l
+    lease_obj.tenants.add(tenant)
+    return lease_obj
 
 
 @pytest.mark.integration
@@ -95,7 +93,9 @@ class TestGetTemplateEndpoint:
         response = regular_authenticated_api_client.get(self.url)
         assert response.status_code == status.HTTP_403_FORBIDDEN
 
-    def test_returns_404_when_template_missing(self, authenticated_api_client, tmp_path, monkeypatch):
+    def test_returns_404_when_template_missing(
+        self, authenticated_api_client, tmp_path, monkeypatch
+    ):
         empty = tmp_path / "notemplate"
         (empty / "core" / "templates").mkdir(parents=True)
         monkeypatch.setattr(settings, "BASE_DIR", str(empty))
@@ -110,9 +110,7 @@ class TestSaveTemplateEndpoint:
 
     def test_saves_template_and_returns_200(self, authenticated_api_client, template_dir):
         new_content = "<html><body>Updated Template</body></html>"
-        response = authenticated_api_client.post(
-            self.url, {"content": new_content}, format="json"
-        )
+        response = authenticated_api_client.post(self.url, {"content": new_content}, format="json")
         assert response.status_code == status.HTTP_200_OK
         assert "message" in response.data
         assert "backup_filename" in response.data
@@ -123,9 +121,7 @@ class TestSaveTemplateEndpoint:
         assert "error" in response.data
 
     def test_empty_content_returns_400(self, authenticated_api_client, template_dir):
-        response = authenticated_api_client.post(
-            self.url, {"content": "   "}, format="json"
-        )
+        response = authenticated_api_client.post(self.url, {"content": "   "}, format="json")
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
     def test_unauthenticated_returns_401(self, api_client, template_dir):
@@ -149,9 +145,7 @@ class TestSaveTemplateEndpoint:
 class TestPreviewTemplateEndpoint:
     url = "/api/templates/preview/"
 
-    def test_returns_200_with_rendered_html(
-        self, authenticated_api_client, template_dir, lease
-    ):
+    def test_returns_200_with_rendered_html(self, authenticated_api_client, template_dir, lease):
         response = authenticated_api_client.post(
             self.url,
             {"content": "<html><body>Preview {{ lease.id }}</body></html>"},
@@ -161,9 +155,7 @@ class TestPreviewTemplateEndpoint:
         assert "html" in response.data
         assert str(lease.id) in response.data["html"]
 
-    def test_renders_with_specific_lease_id(
-        self, authenticated_api_client, template_dir, lease
-    ):
+    def test_renders_with_specific_lease_id(self, authenticated_api_client, template_dir, lease):
         response = authenticated_api_client.post(
             self.url,
             {
@@ -180,9 +172,7 @@ class TestPreviewTemplateEndpoint:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "error" in response.data
 
-    def test_invalid_lease_id_returns_400(
-        self, authenticated_api_client, template_dir, lease
-    ):
+    def test_invalid_lease_id_returns_400(self, authenticated_api_client, template_dir, lease):
         response = authenticated_api_client.post(
             self.url,
             {"content": "<html></html>", "lease_id": 999999},
@@ -198,9 +188,7 @@ class TestPreviewTemplateEndpoint:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
     def test_unauthenticated_returns_401(self, api_client, template_dir, lease):
-        response = api_client.post(
-            self.url, {"content": "<html></html>"}, format="json"
-        )
+        response = api_client.post(self.url, {"content": "<html></html>"}, format="json")
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
 
@@ -283,9 +271,7 @@ class TestRestoreBackupEndpoint:
         assert "error" in response.data
 
     def test_unauthenticated_returns_401(self, api_client, template_dir):
-        response = api_client.post(
-            self.url, {"backup_filename": "some_backup.html"}, format="json"
-        )
+        response = api_client.post(self.url, {"backup_filename": "some_backup.html"}, format="json")
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
     def test_non_admin_returns_403(self, regular_authenticated_api_client, template_dir):
@@ -304,7 +290,9 @@ class TestRestoreBackupEndpoint:
 class TestGetTemplatePermissionError:
     url = "/api/templates/current/"
 
-    def test_permission_error_returns_403(self, authenticated_api_client, template_dir, monkeypatch):
+    def test_permission_error_returns_403(
+        self, authenticated_api_client, template_dir, monkeypatch
+    ):
         """PermissionError reading the template file → 403.
 
         Patches Path.read_text at the filesystem boundary to simulate OS-level
@@ -316,7 +304,8 @@ class TestGetTemplatePermissionError:
 
         def deny_read(self, *args, **kwargs):
             if "contract_template.html" in str(self) and "backups" not in str(self):
-                raise PermissionError("no read access")
+                msg = "no read access"
+                raise PermissionError(msg)
             return original_read_text(self, *args, **kwargs)
 
         monkeypatch.setattr(svc_module.Path, "read_text", deny_read)
@@ -329,7 +318,9 @@ class TestGetTemplatePermissionError:
 class TestSaveTemplateErrorBranches:
     url = "/api/templates/save/"
 
-    def test_permission_error_returns_403(self, authenticated_api_client, template_dir, monkeypatch):
+    def test_permission_error_returns_403(
+        self, authenticated_api_client, template_dir, monkeypatch
+    ):
         """PermissionError writing the template file → 403.
 
         Patches Path.write_text at the filesystem boundary.
@@ -337,7 +328,8 @@ class TestSaveTemplateErrorBranches:
         import core.services.template_management_service as svc_module
 
         def deny_write(self, *args, **kwargs):
-            raise PermissionError("no write access")
+            msg = "no write access"
+            raise PermissionError(msg)
 
         monkeypatch.setattr(svc_module.Path, "write_text", deny_write)
         response = authenticated_api_client.post(
@@ -354,7 +346,8 @@ class TestSaveTemplateErrorBranches:
         import core.services.template_management_service as svc_module
 
         def raise_os_error(src, dst, **kwargs):
-            raise OSError("disk full")
+            msg = "disk full"
+            raise OSError(msg)
 
         monkeypatch.setattr(svc_module.shutil, "copy2", raise_os_error)
         response = authenticated_api_client.post(
@@ -368,7 +361,9 @@ class TestSaveTemplateErrorBranches:
 class TestListBackupsErrorBranches:
     url = "/api/templates/backups/"
 
-    def test_permission_error_returns_403(self, authenticated_api_client, template_dir, monkeypatch):
+    def test_permission_error_returns_403(
+        self, authenticated_api_client, template_dir, monkeypatch
+    ):
         """PermissionError iterating the backup directory → 403.
 
         Patches Path.iterdir at the filesystem boundary.
@@ -376,7 +371,8 @@ class TestListBackupsErrorBranches:
         import core.services.template_management_service as svc_module
 
         def deny_iterdir(self):
-            raise PermissionError("no list access")
+            msg = "no list access"
+            raise PermissionError(msg)
 
         monkeypatch.setattr(svc_module.Path, "iterdir", deny_iterdir)
         response = authenticated_api_client.get(self.url)
@@ -388,7 +384,9 @@ class TestListBackupsErrorBranches:
 class TestRestoreBackupErrorBranches:
     url = "/api/templates/restore/"
 
-    def test_permission_error_returns_403(self, authenticated_api_client, template_dir, monkeypatch):
+    def test_permission_error_returns_403(
+        self, authenticated_api_client, template_dir, monkeypatch
+    ):
         """PermissionError copying backup to template → 403.
 
         Creates a real backup first, then patches shutil.copy2 on the restore
@@ -411,7 +409,8 @@ class TestRestoreBackupErrorBranches:
             if call_count["n"] == 1:
                 # First call: safety backup — allow it
                 return original_copy2(src, dst, **kwargs)
-            raise PermissionError("no restore access")
+            msg = "no restore access"
+            raise PermissionError(msg)
 
         monkeypatch.setattr(svc_module.shutil, "copy2", deny_second_copy)
         response = authenticated_api_client.post(
@@ -435,7 +434,8 @@ class TestRestoreBackupErrorBranches:
         backup_filename = save_response.data["backup_filename"]
 
         def raise_os_error(src, dst, **kwargs):
-            raise OSError("disk error during restore")
+            msg = "disk error during restore"
+            raise OSError(msg)
 
         monkeypatch.setattr(svc_module.shutil, "copy2", raise_os_error)
         response = authenticated_api_client.post(

@@ -134,11 +134,11 @@ class TestCookieLogout:
 @pytest.mark.integration
 class TestOAuthCookieFlow:
     def test_exchange_oauth_code_sets_cookies(self, api_client, admin_user):
-        from rest_framework_simplejwt.tokens import RefreshToken as RT
+        from rest_framework_simplejwt.tokens import RefreshToken
 
         from core.models import OAuthExchangeCode
 
-        refresh = RT.for_user(admin_user)
+        refresh = RefreshToken.for_user(admin_user)
         exchange = OAuthExchangeCode.objects.create(
             user=admin_user,
             access_token=str(refresh.access_token),
@@ -158,11 +158,11 @@ class TestOAuthCookieFlow:
         assert "user" in response.data
 
     def test_exchange_oauth_code_returns_user_info(self, api_client, admin_user):
-        from rest_framework_simplejwt.tokens import RefreshToken as RT
+        from rest_framework_simplejwt.tokens import RefreshToken
 
         from core.models import OAuthExchangeCode
 
-        refresh = RT.for_user(admin_user)
+        refresh = RefreshToken.for_user(admin_user)
         exchange = OAuthExchangeCode.objects.create(
             user=admin_user,
             access_token=str(refresh.access_token),

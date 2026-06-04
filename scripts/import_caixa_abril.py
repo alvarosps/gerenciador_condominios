@@ -53,7 +53,6 @@ def add_months(source_date: date, months: int) -> date:
 def main() -> None:
     rodrigo = Person.objects.get(name="Rodrigo")
     caixa = CreditCard.objects.get(person=rodrigo, nickname="Caixa Rodrigo")
-    due_day = caixa.due_day  # 7
 
     # Vencimento desta fatura: 08/04/2026
     fatura_vencimento = date(2026, 4, 8)
