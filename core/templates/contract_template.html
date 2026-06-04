@@ -577,10 +577,10 @@
       <strong>deve ser devolvida</strong> ao final do contrato / saída do
       kitnet, e <strong>{{ lease.number_of_tenants }} tag(s) de acesso</strong>,
       que <strong>são de propriedade do LOCATÁRIO</strong> e não precisam ser
-      devolvidas. Caso ocorra a <strong>perda de uma tag</strong>, o LOCATÁRIO
-      deverá adquirir uma nova ao valor de
+      devolvidas. <strong>Caso ocorra a perda de uma ou mais tags</strong>, o
+      LOCATÁRIO deverá adquirir uma nova tag para cada uma perdida, ao valor de
       <strong>{{ tag_unit_price | currency }}</strong> ({{ tag_unit_price |
-      extenso }} reais) por unidade. O LOCADOR não tem obrigação de possuir
+      extenso }} reais) cada uma. O LOCADOR não tem obrigação de possuir
       chave reserva para o kitnet, caso o LOCATÁRIO perca a chave, e o LOCADOR
       não possua chaves reservas, é de responsabilidade do LOCATÁRIO chamar um
       chaveiro para abrir a porta e fazer uma nova chave. Caso ocorra a
