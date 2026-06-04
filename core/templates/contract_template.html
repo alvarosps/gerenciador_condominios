@@ -422,12 +422,12 @@
     <h1 class="contract-title">CONTRATO RESIDENCIAL DE ALUGUEL</h1>
 
     <p>
-      <strong>DEPÓSITO E GARANTIAS:</strong> No ato da assinatura, o LOCATÁRIO
+      <strong>PAGAMENTO INICIAL:</strong> No ato da assinatura, o LOCATÁRIO
       entrega: <strong>a)</strong> {{ rental_value | currency }} ({{
       rental_value | extenso }} reais) referente ao primeiro mês de aluguel;
       <strong>b)</strong> {{ valor_tags | currency }} ({{ valor_tags | extenso
-      }} reais) como caução da(s) tag(s) de acesso, a ser devolvido mediante
-      devolução das tags em perfeito estado; <strong>c)</strong> {{ cleaning_fee
+      }} reais) referente à(s) tag(s) de acesso, que passam a ser de propriedade
+      do LOCATÁRIO (valor não reembolsável); <strong>c)</strong> {{ cleaning_fee
       | currency }} ({{ cleaning_fee | extenso }}) referente à taxa de limpeza.
       Totalizando <strong>{{ valor_total | currency }}</strong> ({{ valor_total
       | extenso }}).
@@ -568,23 +568,22 @@
       <strong>VISTORIA DE SAÍDA:</strong> Na desocupação, será verificado o
       estado dos móveis e eletrodomésticos. Danos que excedam o desgaste natural
       serão descontados do caução (se existir) ou cobrados diretamente do
-      LOCATÁRIO. A não devolução das chaves/tags também será cobrada.
+      LOCATÁRIO. A não devolução das chaves também será cobrada.
     </p>
 
     <p>
       O LOCATÁRIO irá receber
-      <strong>1 cópia da chave do apartamento</strong>, e
-      <strong>{{ lease.number_of_tenants }} tag(s)</strong> e
-      <strong>deve devolvê-las</strong> ao final do contrato / saída do kitnet.
-      Caso ocorra <strong>a perda de 1 tag</strong>, será utilizado o valor do
-      caução da tag (se existir), e receberá uma nova. Em
-      <strong
-        >caso de reinscidência de perda da tag, ou de não possuir caução</strong
-      >, será cobrado a multa de R$50,00 ({{ 50 | extenso}} reais) para cada vez
-      que acontecer. O LOCADOR não tem obrigação de possuir chave reserva para o
-      kitnet, caso o LOCATÁRIO perca a chave, e o LOCADOR não possua chaves
-      reservas, é de responsabilidade do LOCATÁRIO chamar um chaveiro para abrir
-      a porta e fazer uma nova chave. Caso ocorra a
+      <strong>1 cópia da chave do apartamento</strong>, que
+      <strong>deve ser devolvida</strong> ao final do contrato / saída do
+      kitnet, e <strong>{{ lease.number_of_tenants }} tag(s) de acesso</strong>,
+      que <strong>são de propriedade do LOCATÁRIO</strong> e não precisam ser
+      devolvidas. Caso ocorra a <strong>perda de uma tag</strong>, o LOCATÁRIO
+      deverá adquirir uma nova ao valor de
+      <strong>{{ tag_unit_price | currency }}</strong> ({{ tag_unit_price |
+      extenso }} reais) por unidade. O LOCADOR não tem obrigação de possuir
+      chave reserva para o kitnet, caso o LOCATÁRIO perca a chave, e o LOCADOR
+      não possua chaves reservas, é de responsabilidade do LOCATÁRIO chamar um
+      chaveiro para abrir a porta e fazer uma nova chave. Caso ocorra a
       <strong>perda da chave</strong>, e o LOCADOR possuir uma chave reserva
       disponível, será cobrado uma multa de R$50,00 ({{ 50 | extenso}} reais) e
       será entregue uma chave reserva.

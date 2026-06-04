@@ -76,17 +76,17 @@ class TestFeeCalculatorEdgeCases:
         assert rate > Decimal(0)
 
     def test_tag_fee_one_tenant(self) -> None:
-        """Single tenant returns DEFAULT_TAG_FEE_SINGLE (R$50)."""
+        """Single tenant returns DEFAULT_TAG_FEE_SINGLE (R$20)."""
         fee = FeeCalculatorService.calculate_tag_fee(1)
         assert fee == Decimal(str(settings.DEFAULT_TAG_FEE_SINGLE))
 
     def test_tag_fee_two_tenants(self) -> None:
-        """Two tenants returns DEFAULT_TAG_FEE_MULTIPLE (R$80)."""
+        """Two tenants returns DEFAULT_TAG_FEE_MULTIPLE (R$40)."""
         fee = FeeCalculatorService.calculate_tag_fee(2)
         assert fee == Decimal(str(settings.DEFAULT_TAG_FEE_MULTIPLE))
 
     def test_tag_fee_many_tenants(self) -> None:
-        """10 tenants still returns DEFAULT_TAG_FEE_MULTIPLE (R$80)."""
+        """10 tenants still returns DEFAULT_TAG_FEE_MULTIPLE (R$40)."""
         fee = FeeCalculatorService.calculate_tag_fee(10)
         assert fee == Decimal(str(settings.DEFAULT_TAG_FEE_MULTIPLE))
 

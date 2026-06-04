@@ -27,7 +27,7 @@ export function FurnitureStep({ formMethods }: StepProps) {
         name="furniture_ids"
         render={() => (
           <FormItem>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid max-h-[340px] grid-cols-2 gap-4 overflow-y-auto rounded-md border p-4">
               {furniture?.map((item) => (
                 <FormField
                   key={item.id}
