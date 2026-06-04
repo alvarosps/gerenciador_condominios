@@ -80,16 +80,21 @@ class TestCurrentUserEndpoint:
 
 @pytest.mark.integration
 class TestOAuthStatusEndpoint:
-    def test_oauth_status_returns_200(self, api_client):
-        # oauth_status is AllowAny — accessible without auth
-        response = api_client.get("/api/auth/oauth/status/")
+    def test_oauth_status_returns_200(self, authenticated_api_client):
+        # oauth_status is IsAdminUser — exposes OAuth config, admin only
+        response = authenticated_api_client.get("/api/auth/oauth/status/")
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert isinstance(data, dict)
 
-    def test_oauth_status_contains_google_config(self, api_client):
-        response = api_client.get("/api/auth/oauth/status/")
+    def test_oauth_status_contains_google_config(self, authenticated_api_client):
+        response = authenticated_api_client.get("/api/auth/oauth/status/")
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         # Should contain some OAuth configuration status
         assert "google_configured" in data or len(data) > 0
+
+    def test_oauth_status_requires_auth(self, api_client):
+        # Unauthenticated access is rejected (admin-only enumeration guard)
+        response = api_client.get("/api/auth/oauth/status/")
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED

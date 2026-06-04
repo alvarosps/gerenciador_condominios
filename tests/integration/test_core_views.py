@@ -528,7 +528,37 @@ class TestDashboardViewSet:
         assert "average_late_days" in data
         assert "late_leases" in data
 
-    def test_tenant_statistics_admin(self, authenticated_api_client, tenant, tenant2):
+    def test_tenant_statistics_admin(
+        self,
+        authenticated_api_client,
+        admin_user,
+        apartment,
+        apartment_expensive,
+        tenant,
+        tenant2,
+    ):
+        # get_tenant_statistics counts only ACTIVE tenants (those with a
+        # non-deleted lease), so each tenant needs a lease to be counted.
+        Lease.objects.create(
+            apartment=apartment,
+            responsible_tenant=tenant,
+            start_date=date(2026, 1, 1),
+            validity_months=12,
+            tag_fee=Decimal("50.00"),
+            rental_value=Decimal("1200.00"),
+            created_by=admin_user,
+            updated_by=admin_user,
+        )
+        Lease.objects.create(
+            apartment=apartment_expensive,
+            responsible_tenant=tenant2,
+            start_date=date(2026, 1, 1),
+            validity_months=12,
+            tag_fee=Decimal("50.00"),
+            rental_value=Decimal("3000.00"),
+            created_by=admin_user,
+            updated_by=admin_user,
+        )
         response = authenticated_api_client.get("/api/dashboard/tenant_statistics/")
         assert response.status_code == status.HTTP_200_OK
         data = response.data

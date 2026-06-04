@@ -110,8 +110,8 @@ class RentAdjustmentService:
                 apartment.rental_value_double = (
                     apartment.rental_value_double * multiplier
                 ).quantize(_TWO_DECIMAL_PLACES, rounding=ROUND_HALF_UP)
-        apartment.last_rent_increase_date = adjustment_date
-        apartment.save()
+            apartment.last_rent_increase_date = adjustment_date
+            apartment.save()
 
     @staticmethod
     @transaction.atomic
