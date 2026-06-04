@@ -8,11 +8,13 @@ from datetime import date
 from decimal import Decimal
 
 import pytest
+from django.conf import settings
 from freezegun import freeze_time
 
 from core.models import Apartment, Building, Dependent, Lease, Tenant
 from core.services.dashboard_service import DashboardService
-from tests.factories import make_rent_payment
+from core.services.fee_calculator import FeeCalculatorService
+from tests.factories import make_person, make_rent_payment
 
 # ---------------------------------------------------------------------------
 # Shared fixtures
@@ -351,6 +353,192 @@ class TestGetLatePaymentSummary:
         summary = DashboardService.get_late_payment_summary()
         if summary["total_late_leases"] > 0:
             assert summary["average_late_days"] > 0
+
+
+# ---------------------------------------------------------------------------
+# get_late_payment_summary — rent-collectibility SSOT consolidation
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestLatePaymentSummarySSOT:
+    """Regression tests for routing the late-payment summary through the
+    rent-collectibility single source of truth (RentScheduleService)."""
+
+    @freeze_time("2026-03-15")
+    def test_late_fee_uses_effective_rental_value(self, apartment_rented, admin_user):
+        # Pending adjustment in effect for March (date = first of the frozen month):
+        # the late fee must be computed on the effective value (1200), not 1000.
+        tenant = Tenant.objects.create(
+            name="Effective Value Tenant",
+            cpf_cnpj="11144477735",
+            phone="11933330001",
+            marital_status="Solteiro(a)",
+            profession="Dev",
+            due_day=10,
+            created_by=admin_user,
+            updated_by=admin_user,
+        )
+        lease = Lease.objects.create(
+            apartment=apartment_rented,
+            responsible_tenant=tenant,
+            start_date=date(2026, 3, 1),
+            validity_months=24,
+            tag_fee=Decimal("80.00"),
+            rental_value=Decimal("1000.00"),
+            pending_rental_value=Decimal("1200.00"),
+            pending_rental_value_date=date(2026, 3, 1),
+            created_by=admin_user,
+            updated_by=admin_user,
+        )
+
+        summary = DashboardService.get_late_payment_summary()
+        late = next(item for item in summary["late_leases"] if item["lease_id"] == lease.id)
+
+        # Frozen on day 15, due_day=10 → 5 days late, single month (March only).
+        late_fee_percentage = Decimal(str(settings.LATE_FEE_PERCENTAGE))
+        expected_fee = (
+            FeeCalculatorService.calculate_daily_rate(Decimal("1200.00")) * 5 * late_fee_percentage
+        ).quantize(Decimal("0.01"))
+        fee_on_1000 = (
+            FeeCalculatorService.calculate_daily_rate(Decimal("1000.00")) * 5 * late_fee_percentage
+        ).quantize(Decimal("0.01"))
+
+        assert Decimal(late["late_fee"]) == expected_fee
+        assert Decimal(late["late_fee"]) > fee_on_1000
+        # Output rental_value also reflects the effective (pending) value.
+        assert Decimal(late["rental_value"]) == Decimal("1200.00")
+
+    @freeze_time("2026-03-20")
+    def test_prepaid_boundary_off_by_one_regression(self, apartment_rented, admin_user):
+        # prepaid_until == clamped due date (March 15). Per is_prepaid_for_month
+        # (prepaid only if strictly AFTER the due date), the installment due on the
+        # 15th is NOT prepaid → this lease IS collectible and must appear as late.
+        tenant = Tenant.objects.create(
+            name="Boundary Tenant",
+            cpf_cnpj="12345678909",
+            phone="11933330002",
+            marital_status="Solteiro(a)",
+            profession="Dev",
+            due_day=15,
+            created_by=admin_user,
+            updated_by=admin_user,
+        )
+        lease = Lease.objects.create(
+            apartment=apartment_rented,
+            responsible_tenant=tenant,
+            start_date=date(2026, 3, 1),
+            validity_months=24,
+            tag_fee=Decimal("80.00"),
+            rental_value=Decimal("1000.00"),
+            prepaid_until=date(2026, 3, 15),
+            created_by=admin_user,
+            updated_by=admin_user,
+        )
+
+        summary = DashboardService.get_late_payment_summary()
+        late_ids = [item["lease_id"] for item in summary["late_leases"]]
+        assert lease.id in late_ids
+
+    @freeze_time("2026-03-20")
+    def test_truly_prepaid_lease_excluded(self, apartment_rented, admin_user):
+        # prepaid_until strictly AFTER the clamped due date (March 16 > 15) → the
+        # March installment is prepaid → not collectible → must NOT appear as late.
+        tenant = Tenant.objects.create(
+            name="Prepaid Tenant",
+            cpf_cnpj="98765432100",
+            phone="11933330003",
+            marital_status="Solteiro(a)",
+            profession="Dev",
+            due_day=15,
+            created_by=admin_user,
+            updated_by=admin_user,
+        )
+        lease = Lease.objects.create(
+            apartment=apartment_rented,
+            responsible_tenant=tenant,
+            start_date=date(2026, 3, 1),
+            validity_months=24,
+            tag_fee=Decimal("80.00"),
+            rental_value=Decimal("1000.00"),
+            prepaid_until=date(2026, 3, 16),
+            created_by=admin_user,
+            updated_by=admin_user,
+        )
+
+        summary = DashboardService.get_late_payment_summary()
+        late_ids = [item["lease_id"] for item in summary["late_leases"]]
+        assert lease.id not in late_ids
+
+    @freeze_time("2026-03-20")
+    def test_owner_kitnet_lease_not_in_late_summary(self, building, admin_user):
+        # Apartment with an owner = rent repassed to the owner, not condominium
+        # revenue → excluded from the late summary even when past due and unpaid.
+        owner = make_person(user=admin_user, relationship="Proprietário")
+        owned_apt = Apartment.objects.create(
+            building=building,
+            number=410,
+            rental_value=Decimal("1000.00"),
+            cleaning_fee=Decimal("100.00"),
+            max_tenants=1,
+            owner=owner,
+            created_by=admin_user,
+            updated_by=admin_user,
+        )
+        tenant = Tenant.objects.create(
+            name="Owner Kitnet Tenant",
+            cpf_cnpj="71428793860",
+            phone="11933330004",
+            marital_status="Solteiro(a)",
+            profession="Dev",
+            due_day=10,
+            created_by=admin_user,
+            updated_by=admin_user,
+        )
+        lease = Lease.objects.create(
+            apartment=owned_apt,
+            responsible_tenant=tenant,
+            start_date=date(2026, 2, 1),
+            validity_months=24,
+            tag_fee=Decimal("80.00"),
+            rental_value=Decimal("1000.00"),
+            created_by=admin_user,
+            updated_by=admin_user,
+        )
+
+        summary = DashboardService.get_late_payment_summary()
+        late_ids = [item["lease_id"] for item in summary["late_leases"]]
+        assert lease.id not in late_ids
+
+    @freeze_time("2026-03-20")
+    def test_salary_offset_lease_not_in_late_summary(self, apartment_rented, admin_user):
+        # Salary-offset rent is netted against an employee salary, never collected
+        # as cash → excluded from the late summary even when past due and unpaid.
+        tenant = Tenant.objects.create(
+            name="Salary Offset Tenant",
+            cpf_cnpj="15782647825",
+            phone="11933330005",
+            marital_status="Solteiro(a)",
+            profession="Dev",
+            due_day=10,
+            created_by=admin_user,
+            updated_by=admin_user,
+        )
+        lease = Lease.objects.create(
+            apartment=apartment_rented,
+            responsible_tenant=tenant,
+            start_date=date(2026, 2, 1),
+            validity_months=24,
+            tag_fee=Decimal("80.00"),
+            rental_value=Decimal("1000.00"),
+            is_salary_offset=True,
+            created_by=admin_user,
+            updated_by=admin_user,
+        )
+
+        summary = DashboardService.get_late_payment_summary()
+        late_ids = [item["lease_id"] for item in summary["late_leases"]]
+        assert lease.id not in late_ids
 
 
 # ---------------------------------------------------------------------------
