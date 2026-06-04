@@ -510,6 +510,11 @@ TWILIO_TEMPLATE_VERIFICATION = config("TWILIO_TEMPLATE_VERIFICATION", default=""
 TWILIO_TEMPLATE_RENT_ADJUSTMENT = config("TWILIO_TEMPLATE_RENT_ADJUSTMENT", default="")
 TWILIO_TEMPLATE_GENERIC = config("TWILIO_TEMPLATE_GENERIC", default="")
 
+# Web Push (VAPID) settings
+VAPID_PUBLIC_KEY = config("VAPID_PUBLIC_KEY", default="")
+VAPID_PRIVATE_KEY = config("VAPID_PRIVATE_KEY", default="")
+VAPID_SUBJECT = config("VAPID_SUBJECT", default="mailto:admin@example.com")
+
 # Celery Configuration
 CELERY_BROKER_URL = config("CELERY_BROKER_URL", default=None)
 # If no broker is provided (like in basic Render deployments), run tasks synchronously

@@ -29,8 +29,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
-import { Loader2, Save, User, MapPin, Phone, TrendingUp, KeyRound } from 'lucide-react';
+import { Loader2, Save, User, MapPin, Phone, TrendingUp, KeyRound, Bell } from 'lucide-react';
 import { toast } from 'sonner';
+import { PushToggle } from '@/components/notifications/push-toggle';
 import { useLandlord, useUpdateLandlord } from '@/lib/api/hooks/use-landlord';
 import { useUpdateProfile, useChangePassword } from '@/lib/api/hooks/use-settings';
 import {
@@ -320,6 +321,19 @@ export default function SettingsPage() {
               </Button>
             </form>
           </Form>
+        </CardContent>
+      </Card>
+
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Bell className="h-5 w-5" />
+            Notificações
+          </CardTitle>
+          <CardDescription>Receba avisos do sistema neste dispositivo</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <PushToggle />
         </CardContent>
       </Card>
 
