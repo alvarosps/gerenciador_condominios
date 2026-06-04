@@ -113,12 +113,40 @@ export function useCurrentUser() {
 }
 
 /**
+ * Code exchange payload for the OAuth callback flow
+ */
+export interface OAuthExchangePayload {
+  code: string;
+}
+
+/**
  * Hook to initiate Google OAuth login
- * Returns a function that redirects to Google OAuth
+ * Returns a function that redirects to the django-allauth login-start endpoint.
+ * allauth lives at the backend origin under /accounts/ (NOT under the /api prefix),
+ * so the origin is derived by stripping a trailing /api from NEXT_PUBLIC_API_URL.
  */
 export function useGoogleLogin() {
   return () => {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8008/api';
-    window.location.href = `${apiUrl}/auth/google/`;
+    const origin = apiUrl.replace(/\/api\/?$/, '');
+    window.location.href = `${origin}/accounts/google/login/`;
   };
+}
+
+/**
+ * Hook to exchange a short-lived OAuth code (returned to the frontend callback)
+ * for an authenticated session — tokens land in HttpOnly cookies, user in body.
+ */
+export function useExchangeOAuthCode() {
+  const setAuth = useAuthStore((state) => state.setAuth);
+
+  return useMutation({
+    mutationFn: async (payload: OAuthExchangePayload) => {
+      const { data } = await apiClient.post<AuthResponse>('/auth/oauth/exchange/', payload);
+      return data;
+    },
+    onSuccess: (data) => {
+      setAuth(data.user);
+    },
+  });
 }

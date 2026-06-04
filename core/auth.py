@@ -8,12 +8,11 @@ Provides OAuth callback handler that issues JWT tokens after successful Google O
 import logging
 from typing import Any
 
-from allauth.socialaccount.models import SocialAccount
 from django.conf import settings
-from django.contrib.auth import get_user_model
 from django.http import JsonResponse
 from django.shortcuts import redirect
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.authentication import SessionAuthentication
+from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework.permissions import AllowAny, IsAdminUser, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -23,7 +22,6 @@ from core.models import OAuthExchangeCode
 from core.viewsets.auth_views_cookie import _set_auth_cookies
 
 logger = logging.getLogger(__name__)
-User = get_user_model()
 
 
 @api_view(["GET"])
@@ -94,8 +92,6 @@ class GoogleOAuthCallbackView:
             )
 
             # Create one-time exchange code instead of passing tokens in URL
-            from core.models import OAuthExchangeCode
-
             exchange = OAuthExchangeCode.objects.create(
                 user=request.user,
                 access_token=str(tokens["access"]),
@@ -115,10 +111,15 @@ class GoogleOAuthCallbackView:
 
 
 @api_view(["GET"])
+@authentication_classes([SessionAuthentication])
 @permission_classes([AllowAny])
 def google_oauth_callback(request: Request) -> Any:
     """
     Endpoint for Google OAuth callback.
+
+    Runs after allauth has logged the user into the Django session, so it reads the
+    session user via SessionAuthentication rather than a JWT. If the session is not
+    authenticated, handle_callback redirects to the frontend with ?error=oauth_failed.
 
     URL: /api/auth/oauth/google/callback/
     Method: GET
@@ -161,50 +162,12 @@ def exchange_oauth_code(request: Request) -> Response:
                 "first_name": user.first_name,
                 "last_name": user.last_name,
                 "is_staff": user.is_staff,
+                "is_superuser": user.is_superuser,
             },
         }
     )
     _set_auth_cookies(response, exchange.access_token, exchange.refresh_token)
     return response
-
-
-@api_view(["POST"])
-@permission_classes([IsAuthenticated])
-def link_oauth_account(request: Request) -> JsonResponse:
-    """
-    Manually link a Google account to an existing Django user by email.
-
-    URL: /api/auth/oauth/link/
-    Method: POST
-    Body: { "email": "user@example.com" }
-    """
-    email = request.data.get("email")
-
-    if not email:
-        return JsonResponse({"error": "Email is required"}, status=400)
-
-    try:
-        user = User.objects.get(email=email)
-        google_account = SocialAccount.objects.filter(user=user, provider="google").first()
-
-        if google_account:
-            return JsonResponse(
-                {"success": True, "message": "Google account already linked", "user_id": user.id}
-            )
-
-        return JsonResponse(
-            {
-                "success": True,
-                "message": "User found, ready to link Google account",
-                "user_id": user.id,
-            }
-        )
-
-    except User.DoesNotExist:
-        return JsonResponse({"error": "User with this email does not exist"}, status=404)
-    except Exception:
-        logger.exception("Error linking OAuth account")
-        return JsonResponse({"error": "Failed to link account"}, status=500)
 
 
 @api_view(["GET"])

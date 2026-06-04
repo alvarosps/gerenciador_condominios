@@ -355,6 +355,16 @@ ACCOUNT_USERNAME_REQUIRED = True  # Username is required (Django default User mo
 SOCIALACCOUNT_AUTO_SIGNUP = True  # Auto-create accounts from social login
 SOCIALACCOUNT_EMAIL_VERIFICATION = "optional"  # Skip email verification for social accounts
 
+# Redirect straight to the provider on GET /accounts/google/login/ instead of
+# stalling on allauth's confirmation page (allauth 0.63.6 defaults this to False).
+SOCIALACCOUNT_LOGIN_ON_GET = True
+
+# Custom adapter: promote allowlisted Google emails to admin on signup/login.
+SOCIALACCOUNT_ADAPTER = "core.adapters.AdminAllowlistSocialAccountAdapter"
+
+# Comma-separated Google emails that should be promoted to is_staff + is_superuser.
+ADMIN_GOOGLE_EMAILS = config("ADMIN_GOOGLE_EMAILS", default="", cast=Csv())
+
 # Google OAuth Provider Settings
 SOCIALACCOUNT_PROVIDERS = {
     "google": {
@@ -393,9 +403,13 @@ SOCIALACCOUNT_PROVIDERS = {
 FRONTEND_URL = config("FRONTEND_URL", default="http://localhost:6000")
 FRONTEND_AUTH_CALLBACK_PATH = config("FRONTEND_AUTH_CALLBACK_PATH", default="/auth/callback")
 
-# Redirect after OAuth login (will be overridden by custom callback view)
-LOGIN_REDIRECT_URL = f"{FRONTEND_URL}{FRONTEND_AUTH_CALLBACK_PATH}"
+# After allauth completes login, hand off to our backend callback, which creates a
+# one-time exchange code and redirects to the frontend callback page.
+LOGIN_REDIRECT_URL = "/api/auth/oauth/google/callback/"
 ACCOUNT_LOGOUT_REDIRECT_URL = FRONTEND_URL
+
+# Origins trusted for CSRF (the OAuth callback POST/redirect flow hits the backend host).
+CSRF_TRUSTED_ORIGINS = config("CSRF_TRUSTED_ORIGINS", default="http://localhost:8008", cast=Csv())
 
 
 # PDF Generation Configuration
