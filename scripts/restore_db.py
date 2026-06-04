@@ -44,11 +44,11 @@ sys.path.insert(0, str(project_root))
 
 # Import Django settings
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "condominios_manager.settings")
-import django  # noqa: E402
+import django
 
 django.setup()
 
-from django.conf import settings  # noqa: E402
+from django.conf import settings
 
 _MIN_ARGS = 2
 _MAX_SHOWN_WARNINGS = 10

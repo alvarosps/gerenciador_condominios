@@ -68,9 +68,7 @@ class TestTenantCreate:
         assert response.status_code == status.HTTP_201_CREATED
         assert response.data["is_company"] is True
 
-    def test_create_tenant_duplicate_cpf_returns_400(
-        self, authenticated_api_client, tenant
-    ):
+    def test_create_tenant_duplicate_cpf_returns_400(self, authenticated_api_client, tenant):
         # Use the same exact stored format as the fixture (raw digits, no formatting)
         payload = {
             "name": "Outro Com Mesmo CPF",
@@ -130,9 +128,7 @@ class TestTenantUpdate:
         assert response.data["name"] == "Ana Parcial"
         assert response.data["due_day"] == 15
 
-    def test_update_tenant_regular_user_forbidden(
-        self, regular_authenticated_api_client, tenant
-    ):
+    def test_update_tenant_regular_user_forbidden(self, regular_authenticated_api_client, tenant):
         response = regular_authenticated_api_client.patch(
             f"/api/tenants/{tenant.id}/",
             {"name": "Não Permitido"},
@@ -161,9 +157,7 @@ class TestTenantSoftDelete:
 
 @pytest.mark.integration
 class TestTenantFilters:
-    def test_filter_is_company_true(
-        self, authenticated_api_client, tenant, company_tenant
-    ):
+    def test_filter_is_company_true(self, authenticated_api_client, tenant, company_tenant):
         response = authenticated_api_client.get("/api/tenants/?is_company=true")
         assert response.status_code == status.HTTP_200_OK
         ids = [item["id"] for item in response.data["results"]]

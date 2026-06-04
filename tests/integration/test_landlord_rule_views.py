@@ -13,7 +13,6 @@ from rest_framework import status
 
 from core.models import ContractRule, Landlord
 
-
 # ---------------------------------------------------------------------------
 # Shared fixtures
 # ---------------------------------------------------------------------------
@@ -150,9 +149,7 @@ class TestLandlordViewSet:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
     def test_put_regular_user_forbidden(self, regular_authenticated_api_client):
-        response = regular_authenticated_api_client.put(
-            self.url, LANDLORD_PAYLOAD, format="json"
-        )
+        response = regular_authenticated_api_client.put(self.url, LANDLORD_PAYLOAD, format="json")
         assert response.status_code == status.HTTP_403_FORBIDDEN
 
 
@@ -185,18 +182,14 @@ class TestContractRuleViewSet:
         response = api_client.get(self.list_url)
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
-    def test_filter_by_is_active_true(
-        self, authenticated_api_client, rule, inactive_rule
-    ):
+    def test_filter_by_is_active_true(self, authenticated_api_client, rule, inactive_rule):
         response = authenticated_api_client.get(f"{self.list_url}?is_active=true")
         assert response.status_code == status.HTTP_200_OK
         ids = get_ids(response)
         assert rule.id in ids
         assert inactive_rule.id not in ids
 
-    def test_filter_by_is_active_false(
-        self, authenticated_api_client, rule, inactive_rule
-    ):
+    def test_filter_by_is_active_false(self, authenticated_api_client, rule, inactive_rule):
         response = authenticated_api_client.get(f"{self.list_url}?is_active=false")
         assert response.status_code == status.HTTP_200_OK
         ids = get_ids(response)
@@ -221,9 +214,7 @@ class TestContractRuleViewSet:
 
     def test_create_rule_regular_user_forbidden(self, regular_authenticated_api_client):
         payload = {"content": "Bloqueado.", "order": 1, "is_active": True}
-        response = regular_authenticated_api_client.post(
-            self.list_url, payload, format="json"
-        )
+        response = regular_authenticated_api_client.post(self.list_url, payload, format="json")
         assert response.status_code == status.HTTP_403_FORBIDDEN
 
     def test_update_rule_admin(self, authenticated_api_client, rule):
@@ -248,9 +239,7 @@ class TestContractRuleViewSet:
         rule.refresh_from_db()
         assert rule.is_deleted is True
 
-    def test_delete_rule_regular_user_forbidden(
-        self, regular_authenticated_api_client, rule
-    ):
+    def test_delete_rule_regular_user_forbidden(self, regular_authenticated_api_client, rule):
         response = regular_authenticated_api_client.delete(f"{self.list_url}{rule.id}/")
         assert response.status_code == status.HTTP_403_FORBIDDEN
 
@@ -274,21 +263,15 @@ class TestContractRuleReorder:
         assert rule2.order == 0
         assert rule.order == 1
 
-    def test_reorder_with_nonexistent_id_returns_400(
-        self, authenticated_api_client, rule
-    ):
+    def test_reorder_with_nonexistent_id_returns_400(self, authenticated_api_client, rule):
         payload = {"rule_ids": [rule.id, 999999]}
         response = authenticated_api_client.post(self.reorder_url, payload, format="json")
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "error" in response.data
 
-    def test_reorder_regular_user_forbidden(
-        self, regular_authenticated_api_client, rule, rule2
-    ):
+    def test_reorder_regular_user_forbidden(self, regular_authenticated_api_client, rule, rule2):
         payload = {"rule_ids": [rule.id, rule2.id]}
-        response = regular_authenticated_api_client.post(
-            self.reorder_url, payload, format="json"
-        )
+        response = regular_authenticated_api_client.post(self.reorder_url, payload, format="json")
         assert response.status_code == status.HTTP_403_FORBIDDEN
 
     def test_reorder_missing_rule_ids_returns_400(self, authenticated_api_client):
@@ -305,25 +288,19 @@ class TestContractRuleReorder:
 class TestContractRuleActiveRules:
     active_url = "/api/rules/active/"
 
-    def test_active_rules_returns_only_active(
-        self, authenticated_api_client, rule, inactive_rule
-    ):
+    def test_active_rules_returns_only_active(self, authenticated_api_client, rule, inactive_rule):
         response = authenticated_api_client.get(self.active_url)
         assert response.status_code == status.HTTP_200_OK
         ids = [r["id"] for r in response.data]
         assert rule.id in ids
         assert inactive_rule.id not in ids
 
-    def test_active_rules_ordered_by_order_field(
-        self, authenticated_api_client, rule, rule2
-    ):
+    def test_active_rules_ordered_by_order_field(self, authenticated_api_client, rule, rule2):
         response = authenticated_api_client.get(self.active_url)
         assert response.status_code == status.HTTP_200_OK
         orders = [r["order"] for r in response.data]
         assert orders == sorted(orders)
 
-    def test_active_rules_regular_user_forbidden(
-        self, regular_authenticated_api_client, rule
-    ):
+    def test_active_rules_regular_user_forbidden(self, regular_authenticated_api_client, rule):
         response = regular_authenticated_api_client.get(self.active_url)
         assert response.status_code == status.HTTP_403_FORBIDDEN

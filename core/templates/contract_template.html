@@ -386,7 +386,7 @@
         pessoa(s)</strong
       >, a ser efetuado diretamente ao LOCADOR, ou por PIX/Depósito bancário.
       <strong
-        >O pagamento deve ser feito até o dia {{ lease.due_day }} de cada
+        >O pagamento deve ser feito até o dia {{ tenant.due_day }} de cada
         mês</strong
       >.
     </p>
@@ -408,7 +408,7 @@
     <p>
       O pagamento do aluguel é sempre referente ao mês que o LOCATÁRIO estará
       morando no kitnet. A <strong>data de vencimento</strong> é definida como o
-      dia de início da locação (dia {{ lease.due_day }}), permanecendo fixa
+      dia de início da locação (dia {{ tenant.due_day }}), permanecendo fixa
       mensalmente.
       <strong>Caso o LOCATÁRIO deseje alterar a data de vencimento</strong>,
       será calculado o valor proporcional: (aluguel ÷ 30) × dias de diferença

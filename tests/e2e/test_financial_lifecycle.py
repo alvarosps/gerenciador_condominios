@@ -22,7 +22,7 @@ from freezegun import freeze_time
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from core.models import Building, Apartment, Lease, Person, Tenant
+from core.models import Apartment, Building, Lease, Tenant
 
 pytestmark = pytest.mark.integration
 
@@ -85,7 +85,9 @@ def _generate_installments(client: APIClient, expense_id: int, start_date: str) 
     return resp.data["installments"]
 
 
-def _create_rented_lease(street_number: int, due_day: int = 10) -> tuple[Building, Apartment, Tenant, Lease]:
+def _create_rented_lease(
+    street_number: int, due_day: int = 10
+) -> tuple[Building, Apartment, Tenant, Lease]:
     building = Building.objects.create(
         street_number=street_number, name=f"Prédio {street_number}", address=f"Rua {street_number}"
     )
@@ -263,14 +265,18 @@ class TestIncomeLiftcycle:
         # Filter by person_a only
         filter_resp = client.get("/api/incomes/", {"person_id": person_a})
         assert filter_resp.status_code == status.HTTP_200_OK
-        items = filter_resp.data["results"] if "results" in filter_resp.data else filter_resp.data
-        person_a_ids = {i["person"]["id"] if isinstance(i["person"], dict) else i["person"] for i in items}
+        items = filter_resp.data.get("results", filter_resp.data)
+        person_a_ids = {
+            i["person"]["id"] if isinstance(i["person"], dict) else i["person"] for i in items
+        }
         assert all(pid == person_a for pid in person_a_ids)
 
         # Filter by date range — only march
-        date_resp = client.get("/api/incomes/", {"date_from": "2026-03-01", "date_to": "2026-03-31"})
+        date_resp = client.get(
+            "/api/incomes/", {"date_from": "2026-03-01", "date_to": "2026-03-31"}
+        )
         assert date_resp.status_code == status.HTTP_200_OK
-        date_items = date_resp.data["results"] if "results" in date_resp.data else date_resp.data
+        date_items = date_resp.data.get("results", date_resp.data)
         for item in date_items:
             assert item["income_date"] >= "2026-03-01"
             assert item["income_date"] <= "2026-03-31"
@@ -674,10 +680,7 @@ class TestExpenseCategoryHierarchy:
         # Both children show in list
         list_resp = client.get("/api/expense-categories/")
         assert list_resp.status_code == status.HTTP_200_OK
-        all_ids = [
-            c["id"]
-            for c in (list_resp.data["results"] if "results" in list_resp.data else list_resp.data)
-        ]
+        all_ids = [c["id"] for c in (list_resp.data.get("results", list_resp.data))]
         assert child_a_id in all_ids
         assert child_b_id in all_ids
 
@@ -784,7 +787,7 @@ class TestExpenseRebuild:
         # Verify new installments replace old ones
         inst_resp = client.get("/api/expense-installments/", {"expense_id": expense_id})
         assert inst_resp.status_code == status.HTTP_200_OK
-        new_installments = inst_resp.data["results"] if "results" in inst_resp.data else inst_resp.data
+        new_installments = inst_resp.data.get("results", inst_resp.data)
         assert len(new_installments) == 2
         amounts = {Decimal(str(i["amount"])) for i in new_installments}
         assert amounts == {Decimal("250.00")}
@@ -816,9 +819,11 @@ class TestExpenseAndInstallmentFilters:
             expected_monthly_amount="200.00",
         )
 
-        one_time_resp = client.get("/api/expenses/", {"expense_type": "one_time_expense", "person_id": person_id})
+        one_time_resp = client.get(
+            "/api/expenses/", {"expense_type": "one_time_expense", "person_id": person_id}
+        )
         assert one_time_resp.status_code == status.HTTP_200_OK
-        one_time_items = one_time_resp.data["results"] if "results" in one_time_resp.data else one_time_resp.data
+        one_time_items = one_time_resp.data.get("results", one_time_resp.data)
         assert all(i["expense_type"] == "one_time_expense" for i in one_time_items)
 
     def test_expense_filter_by_date_range(self, authenticated_api_client):
@@ -847,7 +852,7 @@ class TestExpenseAndInstallmentFilters:
             {"date_from": "2026-03-01", "date_to": "2026-03-31", "person_id": person_id},
         )
         assert march_resp.status_code == status.HTTP_200_OK
-        march_items = march_resp.data["results"] if "results" in march_resp.data else march_resp.data
+        march_items = march_resp.data.get("results", march_resp.data)
         assert len(march_items) == 1
         assert march_items[0]["description"] == "Mar expense"
 
@@ -871,7 +876,7 @@ class TestExpenseAndInstallmentFilters:
         # Filter overdue=true — this installment is from January, already past
         overdue_resp = client.get("/api/expense-installments/", {"is_overdue": "true"})
         assert overdue_resp.status_code == status.HTTP_200_OK
-        overdue_items = overdue_resp.data["results"] if "results" in overdue_resp.data else overdue_resp.data
+        overdue_items = overdue_resp.data.get("results", overdue_resp.data)
         overdue_ids = [i["id"] for i in overdue_items]
         assert installment_id in overdue_ids
 
@@ -907,13 +912,17 @@ class TestExpenseAndInstallmentFilters:
         # Filter by person_a — should only return person_a installments
         resp = client.get("/api/expense-installments/", {"person_id": person_a})
         assert resp.status_code == status.HTTP_200_OK
-        items = resp.data["results"] if "results" in resp.data else resp.data
+        items = resp.data.get("results", resp.data)
         for item in items:
             # expense field is a FK integer in installment serializer; use person filter directly
-            expense_id = item["expense"] if isinstance(item["expense"], int) else item["expense"]["id"]
+            expense_id = (
+                item["expense"] if isinstance(item["expense"], int) else item["expense"]["id"]
+            )
             exp_detail = client.get(f"/api/expenses/{expense_id}/")
             person_field = exp_detail.data["person"]
-            person_id_actual = person_field["id"] if isinstance(person_field, dict) else person_field
+            person_id_actual = (
+                person_field["id"] if isinstance(person_field, dict) else person_field
+            )
             assert person_id_actual == person_a
 
 
@@ -967,9 +976,11 @@ class TestPersonIncomeLifecycle:
         assert patch_resp.data["is_active"] is False
 
         # Filter by is_active=false
-        filter_resp = client.get("/api/person-incomes/", {"is_active": "false", "person_id": person_id})
+        filter_resp = client.get(
+            "/api/person-incomes/", {"is_active": "false", "person_id": person_id}
+        )
         assert filter_resp.status_code == status.HTTP_200_OK
-        inactive_items = filter_resp.data["results"] if "results" in filter_resp.data else filter_resp.data
+        inactive_items = filter_resp.data.get("results", filter_resp.data)
         inactive_ids = [i["id"] for i in inactive_items]
         assert income_id in inactive_ids
 
@@ -1091,7 +1102,7 @@ class TestPersonCRUD:
 
         filter_resp = client.get("/api/persons/", {"is_owner": "true"})
         assert filter_resp.status_code == status.HTTP_200_OK
-        items = filter_resp.data["results"] if "results" in filter_resp.data else filter_resp.data
+        items = filter_resp.data.get("results", filter_resp.data)
         owner_ids = [p["id"] for p in items]
         assert owner_id in owner_ids
 
@@ -1107,7 +1118,7 @@ class TestPersonCRUD:
 
         filter_resp = client.get("/api/persons/", {"is_employee": "true"})
         assert filter_resp.status_code == status.HTTP_200_OK
-        items = filter_resp.data["results"] if "results" in filter_resp.data else filter_resp.data
+        items = filter_resp.data.get("results", filter_resp.data)
         emp_ids = [p["id"] for p in items]
         assert emp_id in emp_ids
 
@@ -1118,7 +1129,7 @@ class TestPersonCRUD:
 
         search_resp = client.get("/api/persons/", {"search": "Xavier"})
         assert search_resp.status_code == status.HTTP_200_OK
-        items = search_resp.data["results"] if "results" in search_resp.data else search_resp.data
+        items = search_resp.data.get("results", search_resp.data)
         names = [p["name"] for p in items]
         assert any("Xavier" in n for n in names)
 
@@ -1136,11 +1147,13 @@ class TestCreditCardFilters:
 
         resp = client.get("/api/credit-cards/", {"person_id": person_a})
         assert resp.status_code == status.HTTP_200_OK
-        items = resp.data["results"] if "results" in resp.data else resp.data
+        items = resp.data.get("results", resp.data)
         card_ids = [c["id"] for c in items]
         assert card_a in card_ids
         assert all(
-            c["person"]["id"] == person_a if isinstance(c["person"], dict) else c["person"] == person_a
+            c["person"]["id"] == person_a
+            if isinstance(c["person"], dict)
+            else c["person"] == person_a
             for c in items
         )
 
@@ -1155,8 +1168,10 @@ class TestCreditCardFilters:
         assert patch_resp.data["is_active"] is False
 
         # Filter active only — card should not appear
-        active_resp = client.get("/api/credit-cards/", {"is_active": "true", "person_id": person_id})
+        active_resp = client.get(
+            "/api/credit-cards/", {"is_active": "true", "person_id": person_id}
+        )
         assert active_resp.status_code == status.HTTP_200_OK
-        active_items = active_resp.data["results"] if "results" in active_resp.data else active_resp.data
+        active_items = active_resp.data.get("results", active_resp.data)
         active_ids = [c["id"] for c in active_items]
         assert card_id not in active_ids

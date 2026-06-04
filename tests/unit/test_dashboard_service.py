@@ -13,7 +13,6 @@ from freezegun import freeze_time
 from core.models import Apartment, Building, Dependent, Lease, Tenant
 from core.services.dashboard_service import DashboardService
 
-
 # ---------------------------------------------------------------------------
 # Shared fixtures
 # ---------------------------------------------------------------------------
@@ -142,9 +141,7 @@ class TestGetFinancialSummary:
         assert summary["occupancy_rate"] == 0
         assert summary["total_apartments"] >= 0
 
-    def test_with_rented_apartment_calculates_revenue(
-        self, apartment_rented, active_lease
-    ):
+    def test_with_rented_apartment_calculates_revenue(self, apartment_rented, active_lease):
         summary = DashboardService.get_financial_summary()
         assert summary["rented_apartments"] >= 1
         assert summary["total_revenue"] >= Decimal("1500.00")
@@ -169,9 +166,7 @@ class TestGetFinancialSummary:
     def test_total_income_equals_sum(self, active_lease, apartment_rented):
         summary = DashboardService.get_financial_summary()
         expected = (
-            summary["total_revenue"]
-            + summary["total_cleaning_fees"]
-            + summary["total_tag_fees"]
+            summary["total_revenue"] + summary["total_cleaning_fees"] + summary["total_tag_fees"]
         )
         assert summary["total_income"] == expected
 
@@ -223,8 +218,7 @@ class TestGetLeaseMetrics:
     def test_contracts_pending_equals_total_minus_generated(self, active_lease):
         metrics = DashboardService.get_lease_metrics()
         assert (
-            metrics["contracts_pending"]
-            == metrics["total_leases"] - metrics["contracts_generated"]
+            metrics["contracts_pending"] == metrics["total_leases"] - metrics["contracts_generated"]
         )
 
     def test_inactive_leases_equals_total_minus_active(self, active_lease, apartment_rented):
@@ -271,9 +265,7 @@ class TestGetBuildingStatistics:
 
     def test_building_with_no_apartments_has_zero_occupancy(self, building2):
         stats = DashboardService.get_building_statistics()
-        building_stat = next(
-            (s for s in stats if s["building_id"] == building2.id), None
-        )
+        building_stat = next((s for s in stats if s["building_id"] == building2.id), None)
         assert building_stat is not None
         assert building_stat["total_apartments"] == 0
         assert building_stat["occupancy_rate"] == 0
@@ -318,13 +310,11 @@ class TestGetLatePaymentSummary:
         assert late["late_days"] >= 1
 
     @freeze_time("2026-03-05")
-    def test_not_late_when_before_due_day(
-        self, active_lease, apartment_rented, tenant_individual
-    ):
+    def test_not_late_when_before_due_day(self, active_lease, apartment_rented, tenant_individual):
         # due_day = 10, today = 2026-03-05 → not late
         summary = DashboardService.get_late_payment_summary()
         # This particular lease should not be in late_leases
-        late_lease_ids = [l["lease_id"] for l in summary["late_leases"]]
+        late_lease_ids = [lease["lease_id"] for lease in summary["late_leases"]]
         assert active_lease.id not in late_lease_ids
 
     @freeze_time("2026-03-15")
@@ -353,9 +343,7 @@ class TestGetTenantStatistics:
         }
         assert expected_keys.issubset(stats.keys())
 
-    def test_counts_individual_and_company_tenants(
-        self, tenant_individual, tenant_company
-    ):
+    def test_counts_individual_and_company_tenants(self, tenant_individual, tenant_company):
         stats = DashboardService.get_tenant_statistics()
         assert stats["individual_tenants"] >= 1
         assert stats["company_tenants"] >= 1
@@ -376,9 +364,7 @@ class TestGetTenantStatistics:
         stats = DashboardService.get_tenant_statistics()
         assert isinstance(stats["marital_status_distribution"], dict)
 
-    def test_marital_status_counts_individual_tenants_only(
-        self, tenant_individual, tenant_company
-    ):
+    def test_marital_status_counts_individual_tenants_only(self, tenant_individual, tenant_company):
         # company tenants should not appear in marital status distribution
         stats = DashboardService.get_tenant_statistics()
         dist = stats["marital_status_distribution"]

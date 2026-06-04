@@ -1,7 +1,5 @@
 """Unit tests for core/services/base.py — BaseService CRUD operations."""
 
-from decimal import Decimal
-
 import pytest
 
 from core.models import Building, Tenant

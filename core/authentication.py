@@ -11,9 +11,9 @@ class CookieJWTAuthentication(JWTAuthentication):
     """Authenticate using JWT from HttpOnly cookies, falling back to Authorization header."""
 
     def authenticate(self, request: Request) -> tuple[Any, Token] | None:
-        # Try standard Authorization header first
+        # Try standard Authorization header first (get_header returns None or a non-empty header)
         header = self.get_header(request)
-        if header is not None:
+        if header:
             raw_token = self.get_raw_token(header)
             if raw_token is not None:
                 validated_token = self.get_validated_token(raw_token)

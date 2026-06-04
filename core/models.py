@@ -343,11 +343,11 @@ class Apartment(AuditMixin, SoftDeleteMixin, models.Model):
         ]
         constraints = [
             models.CheckConstraint(
-                check=models.Q(rental_value__gte=0),
+                condition=models.Q(rental_value__gte=0),
                 name="apt_rental_value_non_negative",
             ),
             models.CheckConstraint(
-                check=models.Q(cleaning_fee__gte=0),
+                condition=models.Q(cleaning_fee__gte=0),
                 name="apt_cleaning_fee_non_negative",
             ),
         ]
@@ -665,7 +665,7 @@ class Lease(AuditMixin, SoftDeleteMixin, models.Model):
                 name="unique_active_lease_per_apartment",
             ),
             models.CheckConstraint(
-                check=models.Q(rental_value__gte=0),
+                condition=models.Q(rental_value__gte=0),
                 name="lease_rental_value_non_negative",
             ),
         ]
@@ -1097,7 +1097,7 @@ class Expense(AuditMixin, SoftDeleteMixin, models.Model):
         ]
         constraints = [
             models.CheckConstraint(
-                check=models.Q(total_amount__gt=0),
+                condition=models.Q(total_amount__gt=0),
                 name="expense_total_amount_positive",
             ),
         ]
@@ -1166,7 +1166,7 @@ class ExpenseInstallment(AuditMixin, SoftDeleteMixin, models.Model):
                 name="unique_active_expense_installment",
             ),
             models.CheckConstraint(
-                check=models.Q(amount__gte=0),
+                condition=models.Q(amount__gte=0),
                 name="installment_amount_non_negative",
             ),
         ]
@@ -1256,7 +1256,7 @@ class RentPayment(AuditMixin, SoftDeleteMixin, models.Model):
                 name="unique_active_rent_payment",
             ),
             models.CheckConstraint(
-                check=models.Q(amount_paid__gt=0),
+                condition=models.Q(amount_paid__gt=0),
                 name="rent_payment_amount_positive",
             ),
         ]
@@ -1297,7 +1297,7 @@ class EmployeePayment(AuditMixin, SoftDeleteMixin, models.Model):
                 name="unique_active_employee_payment",
             ),
             models.CheckConstraint(
-                check=models.Q(base_salary__gte=0),
+                condition=models.Q(base_salary__gte=0),
                 name="employee_base_salary_non_negative",
             ),
         ]
@@ -1334,7 +1334,7 @@ class PersonPayment(AuditMixin, SoftDeleteMixin, models.Model):
         ]
         constraints = [
             models.CheckConstraint(
-                check=models.Q(amount__gt=0),
+                condition=models.Q(amount__gt=0),
                 name="person_payment_amount_positive",
             ),
         ]

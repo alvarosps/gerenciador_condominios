@@ -60,6 +60,6 @@ class TestNumberToWords:
 
     def test_invalid_value_returns_string_representation(self):
         # Pass an object that num2words cannot handle — it should return str(value)
-        result = number_to_words("not_a_number")  # type: ignore[arg-type]
+        result = number_to_words("not_a_number")
         # Either raises or returns fallback string
         assert isinstance(result, str)
