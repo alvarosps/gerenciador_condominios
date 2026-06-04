@@ -4,6 +4,8 @@ export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 1000 * 60 * 5, // 5 minutes
+      gcTime: 1000 * 60 * 60 * 24, // 24h — must be >= persister maxAge so cache survives until rehydration
+      networkMode: 'offlineFirst',
       retry: (failureCount, error) => {
         if (
           error instanceof Error &&
