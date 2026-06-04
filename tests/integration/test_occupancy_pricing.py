@@ -221,10 +221,16 @@ class TestLeaseSerializerValidation:
         response = api_client.post(self.url, payload, format="json")
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
-    def test_lease_resident_dependent_required_when_2_tenants(
+    def test_lease_resident_dependent_optional_when_2_tenants(
         self, api_client, apartment_double, tenant
     ):
-        """number_of_tenants=2 without resident_dependent_id must fail."""
+        """number_of_tenants=2 without resident_dependent_id must succeed.
+
+        Generating a contract for two people no longer requires the second
+        occupant's data (resident_dependent), so a 2-tenant lease may be created
+        without a resident_dependent. The double-occupancy rental value is still
+        derived from the apartment.
+        """
         payload = {
             "apartment_id": apartment_double.id,
             "responsible_tenant_id": tenant.id,
@@ -235,8 +241,10 @@ class TestLeaseSerializerValidation:
             "number_of_tenants": 2,
         }
         response = api_client.post(self.url, payload, format="json")
-        assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "resident_dependent_id" in response.data
+        assert response.status_code == status.HTTP_201_CREATED
+        assert response.data["resident_dependent"] is None
+        assert response.data["number_of_tenants"] == 2
+        assert Decimal(response.data["rental_value"]) == apartment_double.rental_value_double
 
     def test_lease_resident_dependent_must_belong_to_responsible_tenant(
         self, api_client, apartment_double, tenant, dependent_of_other

@@ -291,9 +291,11 @@ def invalidate_dependent_cache_on_delete(
 def _invalidate_financial_caches(model_name: str, pk: int) -> None:
     """Invalidate all financial dashboard caches affected by financial model changes."""
     logger.info(f"{model_name} {pk} changed, invalidating financial caches")
-    CacheManager.invalidate_pattern("daily-control:*")
-    CacheManager.invalidate_pattern("cash-flow:*")
-    CacheManager.invalidate_pattern("financial-dashboard:*")
+    # Keys are hyphen-prefixed (e.g. "financial-dashboard-debt-type"), not colon-separated,
+    # so the glob must be "<prefix>*" — "<prefix>:*" never matches and leaves caches stale.
+    CacheManager.invalidate_pattern("daily-control*")
+    CacheManager.invalidate_pattern("cash-flow*")
+    CacheManager.invalidate_pattern("financial-dashboard*")
 
 
 @receiver(post_save, sender=PersonPayment)
