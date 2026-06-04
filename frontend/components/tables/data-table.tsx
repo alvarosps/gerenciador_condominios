@@ -91,10 +91,14 @@ export function DataTable<T extends object>({
   }, [dataSource, columns, sortKey, sortDirection]);
 
   const total = paginationConfig.total ?? sortedData.length;
-  const totalPages = Math.ceil(total / pageSize);
-  const start = (currentPage - 1) * pageSize;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  // Clamp to a valid page so a shrinking dataSource (e.g. after filtering) never
+  // strands us on an out-of-range page that renders "no data".
+  const safePage = Math.min(currentPage, totalPages);
+  const start = (safePage - 1) * pageSize;
   const end = start + pageSize;
-  const paginatedData = sortedData.slice(start, end);
+  // pagination={false} shows every row (no slicing), not just the first page.
+  const paginatedData = showPagination ? sortedData.slice(start, end) : sortedData;
 
   // Define getRowKey before it's used
   const getRowKey = (record: T, index: number): string => {
@@ -338,22 +342,22 @@ export function DataTable<T extends object>({
                 variant="outline"
                 size="sm"
                 aria-label="Página anterior"
-                onClick={() => handlePageChange(currentPage - 1)}
-                disabled={currentPage === 1}
+                onClick={() => handlePageChange(safePage - 1)}
+                disabled={safePage <= 1}
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
 
               <span className="text-sm px-2">
-                Página {currentPage} de {totalPages}
+                Página {safePage} de {totalPages}
               </span>
 
               <Button
                 variant="outline"
                 size="sm"
                 aria-label="Próxima página"
-                onClick={() => handlePageChange(currentPage + 1)}
-                disabled={currentPage === totalPages}
+                onClick={() => handlePageChange(safePage + 1)}
+                disabled={safePage >= totalPages}
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>
