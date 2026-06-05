@@ -805,9 +805,7 @@ class TestFinancialWorkflowE2E:
         day_15 = days[14]
         assert day_15["date"] == "2026-03-15"
         card_exits = [
-            e
-            for e in day_15["exits"]
-            if e["type"] == "credit_card" and e["card"] == "Daily Card"
+            e for e in day_15["exits"] if e["type"] == "credit_card" and e["card"] == "Daily Card"
         ]
         assert len(card_exits) > 0
         assert len(card_exits[0]["installment_ids"]) > 0

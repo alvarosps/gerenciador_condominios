@@ -1187,6 +1187,7 @@ class FinancialSettingsSerializer(serializers.ModelSerializer):
             "default_pix_key",
             "default_pix_key_type",
             "notes",
+            "rent_tracking_start_date",
             "updated_at",
             "updated_by",
         ]
