@@ -4,7 +4,7 @@ import type { NextRequest } from 'next/server';
 /**
  * List of public paths that don't require authentication
  */
-const PUBLIC_PATHS = ['/login', '/register', '/tenant/login'];
+const PUBLIC_PATHS = ['/login', '/register', '/tenant/login', '/auth/callback'];
 
 /**
  * Middleware to protect routes that require authentication
