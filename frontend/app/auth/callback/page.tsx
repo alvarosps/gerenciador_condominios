@@ -2,7 +2,6 @@
 
 import { Suspense, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { toast } from 'sonner';
 import { Loading } from '@/components/shared/loading';
 import { useExchangeOAuthCode } from '@/lib/api/hooks/use-auth';
 
