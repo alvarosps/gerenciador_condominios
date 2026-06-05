@@ -54,13 +54,16 @@ export function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     /*
-     * Match all request paths except for the ones starting with:
-     * - api (API routes)
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public files (images, etc.)
+     * Run the auth middleware on app routes only. Skip:
+     * - api            — proxied to the backend (app/api/[...route])
+     * - _next/static   — build assets
+     * - _next/image    — image optimization
+     * - offline        — the PWA offline fallback page (must load without auth)
+     * - any path containing a dot — static/metadata assets served at the root
+     *   (manifest.webmanifest, sw.js, favicon.ico, icons, robots.txt, …). These
+     *   must NOT be auth-gated, or they 307 to /login and break the PWA/manifest.
+     * Protected app routes (e.g. /buildings, /leases) have no dot, so they stay gated.
      */
-    '/((?!api|_next/static|_next/image|favicon.ico|.*\\.png$|.*\\.jpg$|.*\\.svg$).*)',
+    '/((?!api|_next/static|_next/image|offline|.*\\..*).*)',
   ],
 };

@@ -128,14 +128,16 @@ export interface OAuthExchangePayload {
 /**
  * Hook to initiate Google OAuth login
  * Returns a function that redirects to the django-allauth login-start endpoint.
- * allauth lives at the backend origin under /accounts/ (NOT under the /api prefix),
- * so the origin is derived by stripping a trailing /api from NEXT_PUBLIC_API_URL.
+ * allauth lives at the backend origin under /accounts/ — NOT under the /api prefix,
+ * and NOT reachable through the same-origin /api proxy — so it needs the absolute
+ * backend origin from NEXT_PUBLIC_BACKEND_URL. After Google authenticates, the backend
+ * hands a one-time code back to the frontend /auth/callback, which exchanges it through
+ * the /api proxy (so the resulting auth cookies land same-origin on the frontend).
  */
 export function useGoogleLogin() {
   return () => {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8008/api';
-    const origin = apiUrl.replace(/\/api\/?$/, '');
-    window.location.href = `${origin}/accounts/google/login/`;
+    const backendOrigin = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:8008';
+    window.location.href = `${backendOrigin}/accounts/google/login/`;
   };
 }
 
