@@ -266,8 +266,11 @@ describe('useAuth hooks', () => {
       result.current();
 
       expect(window.location.href).toContain('/accounts/google/login/');
-      expect(window.location.href).not.toContain('/api/auth/google/');
-      expect(window.location.href).not.toContain('/api/accounts/');
+      // Must be an ABSOLUTE backend origin. A relative '/accounts/google/login/' (the
+      // prod regression, when NEXT_PUBLIC_API_URL='/api' was stripped to an empty
+      // origin) would hit the frontend domain and be bounced to /login — guard it.
+      expect(window.location.href).toMatch(/^https?:\/\//);
+      expect(window.location.href).not.toContain('/api/');
     });
   });
 
