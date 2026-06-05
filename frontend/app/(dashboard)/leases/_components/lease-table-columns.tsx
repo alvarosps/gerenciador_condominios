@@ -302,9 +302,10 @@ export function createLeaseColumns(handlers: LeaseActionHandlers): Column<Lease>
       key: 'actions',
       width: 240,
       fixed: 'right',
+      isActions: true,
       render: (_, record: Lease) => (
         <TooltipProvider>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 flex-wrap sm:flex-nowrap">
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button

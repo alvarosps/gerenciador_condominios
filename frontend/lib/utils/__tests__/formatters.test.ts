@@ -134,6 +134,11 @@ describe('formatDate', () => {
     expect(result).toContain('2024');
   });
 
+  it('parses date-only ISO strings as local dates (no UTC off-by-one)', () => {
+    expect(formatDate('2026-06-17')).toBe('17/06/2026');
+    expect(formatDate('2026-07-05')).toBe('05/07/2026');
+  });
+
   it('returns empty string for null', () => {
     expect(formatDate(null)).toBe('');
   });

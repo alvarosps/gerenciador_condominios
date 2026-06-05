@@ -72,7 +72,7 @@ export function DataTableCards<T extends object>({
                   className="flex flex-col gap-2 border-t pt-3"
                 >
                   {actionColumns.map((column) => (
-                    <div key={column.key} className="w-full [&>*]:w-full">
+                    <div key={column.key} className="w-full">
                       {column.render?.(undefined, record, index)}
                     </div>
                   ))}

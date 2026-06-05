@@ -16,8 +16,8 @@ interface StepperProps {
 
 export function Stepper({ steps, currentStep, className }: StepperProps) {
   return (
-    <div className={cn('w-full', className)}>
-      <div className="flex items-center justify-between">
+    <div className={cn('w-full overflow-x-auto pb-4 no-scrollbar', className)}>
+      <div className="flex items-center justify-between min-w-max px-2">
         {steps.map((step, index) => {
           const isCompleted = index < currentStep;
           const isCurrent = index === currentStep;

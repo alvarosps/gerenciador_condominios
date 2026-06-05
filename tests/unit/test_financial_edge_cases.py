@@ -118,7 +118,7 @@ class TestFeeCalculatorEdgeCases:
             rental_value=Decimal("1500.00"),
             current_due_day=10,
             new_due_day=20,
-            reference_date=date(2026, 3, 1),
+            reference_date=date(2026, 3, 15),
         )
         assert result["old_due_date"] == date(2026, 3, 10)
         assert result["new_due_date"] == date(2026, 3, 20)
@@ -132,7 +132,7 @@ class TestFeeCalculatorEdgeCases:
             rental_value=Decimal("1250.00"),
             current_due_day=22,
             new_due_day=5,
-            reference_date=date(2026, 3, 1),
+            reference_date=date(2026, 3, 25),
         )
         assert result["old_due_date"] == date(2026, 3, 22)
         assert result["new_due_date"] == date(2026, 4, 5)
@@ -145,7 +145,7 @@ class TestFeeCalculatorEdgeCases:
             rental_value=Decimal("1000.00"),
             current_due_day=10,
             new_due_day=31,
-            reference_date=date(2026, 2, 1),
+            reference_date=date(2026, 2, 15),
         )
         # Feb 2026 has 28 days — day 31 clamped to 28
         assert result["new_due_date"] == date(2026, 2, 28)

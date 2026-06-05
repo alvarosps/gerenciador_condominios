@@ -149,16 +149,16 @@ export default function ContractTemplatePage() {
     <div className="h-full">
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <CardTitle className="flex flex-wrap items-center gap-2">
               <span>Editor de Template de Contrato</span>
               {hasChanges && (
-                <Badge variant="secondary" className="bg-warning/10 text-warning hover:bg-warning/20">
+                <Badge variant="secondary" className="bg-warning/10 text-warning hover:bg-warning/20 whitespace-nowrap">
                   Alterações não salvas
                 </Badge>
               )}
             </CardTitle>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button
                 variant="outline"
                 size="sm"
@@ -250,7 +250,7 @@ export default function ContractTemplatePage() {
           </Alert>
 
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="mb-4">
+            <TabsList className="mb-4 flex-wrap h-auto justify-start w-full gap-1">
               <TabsTrigger value="editor">Editor</TabsTrigger>
               <TabsTrigger value="rules">Regras</TabsTrigger>
               <TabsTrigger value="preview">Preview</TabsTrigger>
