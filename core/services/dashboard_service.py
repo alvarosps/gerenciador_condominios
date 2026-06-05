@@ -338,9 +338,17 @@ class DashboardService:
             if not existing_last or p["payment_date"] > existing_last:
                 last_payments[lid] = p["payment_date"]
 
+        # Fetch the tracking boundary once — avoids a FinancialSettings DB query on
+        # every loop iteration that is_collectible_for_month would otherwise incur.
+        tracking_start = RentScheduleService.rent_tracking_start_month()
+
         for lease in collectible_leases:
             lease_payments = payments_by_lease.get(lease.id, set())
             start_month = lease.start_date.replace(day=1)
+            # Bound the back-scan to the tracking boundary so leases that started
+            # years ago don't accumulate absurd late-day counts from untracked months.
+            if tracking_start is not None and tracking_start > start_month:
+                start_month = tracking_start
 
             curr_month_iter = start_month
             lease_late_months_count = 0
@@ -348,7 +356,13 @@ class DashboardService:
             lease_total_late_days = 0
 
             while curr_month_iter <= month_start:
-                if not RentScheduleService.is_collectible_for_month(
+                # started + tracked are guaranteed by the bounded start_month above
+                # (started: collectible_leases requires start_date <= month_start; tracked:
+                # curr_month_iter >= tracking_start by construction of start_month), so the
+                # only per-month collectibility variable left is prepayment. Calling
+                # is_prepaid_for_month directly (pure date math) avoids a FinancialSettings
+                # query on every iteration that is_collectible_for_month would incur.
+                if RentScheduleService.is_prepaid_for_month(
                     lease, curr_month_iter.year, curr_month_iter.month
                 ):
                     curr_month_iter = curr_month_iter + relativedelta(months=1)

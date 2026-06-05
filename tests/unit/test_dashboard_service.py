@@ -11,7 +11,7 @@ import pytest
 from django.conf import settings
 from freezegun import freeze_time
 
-from core.models import Apartment, Building, Dependent, Lease, Tenant
+from core.models import Apartment, Building, Dependent, FinancialSettings, Lease, Tenant
 from core.services.dashboard_service import DashboardService
 from core.services.fee_calculator import FeeCalculatorService
 from tests.factories import make_person, make_rent_payment
@@ -596,3 +596,148 @@ class TestGetTenantStatistics:
         stats = DashboardService.get_tenant_statistics()
         assert stats["total_tenants"] >= 0
         assert stats["total_dependents"] >= 0
+
+
+# ---------------------------------------------------------------------------
+# get_late_payment_summary — rent-tracking start boundary
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestLatePaymentSummaryTrackingBoundary:
+    """Regression tests for bounding the overdue back-scan to the configured
+    rent-tracking start date (FinancialSettings.rent_tracking_start_date).
+
+    Without a boundary a lease starting in 2024 accumulates thousands of late
+    days by 2026; with the boundary set to 2026-06-01 only June 2026 is scanned,
+    producing a small, sane number.
+    """
+
+    def _make_old_lease(self, building, admin_user):
+        """Lease started 2024-07-01, validity 60 months (max), due_day=10, no payments.
+
+        Start date chosen so the lease is well in the past relative to June 2026 test
+        dates: 2024-07 → 2026-06 = 24 months of unpaid rent when no boundary is set.
+        """
+        tenant = Tenant.objects.create(
+            name="Old Lease Tenant",
+            cpf_cnpj="10000000019",
+            phone="11900000010",
+            marital_status="Solteiro(a)",
+            profession="Dev",
+            due_day=10,
+            created_by=admin_user,
+            updated_by=admin_user,
+        )
+        apartment = Apartment.objects.create(
+            building=building,
+            number=501,
+            rental_value=Decimal("1500.00"),
+            cleaning_fee=Decimal("200.00"),
+            max_tenants=2,
+            created_by=admin_user,
+            updated_by=admin_user,
+        )
+        return Lease.objects.create(
+            apartment=apartment,
+            responsible_tenant=tenant,
+            start_date=date(2024, 7, 1),
+            validity_months=60,
+            tag_fee=Decimal("40.00"),
+            rental_value=Decimal("1500.00"),
+            created_by=admin_user,
+            updated_by=admin_user,
+        )
+
+    @freeze_time("2026-06-15")
+    def test_boundary_limits_scan_to_one_month(self, building, admin_user):
+        """Core regression: with boundary=2026-06-01 the lease that started in 2024
+        is only scanned from June 2026, so late_months==1 and late_days is small (5)."""
+        FinancialSettings.objects.create(
+            initial_balance=Decimal("0.00"),
+            initial_balance_date=date(2026, 1, 1),
+            rent_tracking_start_date=date(2026, 6, 1),
+        )
+        lease = self._make_old_lease(building, admin_user)
+
+        summary = DashboardService.get_late_payment_summary()
+        late = next(item for item in summary["late_leases"] if item["lease_id"] == lease.id)
+
+        # Only June 2026 is scanned; due_day=10, today=2026-06-15 → 5 days late.
+        assert late["late_months"] == 1
+        assert late["late_days"] == 5
+        # Sanity: total late days must be small, NOT thousands.
+        assert late["late_days"] <= 31
+
+    @freeze_time("2026-06-15")
+    def test_no_boundary_accumulates_many_months(self, building, admin_user):
+        """Legacy behavior without a boundary: same lease accumulates many late months
+        (2024-07 through 2026-06 = 24 months), documenting what the boundary fixes."""
+        # No FinancialSettings row → no boundary.
+        lease = self._make_old_lease(building, admin_user)
+
+        summary = DashboardService.get_late_payment_summary()
+        late = next(item for item in summary["late_leases"] if item["lease_id"] == lease.id)
+
+        # 2024-07 to 2026-06 inclusive = 24 months, all unpaid and overdue.
+        assert late["late_months"] >= 24
+        assert late["late_days"] >= 100
+
+    @freeze_time("2026-05-20")
+    def test_current_month_before_boundary_produces_empty_summary(self, building, admin_user):
+        """When today is before the tracking boundary, no month is tracked yet → no
+        late leases reported even if the lease would otherwise be overdue."""
+        FinancialSettings.objects.create(
+            initial_balance=Decimal("0.00"),
+            initial_balance_date=date(2026, 1, 1),
+            rent_tracking_start_date=date(2026, 6, 1),
+        )
+        self._make_old_lease(building, admin_user)
+
+        summary = DashboardService.get_late_payment_summary()
+        assert summary["total_late_leases"] == 0
+
+    @freeze_time("2026-06-20")
+    def test_prepaid_lease_still_excluded_under_boundary(self, building, admin_user):
+        """With the boundary set, a lease prepaid past the June due date is still
+        excluded from the late summary (prepaid logic works inside the bounded loop)."""
+        FinancialSettings.objects.create(
+            initial_balance=Decimal("0.00"),
+            initial_balance_date=date(2026, 1, 1),
+            rent_tracking_start_date=date(2026, 6, 1),
+        )
+        tenant = Tenant.objects.create(
+            name="Prepaid Boundary Tenant",
+            cpf_cnpj="20000000108",
+            phone="11900000020",
+            marital_status="Solteiro(a)",
+            profession="Dev",
+            due_day=10,
+            created_by=admin_user,
+            updated_by=admin_user,
+        )
+        apartment = Apartment.objects.create(
+            building=building,
+            number=502,
+            rental_value=Decimal("1200.00"),
+            cleaning_fee=Decimal("150.00"),
+            max_tenants=1,
+            created_by=admin_user,
+            updated_by=admin_user,
+        )
+        lease = Lease.objects.create(
+            apartment=apartment,
+            responsible_tenant=tenant,
+            start_date=date(2024, 7, 1),
+            validity_months=60,
+            tag_fee=Decimal("20.00"),
+            rental_value=Decimal("1200.00"),
+            # prepaid_until strictly after June 10 → June installment is prepaid.
+            prepaid_until=date(2026, 6, 11),
+            created_by=admin_user,
+            updated_by=admin_user,
+        )
+
+        summary = DashboardService.get_late_payment_summary()
+        late_ids = [item["lease_id"] for item in summary["late_leases"]]
+        assert lease.id not in late_ids
