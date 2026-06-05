@@ -29,7 +29,7 @@ from django.db import transaction
 from django.db.models import Count, QuerySet, Sum
 from django.utils import timezone
 
-from core.models import Apartment, Lease, MonthSnapshot, RentPayment
+from core.models import Apartment, FinancialSettings, Lease, MonthSnapshot, RentPayment
 from core.services.fee_calculator import FeeCalculatorService
 
 logger = logging.getLogger(__name__)
@@ -71,6 +71,25 @@ class RentScheduleService:
         return min(due_day, days_in_month)
 
     @staticmethod
+    def rent_tracking_start_month() -> date | None:
+        """First day of the month from which rent is tracked, or None if unbounded.
+
+        Driven by the FinancialSettings singleton. None means no boundary configured:
+        every month is tracked (legacy behavior).
+        """
+        financial_settings = FinancialSettings.objects.first()
+        if financial_settings is None or financial_settings.rent_tracking_start_date is None:
+            return None
+        return financial_settings.rent_tracking_start_date.replace(day=1)
+
+    @staticmethod
+    def is_month_tracked(year: int, month: int) -> bool:
+        """Whether the system tracks rent for (year, month). Months before the configured
+        tracking-start are considered already settled and are never collectible."""
+        start = RentScheduleService.rent_tracking_start_month()
+        return start is None or date(year, month, 1) >= start
+
+    @staticmethod
     def is_prepaid_for_month(lease: Lease, year: int, month: int) -> bool:
         """Whether the month's rent installment is already covered by prepayment.
 
@@ -94,7 +113,11 @@ class RentScheduleService:
         are structural and handled by collectible_leases, not here."""
         _, days_in_month = monthrange(year, month)
         started = lease.start_date <= date(year, month, days_in_month)
-        return started and not RentScheduleService.is_prepaid_for_month(lease, year, month)
+        return (
+            started
+            and RentScheduleService.is_month_tracked(year, month)
+            and not RentScheduleService.is_prepaid_for_month(lease, year, month)
+        )
 
     @staticmethod
     def effective_rental_value(lease: Lease, reference_month: date) -> Decimal:
@@ -142,6 +165,8 @@ class RentScheduleService:
         (which needs the clamped due date) is applied in Python over the reduced queryset.
         """
         year, month = reference_month.year, reference_month.month
+        if not RentScheduleService.is_month_tracked(year, month):
+            return Lease.objects.none()
         _, days_in_month = monthrange(year, month)
         month_end = date(year, month, days_in_month)
 

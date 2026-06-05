@@ -12,7 +12,7 @@ from django.contrib.auth import get_user_model
 from freezegun import freeze_time
 from model_bakery import baker
 
-from core.models import RentPayment
+from core.models import FinancialSettings, RentPayment
 from core.services.fee_calculator import FeeCalculatorService
 from core.services.rent_schedule_service import RentScheduleService
 from tests.factories import (
@@ -972,6 +972,130 @@ class TestIsCollectibleForMonth:
         )
         assert RentScheduleService.is_collectible_for_month(lease, 2026, 3) is False
         assert RentScheduleService.is_collectible_for_month(lease, 2026, 4) is True
+
+
+# ──────────────────────────────────────────
+# rent_tracking_start_month / is_month_tracked / tracking boundary
+# ──────────────────────────────────────────
+
+
+@pytest.mark.django_db
+class TestRentTrackingBoundary:
+    """Gating collectibility by FinancialSettings.rent_tracking_start_date."""
+
+    def _make_lease_for_boundary(self, building):
+        """Helper: a lease started May 2026, otherwise collectible from May onwards."""
+        apt = make_apartment(
+            building=building,
+            number=500,
+            rental_value=Decimal("1100.00"),
+            max_tenants=1,
+            is_rented=True,
+        )
+        tenant = make_tenant(cpf_cnpj="40000000396", name="Boundary Tenant", due_day=10)
+        return make_lease(
+            apartment=apt,
+            tenant=tenant,
+            start_date=date(2026, 5, 1),
+            validity_months=12,
+            rental_value=Decimal("1100.00"),
+        )
+
+    # 1. collectible_leases gated by boundary
+    def test_collectible_leases_empty_before_boundary(self, building) -> None:
+        FinancialSettings.objects.create(
+            initial_balance=Decimal("0.00"),
+            initial_balance_date=date(2026, 1, 1),
+            rent_tracking_start_date=date(2026, 6, 1),
+        )
+        lease = self._make_lease_for_boundary(building)
+        result = list(RentScheduleService.collectible_leases(date(2026, 5, 1)))
+        assert lease not in result
+
+    def test_collectible_leases_includes_lease_on_boundary_month(self, building) -> None:
+        FinancialSettings.objects.create(
+            initial_balance=Decimal("0.00"),
+            initial_balance_date=date(2026, 1, 1),
+            rent_tracking_start_date=date(2026, 6, 1),
+        )
+        lease = self._make_lease_for_boundary(building)
+        result = list(RentScheduleService.collectible_leases(date(2026, 6, 1)))
+        assert lease in result
+
+    # 2. is_collectible_for_month gated by boundary
+    def test_is_collectible_false_before_boundary(self, building) -> None:
+        FinancialSettings.objects.create(
+            initial_balance=Decimal("0.00"),
+            initial_balance_date=date(2026, 1, 1),
+            rent_tracking_start_date=date(2026, 6, 1),
+        )
+        lease = self._make_lease_for_boundary(building)
+        assert RentScheduleService.is_collectible_for_month(lease, 2026, 5) is False
+
+    def test_is_collectible_true_on_boundary_month(self, building) -> None:
+        FinancialSettings.objects.create(
+            initial_balance=Decimal("0.00"),
+            initial_balance_date=date(2026, 1, 1),
+            rent_tracking_start_date=date(2026, 6, 1),
+        )
+        lease = self._make_lease_for_boundary(building)
+        assert RentScheduleService.is_collectible_for_month(lease, 2026, 6) is True
+
+    # 3. No boundary → gate is a no-op
+    def test_no_boundary_collectible_leases_includes_lease(self, building) -> None:
+        # No FinancialSettings row at all — legacy behavior must be preserved.
+        lease = self._make_lease_for_boundary(building)
+        result = list(RentScheduleService.collectible_leases(date(2026, 5, 1)))
+        assert lease in result
+
+    def test_no_boundary_is_collectible_true(self, building) -> None:
+        lease = self._make_lease_for_boundary(building)
+        assert RentScheduleService.is_collectible_for_month(lease, 2026, 5) is True
+
+    # 4. rent_tracking_start_month() return values
+    def test_rent_tracking_start_month_none_when_no_row(self) -> None:
+        assert RentScheduleService.rent_tracking_start_month() is None
+
+    def test_rent_tracking_start_month_none_when_field_is_null(self) -> None:
+        FinancialSettings.objects.create(
+            initial_balance=Decimal("0.00"),
+            initial_balance_date=date(2026, 1, 1),
+            rent_tracking_start_date=None,
+        )
+        assert RentScheduleService.rent_tracking_start_month() is None
+
+    def test_rent_tracking_start_month_returns_first_of_month(self) -> None:
+        FinancialSettings.objects.create(
+            initial_balance=Decimal("0.00"),
+            initial_balance_date=date(2026, 1, 1),
+            rent_tracking_start_date=date(2026, 6, 1),
+        )
+        assert RentScheduleService.rent_tracking_start_month() == date(2026, 6, 1)
+
+    def test_rent_tracking_start_month_normalizes_mid_month_value(self) -> None:
+        FinancialSettings.objects.create(
+            initial_balance=Decimal("0.00"),
+            initial_balance_date=date(2026, 1, 1),
+            rent_tracking_start_date=date(2026, 6, 15),
+        )
+        assert RentScheduleService.rent_tracking_start_month() == date(2026, 6, 1)
+
+    # 5. Boundary respects month granularity
+    def test_is_month_tracked_true_for_boundary_month(self) -> None:
+        FinancialSettings.objects.create(
+            initial_balance=Decimal("0.00"),
+            initial_balance_date=date(2026, 1, 1),
+            rent_tracking_start_date=date(2026, 6, 1),
+        )
+        assert RentScheduleService.is_month_tracked(2026, 6) is True
+
+    def test_is_month_tracked_false_for_month_before_boundary(self) -> None:
+        FinancialSettings.objects.create(
+            initial_balance=Decimal("0.00"),
+            initial_balance_date=date(2026, 1, 1),
+            rent_tracking_start_date=date(2026, 6, 1),
+        )
+        assert RentScheduleService.is_month_tracked(2026, 5) is False
 
 
 def _find_item(schedule: dict, lease_id: int) -> dict:
