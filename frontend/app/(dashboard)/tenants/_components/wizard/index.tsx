@@ -202,7 +202,7 @@ export function TenantFormWizard({ open, tenant, onClose }: Props) {
   return (
     <>
       <Dialog open={open} onOpenChange={undefined}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[95vw] sm:w-full max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {tenant ? 'Editar Inquilino' : 'Novo Inquilino'}
@@ -217,7 +217,7 @@ export function TenantFormWizard({ open, tenant, onClose }: Props) {
 
           <Separator className="my-4" />
 
-          <DialogFooter className="flex justify-between sm:justify-between">
+          <DialogFooter className="flex flex-row justify-between sm:justify-between w-full">
             <div>
               {currentStep > 0 && (
                 <Button variant="outline" onClick={handlePrev}>

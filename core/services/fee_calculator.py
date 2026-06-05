@@ -133,12 +133,20 @@ class FeeCalculatorService:
 
         year, month = reference_date.year, reference_date.month
 
-        old_date = FeeCalculatorService._clamp_day(year, month, current_due_day)
+        if reference_date.day >= current_due_day:
+            old_year, old_month = year, month
+        else:
+            if month == 1:
+                old_year, old_month = year - 1, 12
+            else:
+                old_year, old_month = year, month - 1
+
+        old_date = FeeCalculatorService._clamp_day(old_year, old_month, current_due_day)
 
         if new_due_day > current_due_day:
-            new_date = FeeCalculatorService._clamp_day(year, month, new_due_day)
+            new_date = FeeCalculatorService._clamp_day(old_year, old_month, new_due_day)
         else:
-            next_start = DateCalculatorService.next_month_start(year, month)
+            next_start = DateCalculatorService.next_month_start(old_year, old_month)
             new_date = FeeCalculatorService._clamp_day(
                 next_start.year, next_start.month, new_due_day
             )

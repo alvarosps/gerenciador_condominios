@@ -57,11 +57,28 @@ export function formatPhone(phone: string): string {
 }
 
 /**
+ * Parse a date string into a Date.
+ *
+ * Date-only ISO strings (YYYY-MM-DD) are parsed as LOCAL calendar dates rather
+ * than UTC midnight, avoiding the off-by-one day shift that `new Date('YYYY-MM-DD')`
+ * causes in negative-offset timezones (e.g. Brazil UTC−3). Strings carrying a time
+ * component fall back to the native parser.
+ */
+function parseDateString(value: string): Date {
+  const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (dateOnly) {
+    const [, year, month, day] = dateOnly;
+    return new Date(Number(year), Number(month) - 1, Number(day));
+  }
+  return new Date(value);
+}
+
+/**
  * Format date to Brazilian format (DD/MM/YYYY)
  */
 export function formatDate(date: string | Date | null | undefined): string {
   if (!date) return '';
-  const dateObj = typeof date === 'string' ? new Date(date) : date;
+  const dateObj = typeof date === 'string' ? parseDateString(date) : date;
   if (isNaN(dateObj.getTime())) return '';
   return new Intl.DateTimeFormat('pt-BR').format(dateObj);
 }

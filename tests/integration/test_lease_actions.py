@@ -118,7 +118,7 @@ class TestChangeDueDate:
         assert response.data["change_fee"] == 550
         assert Decimal(str(response.data["total_due"])) == Decimal("2050.00")
 
-    @freeze_time("2026-03-15")
+    @freeze_time("2026-03-25")
     def test_change_due_date_wraps_to_next_month(self, authenticated_api_client, admin_user):
         """When new_due_day < current_due_day, the new date falls in the next month.
 
