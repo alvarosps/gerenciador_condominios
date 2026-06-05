@@ -125,11 +125,10 @@ class TestSendScheduledNotificationsCollectibility:
 
     @freeze_time("2026-06-16")
     def test_overdue_notification_sent_for_collectible_lease(self, building, admin_user):
-        """A collectible lease that is 6 days past due receives an 'overdue' notification.
-        today=2026-06-16, due_day=10 → days_past_due=6 (not in [1,5,15]).
-        Use due_day=10 with today=2026-06-15+1: days_past_due=5 ∈ _OVERDUE_CHECK_DAYS."""
-        # Use today=2026-06-16 and due_day=11 → days_past_due=5.
-        # Wait — let's use due_day=11, days_past_due=5.
+        """A collectible lease past due receives an 'overdue' notification.
+
+        today=2026-06-16, due_day=11 → days_past_due=5 ∈ _OVERDUE_CHECK_DAYS.
+        """
         apartment = _make_apartment(building, 101, admin_user)
         tenant = _make_tenant_with_user("11144477735", "Inquilino Normal", 11, admin_user)
         _make_lease(apartment, tenant, admin_user)
