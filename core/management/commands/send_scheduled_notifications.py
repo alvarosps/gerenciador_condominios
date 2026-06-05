@@ -25,6 +25,7 @@ from django.utils import timezone
 
 from core.models import Lease, RentPayment, Tenant
 from core.services.notification_service import create_notification, is_notification_sent_today
+from core.services.rent_schedule_service import RentScheduleService
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +60,11 @@ class Command(BaseCommand):
         today = timezone.now().date()
         sent_count = 0
 
+        reference_month = _current_reference_month(today)
+        collectible_ids = {
+            lease.pk for lease in RentScheduleService.collectible_leases(reference_month)
+        }
+
         active_leases = Lease.objects.filter(is_deleted=False).select_related(
             "responsible_tenant", "responsible_tenant__user", "apartment"
         )
@@ -68,8 +74,10 @@ class Command(BaseCommand):
             if not isinstance(tenant.user, User):
                 continue
 
-            due_day = tenant.due_day
-            sent_count += self._send_due_notifications(lease, tenant, tenant.user, today, due_day)
+            if lease.pk in collectible_ids:
+                sent_count += self._send_due_notifications(
+                    lease, tenant, tenant.user, today, tenant.due_day
+                )
             sent_count += self._send_contract_expiry_notification(lease, tenant.user, today)
 
         self.stdout.write(self.style.SUCCESS(f"Sent {sent_count} notifications."))
