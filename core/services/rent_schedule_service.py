@@ -202,9 +202,10 @@ class RentScheduleService:
         - owner-repass leases → ``(lease, False, "owner_repass")`` (surfaced, not toggleable);
         - salary-offset leases → ``(lease, False, "salary_offset")`` (surfaced, not toggleable).
 
-        Prepaid leases are intentionally NOT surfaced — they stay hidden, exactly as the
-        collectible set already hides them. That is why ``NonCollectibleReason`` has only the
-        owner-repass and salary-offset literals.
+        Prepaid leases — and leases in a month before the rent-tracking boundary
+        (``FinancialSettings.rent_tracking_start_date``) — are intentionally NOT surfaced:
+        they stay hidden, exactly as the collectible set already hides them. That is why
+        ``NonCollectibleReason`` has only the owner-repass and salary-offset literals.
         """
         year, month = reference_month.year, reference_month.month
         _, days_in_month = monthrange(year, month)
@@ -229,7 +230,8 @@ class RentScheduleService:
                 result.append((lease, False, "owner_repass"))
             elif lease.is_salary_offset:
                 result.append((lease, False, "salary_offset"))
-            # else: excluded only because prepaid → stays hidden (not surfaced).
+            # else: excluded because prepaid or because the month precedes the rent-tracking
+            # boundary → stays hidden (not surfaced as a non-collectible reason in either case).
         return result
 
     @staticmethod
