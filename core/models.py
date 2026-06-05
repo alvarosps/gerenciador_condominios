@@ -1420,6 +1420,14 @@ class FinancialSettings(models.Model):
     default_pix_key_type = models.CharField(
         max_length=10, blank=True, default="", choices=PIX_KEY_TYPE_CHOICES
     )
+    rent_tracking_start_date = models.DateField(
+        null=True,
+        blank=True,
+        help_text=(
+            "Sistema rastreia aluguéis (cobrança/atraso) a partir desta data; "
+            "meses anteriores são considerados quitados."
+        ),
+    )
 
     class Meta:
         verbose_name_plural = "Financial settings"
