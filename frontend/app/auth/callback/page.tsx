@@ -47,8 +47,9 @@ function OAuthCallbackContent() {
         onSuccess: () => {
           router.replace('/');
         },
-        onError: (err: any) => {
-          const isNotAdmin = err?.response?.data?.error === 'not_admin';
+        onError: (err: unknown) => {
+          const errorObj = err as { response?: { data?: { error?: string } } };
+          const isNotAdmin = errorObj?.response?.data?.error === 'not_admin';
           if (isNotAdmin) {
             router.replace('/login?error=not_admin');
           } else {
