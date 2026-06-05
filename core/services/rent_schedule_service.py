@@ -208,6 +208,8 @@ class RentScheduleService:
         ``NonCollectibleReason`` has only the owner-repass and salary-offset literals.
         """
         year, month = reference_month.year, reference_month.month
+        if not RentScheduleService.is_month_tracked(year, month):
+            return []
         _, days_in_month = monthrange(year, month)
         month_end = date(year, month, days_in_month)
 
