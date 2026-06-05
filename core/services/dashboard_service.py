@@ -375,8 +375,9 @@ class DashboardService:
                         curr_month_iter.month,
                     )
                     due_date = curr_month_iter.replace(day=due_day)
-
-                    if today > due_date:
+                    # Skip months whose first installment date precedes move-in: a lease
+                    # starting mid-month after the due day has no obligation for that month.
+                    if due_date >= lease.start_date and today > due_date:
                         late_days = (today - due_date).days
                         daily_rate = FeeCalculatorService.calculate_daily_rate(
                             RentScheduleService.effective_rental_value(lease, curr_month_iter)

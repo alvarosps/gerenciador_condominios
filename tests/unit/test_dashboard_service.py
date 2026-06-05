@@ -542,6 +542,95 @@ class TestLatePaymentSummarySSOT:
 
 
 # ---------------------------------------------------------------------------
+# get_late_payment_summary — start-date guard (Fix D)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestLatePaymentSummaryStartDateGuard:
+    """Regression tests: a lease whose due date falls before its start_date must not
+    be flagged as late for that month (the tenant was not yet living there)."""
+
+    @freeze_time("2026-06-25")
+    def test_lease_starting_after_due_day_not_late_for_that_month(self, building, admin_user):
+        """start_date=2026-06-20, due_day=10 → June-10 due date precedes move-in →
+        the lease must NOT appear in late_leases for June."""
+        apartment = Apartment.objects.create(
+            building=building,
+            number=420,
+            rental_value=Decimal("1200.00"),
+            cleaning_fee=Decimal("100.00"),
+            max_tenants=1,
+            created_by=admin_user,
+            updated_by=admin_user,
+        )
+        tenant = Tenant.objects.create(
+            name="Late After Move-In",
+            cpf_cnpj="20000000299",
+            is_company=False,
+            phone="11933330010",
+            marital_status="Solteiro(a)",
+            profession="Dev",
+            due_day=10,
+            created_by=admin_user,
+            updated_by=admin_user,
+        )
+        lease = Lease.objects.create(
+            apartment=apartment,
+            responsible_tenant=tenant,
+            start_date=date(2026, 6, 20),
+            validity_months=24,
+            tag_fee=Decimal("50.00"),
+            rental_value=Decimal("1200.00"),
+            created_by=admin_user,
+            updated_by=admin_user,
+        )
+
+        summary = DashboardService.get_late_payment_summary()
+        late_ids = [item["lease_id"] for item in summary["late_leases"]]
+        assert lease.id not in late_ids
+
+    @freeze_time("2026-06-25")
+    def test_lease_starting_before_due_day_is_late(self, building, admin_user):
+        """start_date=2026-06-05, due_day=10 → June-10 due date is after move-in →
+        the lease IS late when today=2026-06-25 and no payment exists."""
+        apartment = Apartment.objects.create(
+            building=building,
+            number=421,
+            rental_value=Decimal("1300.00"),
+            cleaning_fee=Decimal("100.00"),
+            max_tenants=1,
+            created_by=admin_user,
+            updated_by=admin_user,
+        )
+        tenant = Tenant.objects.create(
+            name="Late From Move-In",
+            cpf_cnpj="30000000388",
+            is_company=False,
+            phone="11933330011",
+            marital_status="Solteiro(a)",
+            profession="Dev",
+            due_day=10,
+            created_by=admin_user,
+            updated_by=admin_user,
+        )
+        lease = Lease.objects.create(
+            apartment=apartment,
+            responsible_tenant=tenant,
+            start_date=date(2026, 6, 5),
+            validity_months=24,
+            tag_fee=Decimal("50.00"),
+            rental_value=Decimal("1300.00"),
+            created_by=admin_user,
+            updated_by=admin_user,
+        )
+
+        summary = DashboardService.get_late_payment_summary()
+        late_ids = [item["lease_id"] for item in summary["late_leases"]]
+        assert lease.id in late_ids
+
+
+# ---------------------------------------------------------------------------
 # get_tenant_statistics
 # ---------------------------------------------------------------------------
 
