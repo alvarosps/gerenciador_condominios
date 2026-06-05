@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, Suspense, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm, type ControllerRenderProps } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -34,6 +34,28 @@ const loginSchema = z.object({
 });
 
 type LoginFormData = z.infer<typeof loginSchema>;
+
+/**
+ * Helper component to handle URL query parameters for login errors
+ */
+function URLParamsHandler({ setError }: { setError: (msg: string | null) => void }) {
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const errorParam = searchParams.get('error');
+    if (errorParam === 'not_admin') {
+      setError('Acesso negado. Esta conta do Google não tem permissão de administrador.');
+    } else if (errorParam === 'exchange_failed' || errorParam === 'oauth_failed') {
+      setError('Não foi possível concluir o login com o Google.');
+    } else if (errorParam === 'invalid_session') {
+      setError('Sessão de login inválida ou expirada.');
+    } else if (errorParam) {
+      setError('Ocorreu um erro durante a autenticação.');
+    }
+  }, [searchParams, setError]);
+
+  return null;
+}
 
 /**
  * Login page component
@@ -84,6 +106,9 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-secondary to-accent p-4">
+      <Suspense fallback={null}>
+        <URLParamsHandler setError={setError} />
+      </Suspense>
       <Card className="w-full max-w-md shadow-xl">
         <CardContent className="pt-6">
           <div className="text-center mb-8">
