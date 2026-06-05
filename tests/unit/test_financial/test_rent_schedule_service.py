@@ -12,7 +12,7 @@ from django.contrib.auth import get_user_model
 from freezegun import freeze_time
 from model_bakery import baker
 
-from core.models import RentPayment
+from core.models import FinancialSettings, RentPayment
 from core.services.fee_calculator import FeeCalculatorService
 from core.services.rent_schedule_service import RentScheduleService
 from tests.factories import (
@@ -972,6 +972,294 @@ class TestIsCollectibleForMonth:
         )
         assert RentScheduleService.is_collectible_for_month(lease, 2026, 3) is False
         assert RentScheduleService.is_collectible_for_month(lease, 2026, 4) is True
+
+
+# ──────────────────────────────────────────
+# rent_tracking_start_month / is_month_tracked / tracking boundary
+# ──────────────────────────────────────────
+
+
+@pytest.mark.django_db
+class TestRentTrackingBoundary:
+    """Gating collectibility by FinancialSettings.rent_tracking_start_date."""
+
+    def _make_lease_for_boundary(self, building):
+        """Helper: a lease started May 2026, otherwise collectible from May onwards."""
+        apt = make_apartment(
+            building=building,
+            number=500,
+            rental_value=Decimal("1100.00"),
+            max_tenants=1,
+            is_rented=True,
+        )
+        tenant = make_tenant(cpf_cnpj="40000000396", name="Boundary Tenant", due_day=10)
+        return make_lease(
+            apartment=apt,
+            tenant=tenant,
+            start_date=date(2026, 5, 1),
+            validity_months=12,
+            rental_value=Decimal("1100.00"),
+        )
+
+    # 1. collectible_leases gated by boundary
+    def test_collectible_leases_empty_before_boundary(self, building) -> None:
+        FinancialSettings.objects.create(
+            initial_balance=Decimal("0.00"),
+            initial_balance_date=date(2026, 1, 1),
+            rent_tracking_start_date=date(2026, 6, 1),
+        )
+        lease = self._make_lease_for_boundary(building)
+        result = list(RentScheduleService.collectible_leases(date(2026, 5, 1)))
+        assert lease not in result
+
+    def test_collectible_leases_includes_lease_on_boundary_month(self, building) -> None:
+        FinancialSettings.objects.create(
+            initial_balance=Decimal("0.00"),
+            initial_balance_date=date(2026, 1, 1),
+            rent_tracking_start_date=date(2026, 6, 1),
+        )
+        lease = self._make_lease_for_boundary(building)
+        result = list(RentScheduleService.collectible_leases(date(2026, 6, 1)))
+        assert lease in result
+
+    # 2. is_collectible_for_month gated by boundary
+    def test_is_collectible_false_before_boundary(self, building) -> None:
+        FinancialSettings.objects.create(
+            initial_balance=Decimal("0.00"),
+            initial_balance_date=date(2026, 1, 1),
+            rent_tracking_start_date=date(2026, 6, 1),
+        )
+        lease = self._make_lease_for_boundary(building)
+        assert RentScheduleService.is_collectible_for_month(lease, 2026, 5) is False
+
+    def test_is_collectible_true_on_boundary_month(self, building) -> None:
+        FinancialSettings.objects.create(
+            initial_balance=Decimal("0.00"),
+            initial_balance_date=date(2026, 1, 1),
+            rent_tracking_start_date=date(2026, 6, 1),
+        )
+        lease = self._make_lease_for_boundary(building)
+        assert RentScheduleService.is_collectible_for_month(lease, 2026, 6) is True
+
+    # 3. No boundary → gate is a no-op
+    def test_no_boundary_collectible_leases_includes_lease(self, building) -> None:
+        # No FinancialSettings row at all — legacy behavior must be preserved.
+        lease = self._make_lease_for_boundary(building)
+        result = list(RentScheduleService.collectible_leases(date(2026, 5, 1)))
+        assert lease in result
+
+    def test_no_boundary_is_collectible_true(self, building) -> None:
+        lease = self._make_lease_for_boundary(building)
+        assert RentScheduleService.is_collectible_for_month(lease, 2026, 5) is True
+
+    # 4. rent_tracking_start_month() return values
+    def test_rent_tracking_start_month_none_when_no_row(self) -> None:
+        assert RentScheduleService.rent_tracking_start_month() is None
+
+    def test_rent_tracking_start_month_none_when_field_is_null(self) -> None:
+        FinancialSettings.objects.create(
+            initial_balance=Decimal("0.00"),
+            initial_balance_date=date(2026, 1, 1),
+            rent_tracking_start_date=None,
+        )
+        assert RentScheduleService.rent_tracking_start_month() is None
+
+    def test_rent_tracking_start_month_returns_first_of_month(self) -> None:
+        FinancialSettings.objects.create(
+            initial_balance=Decimal("0.00"),
+            initial_balance_date=date(2026, 1, 1),
+            rent_tracking_start_date=date(2026, 6, 1),
+        )
+        assert RentScheduleService.rent_tracking_start_month() == date(2026, 6, 1)
+
+    def test_rent_tracking_start_month_normalizes_mid_month_value(self) -> None:
+        FinancialSettings.objects.create(
+            initial_balance=Decimal("0.00"),
+            initial_balance_date=date(2026, 1, 1),
+            rent_tracking_start_date=date(2026, 6, 15),
+        )
+        assert RentScheduleService.rent_tracking_start_month() == date(2026, 6, 1)
+
+    # 5. Boundary respects month granularity
+    def test_is_month_tracked_true_for_boundary_month(self) -> None:
+        FinancialSettings.objects.create(
+            initial_balance=Decimal("0.00"),
+            initial_balance_date=date(2026, 1, 1),
+            rent_tracking_start_date=date(2026, 6, 1),
+        )
+        assert RentScheduleService.is_month_tracked(2026, 6) is True
+
+    def test_is_month_tracked_false_for_month_before_boundary(self) -> None:
+        FinancialSettings.objects.create(
+            initial_balance=Decimal("0.00"),
+            initial_balance_date=date(2026, 1, 1),
+            rent_tracking_start_date=date(2026, 6, 1),
+        )
+        assert RentScheduleService.is_month_tracked(2026, 5) is False
+
+    # 6. displayable_leases gated by boundary (Fix A)
+    def test_displayable_leases_empty_before_boundary(self, building) -> None:
+        """A month before the boundary must render an empty calendar (owner-repass and
+        salary-offset rows must also be hidden, matching the docstring claim)."""
+        FinancialSettings.objects.create(
+            initial_balance=Decimal("0.00"),
+            initial_balance_date=date(2026, 1, 1),
+            rent_tracking_start_date=date(2026, 6, 1),
+        )
+        # Owner-repass lease
+        owner = make_person(name="Proprietário Fix A")
+        owner_apt = make_apartment(
+            building=building,
+            number=510,
+            rental_value=Decimal("900.00"),
+            max_tenants=1,
+            is_rented=True,
+            owner=owner,
+        )
+        owner_tenant = make_tenant(cpf_cnpj="40000000477", name="Repasse Fix A", due_day=10)
+        make_lease(
+            apartment=owner_apt,
+            tenant=owner_tenant,
+            start_date=date(2026, 1, 1),
+            validity_months=24,
+            rental_value=Decimal("900.00"),
+        )
+        # Salary-offset lease
+        salary_apt = make_apartment(
+            building=building,
+            number=511,
+            rental_value=Decimal("800.00"),
+            max_tenants=1,
+            is_rented=True,
+        )
+        salary_tenant = make_tenant(cpf_cnpj="50000000566", name="Salário Fix A", due_day=5)
+        make_lease(
+            apartment=salary_apt,
+            tenant=salary_tenant,
+            start_date=date(2026, 1, 1),
+            validity_months=24,
+            rental_value=Decimal("800.00"),
+            is_salary_offset=True,
+        )
+        # Normal collectible lease
+        normal_apt = make_apartment(
+            building=building,
+            number=512,
+            rental_value=Decimal("1100.00"),
+            max_tenants=1,
+            is_rented=True,
+        )
+        normal_tenant = make_tenant(cpf_cnpj="60000000655", name="Normal Fix A", due_day=15)
+        make_lease(
+            apartment=normal_apt,
+            tenant=normal_tenant,
+            start_date=date(2026, 1, 1),
+            validity_months=24,
+            rental_value=Decimal("1100.00"),
+        )
+        # Pre-boundary month → empty
+        assert RentScheduleService.displayable_leases(date(2026, 5, 1)) == []
+
+    def test_displayable_leases_shows_normal_lease_on_boundary_month(self, building) -> None:
+        """On the boundary month, a collectible lease appears as (lease, True, None)."""
+        FinancialSettings.objects.create(
+            initial_balance=Decimal("0.00"),
+            initial_balance_date=date(2026, 1, 1),
+            rent_tracking_start_date=date(2026, 6, 1),
+        )
+        normal_apt = make_apartment(
+            building=building,
+            number=513,
+            rental_value=Decimal("1100.00"),
+            max_tenants=1,
+            is_rented=True,
+        )
+        normal_tenant = make_tenant(cpf_cnpj="70000000663", name="Normal Boundary", due_day=15)
+        normal_lease = make_lease(
+            apartment=normal_apt,
+            tenant=normal_tenant,
+            start_date=date(2026, 1, 1),
+            validity_months=24,
+            rental_value=Decimal("1100.00"),
+        )
+        result = RentScheduleService.displayable_leases(date(2026, 6, 1))
+        assert (normal_lease, True, None) in result
+
+    def test_displayable_leases_no_boundary_includes_owner_salary(self, building) -> None:
+        """With no FinancialSettings row (no boundary), owner/salary-offset rows still appear
+        (legacy NO-OP behavior must be preserved)."""
+        # Owner-repass lease
+        owner = make_person(name="Proprietário No Boundary")
+        owner_apt = make_apartment(
+            building=building,
+            number=514,
+            rental_value=Decimal("900.00"),
+            max_tenants=1,
+            is_rented=True,
+            owner=owner,
+        )
+        owner_tenant = make_tenant(cpf_cnpj="70000000744", name="Repasse No Boundary", due_day=10)
+        owner_lease = make_lease(
+            apartment=owner_apt,
+            tenant=owner_tenant,
+            start_date=date(2026, 1, 1),
+            validity_months=24,
+            rental_value=Decimal("900.00"),
+        )
+        # Salary-offset lease
+        salary_apt = make_apartment(
+            building=building,
+            number=515,
+            rental_value=Decimal("800.00"),
+            max_tenants=1,
+            is_rented=True,
+        )
+        salary_tenant = make_tenant(cpf_cnpj="80000000833", name="Salário No Boundary", due_day=5)
+        salary_lease = make_lease(
+            apartment=salary_apt,
+            tenant=salary_tenant,
+            start_date=date(2026, 1, 1),
+            validity_months=24,
+            rental_value=Decimal("800.00"),
+            is_salary_offset=True,
+        )
+        # No boundary → both must appear
+        result = RentScheduleService.displayable_leases(date(2026, 5, 1))
+        leases_in_result = [item[0] for item in result]
+        assert owner_lease in leases_in_result
+        assert salary_lease in leases_in_result
+
+    # 7. toggle_payment refused for pre-boundary month (Fix C)
+    @freeze_time("2026-06-10")
+    def test_toggle_payment_refused_for_pre_boundary_month(self, building, admin_user) -> None:
+        """When the current month is tracked (June) but the requested month is before the
+        boundary (May), toggle_payment must return an error and leave no RentPayment."""
+        FinancialSettings.objects.create(
+            initial_balance=Decimal("0.00"),
+            initial_balance_date=date(2026, 1, 1),
+            rent_tracking_start_date=date(2026, 6, 1),
+        )
+        apt = make_apartment(
+            building=building,
+            number=520,
+            rental_value=Decimal("1100.00"),
+            max_tenants=1,
+            is_rented=True,
+        )
+        tenant = make_tenant(cpf_cnpj="90000000922", name="Toggle Boundary", due_day=10)
+        lease = make_lease(
+            apartment=apt,
+            tenant=tenant,
+            start_date=date(2026, 1, 1),
+            validity_months=24,
+            rental_value=Decimal("1100.00"),
+        )
+        result = RentScheduleService.toggle_payment(lease.id, date(2026, 5, 1), admin_user)
+        assert result["status"] == "error"
+        assert "não é cobrável" in result["message"]
+        assert not RentPayment.objects.filter(
+            lease=lease, reference_month=date(2026, 5, 1)
+        ).exists()
 
 
 def _find_item(schedule: dict, lease_id: int) -> dict:

@@ -33,6 +33,7 @@ from .models import (
     Expense,
     ExpenseInstallment,
     ExpenseMonthSkip,
+    FinancialSettings,
     Furniture,
     Income,
     Lease,
@@ -377,6 +378,17 @@ def invalidate_rent_payment_cache_on_delete(
     sender: type[RentPayment], instance: RentPayment, **kwargs: Any
 ) -> None:
     _invalidate_rent_payment_caches(instance.pk)
+
+
+@receiver(post_save, sender=FinancialSettings)
+def invalidate_financial_settings_cache_on_save(
+    sender: type[FinancialSettings], instance: FinancialSettings, **kwargs: Any
+) -> None:
+    """FinancialSettings drives the rent-tracking boundary and other financial config,
+    which changes collectibility, overdue and cash-flow results — invalidate the
+    financial AND late-payment dashboard caches."""
+    _invalidate_financial_caches("FinancialSettings", instance.pk)
+    CacheManager.invalidate_pattern("dashboard-late-payment*")
 
 
 @receiver(post_save, sender=Expense)

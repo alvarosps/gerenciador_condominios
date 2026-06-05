@@ -9,6 +9,7 @@ from core.models import (
     Apartment,
     Building,
     Dependent,
+    FinancialSettings,
     Furniture,
     Lease,
     Tenant,
@@ -373,3 +374,32 @@ class TestSignalConnectDisconnect:
         # Signal reconnected — but disconnect removed receivers; behavior may differ
         # Main goal: no exception raised
         assert lease.pk is not None
+
+
+# =============================================================================
+# FinancialSettings cache invalidation signal
+# =============================================================================
+
+
+@pytest.mark.unit
+class TestFinancialSettingsSignal:
+    def test_financial_settings_save_invalidates_financial_and_late_payment_caches(
+        self, mocker
+    ) -> None:
+        """Saving FinancialSettings triggers invalidation of financial dashboard
+        and late-payment caches — verifies the receiver calls the right patterns."""
+        from core.cache import CacheManager
+
+        spy = mocker.spy(CacheManager, "invalidate_pattern")
+
+        settings = FinancialSettings(
+            initial_balance=0,
+            initial_balance_date=date(2024, 1, 1),
+        )
+        settings.save()
+
+        called_patterns = [call.args[0] for call in spy.call_args_list]
+        assert "daily-control*" in called_patterns
+        assert "cash-flow*" in called_patterns
+        assert "financial-dashboard*" in called_patterns
+        assert "dashboard-late-payment*" in called_patterns
