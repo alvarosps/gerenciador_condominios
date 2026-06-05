@@ -31,16 +31,14 @@ function OAuthCallbackContent() {
     const code = searchParams.get('code');
 
     if (error) {
-      toast.error('Falha no login com Google.');
-      router.replace('/login');
+      router.replace(`/login?error=${error}`);
       return;
     }
 
     if (!code) {
       // No code and no error: a direct hit or a misconfigured backend redirect.
       // Surface it instead of bouncing silently, so setup issues are observable.
-      toast.error('Sessão de login inválida.');
-      router.replace('/login');
+      router.replace('/login?error=invalid_session');
       return;
     }
 
@@ -50,9 +48,13 @@ function OAuthCallbackContent() {
         onSuccess: () => {
           router.replace('/');
         },
-        onError: () => {
-          toast.error('Não foi possível concluir o login com Google.');
-          router.replace('/login');
+        onError: (err: any) => {
+          const isNotAdmin = err?.response?.data?.error === 'not_admin';
+          if (isNotAdmin) {
+            router.replace('/login?error=not_admin');
+          } else {
+            router.replace('/login?error=exchange_failed');
+          }
         },
       }
     );

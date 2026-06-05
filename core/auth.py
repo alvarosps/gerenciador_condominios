@@ -154,6 +154,14 @@ def exchange_oauth_code(request: Request) -> Response:
     exchange.save(update_fields=["is_used"])
 
     user = exchange.user
+    
+    if not user.is_staff:
+        # Require admin access for this endpoint (Google OAuth login is only for admins)
+        return Response(
+            {"error": "not_admin", "detail": "Acesso negado. Esta conta não possui permissões de administrador."}, 
+            status=403
+        )
+
     response = Response(
         {
             "user": {
