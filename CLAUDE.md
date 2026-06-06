@@ -1,6 +1,6 @@
 # Condominios Manager
 
-Sistema de gestão de imóveis para locação no Brasil — Django 5.2 + DRF (backend), Next.js 14 + React 18 (frontend), PostgreSQL 15.
+Sistema de gestão de imóveis para locação no Brasil — Django 5.2 + DRF (backend), Next.js 14 + React 18 (frontend), PostgreSQL (Supabase 17 em prod, 18 local).
 
 ## Arquitetura
 
@@ -121,6 +121,12 @@ Sequenciais. Rode `python manage.py showmigrations core` para o estado atual —
 - Backend `.env`: `SECRET_KEY`, `DEBUG`, `DB_PORT` (default 5432, atualmente 5433), `GOOGLE_CLIENT_ID/SECRET`
 - Frontend `.env.local`: `NEXT_PUBLIC_API_URL=http://localhost:8008/api`
 - CORS: `localhost:4000`, `localhost:6000`
+
+## Produção / Supabase (regras canônicas: `.claude/rules/database.md` + `security.md`)
+
+- Prod = Supabase (projeto `kaukiwhbmvnjjekodcmq`, us-west-2, Postgres 17); local = Postgres `localhost:5433` DB `condominio` (PG 18). Ambos conectam como role `postgres` (`rolbypassrls=true`).
+- CRITICAL: **RLS habilitado em TODAS as tabelas `public`** (Supabase expõe `public` via Data API a `anon`/`authenticated`; o app só usa o backend Django, que faz bypass). RLS sem policies = deny-all aos roles da API — o aviso `rls_enabled_no_policy` (INFO) é o estado correto. Toda tabela nova habilita RLS na mesma migration (padrão: `core/migrations/0047_enable_row_level_security.py`).
+- Backup/sync prod→local: `pg_dump "<uri>" --schema=public --no-owner --no-acl` → `scripts/restore_db.py <dump> --yes` (mirror exato; NÃO rodar `migrate` depois). O MCP do Supabase NÃO faz `pg_dump` nem expõe a senha — pegar a connection string no Dashboard → Connect.
 
 ## Skills — Plugin vs Projeto
 
