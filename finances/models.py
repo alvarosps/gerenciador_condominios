@@ -32,7 +32,15 @@ from django.db.models import (
 )
 from django.db.models.functions import Coalesce
 
-from core.models import AuditMixin, Building, Condominium, SoftDeleteManager, SoftDeleteMixin
+from core.models import (
+    AuditMixin,
+    Building,
+    Condominium,
+    Lease,
+    Person,
+    SoftDeleteManager,
+    SoftDeleteMixin,
+)
 
 _MONEY: DecimalField = DecimalField(max_digits=12, decimal_places=2)
 _ZERO_MONEY = Value(Decimal(0), output_field=_MONEY)
@@ -206,9 +214,9 @@ BillManager = SoftDeleteManager.from_queryset(BillQuerySet)
 class Bill(AuditMixin, SoftDeleteMixin, models.Model):
     """A payable (real). amount_* via Bill.objects.with_amounts(today) — never a Python property.
 
-    Source FKs: only billing_account now. Bill.installment and Bill.employee are added
-    in Session 41 (the Installment/Employee models do not exist yet); behavior already
-    includes INSTALLMENT.
+    Source FKs: billing_account (S36, recurring), installment (S41, non-embedded plan),
+    employee (S41, payroll). on_delete=SET_NULL so deleting a plan/employee never erases
+    the real Bill history (past = real lines, design §3.2). behavior includes INSTALLMENT.
     """
 
     condominium = models.ForeignKey(Condominium, on_delete=models.PROTECT, related_name="bills")
@@ -227,6 +235,12 @@ class Bill(AuditMixin, SoftDeleteMixin, models.Model):
     billing_account = models.ForeignKey(
         BillingAccount, null=True, blank=True, on_delete=models.SET_NULL, related_name="bills"
     )
+    installment = models.ForeignKey(
+        "Installment", null=True, blank=True, on_delete=models.SET_NULL, related_name="bills"
+    )
+    employee = models.ForeignKey(
+        "Employee", null=True, blank=True, on_delete=models.SET_NULL, related_name="bills"
+    )
     lifecycle_state = models.CharField(
         max_length=20, choices=BillLifecycleState.choices, default=BillLifecycleState.ACTIVE
     )
@@ -244,6 +258,16 @@ class Bill(AuditMixin, SoftDeleteMixin, models.Model):
                 condition=Q(is_deleted=False, billing_account__isnull=False),
                 name="unique_active_bill_per_account_month",
             ),
+            models.UniqueConstraint(
+                fields=["installment"],
+                condition=Q(is_deleted=False, installment__isnull=False),
+                name="unique_active_bill_per_installment",
+            ),
+            models.UniqueConstraint(
+                fields=["employee", "competence_month"],
+                condition=Q(is_deleted=False, employee__isnull=False),
+                name="unique_active_bill_per_employee_month",
+            ),
         ]
 
     def __str__(self) -> str:
@@ -258,12 +282,16 @@ class Bill(AuditMixin, SoftDeleteMixin, models.Model):
 class BillLineItem(AuditMixin, SoftDeleteMixin, models.Model):
     """A line of a Bill. is_offset: stored POSITIVE, subtracted (design §4.1).
 
-    The installment FK (embedded installment) is added in Session 41.
+    installment marks an embedded-installment line (the parcela on a recurring
+    account's Bill); dedup on (bill, installment) keeps generation idempotent (S41).
     """
 
     bill = models.ForeignKey(Bill, on_delete=models.CASCADE, related_name="line_items")
     category = models.ForeignKey(
         Category, null=True, blank=True, on_delete=models.PROTECT, related_name="line_items"
+    )
+    installment = models.ForeignKey(
+        "Installment", null=True, blank=True, on_delete=models.SET_NULL, related_name="line_items"
     )
     description = models.CharField(max_length=500)
     amount = models.DecimalField(max_digits=12, decimal_places=2)  # >= 0
@@ -371,3 +399,179 @@ class BillSkip(AuditMixin, models.Model):
         super().clean()
         if self.reference_month is not None:
             self.reference_month = self.reference_month.replace(day=1)
+
+
+class InstallmentPlanState(models.TextChoices):
+    ACTIVE = "active", "Ativo"
+    PAID = "paid", "Quitado"
+    DEFERRED = "deferred", "Adiado"
+    CANCELED = "canceled", "Cancelado"
+
+
+class EmployeePaymentType(models.TextChoices):
+    FIXED = "fixed", "Fixo"
+    VARIABLE = "variable", "Variável"
+    MIXED = "mixed", "Misto"
+
+
+class InstallmentPlan(AuditMixin, SoftDeleteMixin, models.Model):
+    """Installment plan (embedded OR standalone). Materializes Installments (schedule)."""
+
+    condominium = models.ForeignKey(
+        Condominium, on_delete=models.PROTECT, related_name="installment_plans"
+    )
+    building = models.ForeignKey(
+        Building, null=True, blank=True, on_delete=models.PROTECT, related_name="installment_plans"
+    )  # null = condominium level
+    category = models.ForeignKey(
+        Category, null=True, blank=True, on_delete=models.PROTECT, related_name="installment_plans"
+    )
+    description = models.CharField(max_length=500)
+    total_amount = models.DecimalField(max_digits=12, decimal_places=2)  # >= 0
+    installment_count = models.PositiveSmallIntegerField()  # > 0
+    start_due_date = models.DateField()
+    default_due_day = models.PositiveSmallIntegerField(
+        validators=[MinValueValidator(1), MaxValueValidator(31)]
+    )
+    lifecycle_state = models.CharField(
+        max_length=20,
+        choices=InstallmentPlanState.choices,
+        default=InstallmentPlanState.ACTIVE,
+    )
+    embedded = models.BooleanField(
+        default=False
+    )  # True = the parcela is a line on the account's Bill
+    linked_billing_account = models.ForeignKey(
+        BillingAccount,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="installment_plans",
+    )  # only for embedded plans
+    notes = models.TextField(blank=True)
+
+    all_objects = models.Manager()
+    objects = SoftDeleteManager()
+
+    class Meta:
+        ordering = ["start_due_date", "description"]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(total_amount__gte=0),
+                name="installment_plan_total_amount_non_negative",
+            ),
+            models.CheckConstraint(
+                condition=Q(installment_count__gt=0),
+                name="installment_plan_count_positive",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.description} ({self.installment_count}x)"
+
+    def clean(self) -> None:
+        super().clean()
+        if self.total_amount is not None and self.total_amount < 0:
+            raise ValidationError({"total_amount": "O valor total não pode ser negativo."})
+        if self.installment_count is not None and self.installment_count <= 0:
+            raise ValidationError({"installment_count": "O número de parcelas deve ser positivo."})
+        # embedded ⇒ linked account required; standalone ⇒ no linked account (design §7).
+        if self.embedded and self.linked_billing_account_id is None:
+            raise ValidationError(
+                {"linked_billing_account": "Plano embutido exige uma conta recorrente vinculada."}
+            )
+        if not self.embedded and self.linked_billing_account_id is not None:
+            raise ValidationError(
+                {"linked_billing_account": "Plano avulso não pode ter conta recorrente vinculada."}
+            )
+
+
+class Installment(AuditMixin, SoftDeleteMixin, models.Model):
+    """A concrete installment (schedule). amount is the projection; copied to the
+    BillLineItem.amount (realized) at materialization — schedule→realized only (S41)."""
+
+    plan = models.ForeignKey(InstallmentPlan, on_delete=models.CASCADE, related_name="installments")
+    number = models.PositiveSmallIntegerField()
+    due_date = models.DateField()
+    amount = models.DecimalField(max_digits=12, decimal_places=2)  # >= 0; SCHEDULE
+
+    all_objects = models.Manager()
+    objects = SoftDeleteManager()
+
+    class Meta:
+        ordering = ["due_date", "number"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["plan", "number"],
+                condition=Q(is_deleted=False),
+                name="unique_active_installment_per_plan_number",
+            ),
+            models.CheckConstraint(
+                condition=Q(amount__gte=0),
+                name="finance_installment_amount_non_negative",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.plan.description} - Parcela {self.number}/{self.plan.installment_count}"
+
+    def clean(self) -> None:
+        super().clean()
+        if self.amount is not None and self.amount < 0:
+            raise ValidationError({"amount": "O valor da parcela não pode ser negativo."})
+
+
+class Employee(AuditMixin, SoftDeleteMixin, models.Model):
+    """Payroll registry. The monthly payment is a Bill(employee=…) with lines (design §4.6)."""
+
+    condominium = models.ForeignKey(Condominium, on_delete=models.PROTECT, related_name="employees")
+    person = models.ForeignKey(
+        Person, null=True, blank=True, on_delete=models.SET_NULL, related_name="finance_employees"
+    )
+    name = models.CharField(max_length=200)
+    role = models.CharField(max_length=200, blank=True)
+    payment_type = models.CharField(max_length=10, choices=EmployeePaymentType.choices)
+    base_salary = models.DecimalField(
+        max_digits=12, decimal_places=2, null=True, blank=True
+    )  # null/0 for variable-only
+    default_due_day = models.PositiveSmallIntegerField(
+        validators=[MinValueValidator(1), MaxValueValidator(31)]
+    )
+    lease = models.ForeignKey(
+        Lease, null=True, blank=True, on_delete=models.SET_NULL, related_name="finance_employees"
+    )  # salary-offset (Rosa, 850/205)
+    is_active = models.BooleanField(default=True)
+    notes = models.TextField(blank=True)
+
+    all_objects = models.Manager()
+    objects = SoftDeleteManager()
+
+    class Meta:
+        ordering = ["name"]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(base_salary__isnull=True) | Q(base_salary__gte=0),
+                name="employee_base_salary_non_negative_or_null",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.name} ({self.get_payment_type_display()})"
+
+    def clean(self) -> None:
+        super().clean()
+        if self.base_salary is not None and self.base_salary < 0:
+            raise ValidationError({"base_salary": "O salário base não pode ser negativo."})
+        needs_base = self.payment_type in (EmployeePaymentType.FIXED, EmployeePaymentType.MIXED)
+        if needs_base and (self.base_salary is None or self.base_salary <= 0):
+            raise ValidationError(
+                {"base_salary": "Funcionário fixo/misto exige um salário base positivo."}
+            )
+        if (
+            self.payment_type == EmployeePaymentType.VARIABLE
+            and self.base_salary is not None
+            and self.base_salary > 0
+        ):
+            raise ValidationError(
+                {"base_salary": "Funcionário variável não pode ter salário base."}
+            )
