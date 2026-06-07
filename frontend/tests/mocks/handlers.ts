@@ -30,13 +30,20 @@ import {
   createMockBill,
   createMockBillingAccount,
   createMockBillSkip,
+  createMockByCategory,
   createMockCombinedCalendar,
+  createMockCondoMonthClose,
   createMockEmployee,
   createMockFinanceCategory,
+  createMockFinanceOverview,
+  createMockIncomeEntry,
   createMockInstallment,
   createMockInstallmentPlan,
+  createMockMonthlyBalance,
   createMockOverdueResponse,
   createMockPayment,
+  createMockReserve,
+  createMockReserveMovement,
 } from './data/finances';
 
 const API_BASE = 'http://localhost:8008/api';
@@ -2451,6 +2458,162 @@ const installmentPayrollHandlers = [
   }),
 ];
 
+// --- Phase 4 (Session 46): reserve / income / month-close / balance dashboard ---
+
+const financesReserveHandlers = [
+  http.get(`${API_BASE}/finances/reserves/`, () => {
+    return HttpResponse.json([createMockReserve()]);
+  }),
+
+  http.get(`${API_BASE}/finances/reserves/:id/`, ({ params }) => {
+    const id = Number(params.id);
+    if (id === 9999) return new HttpResponse(null, { status: 404 });
+    return HttpResponse.json(createMockReserve({ id }));
+  }),
+
+  http.post(`${API_BASE}/finances/reserves/`, async ({ request }) => {
+    await delay(100);
+    const data = (await request.json()) as Record<string, unknown>;
+    return HttpResponse.json(createMockReserve({ id: 10, ...data }), { status: 201 });
+  }),
+
+  http.put(`${API_BASE}/finances/reserves/:id/`, async ({ params, request }) => {
+    await delay(100);
+    const id = Number(params.id);
+    const data = (await request.json()) as Record<string, unknown>;
+    return HttpResponse.json(createMockReserve({ id, ...data }));
+  }),
+
+  http.delete(`${API_BASE}/finances/reserves/:id/`, ({ params }) => {
+    const id = Number(params.id);
+    if (id === 9999) return new HttpResponse(null, { status: 404 });
+    return new HttpResponse(null, { status: 204 });
+  }),
+
+  http.post(`${API_BASE}/finances/reserves/:id/deposit/`, async ({ params, request }) => {
+    await delay(100);
+    const id = Number(params.id);
+    const data = (await request.json()) as Record<string, unknown>;
+    const amount = Number(data.amount ?? 0);
+    return HttpResponse.json(createMockReserve({ id, balance: 5000 + amount }));
+  }),
+
+  http.post(`${API_BASE}/finances/reserves/:id/withdraw/`, async ({ params, request }) => {
+    await delay(100);
+    const id = Number(params.id);
+    const data = (await request.json()) as Record<string, unknown>;
+    const amount = Number(data.amount ?? 0);
+    return HttpResponse.json(createMockReserve({ id, balance: 5000 - amount }));
+  }),
+];
+
+const financesReserveMovementHandlers = [
+  http.get(`${API_BASE}/finances/reserve-movements/`, () => {
+    return HttpResponse.json([
+      createMockReserveMovement(),
+      createMockReserveMovement({ id: 2, kind: 'withdrawal', amount: 500 }),
+    ]);
+  }),
+
+  http.get(`${API_BASE}/finances/reserve-movements/:id/`, ({ params }) => {
+    const id = Number(params.id);
+    if (id === 9999) return new HttpResponse(null, { status: 404 });
+    return HttpResponse.json(createMockReserveMovement({ id }));
+  }),
+];
+
+const financesIncomeEntryHandlers = [
+  http.get(`${API_BASE}/finances/income-entries/`, () => {
+    return HttpResponse.json([
+      createMockIncomeEntry(),
+      createMockIncomeEntry({ id: 2, amount: 300, description: 'Outra receita' }),
+    ]);
+  }),
+
+  http.get(`${API_BASE}/finances/income-entries/:id/`, ({ params }) => {
+    const id = Number(params.id);
+    if (id === 9999) return new HttpResponse(null, { status: 404 });
+    return HttpResponse.json(createMockIncomeEntry({ id }));
+  }),
+
+  http.post(`${API_BASE}/finances/income-entries/`, async ({ request }) => {
+    await delay(100);
+    const data = (await request.json()) as Record<string, unknown>;
+    return HttpResponse.json(createMockIncomeEntry({ id: 10, ...data }), { status: 201 });
+  }),
+
+  http.put(`${API_BASE}/finances/income-entries/:id/`, async ({ params, request }) => {
+    await delay(100);
+    const id = Number(params.id);
+    const data = (await request.json()) as Record<string, unknown>;
+    return HttpResponse.json(createMockIncomeEntry({ id, ...data }));
+  }),
+
+  http.delete(`${API_BASE}/finances/income-entries/:id/`, ({ params }) => {
+    const id = Number(params.id);
+    if (id === 9999) return new HttpResponse(null, { status: 404 });
+    return new HttpResponse(null, { status: 204 });
+  }),
+];
+
+const financesCondoMonthCloseHandlers = [
+  http.get(`${API_BASE}/finances/condo-month-closes/`, () => {
+    return HttpResponse.json([
+      createMockCondoMonthClose(),
+      createMockCondoMonthClose({
+        id: 2,
+        reference_month: '2026-06-01',
+        status: 'open',
+        closed_at: null,
+      }),
+    ]);
+  }),
+
+  http.get(`${API_BASE}/finances/condo-month-closes/:id/`, ({ params }) => {
+    const id = Number(params.id);
+    if (id === 9999) return new HttpResponse(null, { status: 404 });
+    return HttpResponse.json(createMockCondoMonthClose({ id }));
+  }),
+
+  http.post(`${API_BASE}/finances/condo-month-closes/close/`, async ({ request }) => {
+    await delay(100);
+    const data = (await request.json()) as { year: number; month: number };
+    return HttpResponse.json(
+      createMockCondoMonthClose({
+        reference_month: `${data.year}-${String(data.month).padStart(2, '0')}-01`,
+        status: 'closed',
+        closed_at: '2026-06-07T00:00:00Z',
+      }),
+    );
+  }),
+
+  http.post(`${API_BASE}/finances/condo-month-closes/reopen/`, async ({ request }) => {
+    await delay(100);
+    const data = (await request.json()) as { year: number; month: number };
+    return HttpResponse.json(
+      createMockCondoMonthClose({
+        reference_month: `${data.year}-${String(data.month).padStart(2, '0')}-01`,
+        status: 'open',
+        closed_at: null,
+      }),
+    );
+  }),
+];
+
+const financesDashboardHandlers = [
+  http.get(`${API_BASE}/finances/finance-dashboard/overview/`, () => {
+    return HttpResponse.json(createMockFinanceOverview());
+  }),
+
+  http.get(`${API_BASE}/finances/finance-dashboard/monthly_balance/`, () => {
+    return HttpResponse.json(createMockMonthlyBalance());
+  }),
+
+  http.get(`${API_BASE}/finances/finance-dashboard/by_category/`, () => {
+    return HttpResponse.json(createMockByCategory());
+  }),
+];
+
 /**
  * All handlers combined
  */
@@ -2486,4 +2649,9 @@ export const handlers = [
   ...webPushHandlers,
   ...financeHandlers,
   ...installmentPayrollHandlers,
+  ...financesReserveHandlers,
+  ...financesReserveMovementHandlers,
+  ...financesIncomeEntryHandlers,
+  ...financesCondoMonthCloseHandlers,
+  ...financesDashboardHandlers,
 ];

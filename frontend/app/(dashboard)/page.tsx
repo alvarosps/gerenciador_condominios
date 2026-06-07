@@ -7,9 +7,14 @@ import { LatePaymentsAlert } from './_components/late-payments-alert';
 import { RentAdjustmentAlerts } from './_components/rent-adjustment-alerts';
 import { RentCalendarSection } from './_components/rent-calendar/rent-calendar-section';
 import { CombinedCalendarSection } from './_components/finance-calendar/combined-calendar-section';
+import { FinanceKpiRow } from './_components/finance-kpis/finance-kpi-row';
 import { TenantStatisticsWidget } from './_components/tenant-statistics-widget';
 
 export default function DashboardPage() {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1;
+
   return (
     <div>
       <div className="mb-6">
@@ -20,6 +25,9 @@ export default function DashboardPage() {
       </div>
 
       <div className="space-y-6">
+        {/* Condominium finance KPIs — above the condominium calendar (Phase 4) */}
+        <FinanceKpiRow year={currentYear} month={currentMonth} />
+
         {/* Rent Calendar - Top */}
         <RentCalendarSection />
 

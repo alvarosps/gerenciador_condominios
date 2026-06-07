@@ -196,6 +196,44 @@ export const queryKeys = {
         [...queryKeys.finances.employees.all, filters ?? null] as const,
       detail: (id: number) => [...queryKeys.finances.employees.all, id] as const,
     },
+    reserves: {
+      all: ['finances', 'reserves'] as const,
+      list: (filters?: Record<string, unknown>) =>
+        [...queryKeys.finances.reserves.all, filters ?? null] as const,
+      detail: (id: number) => [...queryKeys.finances.reserves.all, id] as const,
+    },
+    reserveMovements: {
+      all: ['finances', 'reserve-movements'] as const,
+      list: (filters?: Record<string, unknown>) =>
+        [...queryKeys.finances.reserveMovements.all, filters ?? null] as const,
+      detail: (id: number) => [...queryKeys.finances.reserveMovements.all, id] as const,
+    },
+    incomeEntries: {
+      all: ['finances', 'income-entries'] as const,
+      list: (filters?: Record<string, unknown>) =>
+        [...queryKeys.finances.incomeEntries.all, filters ?? null] as const,
+      detail: (id: number) => [...queryKeys.finances.incomeEntries.all, id] as const,
+    },
+    condoMonthCloses: {
+      all: ['finances', 'condo-month-closes'] as const,
+      list: (filters?: Record<string, unknown>) =>
+        [...queryKeys.finances.condoMonthCloses.all, filters ?? null] as const,
+      detail: (id: number) => [...queryKeys.finances.condoMonthCloses.all, id] as const,
+    },
+    overview: {
+      all: ['finances', 'overview'] as const,
+      month: (year: number, month: number, buildingId?: number | null) =>
+        [...queryKeys.finances.overview.all, 'month', year, month, buildingId ?? null] as const,
+    },
+    monthlyBalance: {
+      all: ['finances', 'monthly-balance'] as const,
+      year: (year: number) => [...queryKeys.finances.monthlyBalance.all, year] as const,
+    },
+    byCategory: {
+      all: ['finances', 'by-category'] as const,
+      month: (year: number, month: number, buildingId?: number | null) =>
+        [...queryKeys.finances.byCategory.all, 'month', year, month, buildingId ?? null] as const,
+    },
   },
   rentAdjustments: {
     all: ['rent-adjustments'] as const,

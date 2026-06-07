@@ -14,6 +14,10 @@ import type {
   InstallmentPlan,
 } from '@/lib/schemas/finances/installment-plan.schema';
 import type { Payment, PaymentAllocation } from '@/lib/schemas/finances/payment.schema';
+import type { Reserve } from '@/lib/schemas/finances/reserve.schema';
+import type { ReserveMovement } from '@/lib/schemas/finances/reserve-movement.schema';
+import type { IncomeEntry } from '@/lib/schemas/finances/income-entry.schema';
+import type { CondoMonthClose } from '@/lib/schemas/finances/condo-month-close.schema';
 
 export function createMockFinanceCategory(
   overrides: Partial<FinanceCategory> = {},
@@ -246,6 +250,124 @@ export function createMockEmployee(overrides: Partial<Employee> = {}): Employee 
     lease_id: null,
     created_at: '2026-06-01T00:00:00Z',
     updated_at: '2026-06-01T00:00:00Z',
+    ...overrides,
+  };
+}
+
+// --- Phase 4: reserve / income / month-close / balance dashboard (Session 46) ---
+
+const MOCK_CONDO = { id: 1, name: 'Condomínio Central' };
+
+export function createMockReserve(overrides: Partial<Reserve> = {}): Reserve {
+  return {
+    id: 1,
+    condominium: MOCK_CONDO,
+    name: 'Reserva de Emergência',
+    notes: '',
+    balance: 5000,
+    created_at: '2026-01-01T00:00:00Z',
+    updated_at: '2026-01-01T00:00:00Z',
+    ...overrides,
+  };
+}
+
+export function createMockReserveMovement(
+  overrides: Partial<ReserveMovement> = {},
+): ReserveMovement {
+  return {
+    id: 1,
+    reserve: { id: 1, name: 'Reserva de Emergência' },
+    kind: 'deposit',
+    amount: 1000,
+    movement_date: '2026-06-01',
+    bill: null,
+    reference: null,
+    notes: null,
+    created_at: '2026-06-01T00:00:00Z',
+    updated_at: '2026-06-01T00:00:00Z',
+    ...overrides,
+  };
+}
+
+export function createMockIncomeEntry(overrides: Partial<IncomeEntry> = {}): IncomeEntry {
+  return {
+    id: 1,
+    condominium: MOCK_CONDO,
+    building: null,
+    category: null,
+    description: 'Receita extra',
+    amount: 500,
+    income_date: '2026-06-05',
+    is_received: false,
+    received_date: null,
+    notes: '',
+    created_at: '2026-06-05T00:00:00Z',
+    updated_at: '2026-06-05T00:00:00Z',
+    ...overrides,
+  };
+}
+
+export function createMockCondoMonthClose(
+  overrides: Partial<CondoMonthClose> = {},
+): CondoMonthClose {
+  return {
+    id: 1,
+    condominium: MOCK_CONDO,
+    reference_month: '2026-05-01',
+    status: 'closed',
+    closed_at: '2026-06-01T00:00:00Z',
+    net_result: 2000,
+    cash_balance_end: 15000,
+    reserve_balance_end: 5000,
+    carry_forward_out: 0,
+    breakdown: {},
+    created_at: '2026-06-01T00:00:00Z',
+    updated_at: '2026-06-01T00:00:00Z',
+    ...overrides,
+  };
+}
+
+export function createMockFinanceOverview(overrides: Record<string, unknown> = {}) {
+  return {
+    year: 2026,
+    month: 6,
+    result_of_month: '2000.00',
+    cash_change_of_month: '1500.00',
+    cash_balance: '15000.00',
+    reserve_balance: '5000.00',
+    total_balance: '20000.00',
+    overdue_bills_total: '300.00',
+    overdue_bills_count: 2,
+    rent_overdue: { count: 1, total_fee: '75.00' },
+    wedge_ok: true,
+    ...overrides,
+  };
+}
+
+export function createMockMonthlyBalance(overrides: Record<string, unknown> = {}) {
+  return {
+    year: 2026,
+    months: Array.from({ length: 12 }, (_, i) => ({
+      month: i + 1,
+      result_of_month: '2000.00',
+      cash_change_of_month: '1500.00',
+      cash_balance_end: String(10000 + i * 500),
+      reserve_balance_end: '5000.00',
+      total_balance: String(15000 + i * 500),
+      is_closed: i < 5,
+    })),
+    ...overrides,
+  };
+}
+
+export function createMockByCategory(overrides: Record<string, unknown> = {}) {
+  return {
+    year: 2026,
+    month: 6,
+    categories: [
+      { category_id: 1, name: 'Manutenção', color: '#3b82f6', total: '1200.00' },
+      { category_id: null, name: 'Sem categoria', color: '', total: '300.00' },
+    ],
     ...overrides,
   };
 }
