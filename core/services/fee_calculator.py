@@ -131,16 +131,9 @@ class FeeCalculatorService:
         if reference_date is None:
             reference_date = timezone.now().date()
 
-        year, month = reference_date.year, reference_date.month
-
-        if reference_date.day >= current_due_day:
-            old_year, old_month = year, month
-        else:
-            if month == 1:
-                old_year, old_month = year - 1, 12
-            else:
-                old_year, old_month = year, month - 1
-
+        # The old due date is current_due_day within the reference month; the new due
+        # date stays in that month when later, or rolls to the next month when earlier.
+        old_year, old_month = reference_date.year, reference_date.month
         old_date = FeeCalculatorService._clamp_day(old_year, old_month, current_due_day)
 
         if new_due_day > current_due_day:
