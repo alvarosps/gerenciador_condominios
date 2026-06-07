@@ -11,18 +11,23 @@ from decimal import Decimal
 
 from rest_framework import serializers
 
-from core.models import Building, Condominium
-from core.serializers import BuildingSerializer
+from core.models import Building, Condominium, Lease, Person
+from core.serializers import BuildingSerializer, LeaseSerializer, PersonSimpleSerializer
 from finances.models import (
     Bill,
     BillingAccount,
     BillLineItem,
     BillSkip,
     Category,
+    Employee,
+    Installment,
+    InstallmentPlan,
+    InstallmentPlanState,
     Payment,
     PaymentAllocation,
 )
 from finances.money import money_str
+from finances.services.timezone import today_sp
 
 
 class CondominiumSimpleSerializer(serializers.ModelSerializer):
@@ -260,6 +265,146 @@ class PaymentSerializer(serializers.ModelSerializer):
             "reference",
             "notes",
             "allocations",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "created_at", "updated_at"]
+
+
+class InstallmentSerializer(serializers.ModelSerializer):
+    """Installment schedule row. amount is the schedule (editable); is_overdue is computed."""
+
+    is_overdue = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Installment
+        fields = ["id", "plan", "number", "due_date", "amount", "is_overdue"]
+        read_only_fields = ["id", "plan", "number"]
+
+    def get_is_overdue(self, obj: Installment) -> bool:
+        # No "paid" semantics on Installment (the realized side lives on BillLineItem, S41);
+        # overdue = past due AND the plan is still active.
+        return obj.due_date < today_sp() and obj.plan.lifecycle_state == InstallmentPlanState.ACTIVE
+
+
+class InstallmentPlanSerializer(serializers.ModelSerializer):
+    condominium = CondominiumSimpleSerializer(read_only=True)
+    condominium_id = serializers.PrimaryKeyRelatedField(
+        queryset=Condominium.objects.all(), source="condominium", write_only=True
+    )
+    building = BuildingSerializer(read_only=True)
+    building_id = serializers.PrimaryKeyRelatedField(
+        queryset=Building.objects.all(),
+        source="building",
+        write_only=True,
+        required=False,
+        allow_null=True,
+    )
+    category = CategorySerializer(read_only=True)
+    category_id = serializers.PrimaryKeyRelatedField(
+        queryset=Category.objects.all(),
+        source="category",
+        write_only=True,
+        required=False,
+        allow_null=True,
+    )
+    linked_billing_account = BillingAccountSerializer(read_only=True)
+    linked_billing_account_id = serializers.PrimaryKeyRelatedField(
+        queryset=BillingAccount.objects.all(),
+        source="linked_billing_account",
+        write_only=True,
+        required=False,
+        allow_null=True,
+    )
+    installments = InstallmentSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = InstallmentPlan
+        fields = [
+            "id",
+            "condominium",
+            "condominium_id",
+            "building",
+            "building_id",
+            "category",
+            "category_id",
+            "linked_billing_account",
+            "linked_billing_account_id",
+            "description",
+            "total_amount",
+            "installment_count",
+            "start_due_date",
+            "default_due_day",
+            "lifecycle_state",
+            "embedded",
+            "notes",
+            "installments",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "created_at", "updated_at"]
+
+    def validate(self, attrs: dict[str, object]) -> dict[str, object]:
+        # DRF does not call Model.clean(); mirror the embedded <-> linked invariant (design §7)
+        # so the API cannot create an inconsistent plan.
+        embedded = attrs.get("embedded", getattr(self.instance, "embedded", False))
+        linked = attrs.get(
+            "linked_billing_account", getattr(self.instance, "linked_billing_account", None)
+        )
+        if embedded and linked is None:
+            raise serializers.ValidationError(
+                {
+                    "linked_billing_account_id": "Plano embutido exige uma conta recorrente vinculada."
+                }
+            )
+        if not embedded and linked is not None:
+            raise serializers.ValidationError(
+                {
+                    "linked_billing_account_id": "Plano avulso não pode ter conta recorrente vinculada."
+                }
+            )
+        return attrs
+
+
+class EmployeeSerializer(serializers.ModelSerializer):
+    condominium = CondominiumSimpleSerializer(read_only=True)
+    condominium_id = serializers.PrimaryKeyRelatedField(
+        queryset=Condominium.objects.all(), source="condominium", write_only=True
+    )
+    person = PersonSimpleSerializer(read_only=True)
+    person_id = serializers.PrimaryKeyRelatedField(
+        queryset=Person.objects.all(),
+        source="person",
+        write_only=True,
+        required=False,
+        allow_null=True,
+    )
+    lease = LeaseSerializer(read_only=True)
+    lease_id = serializers.PrimaryKeyRelatedField(
+        queryset=Lease.objects.all(),
+        source="lease",
+        write_only=True,
+        required=False,
+        allow_null=True,
+    )
+
+    class Meta:
+        model = Employee
+        fields = [
+            "id",
+            "condominium",
+            "condominium_id",
+            "person",
+            "person_id",
+            "lease",
+            "lease_id",
+            "name",
+            "role",
+            "payment_type",
+            "base_salary",
+            "default_due_day",
+            "is_active",
+            "notes",
             "created_at",
             "updated_at",
         ]
