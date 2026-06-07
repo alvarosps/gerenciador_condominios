@@ -8,11 +8,15 @@ from finances.viewsets import (
     BillSkipViewSet,
     BillViewSet,
     CategoryViewSet,
+    CondoMonthCloseViewSet,
     EmployeeViewSet,
     FinanceDashboardViewSet,
+    IncomeEntryViewSet,
     InstallmentPlanViewSet,
     InstallmentViewSet,
     PaymentViewSet,
+    ReserveMovementViewSet,
+    ReserveViewSet,
 )
 
 # SimpleRouter (not DefaultRouter): a JSON API needs no format-suffix routes, and a second
@@ -26,6 +30,10 @@ router.register(r"payments", PaymentViewSet, basename="payments")
 router.register(r"installment-plans", InstallmentPlanViewSet, basename="finance-installment-plans")
 router.register(r"installments", InstallmentViewSet, basename="finance-installments")
 router.register(r"employees", EmployeeViewSet, basename="finance-employees")
+router.register(r"reserves", ReserveViewSet, basename="reserves")
+router.register(r"reserve-movements", ReserveMovementViewSet, basename="reserve-movements")
+router.register(r"income-entries", IncomeEntryViewSet, basename="income-entries")
+router.register(r"condo-month-closes", CondoMonthCloseViewSet, basename="condo-month-closes")
 router.register(r"finance-dashboard", FinanceDashboardViewSet, basename="finance-dashboard")
 
 urlpatterns = [path("", include(router.urls))]
