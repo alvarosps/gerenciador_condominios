@@ -378,6 +378,22 @@ class RentScheduleService:
         return payments.aggregate(total=Sum("amount_paid"))["total"] or ZERO
 
     @staticmethod
+    def received_collectible_total(reference_month: date, building_id: int | None = None) -> Decimal:
+        """Rent received for the month, restricted to COLLECTIBLE leases (design §4.5).
+
+        Mirrors ``received_total`` but pre-filters by ``collectible_leases`` so owner-repass
+        (Tiago/Alvaro) and salary-offset payments never count toward condominium revenue.
+        Used by the condominium cash/net (Phase 4). Additive — ``received_total`` is
+        unchanged. In the normal case it equals ``received_total`` (only collectible leases
+        ever get a RentPayment); it diverges only if a non-collectible lease has a payment.
+        """
+        collectible = RentScheduleService.collectible_leases(reference_month, building_id)
+        payments = RentPayment.objects.filter(
+            reference_month=reference_month, lease__in=collectible
+        )
+        return payments.aggregate(total=Sum("amount_paid"))["total"] or ZERO
+
+    @staticmethod
     def toggle_payment(lease_id: int, reference_month: date, user: User) -> dict[str, Any]:
         """Create or soft-delete the month's RentPayment (defense in depth).
 

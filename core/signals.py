@@ -37,15 +37,31 @@ from .models import (
     Furniture,
     Income,
     Lease,
+    MonthSnapshot,
     Notification,
     PaymentProof,
     PersonPayment,
     PersonPaymentSchedule,
+    RentAdjustment,
     RentPayment,
     Tenant,
 )
 
 logger = logging.getLogger(__name__)
+
+# The condominium-finance module (app `finances`) owns these prefixes in
+# finances/cache.py (FINANCE_*_PREFIX). core must NOT import finances (that would invert
+# the finances -> core dependency), so the literals are duplicated here and the match is
+# locked by tests/unit/test_finances/test_finance_cache_signals.py. Writes to
+# Apartment / Lease / RentAdjustment / MonthSnapshot / RentPayment / FinancialSettings
+# change condominium revenue, projection or close state, so they invalidate finance-*.
+_FINANCE_CACHE_PREFIXES = ("finance-dashboard", "finance-cash-flow", "finance-projection")
+
+
+def _invalidate_finance_module_caches() -> None:
+    """Invalidate the condominium-finance dashboard / cash-flow / projection caches."""
+    for prefix in _FINANCE_CACHE_PREFIXES:
+        CacheManager.invalidate_pattern(f"{prefix}*")
 
 
 # =============================================================================
@@ -97,6 +113,8 @@ def invalidate_apartment_cache_on_save(
     logger.info(f"Apartment {instance.pk} {action}, invalidating caches")
 
     invalidate_related_caches(instance, related_models=["Building", "Lease"])
+    # owner / rental value changes condominium revenue + projection (design §11, NET-NEW)
+    _invalidate_finance_module_caches()
 
 
 @receiver(post_delete, sender=Apartment)
@@ -108,6 +126,7 @@ def invalidate_apartment_cache_on_delete(
     """
     logger.info(f"Apartment {instance.pk} deleted, invalidating caches")
     invalidate_related_caches(instance, related_models=["Building", "Lease"])
+    _invalidate_finance_module_caches()
 
 
 @receiver(m2m_changed, sender=Apartment.furnitures.through)
@@ -199,6 +218,8 @@ def invalidate_lease_cache_on_save(
     logger.info(f"Lease {instance.pk} {action}, invalidating caches")
 
     invalidate_related_caches(instance, related_models=["Apartment", "Tenant"])
+    # collectibility / salary-offset / prepaid changes condominium revenue (design §11)
+    _invalidate_finance_module_caches()
 
 
 @receiver(post_delete, sender=Lease)
@@ -208,6 +229,7 @@ def invalidate_lease_cache_on_delete(sender: type[Lease], instance: Lease, **kwa
     """
     logger.info(f"Lease {instance.pk} deleted, invalidating caches")
     invalidate_related_caches(instance, related_models=["Apartment", "Tenant"])
+    _invalidate_finance_module_caches()
 
 
 @receiver(m2m_changed, sender=Lease.tenants.through)
@@ -297,6 +319,9 @@ def _invalidate_financial_caches(model_name: str, pk: int) -> None:
     CacheManager.invalidate_pattern("daily-control*")
     CacheManager.invalidate_pattern("cash-flow*")
     CacheManager.invalidate_pattern("financial-dashboard*")
+    # RentPayment / FinancialSettings route through here, so the condominium-finance
+    # module caches are invalidated for them too (DRY).
+    _invalidate_finance_module_caches()
 
 
 @receiver(post_save, sender=PersonPayment)
@@ -389,6 +414,38 @@ def invalidate_financial_settings_cache_on_save(
     financial AND late-payment dashboard caches."""
     _invalidate_financial_caches("FinancialSettings", instance.pk)
     CacheManager.invalidate_pattern("dashboard-late-payment*")
+
+
+@receiver(post_save, sender=RentAdjustment)
+def invalidate_rent_adjustment_finance_cache_on_save(
+    sender: type[RentAdjustment], instance: RentAdjustment, **kwargs: Any
+) -> None:
+    """A rent adjustment changes effective_rental_value, hence the condominium
+    projection — invalidate finance-* (design §11)."""
+    _invalidate_finance_module_caches()
+
+
+@receiver(post_delete, sender=RentAdjustment)
+def invalidate_rent_adjustment_finance_cache_on_delete(
+    sender: type[RentAdjustment], instance: RentAdjustment, **kwargs: Any
+) -> None:
+    _invalidate_finance_module_caches()
+
+
+@receiver(post_save, sender=MonthSnapshot)
+def invalidate_month_snapshot_finance_cache_on_save(
+    sender: type[MonthSnapshot], instance: MonthSnapshot, **kwargs: Any
+) -> None:
+    """Finalizing / rolling back a month snapshot changes settled state used by the
+    condominium balance/projection — invalidate finance-* (design §11)."""
+    _invalidate_finance_module_caches()
+
+
+@receiver(post_delete, sender=MonthSnapshot)
+def invalidate_month_snapshot_finance_cache_on_delete(
+    sender: type[MonthSnapshot], instance: MonthSnapshot, **kwargs: Any
+) -> None:
+    _invalidate_finance_module_caches()
 
 
 @receiver(post_save, sender=Expense)
