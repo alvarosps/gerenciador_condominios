@@ -6,6 +6,7 @@ import { BuildingStatisticsChart } from './_components/building-statistics-chart
 import { LatePaymentsAlert } from './_components/late-payments-alert';
 import { RentAdjustmentAlerts } from './_components/rent-adjustment-alerts';
 import { RentCalendarSection } from './_components/rent-calendar/rent-calendar-section';
+import { CombinedCalendarSection } from './_components/finance-calendar/combined-calendar-section';
 import { TenantStatisticsWidget } from './_components/tenant-statistics-widget';
 
 export default function DashboardPage() {
@@ -21,6 +22,9 @@ export default function DashboardPage() {
       <div className="space-y-6">
         {/* Rent Calendar - Top */}
         <RentCalendarSection />
+
+        {/* Combined Condominium Calendar (rent entries + bill exits) — below the rent calendar */}
+        <CombinedCalendarSection />
 
         {/* Financial Summary - Top Row */}
         <FinancialSummaryWidget />
