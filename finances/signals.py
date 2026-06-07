@@ -18,11 +18,15 @@ from finances.models import (
     BillLineItem,
     BillSkip,
     Category,
+    CondoMonthClose,
     Employee,
+    IncomeEntry,
     Installment,
     InstallmentPlan,
     Payment,
     PaymentAllocation,
+    Reserve,
+    ReserveMovement,
 )
 
 logger = logging.getLogger(__name__)
@@ -38,6 +42,10 @@ _FINANCE_MODELS = (
     InstallmentPlan,
     Installment,
     Employee,
+    Reserve,
+    ReserveMovement,
+    IncomeEntry,
+    CondoMonthClose,
 )
 
 

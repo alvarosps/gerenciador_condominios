@@ -7,6 +7,29 @@
 
 ---
 
+## Feature: Fluxo "Novo inquilino + contrato" (web) — Sessões 51–55
+
+**Design Doc**: `docs/plans/2026-06-07-tenant-lease-onboarding-design.md`
+**Roadmap**: `prompts/ROADMAP.md` (seção "Fluxo Novo inquilino + contrato")
+**Total de Sessões**: 5 (51–55)
+**Branch sugerida**: `feat/tenant-lease-onboarding` (a partir de `master`)
+**Status**: **prompts escritos (51–55)** — nenhuma sessão executada.
+**Decisões de produto** (design §3): inquilino **enxuto + opcionais**; **1 ou 2 inquilinos** (2º = dependente residente criado junto); **endpoint transacional novo** (reusável pelo mobile, Plano 2); `email`/`phone_alternate` **removidos da UI** (eram descartados pelo backend). Sem migração/RLS; sem regra "1 contrato ativo por inquilino".
+
+| # | Sessão | Camada | Status | Arquivo |
+|---|--------|--------|--------|---------|
+| 51 | Correções de raiz (disponibilidade apto + captura dependentes/auditoria + guard locador) | BE | pendente | `prompts/51-onboarding-backend-root-fixes.md` |
+| 52 | Endpoint transacional `POST /api/onboarding/tenant-lease/` (service+serializer+view+rota) | BE | pendente | `prompts/52-onboarding-backend-endpoint.md` |
+| 53 | Extração DRY (derivações/date/resident-dependent) + remoção email/phone_alternate | FE | pendente | `prompts/53-onboarding-frontend-shared-extraction.md` |
+| 54 | Wizard combinado + `useOnboardTenantLease` + schema | FE | pendente | `prompts/54-onboarding-frontend-wizard.md` |
+| 55 | CTA dashboard + passo PDF (eager/202/400) + e2e/polish/audit | FE | pendente | `prompts/55-onboarding-frontend-dashboard-pdf.md` |
+
+**Ordem/dependências**: `51 → 52`; `53` paralelo (FE); `54` depende de **52 + 53**; `55` depende de **54**. Contratos cross-session autoritativos no ROADMAP.
+
+**Fora de escopo / posterior**: app **mobile (Plano 2)** — desenhar quando a sessão de installments/payroll terminar; reusa o endpoint `POST /api/onboarding/tenant-lease/`.
+
+---
+
 ## Feature: App Mobile Completo (Responsivo + PWA + Offline + Web Push) — Sessões 26–33
 
 **Design Doc**: `docs/plans/2026-06-04-mobile-pwa-offline-design.md`
@@ -523,7 +546,7 @@
 
 **Design Doc**: `docs/plans/2026-06-06-condominium-finance-design.md` (v3)
 **Total de Sessoes**: 17 (34-50) - **Branch sugerida**: `feat/condo-finance`
-**Status**: **S34–S43 concluídas** (Fase 1 + Fase 2 completa + Fase 3 BE+FE: parcelas/folha + API + UI). Próxima: **S44** (Fase 4 BE — Reserva/Receita avulsa/Fechamento). Gate por fase mantido (≥90% standalone em `finances` no BE; vitest/tsc/eslint 0/0 no FE).
+**Status**: **S34–S44 concluídas** (Fase 1 + Fase 2 completa + Fase 3 BE+FE + Fase 4 BE modelos: Reserva/Receita avulsa/Fechamento). Próxima: **S45** (Fase 4 BE — `CondoBalanceService`/`CondoMonthCloseService` + guarda de saldo no `pay(funded_from=reserve)` + `received_collectible_total` + API). Gate por fase mantido (≥90% standalone em `finances` no BE; vitest/tsc/eslint 0/0 no FE).
 **Ordem/dependencias**: ver `prompts/ROADMAP.md` (secao desta feature). Sequencial 34->50 recomendado (gate por fase, >=90% em `finances`).
 
 > **REVISÃO S43 (parent)**: gate reconfirmado no checkout principal — **8 files / 46 tests verdes**, suíte FE completa **87 files / 736 tests**, `tsc`/`eslint` 0/0, **zero `as`/`!` em produção**, **zero ruído de teardown** dos arquivos da S43 (lição S40 de mockar read-hooks aplicada; restam só os 4 erros pré-existentes do legado `daily-page-admin`). **CAVEAT de produto (não-bloqueante, polir na S50)**: `convert_deferred` opera sobre um **Bill adiado**, mas a UI dispara o diálogo de uma **linha de plano** passando `plan.id` como `bill_id` — o gatilho deveria estar num Bill adiado (Contas/calendário), não numa linha de plano já criado. `ConvertDeferredDialog` em si está correto/reusável (recebe `billId`); backend é a autoridade (id inválido → 404). Reposicionar é decisão de produto da fase de polish.
@@ -544,7 +567,7 @@
 | 41 | InstallmentPlan/Installment + Employee + convert_deferred + estende geracao | BE | **concluída** | `prompts/41-finances-installments-employee-models-services.md` |
 | 42 | API parcelas/folha | BE | **concluída** | `prompts/42-finances-installments-employee-api.md` |
 | 43 | Frontend parcelas/folha | FE | **concluída** | `prompts/43-finances-installments-employee-frontend.md` |
-| 44 | Modelos: Reserve/ReserveMovement/IncomeEntry/CondoMonthClose | BE | pendente | `prompts/44-finances-reserve-income-close-models.md` |
+| 44 | Modelos: Reserve/ReserveMovement/IncomeEntry/CondoMonthClose | BE | **concluída** | `prompts/44-finances-reserve-income-close-models.md` |
 | 45 | CondoBalanceService + CondoMonthCloseService + received_collectible_total + API | BE | pendente | `prompts/45-finances-balance-close-services-api.md` |
 | 46 | Frontend: KPIs + reserva + receita + fechamento | FE | pendente | `prompts/46-finances-balance-reserve-income-frontend.md` |
 | 47 | CondoProjectionService + CondoSimulationService + endpoints | BE | pendente | `prompts/47-finances-projection-simulation-backend.md` |
@@ -692,6 +715,32 @@
 - **Schemas/tipos** (`@/lib/schemas/finances/*`): `InstallmentPlan`/`Installment` (+ `InstallmentPlanState` `'active'|'paid'|'deferred'|'canceled'`), `Employee` (+ `EmployeePaymentType` `'fixed'|'variable'|'mixed'`). Dinheiro CRUD = `number`; `installments` nested read-only no plano.
 - **Hooks** (`@/lib/api/hooks/*`): `useInstallmentPlans`/`useInstallmentPlan`/`useCreate|Update|DeleteInstallmentPlan`; `useInstallments`/`useUpdateInstallment`; `useConvertDeferred`; `useEmployees`/`useEmployee`/`useCreate|Update|DeleteEmployee`. A projeção (Fase 5) **lê** parcelas futuras via o hook de projeção do backend — não recalcula a partir destes.
 - **query-keys**: `queryKeys.finances.installmentPlans`/`installments`/`employees`. **Rotas/menu**: `ROUTES.FINANCES_INSTALLMENT_PLANS`/`FINANCES_EMPLOYEES`, itens no grupo "Condomínio" do `sidebar.tsx`. **MSW**: `createMockInstallmentPlan`/`createMockInstallment`/`createMockEmployee` + handlers das 3 rotas (estender, não recriar).
+
+### Sessão 44 — Arquivos Criados/Modificados (concluída)
+
+**Fase 4 (BE — modelos) — Reserva + Movimento de reserva + Receita avulsa + Fechamento mensal condo-scoped.** Branch `feat/condo-finance`. Só modelos + migração + RLS + signals + factories + testes; **sem serviço/saldo/close/reopen/API/frontend** (S45/S46).
+
+- **Criados**:
+  - `tests/unit/test_finances/test_reserve_models.py` (11 testes — herança/managers, `kind` choices+obrigatório, `amount>0` via `IntegrityError`+`clean()` PT, `bill?` caixa-vs-conta, `bill` `SET_NULL` no hard-delete vs persiste no soft-delete, **ledger determinístico** `(movement_date, id)` incl. empate de data por `id`, `__str__`).
+  - `tests/unit/test_finances/test_income_entry_model.py` (9 testes — herança/managers, `building`/`category` `SET_NULL`, `amount>0`, **`is_received⇔received_date`** nos 4 sentidos via `clean()` PT, ordering `[-income_date]`, `__str__`).
+  - `tests/unit/test_finances/test_condo_month_close_model.py` (13 testes — `AuditMixin` **sem** `is_deleted`/`with_deleted`, `status` open/closed default OPEN, unique `(condominium, reference_month)` **sem** condição + hard-delete libera slot + mesmo mês p/ condomínio diferente, `reference_month`→dia 1 (+ tolerância a `None`), `carry_forward_out<=0` via CheckConstraint **e** `clean()` PT + zero/negativo OK, `status=closed⇒closed_at`, **negativos** em net/cash/reserve, `breakdown` JSON default `{}`, `__str__`).
+- **Modificados**:
+  - `finances/models.py` — **append-only** após `Employee` (linha 575; nada acima tocado). Enums `ReserveMovementKind` (`deposit`/`withdrawal`), `CondoMonthCloseStatus` (`open`/`closed`); helper privado módulo-nível `_first_of_month(value)` (DRY, usado só em `CondoMonthClose.clean()` — S36 não extraiu helper, `Bill`/`BillingAccount`/`BillSkip` seguem inline e **intactos**); constantes PT nomeadas (`_ERR_AMOUNT_POSITIVE` reusada por 2 models, `_ERR_RECEIVED_DATE_REQUIRED/_FORBIDDEN`, `_ERR_CLOSED_NEEDS_DATE`, `_ERR_CARRY_FORWARD_NON_POSITIVE`). Models `Reserve`/`ReserveMovement`/`IncomeEntry` `(AuditMixin, SoftDeleteMixin)` com managers duplos; **`CondoMonthClose` `(AuditMixin, models.Model)`** com `objects=models.Manager()` simples. Nomes de constraint globalmente únicos: `reserve_movement_amount_positive`, `income_entry_amount_positive`, `unique_condo_month_close`, `condo_month_close_carry_forward_non_positive`.
+  - `finances/migrations/0003_reserve_condomonthclose_incomeentry_reservemovement.py` — `CreateModel` das 4 tabelas (depende de `finances.0002` + `core.0048`) + `RunSQL(ENABLE_RLS, reverse_sql=DISABLE_RLS)` para `finances_reserve`/`finances_reservemovement`/`finances_incomeentry`/`finances_condomonthclose` (SQL estático, sem f-string → S608-safe; espelha `core/0047`).
+  - `finances/signals.py` — `Reserve`/`ReserveMovement`/`IncomeEntry`/`CondoMonthClose` adicionados ao import e à tupla `_FINANCE_MODELS` (o loop existente conecta `post_save`/`post_delete`→`invalidate_finance_caches()`; **zero** `invalidate_pattern` novo).
+  - `tests/factories.py` — `make_reserve`/`make_reserve_movement`/`make_income_entry`/`make_condo_month_close` (estilo `make_<model>(condominium=None, user=None, **kwargs)`).
+- **DECISÃO pinada (verbatim, consumir na S45)**: a guarda **"saque ≤ saldo da reserva" é do SERVIÇO (S45)**, não do model — `clean()` valida só sinal/positividade (`amount>0`), nunca consulta agregados de outras linhas (SRP / models=dados+validação). Documentado no docstring de `ReserveMovement`. O teste §18 "saque > saldo rejeitado" pertence à S45.
+- **Verificação (gate ampliado, escopo da sessão)**: backup `backups/backup_condominio_20260607_194724.sql` ANTES do migrate. **157/157** na suíte `tests/unit/test_finances/` (33 novos + regressão S36 `test_bill_models`/`test_bill_annotations` verde); **coverage standalone `--cov=finances.models --cov=finances.signals` = 95.49%** (`signals` 100%; `models` 95.31% — **zero linha/branch faltando no código novo da Fase 4**; as faltas restantes são branches defensivas `is not None` dos models congelados S36/S41, fora de escopo). `ruff check`+`format --check` limpos; `mypy core/ finances/` Success (89); `pyright finances/models.py finances/signals.py` 0/0/0; `makemigrations --check` "No changes detected"; migração **forward→backward(0002)→re-forward** OK; **RLS=True** nas 4 tabelas (`pg_class.relrowsecurity`). Revisão adversarial multi-agente (4 lentes: spec/aceite/testes/design-escopo) → **0 defeitos confirmados**. **NÃO tocados**: `Bill`/`BillLineItem`/`Payment`/`Installment`/`Employee`/`BillPaymentService`/`core/*`/`settings.py`; nenhum serviço/serializer/viewset/URL/cache/frontend.
+
+### Contratos cross-session definidos pela Sessão 44 (consumir verbatim — S45/S46)
+
+- **`finances.models`** (Fase 4): `Reserve`, `ReserveMovement`, `IncomeEntry`, `CondoMonthClose`; enums `ReserveMovementKind` (`deposit`/`withdrawal`), `CondoMonthCloseStatus` (`open`/`closed`).
+- **Ledger da reserva**: `ReserveMovement` ordenado por `(movement_date, id)` (`Meta.ordering`). Saldo = `Σ(deposit) − Σ(withdrawal)` — **derivado no `CondoBalanceService` (S45)**, nunca property/annotation no model. `amount` **positivo**; o sinal vem de `kind`.
+- **`ReserveMovement.bill`** (`SET_NULL`): `bill` setado = saque p/ pagar conta; `bill=null` = transferência caixa↔reserva. **`amount_paid` do `Bill` NÃO inclui `ReserveMovement`** (design §4.3) — pagamento é só `PaymentAllocation` (S36). A S45, no `pay(funded_from=reserve)`, cria `Payment` + `PaymentAllocation(→bill)` **e** `ReserveMovement(withdrawal, bill=…)` com a **guarda de saldo** (esta sessão não valida saldo).
+- **Guarda de saldo negativo da reserva**: **responsabilidade da S45** (`CondoBalanceService.reserve_balance` + checagem em `ReserveService.withdraw`/`BillPaymentService.pay`). O teste §18 "saque > saldo" é da S45.
+- **`IncomeEntry`**: `is_received=True` (com `received_date`) é o que conta no **caixa** (entradas_caixa, S45 — junto de `received_collectible_total` + saques reserva→caixa). Não recorrente.
+- **`CondoMonthClose`** (âncora do fold/caixa): `cash_balance_end` semeia o caixa do próximo mês (baseline S45 quando há mês fechado; senão `FinancialSettings.initial_balance`); `reserve_balance_end` semeia a reserva; `net_result`/`carry_forward_out` (≤0) alimentam o fold (S49/S50). `status` `open`→`closed` (com `closed_at`); **reopen** recomputa cascata os meses abertos seguintes — algoritmo na S45. Unique `(condominium, reference_month)`. **Não trava aluguel** (rent-lock = `MonthSnapshot` legado).
+- **Signals**: os 4 modelos novos invalidam `finance-*` via `invalidate_finance_caches()` (S37).
 
 ### Sessão 41 — verificação (continuação)
 - **Verificação**: scoped **38/38** + regressão S37 `test_bill_generation_service` **11/11**; **suíte finances completa 124/124** (sem poluição); **coverage standalone módulos tocados 92.14%** (`installment_plan_service` 100%, `signals` 100%, `models` 93.55%, `bill_generation_service` 86% — restante = branches defensivas de `IntegrityError`/race); `ruff check`+`format` limpos; `mypy core/ finances/` Success (88); `pyright finances/` 0/0/0; `makemigrations --check` "No changes detected"; migração **forward/backward/re-forward** OK; **RLS habilitada** nas 3 tabelas novas (`pg_class.relrowsecurity=t`). Backup antes do migrate (`backup_condominio_20260607_165456.sql`). Sem API/serializers/viewsets/frontend; sem `core/models.py`/`core/signals.py`/`settings.py` tocados.
