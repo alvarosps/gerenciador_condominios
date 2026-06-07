@@ -1,0 +1,414 @@
+'use client';
+
+import { useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Info } from 'lucide-react';
+import { toast } from 'sonner';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { useCreateBillWithLines, useUpdateBill } from '@/lib/api/hooks/use-bills';
+import { useBuildings } from '@/lib/api/hooks/use-buildings';
+import { useFinanceCategories } from '@/lib/api/hooks/use-finance-categories';
+import { useBillingAccounts } from '@/lib/api/hooks/use-billing-accounts';
+import { handleError } from '@/lib/utils/error-handler';
+import type { Bill } from '@/lib/schemas/finances/bill.schema';
+import type { BillBehavior } from '@/lib/schemas/finances/category.schema';
+import { BillLineItemsField } from './bill-line-items-field';
+import { billFormSchema, type BillFormValues } from './bill-form-schema';
+
+const NONE = 'none';
+
+const BEHAVIOR_LABELS: Record<BillBehavior, string> = {
+  one_time: 'Avulsa',
+  recurring: 'Recorrente',
+  installment: 'Parcelada',
+};
+
+function emptyDefaults(): BillFormValues {
+  return {
+    description: '',
+    building_id: null,
+    category_id: null,
+    competence_month: '',
+    due_date: '',
+    behavior: 'one_time',
+    billing_account_id: null,
+    external_identifier: '',
+    issue_date: null,
+    notes: '',
+    line_items: [{ category_id: null, description: '', amount: 0, is_offset: false }],
+  };
+}
+
+function billToDefaults(bill: Bill): BillFormValues {
+  return {
+    description: bill.description,
+    building_id: bill.building_id ?? bill.building?.id ?? null,
+    category_id: bill.category_id ?? bill.category?.id ?? null,
+    competence_month: bill.competence_month,
+    due_date: bill.due_date,
+    behavior: bill.behavior,
+    billing_account_id: bill.billing_account_id ?? bill.billing_account?.id ?? null,
+    external_identifier: bill.external_identifier ?? '',
+    issue_date: bill.issue_date ?? null,
+    notes: bill.notes ?? '',
+    line_items: bill.line_items.map((line) => ({
+      category_id: line.category?.id ?? null,
+      description: line.description,
+      amount: line.amount,
+      is_offset: line.is_offset,
+    })),
+  };
+}
+
+interface BillFormModalProps {
+  open: boolean;
+  bill?: Bill | null;
+  onClose: () => void;
+}
+
+export function BillFormModal({ open, bill, onClose }: BillFormModalProps) {
+  const createBill = useCreateBillWithLines();
+  const updateBill = useUpdateBill();
+  const { data: buildings } = useBuildings();
+  const { data: categories } = useFinanceCategories();
+  const { data: billingAccounts } = useBillingAccounts();
+
+  const isEdit = Boolean(bill?.id);
+
+  const form = useForm<BillFormValues>({
+    resolver: zodResolver(billFormSchema),
+    defaultValues: emptyDefaults(),
+  });
+
+  useEffect(() => {
+    if (open) {
+      form.reset(bill ? billToDefaults(bill) : emptyDefaults());
+    }
+  }, [open, bill, form]);
+
+  const behavior = form.watch('behavior');
+  const isInstallment = behavior === 'installment';
+
+  function handleSubmit(values: BillFormValues) {
+    if (isInstallment) {
+      // Installment bills belong to Phase 3 — block submission here.
+      return;
+    }
+
+    if (isEdit && bill?.id) {
+      // Lines are created only via `create_with_lines` (S38 exposes no bills/{id}/lines
+      // endpoint), so editing an existing bill updates its own fields only.
+      updateBill.mutate(
+        {
+          id: bill.id,
+          description: values.description,
+          building_id: values.building_id,
+          category_id: values.category_id,
+          competence_month: values.competence_month,
+          due_date: values.due_date,
+          behavior: values.behavior,
+          billing_account_id: values.billing_account_id,
+          external_identifier: values.external_identifier,
+          issue_date: values.issue_date,
+          notes: values.notes,
+        },
+        {
+          onSuccess: () => {
+            toast.success('Conta atualizada com sucesso');
+            onClose();
+          },
+          onError: (error) => {
+            handleError(error, 'Erro ao salvar conta');
+          },
+        },
+      );
+      return;
+    }
+
+    createBill.mutate(
+      {
+        bill: {
+          description: values.description,
+          building_id: values.building_id,
+          category_id: values.category_id,
+          competence_month: values.competence_month,
+          due_date: values.due_date,
+          behavior: values.behavior,
+          billing_account_id: values.behavior === 'recurring' ? values.billing_account_id : null,
+          external_identifier: values.external_identifier,
+          issue_date: values.issue_date,
+          notes: values.notes,
+        },
+        line_items: values.line_items.map((line) => ({
+          description: line.description,
+          amount: line.amount,
+          is_offset: line.is_offset,
+          ...(line.category_id !== null ? { category_id: line.category_id } : {}),
+        })),
+      },
+      {
+        onSuccess: () => {
+          toast.success('Conta criada com sucesso');
+          onClose();
+        },
+        onError: (error) => {
+          handleError(error, 'Erro ao salvar conta');
+        },
+      },
+    );
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{isEdit ? 'Editar Conta' : 'Nova Conta'}</DialogTitle>
+        </DialogHeader>
+
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(handleSubmit)} noValidate className="space-y-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem className="sm:col-span-2">
+                    <FormLabel>Descrição</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Descrição da conta" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="behavior"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Tipo</FormLabel>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="one_time">{BEHAVIOR_LABELS.one_time}</SelectItem>
+                        <SelectItem value="recurring">{BEHAVIOR_LABELS.recurring}</SelectItem>
+                        <SelectItem value="installment">{BEHAVIOR_LABELS.installment}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="building_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Prédio (opcional)</FormLabel>
+                    <Select
+                      value={field.value ? String(field.value) : NONE}
+                      onValueChange={(value) => field.onChange(value === NONE ? null : Number(value))}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Condomínio" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value={NONE}>Condomínio (sem prédio)</SelectItem>
+                        {buildings?.map((building) =>
+                          building.id === undefined ? null : (
+                            <SelectItem key={building.id} value={String(building.id)}>
+                              {building.name}
+                            </SelectItem>
+                          ),
+                        )}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="category_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Categoria (opcional)</FormLabel>
+                    <Select
+                      value={field.value ? String(field.value) : NONE}
+                      onValueChange={(value) => field.onChange(value === NONE ? null : Number(value))}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value={NONE}>Nenhuma</SelectItem>
+                        {categories?.map((category) =>
+                          category.id === undefined ? null : (
+                            <SelectItem key={category.id} value={String(category.id)}>
+                              {category.name}
+                            </SelectItem>
+                          ),
+                        )}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="competence_month"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Competência</FormLabel>
+                    <FormControl>
+                      <Input type="date" {...field} />
+                    </FormControl>
+                    <FormDescription>Mês de competência (use o dia 1).</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="due_date"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Vencimento</FormLabel>
+                    <FormControl>
+                      <Input type="date" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {behavior === 'recurring' && (
+                <FormField
+                  control={form.control}
+                  name="billing_account_id"
+                  render={({ field }) => (
+                    <FormItem className="sm:col-span-2">
+                      <FormLabel>Conta recorrente</FormLabel>
+                      <Select
+                        value={field.value ? String(field.value) : NONE}
+                        onValueChange={(value) =>
+                          field.onChange(value === NONE ? null : Number(value))
+                        }
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione a conta recorrente" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value={NONE}>Nenhuma</SelectItem>
+                          {billingAccounts?.map((account) =>
+                            account.id === undefined ? null : (
+                              <SelectItem key={account.id} value={String(account.id)}>
+                                {account.name}
+                              </SelectItem>
+                            ),
+                          )}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+            </div>
+
+            {isInstallment && (
+              <Alert>
+                <Info className="h-4 w-4" />
+                <AlertDescription>
+                  Contas parceladas serão suportadas na Fase 3 (Parcelas). Selecione outro tipo para
+                  salvar.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {isEdit ? (
+              <Alert>
+                <Info className="h-4 w-4" />
+                <AlertDescription>
+                  As linhas só podem ser definidas na criação da conta. Para alterar as linhas, crie
+                  uma nova conta.
+                </AlertDescription>
+              </Alert>
+            ) : (
+              !isInstallment && <BillLineItemsField form={form} />
+            )}
+
+            <FormField
+              control={form.control}
+              name="notes"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Observações (opcional)</FormLabel>
+                  <FormControl>
+                    <Textarea placeholder="Notas adicionais..." rows={3} {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={onClose}>
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                disabled={isInstallment || createBill.isPending || updateBill.isPending}
+              >
+                {isEdit ? 'Atualizar' : 'Criar'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+}
