@@ -36,8 +36,12 @@ import { toast } from 'sonner';
 import { useCreateApartment, useUpdateApartment } from '@/lib/api/hooks/use-apartments';
 import { useBuildings } from '@/lib/api/hooks/use-buildings';
 import { useFurniture } from '@/lib/api/hooks/use-furniture';
+import { usePersons } from '@/lib/api/hooks/use-persons';
 import { type Apartment } from '@/lib/schemas/apartment.schema';
+import { useAuthStore } from '@/store/auth-store';
 import { handleError } from '@/lib/utils/error-handler';
+
+const OWNER_NONE = 'none';
 
 interface Props {
   open: boolean;
@@ -54,6 +58,7 @@ const apartmentFormSchema = z.object({
   max_tenants: z.number().min(1, 'Deve ter pelo menos 1 inquilino').max(2, 'Máximo 2 inquilinos'),
   furniture_ids: z.array(z.number()).optional(),
   last_rent_increase_date: z.string().optional(),
+  owner_id: z.number().nullable().optional(),
 });
 
 type ApartmentFormValues = z.infer<typeof apartmentFormSchema>;
@@ -63,6 +68,9 @@ export function ApartmentFormModal({ open, apartment, onClose }: Props) {
   const updateMutation = useUpdateApartment();
   const { data: buildings, isLoading: buildingsLoading } = useBuildings();
   const { data: furniture } = useFurniture();
+  const { data: persons } = usePersons();
+  const { user } = useAuthStore();
+  const isAdmin = user?.is_staff ?? false;
 
   const formMethods = useForm<ApartmentFormValues>({
     resolver: zodResolver(apartmentFormSchema),
@@ -75,6 +83,7 @@ export function ApartmentFormModal({ open, apartment, onClose }: Props) {
       max_tenants: undefined,
       furniture_ids: [],
       last_rent_increase_date: '',
+      owner_id: null,
     },
   });
 
@@ -97,6 +106,7 @@ export function ApartmentFormModal({ open, apartment, onClose }: Props) {
         max_tenants: apartment.max_tenants,
         furniture_ids: apartment.furnitures?.map((f) => f.id).filter((id): id is number => id !== undefined) ?? [],
         last_rent_increase_date: apartment.last_rent_increase_date ?? '',
+        owner_id: apartment.owner?.id ?? null,
       });
     } else {
       formMethods.reset();
@@ -109,12 +119,14 @@ export function ApartmentFormModal({ open, apartment, onClose }: Props) {
         await updateMutation.mutateAsync({
           ...values,
           id: apartment.id,
+          owner_id: values.owner_id ?? null,
         });
         toast.success('Apartamento atualizado com sucesso');
       } else {
         await createMutation.mutateAsync({
           ...values,
           rental_value_double: values.rental_value_double ?? null,
+          owner_id: values.owner_id ?? null,
         });
         toast.success('Apartamento criado com sucesso');
       }
@@ -352,6 +364,43 @@ export function ApartmentFormModal({ open, apartment, onClose }: Props) {
                 </FormItem>
               )}
             />
+
+            {/* Owner (admin only) — empty = condominium income */}
+            {isAdmin && (
+              <FormField
+                control={formMethods.control}
+                name="owner_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Proprietário</FormLabel>
+                    <Select
+                      onValueChange={(value) =>
+                        field.onChange(value === OWNER_NONE ? null : Number(value))
+                      }
+                      value={field.value ? String(field.value) : OWNER_NONE}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value={OWNER_NONE}>Condomínio (sem proprietário)</SelectItem>
+                        {persons?.map((p) => (
+                          <SelectItem key={p.id} value={String(p.id)}>
+                            {p.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>
+                      Vazio = receita do condomínio. Definir proprietário repassa o aluguel (não conta como receita).
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={onClose}>

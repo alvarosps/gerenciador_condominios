@@ -49,6 +49,7 @@ import { toast } from 'sonner';
 import { useCreateLease, useUpdateLease } from '@/lib/api/hooks/use-leases';
 import { useAvailableApartments } from '@/lib/api/hooks/use-apartments';
 import { useTenants } from '@/lib/api/hooks/use-tenants';
+import { useAuthStore } from '@/store/auth-store';
 import { type Lease } from '@/lib/schemas/lease.schema';
 import { type Dependent } from '@/lib/schemas/tenant.schema';
 import { formatCurrency } from '@/lib/utils/formatters';
@@ -84,6 +85,8 @@ const leaseFormSchema = z.object({
   deposit_amount: z.number().min(0, 'Valor não pode ser negativo').optional().nullable(),
   cleaning_fee_paid: z.boolean(),
   tag_deposit_paid: z.boolean(),
+  prepaid_until: z.string().nullable().optional(),
+  is_salary_offset: z.boolean().optional(),
 });
 
 type LeaseFormValues = z.infer<typeof leaseFormSchema>;
@@ -97,6 +100,8 @@ interface NewDependentForm {
 export function LeaseFormModal({ open, lease, onClose }: Props) {
   const createMutation = useCreateLease();
   const updateMutation = useUpdateLease();
+  const { user } = useAuthStore();
+  const isAdmin = user?.is_staff ?? false;
   const isEditMode = Boolean(lease);
   const { data: availableApartments, isLoading: apartmentsLoading } = useAvailableApartments();
 
@@ -129,6 +134,8 @@ export function LeaseFormModal({ open, lease, onClose }: Props) {
       deposit_amount: null,
       cleaning_fee_paid: false,
       tag_deposit_paid: false,
+      prepaid_until: null,
+      is_salary_offset: false,
     },
   });
 
@@ -156,6 +163,8 @@ export function LeaseFormModal({ open, lease, onClose }: Props) {
         deposit_amount: lease.deposit_amount ?? null,
         cleaning_fee_paid: lease.cleaning_fee_paid ?? false,
         tag_deposit_paid: lease.tag_deposit_paid ?? false,
+        prepaid_until: lease.prepaid_until ?? null,
+        is_salary_offset: lease.is_salary_offset ?? false,
       });
       setOriginalDueDay(lease.responsible_tenant?.due_day ?? null);
     } else {
@@ -173,6 +182,8 @@ export function LeaseFormModal({ open, lease, onClose }: Props) {
         deposit_amount: null,
         cleaning_fee_paid: false,
         tag_deposit_paid: false,
+        prepaid_until: null,
+        is_salary_offset: false,
       });
       setOriginalDueDay(null);
     }
@@ -304,6 +315,8 @@ export function LeaseFormModal({ open, lease, onClose }: Props) {
         deposit_amount: values.deposit_amount ?? null,
         cleaning_fee_paid: values.cleaning_fee_paid,
         tag_deposit_paid: values.tag_deposit_paid,
+        prepaid_until: values.prepaid_until ?? null,
+        is_salary_offset: values.is_salary_offset ?? false,
       };
 
       // Update tenant due_day if it changed or if creating
@@ -758,6 +771,51 @@ export function LeaseFormModal({ open, lease, onClose }: Props) {
                 </FormItem>
               )}
             />
+
+            {/* Condominium income controls (admin only) */}
+            {isAdmin && (
+              <>
+                <FormField
+                  control={formMethods.control}
+                  name="is_salary_offset"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                      <FormControl>
+                        <Checkbox checked={field.value ?? false} onCheckedChange={field.onChange} />
+                      </FormControl>
+                      <div className="space-y-1 leading-none">
+                        <FormLabel>Aluguel compensado por salário</FormLabel>
+                        <FormDescription>
+                          Inquilino-funcionário: o aluguel é abatido na folha. Exclui esta locação da receita do condomínio.
+                        </FormDescription>
+                      </div>
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={formMethods.control}
+                  name="prepaid_until"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Pré-pago até</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="date"
+                          {...field}
+                          value={field.value ?? ''}
+                          onChange={(e) => field.onChange(e.target.value || null)}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Meses até esta data já estão pagos (não cobrados). Deixe vazio se não houver pré-pagamento.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </>
+            )}
 
             <Separator />
             <div className="text-sm font-medium">Confirmações de Pagamento</div>
