@@ -262,3 +262,95 @@ def make_person_payment(person=None, user=None, **kwargs):
         defaults["updated_by"] = user
     defaults.update(kwargs)
     return baker.make("core.PersonPayment", person=person, **defaults)
+
+
+def make_finance_category(condominium=None, user=None, **kwargs):
+    if condominium is None:
+        condominium = make_condominium(user=user)
+    defaults = {"name": "Categoria Teste", "sort_order": 0}
+    if user:
+        defaults["created_by"] = user
+        defaults["updated_by"] = user
+    defaults.update(kwargs)
+    return baker.make("finances.Category", condominium=condominium, **defaults)
+
+
+def make_billing_account(condominium=None, user=None, **kwargs):
+    if condominium is None:
+        condominium = make_condominium(user=user)
+    defaults = {
+        "name": "Conta de Água",
+        "default_due_day": 10,
+        "expected_amount": Decimal("100.00"),
+    }
+    if user:
+        defaults["created_by"] = user
+        defaults["updated_by"] = user
+    defaults.update(kwargs)
+    return baker.make("finances.BillingAccount", condominium=condominium, **defaults)
+
+
+def make_bill(condominium=None, user=None, **kwargs):
+    if condominium is None:
+        condominium = make_condominium(user=user)
+    defaults = {
+        "competence_month": date(2026, 6, 1),
+        "due_date": date(2026, 6, 10),
+        "description": "Conta Teste",
+        "behavior": "recurring",
+    }
+    if user:
+        defaults["created_by"] = user
+        defaults["updated_by"] = user
+    defaults.update(kwargs)
+    return baker.make("finances.Bill", condominium=condominium, **defaults)
+
+
+def make_bill_line_item(bill=None, user=None, **kwargs):
+    if bill is None:
+        bill = make_bill(user=user)
+    defaults = {"description": "Linha Teste", "amount": Decimal("100.00"), "is_offset": False}
+    if user:
+        defaults["created_by"] = user
+        defaults["updated_by"] = user
+    defaults.update(kwargs)
+    return baker.make("finances.BillLineItem", bill=bill, **defaults)
+
+
+def make_bill_skip(billing_account=None, user=None, **kwargs):
+    if billing_account is None:
+        billing_account = make_billing_account(user=user)
+    defaults = {"reference_month": date(2026, 6, 1)}
+    if user:
+        defaults["created_by"] = user
+        defaults["updated_by"] = user
+    defaults.update(kwargs)
+    return baker.make("finances.BillSkip", billing_account=billing_account, **defaults)
+
+
+def make_payment(condominium=None, user=None, **kwargs):
+    if condominium is None:
+        condominium = make_condominium(user=user)
+    defaults = {
+        "payment_date": date(2026, 6, 5),
+        "amount": Decimal("100.00"),
+        "funded_from": "caixa",
+    }
+    if user:
+        defaults["created_by"] = user
+        defaults["updated_by"] = user
+    defaults.update(kwargs)
+    return baker.make("finances.Payment", condominium=condominium, **defaults)
+
+
+def make_payment_allocation(payment=None, bill=None, user=None, **kwargs):
+    if payment is None:
+        payment = make_payment(user=user)
+    if bill is None:
+        bill = make_bill(user=user)
+    defaults = {"amount": Decimal("100.00")}
+    if user:
+        defaults["created_by"] = user
+        defaults["updated_by"] = user
+    defaults.update(kwargs)
+    return baker.make("finances.PaymentAllocation", payment=payment, bill=bill, **defaults)
