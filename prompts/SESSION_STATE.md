@@ -515,3 +515,37 @@
 - Testes de serviço (test_contract_service, test_template_management_service) timeout sem Redis local — issue pré-existente, não relacionado ao módulo financeiro
 - xdist workers crasham em Windows/Python 3.14 — issue pré-existente
 - Diretório `financial-employees-temp` é lixo de uma sessão abortada — deve ser deletado manualmente (arquivos foram substituídos por stubs vazios para não bloquear build)
+
+
+---
+
+## Feature: Modulo Financeiro do Condominio (Saidas/Saldo/Reserva/Distribuicao) - Sessoes 34-50
+
+**Design Doc**: `docs/plans/2026-06-06-condominium-finance-design.md` (v3)
+**Total de Sessoes**: 17 (34-50) - **Branch sugerida**: `feat/condo-finance`
+**Status**: **prompts escritos + revisao de consistencia aplicada**. Nenhuma sessao executada.
+**Ordem/dependencias**: ver `prompts/ROADMAP.md` (secao desta feature). Sequencial 34->50 recomendado (gate por fase, >=90% em `finances`).
+
+**Decisoes de produto (detalhe no design v3):** app novo `finances` reusa `core`; separacao estrita condominio x pessoal (sitio = pessoal, fora); owner **nao-invasivo** (`owner=null`=condominio; PROD: so Tiago/Alvaro com owner; Rosa 850/205 salary-offset; Adriana 836/113 prepaid a registrar); household unico Raul&Celia (= o condominio); donos externos = so exibicao; pagamento parcial; reserva (`funded_from`); `CondoMonthClose` leve condo-scoped (ancora do fold + auditoria; NAO e o `MonthSnapshot` legado nem trava aluguel); tipos em dois eixos; materializar real/projetar futuro; gate ampliado p/ `finances`; TZ SP.
+
+**Contratos cross-session AUTORITATIVOS** (mesma lista em `prompts/ROADMAP.md`): Bill.installment+Bill.employee = **S41**; `pay()` reserva/`assert_open` = **S45** (S44 models-only); cache receivers (incl. RentAdjustment/MonthSnapshot) = **S37**; calendario `rent_entries`/`bill_exits` (S38); projecao `net`/`cumulative_cash` (S47); `formatMonthYear`->"Junho de 2026"; RLS em toda tabela nova do finances; wedge mixed-term test (S45); gate >=90% standalone em `finances`.
+
+| # | Sessao | Camada | Status | Arquivo |
+|---|--------|--------|--------|---------|
+| 34 | Fundacao: app finances + Condominium + Building.condominium + gate + TZ + factories | BE | pendente | `prompts/34-finances-app-infra-condominium.md` |
+| 35 | Forms: owner (Apto) + is_salary_offset/prepaid_until (Locacao) | FE | pendente | `prompts/35-forms-owner-salary-prepaid.md` |
+| 36 | Modelos: Category/BillingAccount/Bill/BillLineItem/BillSkip/Payment/PaymentAllocation | BE | pendente | `prompts/36-finances-models-bills.md` |
+| 37 | Servicos: BillGeneration/BillService/BillPayment + cache cross-app | BE | pendente | `prompts/37-finances-bill-services-cache.md` |
+| 38 | Serializers/Viewsets/API + CondoCalendarService + atrasados | BE | pendente | `prompts/38-finances-serializers-viewsets-calendar.md` |
+| 39 | Frontend data layer (schemas/hooks/MSW) | FE | pendente | `prompts/39-finances-frontend-data-layer.md` |
+| 40 | Frontend: calendario combinado + contas (CRUD) + pagamento | FE | pendente | `prompts/40-finances-frontend-calendar-bills-ui.md` |
+| 41 | InstallmentPlan/Installment + Employee + convert_deferred + estende geracao | BE | pendente | `prompts/41-finances-installments-employee-models-services.md` |
+| 42 | API parcelas/folha | BE | pendente | `prompts/42-finances-installments-employee-api.md` |
+| 43 | Frontend parcelas/folha | FE | pendente | `prompts/43-finances-installments-employee-frontend.md` |
+| 44 | Modelos: Reserve/ReserveMovement/IncomeEntry/CondoMonthClose | BE | pendente | `prompts/44-finances-reserve-income-close-models.md` |
+| 45 | CondoBalanceService + CondoMonthCloseService + received_collectible_total + API | BE | pendente | `prompts/45-finances-balance-close-services-api.md` |
+| 46 | Frontend: KPIs + reserva + receita + fechamento | FE | pendente | `prompts/46-finances-balance-reserve-income-frontend.md` |
+| 47 | CondoProjectionService + CondoSimulationService + endpoints | BE | pendente | `prompts/47-finances-projection-simulation-backend.md` |
+| 48 | Frontend: projecao (tabela+chart) + simulador | FE | pendente | `prompts/48-finances-projection-simulation-frontend.md` |
+| 49 | OwnerDistributionService + agregacao por dono + endpoint | BE | pendente | `prompts/49-finances-owner-distribution-backend.md` |
+| 50 | Frontend: cards por proprietario + donos externos + e2e/polish | FE | pendente | `prompts/50-finances-owner-distribution-frontend-polish.md` |
