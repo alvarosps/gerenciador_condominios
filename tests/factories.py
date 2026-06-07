@@ -403,3 +403,59 @@ def make_payment_allocation(payment=None, bill=None, user=None, **kwargs):
         defaults["updated_by"] = user
     defaults.update(kwargs)
     return baker.make("finances.PaymentAllocation", payment=payment, bill=bill, **defaults)
+
+
+def make_reserve(condominium=None, user=None, **kwargs):
+    if condominium is None:
+        condominium = make_condominium(user=user)
+    defaults = {"name": "Reserva Teste"}
+    if user:
+        defaults["created_by"] = user
+        defaults["updated_by"] = user
+    defaults.update(kwargs)
+    return baker.make("finances.Reserve", condominium=condominium, **defaults)
+
+
+def make_reserve_movement(reserve=None, user=None, **kwargs):
+    if reserve is None:
+        reserve = make_reserve(user=user)
+    defaults = {
+        "kind": "deposit",
+        "amount": Decimal("100.00"),
+        "movement_date": date(2026, 6, 5),
+    }
+    if user:
+        defaults["created_by"] = user
+        defaults["updated_by"] = user
+    defaults.update(kwargs)
+    return baker.make("finances.ReserveMovement", reserve=reserve, **defaults)
+
+
+def make_income_entry(condominium=None, user=None, **kwargs):
+    if condominium is None:
+        condominium = make_condominium(user=user)
+    defaults = {
+        "description": "Receita Teste",
+        "amount": Decimal("100.00"),
+        "income_date": date(2026, 6, 5),
+        "is_received": False,
+    }
+    if user:
+        defaults["created_by"] = user
+        defaults["updated_by"] = user
+    defaults.update(kwargs)
+    return baker.make("finances.IncomeEntry", condominium=condominium, **defaults)
+
+
+def make_condo_month_close(condominium=None, user=None, **kwargs):
+    if condominium is None:
+        condominium = make_condominium(user=user)
+    defaults = {
+        "reference_month": date(2026, 6, 1),
+        "status": "open",
+    }
+    if user:
+        defaults["created_by"] = user
+        defaults["updated_by"] = user
+    defaults.update(kwargs)
+    return baker.make("finances.CondoMonthClose", condominium=condominium, **defaults)

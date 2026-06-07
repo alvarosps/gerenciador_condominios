@@ -575,3 +575,193 @@ class Employee(AuditMixin, SoftDeleteMixin, models.Model):
             raise ValidationError(
                 {"base_salary": "Funcionário variável não pode ter salário base."}
             )
+
+
+# =============================================================================
+# PHASE 4 — Reserve / Income / Month close (Session 44)
+# =============================================================================
+
+_ERR_AMOUNT_POSITIVE = "O valor deve ser positivo."
+_ERR_RECEIVED_DATE_REQUIRED = "Informe a data de recebimento quando a receita está recebida."
+_ERR_RECEIVED_DATE_FORBIDDEN = "A data de recebimento só se aplica a receitas recebidas."
+_ERR_CLOSED_NEEDS_DATE = "Um fechamento concluído exige a data de fechamento."
+_ERR_CARRY_FORWARD_NON_POSITIVE = "O valor carregado para o próximo mês não pode ser positivo."
+
+
+def _first_of_month(value: date) -> date:
+    """Normalize a date to the first day of its month (single source — design §13)."""
+    return value.replace(day=1)
+
+
+class ReserveMovementKind(models.TextChoices):
+    DEPOSIT = "deposit", "Depósito"
+    WITHDRAWAL = "withdrawal", "Saque"
+
+
+class CondoMonthCloseStatus(models.TextChoices):
+    OPEN = "open", "Aberto"
+    CLOSED = "closed", "Fechado"
+
+
+class Reserve(AuditMixin, SoftDeleteMixin, models.Model):
+    """Reserve (condominium savings). One per condominium in the UI; the model allows N
+    (no selector now — YAGNI). Balance = Σ(ReserveMovement deposits − withdrawals) — DERIVED
+    in the S45 service (never a @property/annotation here; design §4.3)."""
+
+    condominium = models.ForeignKey(Condominium, on_delete=models.PROTECT, related_name="reserves")
+    name = models.CharField(max_length=200)
+    notes = models.TextField(blank=True)
+
+    all_objects = models.Manager()
+    objects = SoftDeleteManager()
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self) -> str:
+        return f"Reserva {self.name}"
+
+
+class ReserveMovement(AuditMixin, SoftDeleteMixin, models.Model):
+    """A movement on the reserve's single ledger. bill set = withdrawal to pay a bill;
+    bill=null = cash <-> reserve transfer. amount is stored POSITIVE; the SIGN comes from
+    `kind` (deposit adds, withdrawal subtracts).
+
+    The "withdrawal <= reserve balance" guard is a SERVICE concern (S45 — CondoBalanceService
+    + ReserveService.withdraw / BillPaymentService.pay), NOT this model: clean() must not query
+    aggregates of other rows (design §4.3 + pinned decision). Here we only enforce sign/positivity.
+    amount_paid of a Bill derives ONLY from PaymentAllocation (S36 with_amounts) — NEVER from
+    ReserveMovement.bill (the bill link is just the withdrawal target, not a payment)."""
+
+    reserve = models.ForeignKey(Reserve, on_delete=models.CASCADE, related_name="movements")
+    kind = models.CharField(max_length=10, choices=ReserveMovementKind.choices)
+    amount = models.DecimalField(max_digits=12, decimal_places=2)  # > 0
+    movement_date = models.DateField()
+    bill = models.ForeignKey(
+        Bill, null=True, blank=True, on_delete=models.SET_NULL, related_name="reserve_movements"
+    )
+    reference = models.CharField(max_length=200, blank=True)
+    notes = models.TextField(blank=True)
+
+    all_objects = models.Manager()
+    objects = SoftDeleteManager()
+
+    class Meta:
+        # Deterministic ledger (design §4.3): same movement_date ties broken by insertion id.
+        ordering = ["movement_date", "id"]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(amount__gt=0),
+                name="reserve_movement_amount_positive",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.get_kind_display()} R${self.amount} ({self.movement_date:%d/%m/%Y})"
+
+    def clean(self) -> None:
+        super().clean()
+        if self.amount is not None and self.amount <= 0:
+            raise ValidationError({"amount": _ERR_AMOUNT_POSITIVE})
+
+
+class IncomeEntry(AuditMixin, SoftDeleteMixin, models.Model):
+    """One-off condominium income (loan proceeds, etc. — design §7). is_received=True (with
+    received_date) is what counts in the cash balance (entradas_caixa, S45). Not recurring
+    (YAGNI — design §15)."""
+
+    condominium = models.ForeignKey(
+        Condominium, on_delete=models.PROTECT, related_name="income_entries"
+    )
+    building = models.ForeignKey(
+        Building, null=True, blank=True, on_delete=models.SET_NULL, related_name="income_entries"
+    )
+    category = models.ForeignKey(
+        Category, null=True, blank=True, on_delete=models.SET_NULL, related_name="income_entries"
+    )
+    description = models.CharField(max_length=500)
+    amount = models.DecimalField(max_digits=12, decimal_places=2)  # > 0
+    income_date = models.DateField()
+    is_received = models.BooleanField(default=False)
+    received_date = models.DateField(null=True, blank=True)
+    notes = models.TextField(blank=True)
+
+    all_objects = models.Manager()
+    objects = SoftDeleteManager()
+
+    class Meta:
+        ordering = ["-income_date"]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(amount__gt=0),
+                name="income_entry_amount_positive",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.description} - R${self.amount}"
+
+    def clean(self) -> None:
+        super().clean()
+        if self.amount is not None and self.amount <= 0:
+            raise ValidationError({"amount": _ERR_AMOUNT_POSITIVE})
+        if self.is_received and self.received_date is None:
+            raise ValidationError({"received_date": _ERR_RECEIVED_DATE_REQUIRED})
+        if not self.is_received and self.received_date is not None:
+            raise ValidationError({"received_date": _ERR_RECEIVED_DATE_FORBIDDEN})
+
+
+class CondoMonthClose(AuditMixin, models.Model):
+    """Lightweight, condominium-scoped anchor of the cash/fold + audit (design §3.2/§5.2).
+    NO SoftDelete (only AuditMixin). Freezes net/cash/reserve/carry_forward_out of the CLOSED
+    month and seeds the next month's cash/fold (S45). Does NOT lock rent (rent-lock = legacy
+    MonthSnapshot). reference_month = 1st day of the month.
+
+    net_result/cash_balance_end/reserve_balance_end may be negative (cash can go negative — an
+    informational warning, not a block; design §4.2/§4.3) so they carry no CheckConstraint.
+    carry_forward_out is structurally <= 0 (design §4.7: carregado_out = min(0, ...))."""
+
+    condominium = models.ForeignKey(
+        Condominium, on_delete=models.PROTECT, related_name="month_closes"
+    )
+    reference_month = models.DateField(
+        help_text="Primeiro dia do mês de referência (ex: 2026-06-01)"
+    )
+    status = models.CharField(
+        max_length=10, choices=CondoMonthCloseStatus.choices, default=CondoMonthCloseStatus.OPEN
+    )
+    closed_at = models.DateTimeField(null=True, blank=True)
+    net_result = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal(0))
+    cash_balance_end = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal(0))
+    reserve_balance_end = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal(0))
+    carry_forward_out = models.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal(0)
+    )  # <= 0 (design §4.7)
+    breakdown = models.JSONField(default=dict, blank=True)  # minimal display payload (S45/S46)
+
+    objects = models.Manager()  # no SoftDeleteManager (there is no is_deleted)
+
+    class Meta:
+        ordering = ["-reference_month"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["condominium", "reference_month"],
+                name="unique_condo_month_close",
+            ),
+            models.CheckConstraint(
+                condition=Q(carry_forward_out__lte=0),
+                name="condo_month_close_carry_forward_non_positive",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"Fechamento {self.reference_month:%m/%Y} ({self.get_status_display()})"
+
+    def clean(self) -> None:
+        super().clean()
+        if self.reference_month is not None:
+            self.reference_month = _first_of_month(self.reference_month)
+        if self.status == CondoMonthCloseStatus.CLOSED and self.closed_at is None:
+            raise ValidationError({"closed_at": _ERR_CLOSED_NEEDS_DATE})
+        if self.carry_forward_out is not None and self.carry_forward_out > 0:
+            raise ValidationError({"carry_forward_out": _ERR_CARRY_FORWARD_NON_POSITIVE})
