@@ -1,0 +1,327 @@
+"""CRUD viewsets + Bill actions for the finances API (Session 38).
+
+ModelViewSet + FinancialReadOnly + CustomPageNumberPagination. Bill amount_* read from
+the with_amounts(today) annotation (TZ-SP today). Actions are thin: they parse/validate
+request data (400 PT) and delegate to the S37/S38 services.
+"""
+
+from datetime import date
+from decimal import Decimal, InvalidOperation
+from typing import cast
+
+from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
+from django.db import transaction
+from django.db.models import QuerySet
+from django.http import QueryDict
+from rest_framework import status, viewsets
+from rest_framework.decorators import action
+from rest_framework.request import Request
+from rest_framework.response import Response
+
+from core.pagination import CustomPageNumberPagination
+from core.permissions import FinancialReadOnly
+from finances.models import (
+    Bill,
+    BillingAccount,
+    BillLifecycleState,
+    BillSkip,
+    Category,
+    Payment,
+)
+from finances.serializers import (
+    BillingAccountSerializer,
+    BillSerializer,
+    BillSkipSerializer,
+    CategorySerializer,
+    PaymentSerializer,
+)
+from finances.services.bill_generation_service import BillGenerationService
+from finances.services.bill_lifecycle_service import BillLifecycleService
+from finances.services.bill_payment_service import BillPaymentService
+from finances.services.bill_service import BillDraft, BillLineInput, BillService
+from finances.services.timezone import today_sp
+
+MONTHS_IN_YEAR = 12
+
+
+def _parse_year_month(data: dict[str, object]) -> tuple[int, int]:
+    """Parse year/month from request data; raise ValueError (-> 400) when invalid."""
+    year = int(cast(str, data["year"]))
+    month = int(cast(str, data["month"]))
+    if not (1 <= month <= MONTHS_IN_YEAR):
+        raise ValueError  # caller maps this to a 400 with a user-facing message
+    return year, month
+
+
+class CategoryViewSet(viewsets.ModelViewSet):
+    serializer_class = CategorySerializer
+    permission_classes = [FinancialReadOnly]
+    pagination_class = CustomPageNumberPagination
+
+    def get_queryset(self) -> QuerySet[Category]:
+        queryset = Category.objects.select_related("parent", "condominium")
+        params = self.request.query_params
+        parent_id = params.get("parent_id")
+        if parent_id is not None:
+            queryset = queryset.filter(parent_id=int(parent_id))
+        condominium_id = params.get("condominium_id")
+        if condominium_id is not None:
+            queryset = queryset.filter(condominium_id=int(condominium_id))
+        return queryset
+
+
+class BillingAccountViewSet(viewsets.ModelViewSet):
+    serializer_class = BillingAccountSerializer
+    permission_classes = [FinancialReadOnly]
+    pagination_class = CustomPageNumberPagination
+
+    def get_queryset(self) -> QuerySet[BillingAccount]:
+        queryset = BillingAccount.objects.select_related("building", "category", "condominium")
+        params = self.request.query_params
+        building_id = params.get("building_id")
+        if building_id is not None:
+            queryset = queryset.filter(building_id=int(building_id))
+        category_id = params.get("category_id")
+        if category_id is not None:
+            queryset = queryset.filter(category_id=int(category_id))
+        lifecycle_state = params.get("lifecycle_state")
+        if lifecycle_state is not None:
+            queryset = queryset.filter(lifecycle_state=lifecycle_state)
+        return queryset
+
+
+class BillSkipViewSet(viewsets.ModelViewSet):
+    serializer_class = BillSkipSerializer
+    permission_classes = [FinancialReadOnly]
+    pagination_class = CustomPageNumberPagination
+
+    def get_queryset(self) -> QuerySet[BillSkip]:
+        queryset = BillSkip.objects.select_related("billing_account")
+        params = self.request.query_params
+        billing_account_id = params.get("billing_account_id")
+        if billing_account_id is not None:
+            queryset = queryset.filter(billing_account_id=int(billing_account_id))
+        reference_month = params.get("reference_month")
+        if reference_month is not None:
+            queryset = queryset.filter(reference_month=reference_month)
+        return queryset.order_by("-reference_month")
+
+
+class PaymentViewSet(viewsets.ModelViewSet):
+    serializer_class = PaymentSerializer
+    permission_classes = [FinancialReadOnly]
+    pagination_class = CustomPageNumberPagination
+
+    def get_queryset(self) -> QuerySet[Payment]:
+        queryset = Payment.objects.select_related("condominium").prefetch_related(
+            "allocations", "allocations__bill"
+        )
+        params = self.request.query_params
+        funded_from = params.get("funded_from")
+        if funded_from is not None:
+            queryset = queryset.filter(funded_from=funded_from)
+        date_from = params.get("date_from")
+        if date_from is not None:
+            queryset = queryset.filter(payment_date__gte=date_from)
+        date_to = params.get("date_to")
+        if date_to is not None:
+            queryset = queryset.filter(payment_date__lte=date_to)
+        return queryset
+
+
+class BillViewSet(viewsets.ModelViewSet):
+    serializer_class = BillSerializer
+    permission_classes = [FinancialReadOnly]
+    pagination_class = CustomPageNumberPagination
+
+    def get_queryset(self) -> QuerySet[Bill]:
+        queryset = (
+            Bill.objects.with_amounts(today_sp())
+            .select_related("building", "category", "billing_account", "condominium")
+            .prefetch_related("line_items", "allocations")
+        )
+        return self._apply_filters(queryset, self.request.query_params)
+
+    def _apply_filters(self, queryset: QuerySet[Bill], params: QueryDict) -> QuerySet[Bill]:
+        building_id = params.get("building_id")
+        if building_id is not None:
+            queryset = queryset.filter(building_id=int(building_id))
+        category_id = params.get("category_id")
+        if category_id is not None:
+            queryset = queryset.filter(category_id=int(category_id))
+        competence_month = params.get("competence_month")
+        if competence_month is not None:
+            queryset = queryset.filter(competence_month=competence_month)
+        lifecycle_state = params.get("lifecycle_state")
+        if lifecycle_state is not None:
+            queryset = queryset.filter(lifecycle_state=lifecycle_state)
+        behavior = params.get("behavior")
+        if behavior is not None:
+            queryset = queryset.filter(behavior=behavior)
+        # payment_status / is_overdue are with_amounts annotations — pass the lookup through a
+        # dict variable so the django-stubs plugin does not reject the annotation names as
+        # unknown fields (an inline ** literal would be rewritten by ruff PIE804).
+        payment_status = params.get("payment_status")
+        if payment_status is not None:
+            status_lookup: dict[str, object] = {"payment_status": payment_status}
+            queryset = queryset.filter(**status_lookup)
+        is_overdue = params.get("is_overdue")
+        if is_overdue is not None:
+            overdue_lookup: dict[str, object] = {"is_overdue": is_overdue.lower() == "true"}
+            queryset = queryset.filter(**overdue_lookup)
+        return queryset
+
+    def _serialized_bill(self, bill: Bill) -> dict[str, object]:
+        annotated = self.get_queryset().get(pk=bill.pk)
+        return BillSerializer(annotated, context={"request": self.request}).data
+
+    @action(detail=True, methods=["post"])
+    def pay(self, request: Request, pk: str | None = None) -> Response:
+        bill = self.get_object()
+        payment_date_raw = request.data.get("payment_date")
+        if not payment_date_raw:
+            return Response(
+                {"error": "Campo payment_date é obrigatório."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            payment_date = date.fromisoformat(str(payment_date_raw))
+            amount_raw = request.data.get("amount")
+            amount = Decimal(str(amount_raw)) if amount_raw is not None else None
+            funded_from = str(request.data.get("funded_from", "caixa"))
+            BillPaymentService.pay(
+                bill, payment_date, amount, funded_from, user=cast(User, request.user)
+            )
+        except (ValueError, InvalidOperation):
+            return Response(
+                {"error": "Valor ou data de pagamento inválido."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except ValidationError as exc:
+            return Response({"error": str(exc.messages[0])}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(self._serialized_bill(bill), status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["post"])
+    def bulk_pay(self, request: Request) -> Response:
+        bill_ids = request.data.get("bill_ids")
+        payment_date_raw = request.data.get("payment_date")
+        if not bill_ids or not isinstance(bill_ids, list) or not payment_date_raw:
+            return Response(
+                {"error": "Campos bill_ids (lista não vazia) e payment_date são obrigatórios."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        funded_from = str(request.data.get("funded_from", "caixa"))
+        try:
+            payment_date = date.fromisoformat(str(payment_date_raw))
+        except (ValueError, InvalidOperation):
+            return Response(
+                {"error": "Data de pagamento inválida."}, status=status.HTTP_400_BAD_REQUEST
+            )
+        bills = list(Bill.objects.filter(pk__in=bill_ids))
+        if len(bills) != len(bill_ids):
+            return Response(
+                {"error": "Uma ou mais contas não foram encontradas."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            with transaction.atomic():
+                for bill in bills:
+                    BillPaymentService.pay(
+                        bill, payment_date, None, funded_from, user=cast(User, request.user)
+                    )
+        except ValidationError as exc:
+            return Response({"error": str(exc.messages[0])}, status=status.HTTP_400_BAD_REQUEST)
+        return Response([self._serialized_bill(bill) for bill in bills], status=status.HTTP_200_OK)
+
+    def _transition(self, state: str) -> Response:
+        bill = self.get_object()
+        BillLifecycleService.set_state(bill, state, user=cast(User, self.request.user))
+        return Response(self._serialized_bill(bill), status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"])
+    def suspend(self, request: Request, pk: str | None = None) -> Response:
+        return self._transition(BillLifecycleState.SUSPENDED)
+
+    @action(detail=True, methods=["post"])
+    def defer(self, request: Request, pk: str | None = None) -> Response:
+        return self._transition(BillLifecycleState.DEFERRED)
+
+    @action(detail=True, methods=["post"])
+    def cancel(self, request: Request, pk: str | None = None) -> Response:
+        return self._transition(BillLifecycleState.CANCELED)
+
+    @action(detail=True, methods=["post"])
+    def reactivate(self, request: Request, pk: str | None = None) -> Response:
+        bill = self.get_object()
+        try:
+            BillLifecycleService.reactivate(bill, user=cast(User, request.user))
+        except ValidationError as exc:
+            return Response({"error": str(exc.messages[0])}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(self._serialized_bill(bill), status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["post"])
+    def generate_month(self, request: Request) -> Response:
+        try:
+            year, month = _parse_year_month(request.data)
+        except (KeyError, ValueError, TypeError):
+            return Response(
+                {"error": "Parâmetros year/month inválidos (mês entre 1 e 12)."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        bills = BillGenerationService.ensure_month_bills(year, month, user=cast(User, request.user))
+        return Response(
+            {
+                "created": len(bills),
+                "bills": [self._serialized_bill(bill) for bill in bills],
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    @action(detail=False, methods=["post"])
+    def create_with_lines(self, request: Request) -> Response:
+        bill_data = request.data.get("bill")
+        line_items = request.data.get("line_items", [])
+        if not isinstance(bill_data, dict) or not isinstance(line_items, list):
+            return Response(
+                {
+                    "error": "Payload inválido: 'bill' (objeto) e 'line_items' (lista) são obrigatórios."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        bill_serializer = BillSerializer(data=bill_data)
+        if not bill_serializer.is_valid():
+            return Response(bill_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        validated = bill_serializer.validated_data
+        try:
+            draft = BillDraft(
+                condominium=validated["condominium"],
+                competence_month=validated["competence_month"],
+                due_date=validated["due_date"],
+                description=validated["description"],
+                behavior=validated["behavior"],
+                building=validated.get("building"),
+                category=validated.get("category"),
+                billing_account=validated.get("billing_account"),
+                external_identifier=validated.get("external_identifier", ""),
+                lifecycle_state=validated.get("lifecycle_state", BillLifecycleState.ACTIVE),
+                notes=validated.get("notes", ""),
+            )
+            lines: list[BillLineInput] = [
+                BillLineInput(
+                    description=str(item["description"]),
+                    amount=Decimal(str(item["amount"])),
+                    is_offset=bool(item.get("is_offset", False)),
+                    category=(
+                        Category.objects.filter(pk=item.get("category_id")).first()
+                        if item.get("category_id")
+                        else None
+                    ),
+                )
+                for item in line_items
+            ]
+            bill = BillService.create_with_lines(draft, lines, user=cast(User, request.user))
+        except (KeyError, ValueError, InvalidOperation, ValidationError) as exc:
+            message = exc.messages[0] if isinstance(exc, ValidationError) else str(exc)
+            return Response({"error": message}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(self._serialized_bill(bill), status=status.HTTP_201_CREATED)
