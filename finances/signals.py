@@ -18,6 +18,9 @@ from finances.models import (
     BillLineItem,
     BillSkip,
     Category,
+    Employee,
+    Installment,
+    InstallmentPlan,
     Payment,
     PaymentAllocation,
 )
@@ -32,6 +35,9 @@ _FINANCE_MODELS = (
     BillSkip,
     Payment,
     PaymentAllocation,
+    InstallmentPlan,
+    Installment,
+    Employee,
 )
 
 
