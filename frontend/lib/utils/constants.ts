@@ -70,4 +70,6 @@ export const ROUTES = {
   FINANCIAL_PERSON_INCOMES: '/financial/person-incomes',
   // Condomínio (new finances module — coexists with the legacy /financial/* routes)
   FINANCES_BILLS: '/finances/bills',
+  FINANCES_INSTALLMENT_PLANS: '/finances/installment-plans',
+  FINANCES_EMPLOYEES: '/finances/employees',
 };
