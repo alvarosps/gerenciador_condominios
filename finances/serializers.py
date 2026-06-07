@@ -35,6 +35,22 @@ from finances.models import (
 from finances.money import money_str
 from finances.services.timezone import today_sp
 
+_NO_CONDOMINIUM = "Nenhum condomínio configurado."
+
+
+def _apply_default_condominium(instance: object, attrs: dict[str, object]) -> None:
+    """Inject the singleton condominium on create when ``condominium_id`` is omitted.
+
+    The condominium is an invisible singleton with no client-side selector (design §15),
+    so condo-scoped resources (reserve, income) default to ``Condominium.get_default()``
+    exactly as ``Building.save`` does. On update the existing condominium is kept.
+    """
+    if instance is None and attrs.get("condominium") is None:
+        default = Condominium.get_default()
+        if default is None:
+            raise serializers.ValidationError({"condominium_id": _NO_CONDOMINIUM})
+        attrs["condominium"] = default
+
 
 class CondominiumSimpleSerializer(serializers.ModelSerializer):
     class Meta:
@@ -429,7 +445,10 @@ class ReserveSimpleSerializer(serializers.ModelSerializer):
 class ReserveSerializer(serializers.ModelSerializer):
     condominium = CondominiumSimpleSerializer(read_only=True)
     condominium_id = serializers.PrimaryKeyRelatedField(
-        queryset=Condominium.objects.all(), source="condominium", write_only=True
+        queryset=Condominium.objects.all(),
+        source="condominium",
+        write_only=True,
+        required=False,
     )
     balance = serializers.SerializerMethodField()
 
@@ -446,6 +465,10 @@ class ReserveSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
+
+    def validate(self, attrs: dict[str, object]) -> dict[str, object]:
+        _apply_default_condominium(self.instance, attrs)
+        return attrs
 
     def get_balance(self, obj: Reserve) -> str:
         # Reserve-scoped ledger balance (deposits - withdrawals) via the model relation only
@@ -497,7 +520,10 @@ class ReserveMovementSerializer(serializers.ModelSerializer):
 class IncomeEntrySerializer(serializers.ModelSerializer):
     condominium = CondominiumSimpleSerializer(read_only=True)
     condominium_id = serializers.PrimaryKeyRelatedField(
-        queryset=Condominium.objects.all(), source="condominium", write_only=True
+        queryset=Condominium.objects.all(),
+        source="condominium",
+        write_only=True,
+        required=False,
     )
     building = BuildingSerializer(read_only=True)
     building_id = serializers.PrimaryKeyRelatedField(
@@ -539,6 +565,7 @@ class IncomeEntrySerializer(serializers.ModelSerializer):
 
     def validate(self, attrs: dict[str, object]) -> dict[str, object]:
         # DRF does not call Model.clean(); mirror the is_received <-> received_date invariant.
+        _apply_default_condominium(self.instance, attrs)
         is_received = attrs.get("is_received", getattr(self.instance, "is_received", False))
         received_date = attrs.get("received_date", getattr(self.instance, "received_date", None))
         if is_received and received_date is None:

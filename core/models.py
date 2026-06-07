@@ -218,6 +218,19 @@ class Condominium(AuditMixin, SoftDeleteMixin, models.Model):
         """Return string representation of condominium."""
         return self.name
 
+    @classmethod
+    def get_default(cls) -> "Condominium | None":
+        """Resolve the singleton condominium (lowest id), or None if none exists yet.
+
+        The system runs with one invisible default condominium (design §6/§15). Callers
+        that omit an explicit condominium — the reserve/income serializers and the
+        month-close service — fall back to this single source of truth instead of each
+        re-deriving it. ``Building.save`` bootstraps the record on first use, so in
+        practice this never returns None. Multi-condomínio (future) requires explicit
+        assignment instead of this fallback.
+        """
+        return cls.objects.order_by("id").first()
+
 
 class Building(AuditMixin, SoftDeleteMixin, models.Model):
     """

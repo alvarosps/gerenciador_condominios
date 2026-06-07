@@ -198,7 +198,7 @@ class CondoMonthCloseService:
 
     @staticmethod
     def _condominium() -> Condominium:
-        condominium = Condominium.objects.order_by("id").first()
+        condominium = Condominium.get_default()
         if condominium is None:
             raise ValidationError(_NO_CONDOMINIUM)
         return condominium

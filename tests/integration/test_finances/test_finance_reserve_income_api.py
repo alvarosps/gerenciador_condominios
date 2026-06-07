@@ -8,7 +8,7 @@ from finances.services.condo_balance_service import CondoBalanceService
 from freezegun import freeze_time
 from rest_framework import status
 
-from core.models import FinancialSettings
+from core.models import Condominium, FinancialSettings
 from tests.factories import (
     make_condominium,
     make_reserve,
@@ -78,6 +78,70 @@ def test_reserve_withdraw_guard(authenticated_api_client):
     )
     assert ok.status_code == status.HTTP_200_OK
     assert ok.data["balance"] == "20.00"
+
+
+def test_reserve_create_defaults_singleton_condominium(authenticated_api_client):
+    """POST without condominium_id falls back to the singleton (design §15 — no UI selector)."""
+    default = Condominium.get_default()
+    assert default is not None
+    resp = authenticated_api_client.post(
+        "/api/finances/reserves/", {"name": "Reserva"}, format="json"
+    )
+    assert resp.status_code == status.HTTP_201_CREATED
+    assert resp.data["condominium"] == {"id": default.id, "name": default.name}
+
+
+def test_income_entry_defaults_singleton_condominium(authenticated_api_client):
+    """POST without condominium_id falls back to the singleton (design §15)."""
+    default = Condominium.get_default()
+    assert default is not None
+    resp = authenticated_api_client.post(
+        "/api/finances/income-entries/",
+        {
+            "description": "Doação",
+            "amount": "100.00",
+            "income_date": "2026-06-20",
+            "is_received": False,
+        },
+        format="json",
+    )
+    assert resp.status_code == status.HTTP_201_CREATED
+    assert resp.data["condominium"] == {"id": default.id, "name": default.name}
+
+
+def test_income_entry_update_keeps_condominium(authenticated_api_client):
+    """Updating without condominium_id keeps the existing condominium (no default injection)."""
+    cond = make_condominium()
+    created = authenticated_api_client.post(
+        "/api/finances/income-entries/",
+        {
+            "condominium_id": cond.id,
+            "description": "Original",
+            "amount": "10.00",
+            "income_date": "2026-06-20",
+            "is_received": False,
+        },
+        format="json",
+    )
+    income_id = created.data["id"]
+    resp = authenticated_api_client.patch(
+        f"/api/finances/income-entries/{income_id}/",
+        {"description": "Editado"},
+        format="json",
+    )
+    assert resp.status_code == status.HTTP_200_OK
+    assert resp.data["description"] == "Editado"
+    assert resp.data["condominium"]["id"] == cond.id
+
+
+def test_reserve_create_errors_when_no_condominium(authenticated_api_client):
+    """With no condominium configured at all, the create surfaces a PT validation error."""
+    Condominium.all_objects.all().delete()
+    resp = authenticated_api_client.post(
+        "/api/finances/reserves/", {"name": "Reserva"}, format="json"
+    )
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    assert "condomínio" in str(resp.data).lower()
 
 
 def test_reserve_deposit_requires_amount(authenticated_api_client):
