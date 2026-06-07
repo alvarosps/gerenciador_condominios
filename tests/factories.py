@@ -31,13 +31,26 @@ def _next_cpf() -> str:
     return next(_cpf_cycle)
 
 
-def make_building(street_number: int = 100, user=None, **kwargs):
-    defaults = {}
+def make_condominium(user=None, **kwargs):
+    defaults = {"name": "Test Condominium"}
     if user:
         defaults["created_by"] = user
         defaults["updated_by"] = user
     defaults.update(kwargs)
-    return baker.make("core.Building", street_number=street_number, **defaults)
+    return baker.make("core.Condominium", **defaults)
+
+
+def make_building(street_number: int = 100, user=None, condominium=None, **kwargs):
+    defaults = {}
+    if user:
+        defaults["created_by"] = user
+        defaults["updated_by"] = user
+    if condominium is None:
+        condominium = make_condominium(user=user)
+    defaults.update(kwargs)
+    return baker.make(
+        "core.Building", street_number=street_number, condominium=condominium, **defaults
+    )
 
 
 def make_apartment(building=None, number: int = 101, user=None, **kwargs):

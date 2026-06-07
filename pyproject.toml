@@ -372,7 +372,7 @@ disable_error_code = ["import-untyped"]
 # =============================================================================
 
 [tool.coverage.run]
-source = ["core", "condominios_manager"]
+source = ["core", "condominios_manager", "finances"]
 omit = [
     "*/migrations/*",
     "*/tests/*",

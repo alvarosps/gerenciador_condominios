@@ -194,6 +194,30 @@ class SoftDeleteMixin(models.Model):
 # DOMAIN MODELS
 # =============================================================================
 
+DEFAULT_CONDOMINIUM_NAME = "Condomínio Principal"
+
+
+class Condominium(AuditMixin, SoftDeleteMixin, models.Model):
+    """
+    Condomínio — the tenancy root consumed by Building.
+
+    For now there is a single invisible default record (created by migration);
+    multi-condomínio isolation and permissions are future work (design §6, §15).
+
+    Inherits audit fields (created_at, updated_at, created_by, updated_by) and
+    soft delete capability (is_deleted, deleted_at, deleted_by).
+    """
+
+    name = models.CharField(max_length=100, help_text="Nome do condomínio")
+    notes = models.TextField(blank=True, default="", help_text="Observações internas")
+
+    all_objects = models.Manager()  # Access all objects including deleted
+    objects = SoftDeleteManager()
+
+    def __str__(self) -> str:
+        """Return string representation of condominium."""
+        return self.name
+
 
 class Building(AuditMixin, SoftDeleteMixin, models.Model):
     """
@@ -213,6 +237,13 @@ class Building(AuditMixin, SoftDeleteMixin, models.Model):
     )
     name = models.CharField(max_length=100, help_text="Nome do prédio")
     address = models.CharField(max_length=200, help_text="Endereço completo do prédio")
+    condominium = models.ForeignKey(
+        "core.Condominium",
+        on_delete=models.PROTECT,
+        related_name="buildings",
+        blank=True,  # DB-required (non-null); save() defaults to the singleton condominium
+        help_text="Condomínio ao qual o prédio pertence",
+    )
 
     # Custom manager that excludes soft-deleted objects
     all_objects = models.Manager()  # Access all objects including deleted
@@ -221,6 +252,23 @@ class Building(AuditMixin, SoftDeleteMixin, models.Model):
     def __str__(self) -> str:
         """Return string representation of building."""
         return f"{self.name} - {self.street_number}"
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        """Assign the singleton default condominium when none is set.
+
+        A building always belongs to a condominium. While the system runs with a
+        single invisible default condominium (design §6), a building created
+        without an explicit one belongs to that default — so existing callers and
+        the API need no change. Multi-condomínio (future) requires explicit
+        assignment instead.
+        """
+        # Falsy condominium_id means unset (PKs are >= 1) — django-stubs types the
+        # non-null FK's _id as int, so an explicit `is None` would read as unreachable.
+        if not self.condominium_id:
+            self.condominium = Condominium.objects.get_or_create(
+                name=DEFAULT_CONDOMINIUM_NAME, defaults={"notes": ""}
+            )[0]
+        super().save(*args, **kwargs)
 
     def delete(
         self,

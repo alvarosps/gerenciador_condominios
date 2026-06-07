@@ -392,7 +392,7 @@ claude -n "session-13-dashboard"      # Terminal 3
 
 **Design Doc**: `docs/plans/2026-06-06-condominium-finance-design.md` (v3)
 **Sessoes**: 34-50 (17) - **Branch sugerida**: `feat/condo-finance`
-**Status**: prompts escritos (34-50) + revisao de consistencia aplicada. Nenhuma sessao executada.
+**Status**: prompts escritos (34-50) + revisao de consistencia aplicada. **S34 concluída** (Fase 1a — fundação `finances` + `core.Condominium` + `Building.condominium` faseada + helper TZ + gate ampliado; branch `feat/condo-finance`). S35–50 pendentes.
 
 ## Grafo de dependencias (fases sec.14 do design)
 

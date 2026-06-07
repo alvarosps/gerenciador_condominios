@@ -5,6 +5,7 @@
   "include": [
     "core",
     "condominios_manager",
+    "finances",
     "scripts",
     "tests"
   ],
