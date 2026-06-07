@@ -64,6 +64,22 @@ def test_default_condominium_record_created_by_migration() -> None:
 
 
 @pytest.mark.django_db
+def test_get_default_resolves_singleton() -> None:
+    """get_default() returns the migration-created singleton (lowest id)."""
+    default = Condominium.get_default()
+    assert default is not None
+    assert default.name == DEFAULT_CONDOMINIUM_NAME
+    assert default == Condominium.objects.order_by("id").first()
+
+
+@pytest.mark.django_db
+def test_get_default_returns_none_when_no_condominium() -> None:
+    """With no condominium at all, get_default() is None (callers raise a PT error)."""
+    Condominium.all_objects.all().delete()
+    assert Condominium.get_default() is None
+
+
+@pytest.mark.django_db
 def test_condominium_table_has_rls_enabled() -> None:
     """core_condominium must have Row Level Security enabled (Supabase rule)."""
     with connection.cursor() as cursor:
