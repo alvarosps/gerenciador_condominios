@@ -6,6 +6,13 @@ import type { BillingAccount } from '@/lib/schemas/finances/billing-account.sche
 import type { Bill, BillLineItem } from '@/lib/schemas/finances/bill.schema';
 import type { BillSkip } from '@/lib/schemas/finances/bill-skip.schema';
 import type { FinanceCategory } from '@/lib/schemas/finances/category.schema';
+import type {
+  Employee,
+} from '@/lib/schemas/finances/employee.schema';
+import type {
+  Installment,
+  InstallmentPlan,
+} from '@/lib/schemas/finances/installment-plan.schema';
 import type { Payment, PaymentAllocation } from '@/lib/schemas/finances/payment.schema';
 
 export function createMockFinanceCategory(
@@ -174,6 +181,71 @@ export function createMockOverdueResponse(
     overdue_bills_total: '350.00',
     overdue_bills_count: 1,
     rent_overdue: { count: 0, total_fee: '0.00' },
+    ...overrides,
+  };
+}
+
+
+export function createMockInstallment(overrides: Partial<Installment> = {}): Installment {
+  return {
+    id: 1,
+    plan: 1,
+    number: 1,
+    due_date: '2026-07-10',
+    amount: 500,
+    is_overdue: false,
+    ...overrides,
+  };
+}
+
+export function createMockInstallmentPlan(
+  overrides: Partial<InstallmentPlan> = {},
+): InstallmentPlan {
+  return {
+    id: 1,
+    condominium: { id: 1, name: 'Condomínio' },
+    description: 'IPTU 2026 - Prédio 836',
+    total_amount: 1500,
+    installment_count: 3,
+    start_due_date: '2026-07-10',
+    default_due_day: 10,
+    lifecycle_state: 'active',
+    embedded: false,
+    category: null,
+    category_id: null,
+    building: null,
+    building_id: null,
+    linked_billing_account: null,
+    linked_billing_account_id: null,
+    installments: [
+      createMockInstallment({ id: 1, number: 1, amount: 500, due_date: '2026-07-10' }),
+      createMockInstallment({ id: 2, number: 2, amount: 500, due_date: '2026-08-10' }),
+      createMockInstallment({ id: 3, number: 3, amount: 500, due_date: '2026-09-10' }),
+    ],
+    notes: '',
+    created_at: '2026-06-01T00:00:00Z',
+    updated_at: '2026-06-01T00:00:00Z',
+    ...overrides,
+  };
+}
+
+export function createMockEmployee(overrides: Partial<Employee> = {}): Employee {
+  return {
+    id: 1,
+    condominium: { id: 1, name: 'Condomínio' },
+    name: 'Adriana',
+    role: 'Faxineira',
+    payment_type: 'fixed',
+    base_salary: 1320,
+    default_due_day: 5,
+    is_active: true,
+    notes: '',
+    person: null,
+    person_id: null,
+    lease: null,
+    lease_id: null,
+    created_at: '2026-06-01T00:00:00Z',
+    updated_at: '2026-06-01T00:00:00Z',
     ...overrides,
   };
 }

@@ -178,6 +178,24 @@ export const queryKeys = {
       list: (buildingId?: number) =>
         [...queryKeys.finances.overdueBills.all, buildingId ?? null] as const,
     },
+    installmentPlans: {
+      all: ['finances', 'installment-plans'] as const,
+      list: (filters?: Record<string, unknown>) =>
+        [...queryKeys.finances.installmentPlans.all, filters ?? null] as const,
+      detail: (id: number) => [...queryKeys.finances.installmentPlans.all, id] as const,
+    },
+    installments: {
+      all: ['finances', 'installments'] as const,
+      list: (filters?: Record<string, unknown>) =>
+        [...queryKeys.finances.installments.all, filters ?? null] as const,
+      detail: (id: number) => [...queryKeys.finances.installments.all, id] as const,
+    },
+    employees: {
+      all: ['finances', 'employees'] as const,
+      list: (filters?: Record<string, unknown>) =>
+        [...queryKeys.finances.employees.all, filters ?? null] as const,
+      detail: (id: number) => [...queryKeys.finances.employees.all, id] as const,
+    },
   },
   rentAdjustments: {
     all: ['rent-adjustments'] as const,

@@ -31,7 +31,10 @@ import {
   createMockBillingAccount,
   createMockBillSkip,
   createMockCombinedCalendar,
+  createMockEmployee,
   createMockFinanceCategory,
+  createMockInstallment,
+  createMockInstallmentPlan,
   createMockOverdueResponse,
   createMockPayment,
 } from './data/finances';
@@ -54,6 +57,13 @@ let billingAccounts = [createMockBillingAccount()];
 let financePayments = [createMockPayment()];
 let financeCategories = [createMockFinanceCategory()];
 let billSkips = [createMockBillSkip()];
+let installmentPlans = [createMockInstallmentPlan()];
+let installments = [
+  createMockInstallment({ id: 1, plan: 1, number: 1, amount: 500, due_date: '2026-07-10' }),
+  createMockInstallment({ id: 2, plan: 1, number: 2, amount: 500, due_date: '2026-08-10' }),
+  createMockInstallment({ id: 3, plan: 1, number: 3, amount: 500, due_date: '2026-09-10' }),
+];
+let employees = [createMockEmployee()];
 
 // Helper to reset data between tests
 export function resetMockData() {
@@ -70,6 +80,13 @@ export function resetMockData() {
   financePayments = [createMockPayment()];
   financeCategories = [createMockFinanceCategory()];
   billSkips = [createMockBillSkip()];
+  installmentPlans = [createMockInstallmentPlan()];
+  installments = [
+    createMockInstallment({ id: 1, plan: 1, number: 1, amount: 500, due_date: '2026-07-10' }),
+    createMockInstallment({ id: 2, plan: 1, number: 2, amount: 500, due_date: '2026-08-10' }),
+    createMockInstallment({ id: 3, plan: 1, number: 3, amount: 500, due_date: '2026-09-10' }),
+  ];
+  employees = [createMockEmployee()];
 }
 
 /**
@@ -2301,6 +2318,140 @@ const financeHandlers = [
 ];
 
 /**
+ * Installments + payroll handlers (Session 43). The collection action `convert_deferred`
+ * is registered before the `:id` detail routes so MSW does not capture it as a detail pk.
+ * Installments expose GET + PATCH only (no POST/DELETE — 405 on the backend).
+ */
+const installmentPayrollHandlers = [
+  // --- installment-plans (collection action first) ---
+  http.post(`${API_BASE}/finances/installment-plans/convert_deferred/`, async ({ request }) => {
+    await delay(100);
+    const body = (await request.json()) as {
+      bill_id: number;
+      installment_count: number;
+      start_due_date: string;
+      default_due_day: number;
+      category_id?: number;
+    };
+    const plan = createMockInstallmentPlan({
+      id: installmentPlans.length + 1,
+      installment_count: body.installment_count,
+      start_due_date: body.start_due_date,
+      default_due_day: body.default_due_day,
+      lifecycle_state: 'active',
+    });
+    installmentPlans.push(plan);
+    return HttpResponse.json(plan, { status: 201 });
+  }),
+  http.get(`${API_BASE}/finances/installment-plans/`, async () => {
+    await delay(50);
+    return HttpResponse.json(installmentPlans);
+  }),
+  http.get(`${API_BASE}/finances/installment-plans/:id/`, async ({ params }) => {
+    await delay(50);
+    const plan = installmentPlans.find((p) => p.id === Number(params.id));
+    if (!plan) return new HttpResponse(null, { status: 404 });
+    return HttpResponse.json(plan);
+  }),
+  http.post(`${API_BASE}/finances/installment-plans/`, async ({ request }) => {
+    await delay(100);
+    const data = (await request.json()) as Partial<(typeof installmentPlans)[0]>;
+    const plan = createMockInstallmentPlan({ ...data, id: installmentPlans.length + 1 });
+    installmentPlans.push(plan);
+    return HttpResponse.json(plan, { status: 201 });
+  }),
+  http.patch(`${API_BASE}/finances/installment-plans/:id/`, async ({ params, request }) => {
+    await delay(100);
+    const id = Number(params.id);
+    const data = (await request.json()) as Partial<(typeof installmentPlans)[0]>;
+    const index = installmentPlans.findIndex((p) => p.id === id);
+    const existing = installmentPlans[index];
+    if (!existing) return new HttpResponse(null, { status: 404 });
+    const updated = { ...existing, ...data };
+    installmentPlans[index] = updated;
+    return HttpResponse.json(updated);
+  }),
+  http.delete(`${API_BASE}/finances/installment-plans/:id/`, async ({ params }) => {
+    await delay(100);
+    const index = installmentPlans.findIndex((p) => p.id === Number(params.id));
+    if (index === -1) return new HttpResponse(null, { status: 404 });
+    installmentPlans.splice(index, 1);
+    return new HttpResponse(null, { status: 204 });
+  }),
+
+  // --- installments (GET list + GET/PATCH detail only) ---
+  http.get(`${API_BASE}/finances/installments/`, async () => {
+    await delay(50);
+    return HttpResponse.json(installments);
+  }),
+  http.get(`${API_BASE}/finances/installments/:id/`, async ({ params }) => {
+    await delay(50);
+    const installment = installments.find((i) => i.id === Number(params.id));
+    if (!installment) return new HttpResponse(null, { status: 404 });
+    return HttpResponse.json(installment);
+  }),
+  http.patch(`${API_BASE}/finances/installments/:id/`, async ({ params, request }) => {
+    await delay(100);
+    const id = Number(params.id);
+    const data = (await request.json()) as Partial<(typeof installments)[0]>;
+    const index = installments.findIndex((i) => i.id === id);
+    const existing = installments[index];
+    if (!existing) return new HttpResponse(null, { status: 404 });
+    const updated = { ...existing, ...data };
+    installments[index] = updated;
+    return HttpResponse.json(updated);
+  }),
+
+  // --- employees ---
+  http.get(`${API_BASE}/finances/employees/`, async () => {
+    await delay(50);
+    return HttpResponse.json(employees);
+  }),
+  http.get(`${API_BASE}/finances/employees/:id/`, async ({ params }) => {
+    await delay(50);
+    const employee = employees.find((e) => e.id === Number(params.id));
+    if (!employee) return new HttpResponse(null, { status: 404 });
+    return HttpResponse.json(employee);
+  }),
+  http.post(`${API_BASE}/finances/employees/`, async ({ request }) => {
+    await delay(100);
+    const data = (await request.json()) as Partial<(typeof employees)[0]>;
+    const employee = createMockEmployee({ ...data, id: employees.length + 1 });
+    employees.push(employee);
+    return HttpResponse.json(employee, { status: 201 });
+  }),
+  http.patch(`${API_BASE}/finances/employees/:id/`, async ({ params, request }) => {
+    await delay(100);
+    const id = Number(params.id);
+    const data = (await request.json()) as Partial<(typeof employees)[0]>;
+    const index = employees.findIndex((e) => e.id === id);
+    const existing = employees[index];
+    if (!existing) return new HttpResponse(null, { status: 404 });
+    const updated = { ...existing, ...data };
+    employees[index] = updated;
+    return HttpResponse.json(updated);
+  }),
+  http.put(`${API_BASE}/finances/employees/:id/`, async ({ params, request }) => {
+    await delay(100);
+    const id = Number(params.id);
+    const data = (await request.json()) as Partial<(typeof employees)[0]>;
+    const index = employees.findIndex((e) => e.id === id);
+    const existing = employees[index];
+    if (!existing) return new HttpResponse(null, { status: 404 });
+    const updated = { ...existing, ...data };
+    employees[index] = updated;
+    return HttpResponse.json(updated);
+  }),
+  http.delete(`${API_BASE}/finances/employees/:id/`, async ({ params }) => {
+    await delay(100);
+    const index = employees.findIndex((e) => e.id === Number(params.id));
+    if (index === -1) return new HttpResponse(null, { status: 404 });
+    employees.splice(index, 1);
+    return new HttpResponse(null, { status: 204 });
+  }),
+];
+
+/**
  * All handlers combined
  */
 export const handlers = [
@@ -2334,4 +2485,5 @@ export const handlers = [
   ...tenantPortalHandlers,
   ...webPushHandlers,
   ...financeHandlers,
+  ...installmentPayrollHandlers,
 ];
