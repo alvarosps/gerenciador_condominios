@@ -26,6 +26,15 @@ import {
   mockTenants,
 } from './data';
 import { createMockRentCalendar } from './data/rent-calendar';
+import {
+  createMockBill,
+  createMockBillingAccount,
+  createMockBillSkip,
+  createMockCombinedCalendar,
+  createMockFinanceCategory,
+  createMockOverdueResponse,
+  createMockPayment,
+} from './data/finances';
 
 const API_BASE = 'http://localhost:8008/api';
 
@@ -39,6 +48,13 @@ let persons = [...mockPersons];
 let expenses = [...mockExpenses];
 let personPayments = [...mockPersonPayments];
 
+// Condominium-finance (S39) mutable copies — seeded from factories (no constant arrays).
+let financeBills = [createMockBill()];
+let billingAccounts = [createMockBillingAccount()];
+let financePayments = [createMockPayment()];
+let financeCategories = [createMockFinanceCategory()];
+let billSkips = [createMockBillSkip()];
+
 // Helper to reset data between tests
 export function resetMockData() {
   buildings = [...mockBuildings];
@@ -49,6 +65,11 @@ export function resetMockData() {
   persons = [...mockPersons];
   expenses = [...mockExpenses];
   personPayments = [...mockPersonPayments];
+  financeBills = [createMockBill()];
+  billingAccounts = [createMockBillingAccount()];
+  financePayments = [createMockPayment()];
+  financeCategories = [createMockFinanceCategory()];
+  billSkips = [createMockBillSkip()];
 }
 
 /**
@@ -1826,19 +1847,7 @@ const rentPaymentHandlers = [
     return HttpResponse.json([
       {
         id: 1,
-        lease: {
-          id: 1,
-          apartment_id: 1,
-          responsible_tenant_id: 1,
-          start_date: '2024-01-01',
-          validity_months: 12,
-          tag_fee: 50,
-          deposit_amount: null,
-          cleaning_fee_paid: true,
-          tag_deposit_paid: true,
-          contract_generated: true,
-          pdf_path: null,
-        },
+        lease: createMockLease({ id: 1 }),
         lease_id: 1,
         reference_month: '2026-03-01',
         amount_paid: 1300,
@@ -1855,19 +1864,7 @@ const rentPaymentHandlers = [
     if (id === 9999) return new HttpResponse(null, { status: 404 });
     return HttpResponse.json({
       id,
-      lease: {
-        id: 1,
-        apartment_id: 1,
-        responsible_tenant_id: 1,
-        start_date: '2024-01-01',
-        validity_months: 12,
-        tag_fee: 50,
-        deposit_amount: null,
-        cleaning_fee_paid: true,
-        tag_deposit_paid: true,
-        contract_generated: true,
-        pdf_path: null,
-      },
+      lease: createMockLease({ id: 1 }),
       lease_id: 1,
       reference_month: '2026-03-01',
       amount_paid: 1300,
@@ -2090,6 +2087,220 @@ const webPushHandlers = [
 ];
 
 /**
+ * Condominium-finance handlers (S39). Collection actions (create_with_lines, generate_month)
+ * are registered before the `:id` routes so MSW does not capture them as a detail pk.
+ */
+const financeHandlers = [
+  // --- billing-accounts ---
+  http.get(`${API_BASE}/finances/billing-accounts/`, async () => {
+    await delay(50);
+    return HttpResponse.json(billingAccounts);
+  }),
+  http.get(`${API_BASE}/finances/billing-accounts/:id/`, async ({ params }) => {
+    await delay(50);
+    const account = billingAccounts.find((a) => a.id === Number(params.id));
+    if (!account) return new HttpResponse(null, { status: 404 });
+    return HttpResponse.json(account);
+  }),
+  http.post(`${API_BASE}/finances/billing-accounts/`, async ({ request }) => {
+    await delay(100);
+    const data = (await request.json()) as Partial<(typeof billingAccounts)[0]>;
+    const account = createMockBillingAccount({ ...data, id: billingAccounts.length + 1 });
+    billingAccounts.push(account);
+    return HttpResponse.json(account, { status: 201 });
+  }),
+  http.put(`${API_BASE}/finances/billing-accounts/:id/`, async ({ params, request }) => {
+    await delay(100);
+    const id = Number(params.id);
+    const data = (await request.json()) as Partial<(typeof billingAccounts)[0]>;
+    const index = billingAccounts.findIndex((a) => a.id === id);
+    const existing = billingAccounts[index];
+    if (!existing) return new HttpResponse(null, { status: 404 });
+    const updated = { ...existing, ...data };
+    billingAccounts[index] = updated;
+    return HttpResponse.json(updated);
+  }),
+  http.delete(`${API_BASE}/finances/billing-accounts/:id/`, async ({ params }) => {
+    await delay(100);
+    const index = billingAccounts.findIndex((a) => a.id === Number(params.id));
+    if (index === -1) return new HttpResponse(null, { status: 404 });
+    billingAccounts.splice(index, 1);
+    return new HttpResponse(null, { status: 204 });
+  }),
+
+  // --- bills (collection actions first) ---
+  http.post(`${API_BASE}/finances/bills/create_with_lines/`, async () => {
+    await delay(100);
+    const bill = createMockBill({ id: financeBills.length + 1 });
+    financeBills.push(bill);
+    return HttpResponse.json(bill, { status: 201 });
+  }),
+  http.post(`${API_BASE}/finances/bills/generate_month/`, async ({ request }) => {
+    await delay(100);
+    const body = (await request.json()) as { year: number; month: number };
+    const competence = `${body.year}-${String(body.month).padStart(2, '0')}-01`;
+    return HttpResponse.json({ created: 1, bills: [createMockBill({ competence_month: competence })] });
+  }),
+  http.post(`${API_BASE}/finances/bills/:id/pay/`, async ({ params }) => {
+    await delay(100);
+    const id = Number(params.id);
+    const index = financeBills.findIndex((b) => b.id === id);
+    const base = financeBills[index] ?? createMockBill({ id });
+    const paid = {
+      ...base,
+      payment_status: 'paid' as const,
+      amount_paid: base.amount_total ?? 0,
+      amount_remaining: 0,
+    };
+    if (index !== -1) financeBills[index] = paid;
+    return HttpResponse.json(paid);
+  }),
+  http.post(`${API_BASE}/finances/bills/:id/suspend/`, async ({ params }) => {
+    await delay(50);
+    return HttpResponse.json(createMockBill({ id: Number(params.id), lifecycle_state: 'suspended' }));
+  }),
+  http.post(`${API_BASE}/finances/bills/:id/defer/`, async ({ params }) => {
+    await delay(50);
+    return HttpResponse.json(createMockBill({ id: Number(params.id), lifecycle_state: 'deferred' }));
+  }),
+  http.post(`${API_BASE}/finances/bills/:id/cancel/`, async ({ params }) => {
+    await delay(50);
+    return HttpResponse.json(createMockBill({ id: Number(params.id), lifecycle_state: 'canceled' }));
+  }),
+  http.post(`${API_BASE}/finances/bills/:id/reactivate/`, async ({ params }) => {
+    await delay(50);
+    return HttpResponse.json(createMockBill({ id: Number(params.id), lifecycle_state: 'active' }));
+  }),
+  http.get(`${API_BASE}/finances/bills/`, async () => {
+    await delay(50);
+    return HttpResponse.json(financeBills);
+  }),
+  http.get(`${API_BASE}/finances/bills/:id/`, async ({ params }) => {
+    await delay(50);
+    const bill = financeBills.find((b) => b.id === Number(params.id));
+    if (!bill) return new HttpResponse(null, { status: 404 });
+    return HttpResponse.json(bill);
+  }),
+  http.put(`${API_BASE}/finances/bills/:id/`, async ({ params, request }) => {
+    await delay(100);
+    const id = Number(params.id);
+    const data = (await request.json()) as Partial<(typeof financeBills)[0]>;
+    const index = financeBills.findIndex((b) => b.id === id);
+    const existing = financeBills[index];
+    if (!existing) return new HttpResponse(null, { status: 404 });
+    const updated = { ...existing, ...data };
+    financeBills[index] = updated;
+    return HttpResponse.json(updated);
+  }),
+  http.delete(`${API_BASE}/finances/bills/:id/`, async ({ params }) => {
+    await delay(100);
+    const index = financeBills.findIndex((b) => b.id === Number(params.id));
+    if (index === -1) return new HttpResponse(null, { status: 404 });
+    financeBills.splice(index, 1);
+    return new HttpResponse(null, { status: 204 });
+  }),
+
+  // --- payments ---
+  http.get(`${API_BASE}/finances/payments/`, async () => {
+    await delay(50);
+    return HttpResponse.json(financePayments);
+  }),
+  http.get(`${API_BASE}/finances/payments/:id/`, async ({ params }) => {
+    await delay(50);
+    const payment = financePayments.find((p) => p.id === Number(params.id));
+    if (!payment) return new HttpResponse(null, { status: 404 });
+    return HttpResponse.json(payment);
+  }),
+  http.post(`${API_BASE}/finances/payments/`, async ({ request }) => {
+    await delay(100);
+    const data = (await request.json()) as Partial<(typeof financePayments)[0]>;
+    const payment = createMockPayment({ ...data, id: financePayments.length + 1 });
+    financePayments.push(payment);
+    return HttpResponse.json(payment, { status: 201 });
+  }),
+  http.put(`${API_BASE}/finances/payments/:id/`, async ({ params, request }) => {
+    await delay(100);
+    const id = Number(params.id);
+    const data = (await request.json()) as Partial<(typeof financePayments)[0]>;
+    const index = financePayments.findIndex((p) => p.id === id);
+    const existing = financePayments[index];
+    if (!existing) return new HttpResponse(null, { status: 404 });
+    const updated = { ...existing, ...data };
+    financePayments[index] = updated;
+    return HttpResponse.json(updated);
+  }),
+  http.delete(`${API_BASE}/finances/payments/:id/`, async ({ params }) => {
+    await delay(100);
+    const index = financePayments.findIndex((p) => p.id === Number(params.id));
+    if (index === -1) return new HttpResponse(null, { status: 404 });
+    financePayments.splice(index, 1);
+    return new HttpResponse(null, { status: 204 });
+  }),
+
+  // --- finance-categories ---
+  http.get(`${API_BASE}/finances/finance-categories/`, async () => {
+    await delay(50);
+    return HttpResponse.json(financeCategories);
+  }),
+  http.post(`${API_BASE}/finances/finance-categories/`, async ({ request }) => {
+    await delay(100);
+    const data = (await request.json()) as Partial<(typeof financeCategories)[0]>;
+    const category = createMockFinanceCategory({ ...data, id: financeCategories.length + 1 });
+    financeCategories.push(category);
+    return HttpResponse.json(category, { status: 201 });
+  }),
+  http.put(`${API_BASE}/finances/finance-categories/:id/`, async ({ params, request }) => {
+    await delay(100);
+    const id = Number(params.id);
+    const data = (await request.json()) as Partial<(typeof financeCategories)[0]>;
+    const index = financeCategories.findIndex((c) => c.id === id);
+    const existing = financeCategories[index];
+    if (!existing) return new HttpResponse(null, { status: 404 });
+    const updated = { ...existing, ...data };
+    financeCategories[index] = updated;
+    return HttpResponse.json(updated);
+  }),
+  http.delete(`${API_BASE}/finances/finance-categories/:id/`, async ({ params }) => {
+    await delay(100);
+    const index = financeCategories.findIndex((c) => c.id === Number(params.id));
+    if (index === -1) return new HttpResponse(null, { status: 404 });
+    financeCategories.splice(index, 1);
+    return new HttpResponse(null, { status: 204 });
+  }),
+
+  // --- bill-skips (create/delete only) ---
+  http.get(`${API_BASE}/finances/bill-skips/`, async () => {
+    await delay(50);
+    return HttpResponse.json(billSkips);
+  }),
+  http.post(`${API_BASE}/finances/bill-skips/`, async ({ request }) => {
+    await delay(100);
+    const data = (await request.json()) as Partial<(typeof billSkips)[0]>;
+    const skip = createMockBillSkip({ ...data, id: billSkips.length + 1 });
+    billSkips.push(skip);
+    return HttpResponse.json(skip, { status: 201 });
+  }),
+  http.delete(`${API_BASE}/finances/bill-skips/:id/`, async ({ params }) => {
+    await delay(100);
+    const index = billSkips.findIndex((s) => s.id === Number(params.id));
+    if (index === -1) return new HttpResponse(null, { status: 404 });
+    billSkips.splice(index, 1);
+    return new HttpResponse(null, { status: 204 });
+  }),
+
+  // --- finance dashboard ---
+  http.get(`${API_BASE}/finances/finance-dashboard/combined_calendar/`, ({ request }) => {
+    const params = new URL(request.url).searchParams;
+    const year = Number(params.get('year') ?? '2026');
+    const month = Number(params.get('month') ?? '6');
+    return HttpResponse.json(createMockCombinedCalendar({ year, month }));
+  }),
+  http.get(`${API_BASE}/finances/finance-dashboard/overdue/`, () => {
+    return HttpResponse.json(createMockOverdueResponse());
+  }),
+];
+
+/**
  * All handlers combined
  */
 export const handlers = [
@@ -2122,4 +2333,5 @@ export const handlers = [
   ...templateHandlers,
   ...tenantPortalHandlers,
   ...webPushHandlers,
+  ...financeHandlers,
 ];

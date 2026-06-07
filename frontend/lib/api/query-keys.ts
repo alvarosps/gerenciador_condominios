@@ -133,6 +133,52 @@ export const queryKeys = {
     month: (year: number, month: number, buildingId?: number) =>
       [...queryKeys.rentCalendar.all, 'month', year, month, buildingId ?? null] as const,
   },
+  finances: {
+    all: ['finances'] as const,
+    billingAccounts: {
+      all: ['finances', 'billing-accounts'] as const,
+      list: (filters?: Record<string, unknown>) =>
+        [...queryKeys.finances.billingAccounts.all, filters ?? null] as const,
+      detail: (id: number) => [...queryKeys.finances.billingAccounts.all, id] as const,
+    },
+    bills: {
+      all: ['finances', 'bills'] as const,
+      list: (filters?: Record<string, unknown>) =>
+        [...queryKeys.finances.bills.all, filters ?? null] as const,
+      detail: (id: number) => [...queryKeys.finances.bills.all, id] as const,
+    },
+    payments: {
+      all: ['finances', 'payments'] as const,
+      list: (filters?: Record<string, unknown>) =>
+        [...queryKeys.finances.payments.all, filters ?? null] as const,
+      detail: (id: number) => [...queryKeys.finances.payments.all, id] as const,
+    },
+    financeCategories: {
+      all: ['finances', 'finance-categories'] as const,
+      list: () => [...queryKeys.finances.financeCategories.all, 'list'] as const,
+    },
+    billSkips: {
+      all: ['finances', 'bill-skips'] as const,
+      list: (filters?: Record<string, unknown>) =>
+        [...queryKeys.finances.billSkips.all, filters ?? null] as const,
+    },
+    combinedCalendar: {
+      all: ['finances', 'combined-calendar'] as const,
+      month: (year: number, month: number, buildingId?: number) =>
+        [
+          ...queryKeys.finances.combinedCalendar.all,
+          'month',
+          year,
+          month,
+          buildingId ?? null,
+        ] as const,
+    },
+    overdueBills: {
+      all: ['finances', 'overdue-bills'] as const,
+      list: (buildingId?: number) =>
+        [...queryKeys.finances.overdueBills.all, buildingId ?? null] as const,
+    },
+  },
   rentAdjustments: {
     all: ['rent-adjustments'] as const,
     byLease: (leaseId: number | null) => [...queryKeys.rentAdjustments.all, leaseId] as const,
