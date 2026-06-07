@@ -9,6 +9,7 @@ value is defensive and mypy/ruff stay clean) — never recomputed in Python (des
 from datetime import date
 from decimal import Decimal
 
+from django.db.models import Sum
 from rest_framework import serializers
 
 from core.models import Building, Condominium, Lease, Person
@@ -19,12 +20,17 @@ from finances.models import (
     BillLineItem,
     BillSkip,
     Category,
+    CondoMonthClose,
     Employee,
+    IncomeEntry,
     Installment,
     InstallmentPlan,
     InstallmentPlanState,
     Payment,
     PaymentAllocation,
+    Reserve,
+    ReserveMovement,
+    ReserveMovementKind,
 )
 from finances.money import money_str
 from finances.services.timezone import today_sp
@@ -409,3 +415,177 @@ class EmployeeSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
+
+
+class ReserveSimpleSerializer(serializers.ModelSerializer):
+    """Non-recursive read representation of a Reserve (used inside a movement)."""
+
+    class Meta:
+        model = Reserve
+        fields = ["id", "name"]
+        read_only_fields = fields
+
+
+class ReserveSerializer(serializers.ModelSerializer):
+    condominium = CondominiumSimpleSerializer(read_only=True)
+    condominium_id = serializers.PrimaryKeyRelatedField(
+        queryset=Condominium.objects.all(), source="condominium", write_only=True
+    )
+    balance = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Reserve
+        fields = [
+            "id",
+            "condominium",
+            "condominium_id",
+            "name",
+            "notes",
+            "balance",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "created_at", "updated_at"]
+
+    def get_balance(self, obj: Reserve) -> str:
+        # Reserve-scoped ledger balance (deposits - withdrawals) via the model relation only
+        # (architecture rule: serializers read models, never services). money_str at the boundary.
+        deposits = obj.movements.filter(kind=ReserveMovementKind.DEPOSIT).aggregate(
+            total=Sum("amount")
+        )["total"] or Decimal(0)
+        withdrawals = obj.movements.filter(kind=ReserveMovementKind.WITHDRAWAL).aggregate(
+            total=Sum("amount")
+        )["total"] or Decimal(0)
+        return money_str(deposits - withdrawals)
+
+
+class ReserveMovementSerializer(serializers.ModelSerializer):
+    reserve = ReserveSimpleSerializer(read_only=True)
+    reserve_id = serializers.PrimaryKeyRelatedField(
+        queryset=Reserve.objects.all(), source="reserve", write_only=True
+    )
+    bill_id = serializers.PrimaryKeyRelatedField(
+        queryset=Bill.objects.all(),
+        source="bill",
+        write_only=True,
+        required=False,
+        allow_null=True,
+    )
+
+    class Meta:
+        model = ReserveMovement
+        fields = [
+            "id",
+            "reserve",
+            "reserve_id",
+            "kind",
+            "amount",
+            "movement_date",
+            "bill",
+            "bill_id",
+            "reference",
+            "notes",
+            "created_at",
+            "updated_at",
+        ]
+        # bill is exposed as a PK on read (set = withdrawal to pay a bill, null = cash transfer).
+        # The canonical write path is reserves/{id}/deposit|withdraw (the balance guard lives in
+        # the service); direct create is admin-only and unguarded by design.
+        read_only_fields = ["id", "bill", "created_at", "updated_at"]
+
+
+class IncomeEntrySerializer(serializers.ModelSerializer):
+    condominium = CondominiumSimpleSerializer(read_only=True)
+    condominium_id = serializers.PrimaryKeyRelatedField(
+        queryset=Condominium.objects.all(), source="condominium", write_only=True
+    )
+    building = BuildingSerializer(read_only=True)
+    building_id = serializers.PrimaryKeyRelatedField(
+        queryset=Building.objects.all(),
+        source="building",
+        write_only=True,
+        required=False,
+        allow_null=True,
+    )
+    category = CategorySerializer(read_only=True)
+    category_id = serializers.PrimaryKeyRelatedField(
+        queryset=Category.objects.all(),
+        source="category",
+        write_only=True,
+        required=False,
+        allow_null=True,
+    )
+
+    class Meta:
+        model = IncomeEntry
+        fields = [
+            "id",
+            "condominium",
+            "condominium_id",
+            "building",
+            "building_id",
+            "category",
+            "category_id",
+            "description",
+            "amount",
+            "income_date",
+            "is_received",
+            "received_date",
+            "notes",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "created_at", "updated_at"]
+
+    def validate(self, attrs: dict[str, object]) -> dict[str, object]:
+        # DRF does not call Model.clean(); mirror the is_received <-> received_date invariant.
+        is_received = attrs.get("is_received", getattr(self.instance, "is_received", False))
+        received_date = attrs.get("received_date", getattr(self.instance, "received_date", None))
+        if is_received and received_date is None:
+            raise serializers.ValidationError(
+                {"received_date": "Informe a data de recebimento quando a receita está recebida."}
+            )
+        if not is_received and received_date is not None:
+            raise serializers.ValidationError(
+                {"received_date": "A data de recebimento só se aplica a receitas recebidas."}
+            )
+        return attrs
+
+
+class CondoMonthCloseSerializer(serializers.ModelSerializer):
+    condominium = CondominiumSimpleSerializer(read_only=True)
+    condominium_id = serializers.PrimaryKeyRelatedField(
+        queryset=Condominium.objects.all(), source="condominium", write_only=True
+    )
+
+    class Meta:
+        model = CondoMonthClose
+        fields = [
+            "id",
+            "condominium",
+            "condominium_id",
+            "reference_month",
+            "status",
+            "closed_at",
+            "net_result",
+            "cash_balance_end",
+            "reserve_balance_end",
+            "carry_forward_out",
+            "breakdown",
+            "created_at",
+            "updated_at",
+        ]
+        # The canonical write path is condo-month-closes/{close,reopen}; the frozen figures are
+        # computed by the service, never set directly through the serializer.
+        read_only_fields = [
+            "id",
+            "status",
+            "closed_at",
+            "net_result",
+            "cash_balance_end",
+            "reserve_balance_end",
+            "carry_forward_out",
+            "breakdown",
+            "created_at",
+            "updated_at",
+        ]

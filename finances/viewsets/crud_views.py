@@ -5,6 +5,7 @@ the with_amounts(today) annotation (TZ-SP today). Actions are thin: they parse/v
 request data (400 PT) and delegate to the S37/S38 services.
 """
 
+from collections.abc import Callable
 from datetime import date
 from decimal import Decimal, InvalidOperation
 from typing import cast
@@ -27,19 +28,29 @@ from finances.models import (
     BillLifecycleState,
     BillSkip,
     Category,
+    CondoMonthClose,
+    IncomeEntry,
     Payment,
+    Reserve,
+    ReserveMovement,
 )
 from finances.serializers import (
     BillingAccountSerializer,
     BillSerializer,
     BillSkipSerializer,
     CategorySerializer,
+    CondoMonthCloseSerializer,
+    IncomeEntrySerializer,
     PaymentSerializer,
+    ReserveMovementSerializer,
+    ReserveSerializer,
 )
 from finances.services.bill_generation_service import BillGenerationService
 from finances.services.bill_lifecycle_service import BillLifecycleService
 from finances.services.bill_payment_service import BillPaymentService
 from finances.services.bill_service import BillDraft, BillLineInput, BillService
+from finances.services.condo_month_close_service import CondoMonthCloseService
+from finances.services.reserve_service import ReserveService
 from finances.services.timezone import today_sp
 
 MONTHS_IN_YEAR = 12
@@ -325,3 +336,149 @@ class BillViewSet(viewsets.ModelViewSet):
             message = exc.messages[0] if isinstance(exc, ValidationError) else str(exc)
             return Response({"error": message}, status=status.HTTP_400_BAD_REQUEST)
         return Response(self._serialized_bill(bill), status=status.HTTP_201_CREATED)
+
+
+class ReserveViewSet(viewsets.ModelViewSet):
+    serializer_class = ReserveSerializer
+    permission_classes = [FinancialReadOnly]
+    pagination_class = CustomPageNumberPagination
+
+    def get_queryset(self) -> QuerySet[Reserve]:
+        queryset = Reserve.objects.select_related("condominium").prefetch_related("movements")
+        condominium_id = self.request.query_params.get("condominium_id")
+        if condominium_id is not None:
+            queryset = queryset.filter(condominium_id=int(condominium_id))
+        return queryset
+
+    def _serialized(self, reserve: Reserve) -> dict[str, object]:
+        return ReserveSerializer(reserve, context={"request": self.request}).data
+
+    @action(detail=True, methods=["post"])
+    def deposit(self, request: Request, pk: str | None = None) -> Response:
+        return self._movement(request, ReserveService.deposit)
+
+    @action(detail=True, methods=["post"])
+    def withdraw(self, request: Request, pk: str | None = None) -> Response:
+        return self._movement(request, ReserveService.withdraw)
+
+    def _movement(self, request: Request, operation: Callable[..., ReserveMovement]) -> Response:
+        reserve = self.get_object()
+        amount_raw = request.data.get("amount")
+        if amount_raw is None:
+            return Response(
+                {"error": "Campo amount é obrigatório."}, status=status.HTTP_400_BAD_REQUEST
+            )
+        try:
+            amount = Decimal(str(amount_raw))
+            movement_date_raw = request.data.get("movement_date")
+            movement_date = (
+                date.fromisoformat(str(movement_date_raw)) if movement_date_raw else today_sp()
+            )
+            operation(
+                reserve,
+                amount,
+                movement_date,
+                reference=str(request.data.get("reference", "")),
+                notes=str(request.data.get("notes", "")),
+                user=cast(User, request.user),
+            )
+        except (ValueError, InvalidOperation):
+            return Response(
+                {"error": "Valor ou data inválido."}, status=status.HTTP_400_BAD_REQUEST
+            )
+        except ValidationError as exc:
+            return Response({"error": str(exc.messages[0])}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(self._serialized(reserve), status=status.HTTP_200_OK)
+
+
+class ReserveMovementViewSet(viewsets.ModelViewSet):
+    serializer_class = ReserveMovementSerializer
+    permission_classes = [FinancialReadOnly]
+    pagination_class = CustomPageNumberPagination
+
+    def get_queryset(self) -> QuerySet[ReserveMovement]:
+        queryset = ReserveMovement.objects.select_related("reserve", "bill")
+        params = self.request.query_params
+        reserve_id = params.get("reserve_id")
+        if reserve_id is not None:
+            queryset = queryset.filter(reserve_id=int(reserve_id))
+        kind = params.get("kind")
+        if kind is not None:
+            queryset = queryset.filter(kind=kind)
+        date_from = params.get("date_from")
+        if date_from is not None:
+            queryset = queryset.filter(movement_date__gte=date_from)
+        date_to = params.get("date_to")
+        if date_to is not None:
+            queryset = queryset.filter(movement_date__lte=date_to)
+        return queryset
+
+
+class IncomeEntryViewSet(viewsets.ModelViewSet):
+    serializer_class = IncomeEntrySerializer
+    permission_classes = [FinancialReadOnly]
+    pagination_class = CustomPageNumberPagination
+
+    def get_queryset(self) -> QuerySet[IncomeEntry]:
+        queryset = IncomeEntry.objects.select_related("building", "category", "condominium")
+        params = self.request.query_params
+        building_id = params.get("building_id")
+        if building_id is not None:
+            queryset = queryset.filter(building_id=int(building_id))
+        category_id = params.get("category_id")
+        if category_id is not None:
+            queryset = queryset.filter(category_id=int(category_id))
+        is_received = params.get("is_received")
+        if is_received is not None:
+            queryset = queryset.filter(is_received=is_received.lower() == "true")
+        date_from = params.get("date_from")
+        if date_from is not None:
+            queryset = queryset.filter(income_date__gte=date_from)
+        date_to = params.get("date_to")
+        if date_to is not None:
+            queryset = queryset.filter(income_date__lte=date_to)
+        return queryset
+
+
+class CondoMonthCloseViewSet(viewsets.ModelViewSet):
+    serializer_class = CondoMonthCloseSerializer
+    permission_classes = [FinancialReadOnly]
+    pagination_class = CustomPageNumberPagination
+
+    def get_queryset(self) -> QuerySet[CondoMonthClose]:
+        queryset = CondoMonthClose.objects.select_related("condominium")
+        params = self.request.query_params
+        status_param = params.get("status")
+        if status_param is not None:
+            queryset = queryset.filter(status=status_param)
+        reference_month = params.get("reference_month")
+        if reference_month is not None:
+            queryset = queryset.filter(reference_month=reference_month)
+        return queryset
+
+    def _close_action(
+        self, request: Request, operation: Callable[[int, int, User], CondoMonthClose]
+    ) -> Response:
+        try:
+            year, month = _parse_year_month(request.data)
+        except (KeyError, ValueError, TypeError):
+            return Response(
+                {"error": "Parâmetros year/month inválidos (mês entre 1 e 12)."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            close = operation(year, month, cast(User, request.user))
+        except ValidationError as exc:
+            return Response({"error": str(exc.messages[0])}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            CondoMonthCloseSerializer(close, context={"request": request}).data,
+            status=status.HTTP_200_OK,
+        )
+
+    @action(detail=False, methods=["post"])
+    def close(self, request: Request) -> Response:
+        return self._close_action(request, CondoMonthCloseService.close)
+
+    @action(detail=False, methods=["post"])
+    def reopen(self, request: Request) -> Response:
+        return self._close_action(request, CondoMonthCloseService.reopen)

@@ -3,7 +3,11 @@ from finances.viewsets.crud_views import (
     BillSkipViewSet,
     BillViewSet,
     CategoryViewSet,
+    CondoMonthCloseViewSet,
+    IncomeEntryViewSet,
     PaymentViewSet,
+    ReserveMovementViewSet,
+    ReserveViewSet,
 )
 from finances.viewsets.dashboard_views import FinanceDashboardViewSet
 from finances.viewsets.installment_payroll_views import (
@@ -17,9 +21,13 @@ __all__ = [
     "BillViewSet",
     "BillingAccountViewSet",
     "CategoryViewSet",
+    "CondoMonthCloseViewSet",
     "EmployeeViewSet",
     "FinanceDashboardViewSet",
+    "IncomeEntryViewSet",
     "InstallmentPlanViewSet",
     "InstallmentViewSet",
     "PaymentViewSet",
+    "ReserveMovementViewSet",
+    "ReserveViewSet",
 ]
