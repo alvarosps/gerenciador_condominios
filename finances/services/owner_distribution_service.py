@@ -20,10 +20,9 @@ from core.models import Person
 from core.services.rent_schedule_service import RentScheduleService
 from finances.money import money_str
 from finances.services.condo_balance_service import CondoBalanceService
-from finances.services.condo_month_close_service import CondoMonthCloseService, fold_step
+from finances.services.condo_month_close_service import CondoMonthCloseService
 
 ZERO = Decimal(0)
-ZERO_MONEY = Decimal("0.00")
 
 # Raul & Célia are NOT a Person (§17) — the household IS the condominium (locked decision #13).
 _HOUSEHOLD_NAME = "Raul & Célia"
@@ -44,15 +43,11 @@ class OwnerDistributionService:
         reference_month = date(year, month, 1)
         net = CondoBalanceService.result_of_month(year, month, building_id)
 
-        if RentScheduleService.is_month_tracked(year, month):
-            carried_in = CondoMonthCloseService.carried_in_for(reference_month)
-            available, carried_out = fold_step(net, carried_in)
-        else:
-            # Pre-tracking month: net is isolated, NOT accumulated into the fold (design §4.7) — it
-            # must not carry a spurious negative forward.
-            carried_in = ZERO_MONEY
-            available = max(ZERO_MONEY, net)
-            carried_out = ZERO_MONEY
+        # Single source of the fold + pre-tracking isolation, shared with CondoMonthCloseService.close
+        # so the displayed distribution can never contradict the frozen CondoMonthClose (design §4.7).
+        carried_in, available, carried_out = CondoMonthCloseService.folded_distribution(
+            reference_month, net
+        )
 
         external_owners = OwnerDistributionService._external_owners(reference_month, building_id)
         external_total = sum((Decimal(owner["rent_total"]) for owner in external_owners), ZERO)

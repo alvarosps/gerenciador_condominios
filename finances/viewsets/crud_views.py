@@ -29,6 +29,7 @@ from finances.models import (
     BillSkip,
     Category,
     CondoMonthClose,
+    FundedFrom,
     IncomeEntry,
     Payment,
     Reserve,
@@ -52,6 +53,7 @@ from finances.services.bill_service import BillDraft, BillLineInput, BillService
 from finances.services.condo_month_close_service import CondoMonthCloseService
 from finances.services.reserve_service import ReserveService
 from finances.services.timezone import today_sp
+from finances.viewsets.query_params import int_param
 
 MONTHS_IN_YEAR = 12
 
@@ -65,6 +67,19 @@ def _parse_year_month(data: dict[str, object]) -> tuple[int, int]:
     return year, month
 
 
+def _validated_funded_from(raw: object) -> str:
+    """funded_from coerced to a known FundedFrom value; raise ValueError (-> 400) otherwise.
+
+    Without this an arbitrary string is persisted verbatim (CharField choices are not DB-enforced
+    and .create() skips full_clean), silently behaving as 'caixa' while polluting the funded_from
+    filter — so validate it at the action boundary for both pay and bulk_pay (DRY).
+    """
+    value = str(raw)
+    if value not in FundedFrom.values:
+        raise ValueError
+    return value
+
+
 class CategoryViewSet(viewsets.ModelViewSet):
     serializer_class = CategorySerializer
     permission_classes = [FinancialReadOnly]
@@ -73,12 +88,12 @@ class CategoryViewSet(viewsets.ModelViewSet):
     def get_queryset(self) -> QuerySet[Category]:
         queryset = Category.objects.select_related("parent", "condominium")
         params = self.request.query_params
-        parent_id = params.get("parent_id")
+        parent_id = int_param(params, "parent_id")
         if parent_id is not None:
-            queryset = queryset.filter(parent_id=int(parent_id))
-        condominium_id = params.get("condominium_id")
+            queryset = queryset.filter(parent_id=parent_id)
+        condominium_id = int_param(params, "condominium_id")
         if condominium_id is not None:
-            queryset = queryset.filter(condominium_id=int(condominium_id))
+            queryset = queryset.filter(condominium_id=condominium_id)
         return queryset
 
 
@@ -90,12 +105,12 @@ class BillingAccountViewSet(viewsets.ModelViewSet):
     def get_queryset(self) -> QuerySet[BillingAccount]:
         queryset = BillingAccount.objects.select_related("building", "category", "condominium")
         params = self.request.query_params
-        building_id = params.get("building_id")
+        building_id = int_param(params, "building_id")
         if building_id is not None:
-            queryset = queryset.filter(building_id=int(building_id))
-        category_id = params.get("category_id")
+            queryset = queryset.filter(building_id=building_id)
+        category_id = int_param(params, "category_id")
         if category_id is not None:
-            queryset = queryset.filter(category_id=int(category_id))
+            queryset = queryset.filter(category_id=category_id)
         lifecycle_state = params.get("lifecycle_state")
         if lifecycle_state is not None:
             queryset = queryset.filter(lifecycle_state=lifecycle_state)
@@ -110,9 +125,9 @@ class BillSkipViewSet(viewsets.ModelViewSet):
     def get_queryset(self) -> QuerySet[BillSkip]:
         queryset = BillSkip.objects.select_related("billing_account")
         params = self.request.query_params
-        billing_account_id = params.get("billing_account_id")
+        billing_account_id = int_param(params, "billing_account_id")
         if billing_account_id is not None:
-            queryset = queryset.filter(billing_account_id=int(billing_account_id))
+            queryset = queryset.filter(billing_account_id=billing_account_id)
         reference_month = params.get("reference_month")
         if reference_month is not None:
             queryset = queryset.filter(reference_month=reference_month)
@@ -140,6 +155,21 @@ class PaymentViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(payment_date__lte=date_to)
         return queryset
 
+    def destroy(self, request: Request, *args: object, **kwargs: object) -> Response:
+        """Reverse a payment through the single reversal path (BillPaymentService.unpay).
+
+        The default destroy would SoftDeleteMixin.delete() only the Payment row, orphaning its
+        live PaymentAllocation rows (the bill stays falsely 'paid', amount_remaining unchanged) and
+        never reversing a reserve withdrawal. unpay soft-deletes the allocations, reverses the
+        reserve movement, and enforces the closed-month guard (assert_open -> 400 PT).
+        """
+        payment = self.get_object()
+        try:
+            BillPaymentService.unpay(payment, user=cast(User, request.user))
+        except ValidationError as exc:
+            return Response({"error": str(exc.messages[0])}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
 
 class BillViewSet(viewsets.ModelViewSet):
     serializer_class = BillSerializer
@@ -155,12 +185,12 @@ class BillViewSet(viewsets.ModelViewSet):
         return self._apply_filters(queryset, self.request.query_params)
 
     def _apply_filters(self, queryset: QuerySet[Bill], params: QueryDict) -> QuerySet[Bill]:
-        building_id = params.get("building_id")
+        building_id = int_param(params, "building_id")
         if building_id is not None:
-            queryset = queryset.filter(building_id=int(building_id))
-        category_id = params.get("category_id")
+            queryset = queryset.filter(building_id=building_id)
+        category_id = int_param(params, "category_id")
         if category_id is not None:
-            queryset = queryset.filter(category_id=int(category_id))
+            queryset = queryset.filter(category_id=category_id)
         competence_month = params.get("competence_month")
         if competence_month is not None:
             queryset = queryset.filter(competence_month=competence_month)
@@ -200,13 +230,13 @@ class BillViewSet(viewsets.ModelViewSet):
             payment_date = date.fromisoformat(str(payment_date_raw))
             amount_raw = request.data.get("amount")
             amount = Decimal(str(amount_raw)) if amount_raw is not None else None
-            funded_from = str(request.data.get("funded_from", "caixa"))
+            funded_from = _validated_funded_from(request.data.get("funded_from", "caixa"))
             BillPaymentService.pay(
                 bill, payment_date, amount, funded_from, user=cast(User, request.user)
             )
         except (ValueError, InvalidOperation):
             return Response(
-                {"error": "Valor ou data de pagamento inválido."},
+                {"error": "Valor, data ou forma de pagamento inválido."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         except ValidationError as exc:
@@ -222,12 +252,13 @@ class BillViewSet(viewsets.ModelViewSet):
                 {"error": "Campos bill_ids (lista não vazia) e payment_date são obrigatórios."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        funded_from = str(request.data.get("funded_from", "caixa"))
         try:
+            funded_from = _validated_funded_from(request.data.get("funded_from", "caixa"))
             payment_date = date.fromisoformat(str(payment_date_raw))
         except (ValueError, InvalidOperation):
             return Response(
-                {"error": "Data de pagamento inválida."}, status=status.HTTP_400_BAD_REQUEST
+                {"error": "Data ou forma de pagamento inválida."},
+                status=status.HTTP_400_BAD_REQUEST,
             )
         bills = list(Bill.objects.filter(pk__in=bill_ids))
         if len(bills) != len(bill_ids):
@@ -345,9 +376,9 @@ class ReserveViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self) -> QuerySet[Reserve]:
         queryset = Reserve.objects.select_related("condominium").prefetch_related("movements")
-        condominium_id = self.request.query_params.get("condominium_id")
+        condominium_id = int_param(self.request.query_params, "condominium_id")
         if condominium_id is not None:
-            queryset = queryset.filter(condominium_id=int(condominium_id))
+            queryset = queryset.filter(condominium_id=condominium_id)
         return queryset
 
     def _serialized(self, reserve: Reserve) -> dict[str, object]:
@@ -391,7 +422,11 @@ class ReserveViewSet(viewsets.ModelViewSet):
         return Response(self._serialized(reserve), status=status.HTTP_200_OK)
 
 
-class ReserveMovementViewSet(viewsets.ModelViewSet):
+class ReserveMovementViewSet(viewsets.ReadOnlyModelViewSet):
+    """Read-only ledger. The ONLY write path is reserves/{id}/deposit|withdraw, where
+    ReserveService enforces the never-negative guard (design §4.3/§18). A direct create/update
+    here would bypass that guard and could drive the reserve negative, so writes are not exposed."""
+
     serializer_class = ReserveMovementSerializer
     permission_classes = [FinancialReadOnly]
     pagination_class = CustomPageNumberPagination
@@ -399,9 +434,9 @@ class ReserveMovementViewSet(viewsets.ModelViewSet):
     def get_queryset(self) -> QuerySet[ReserveMovement]:
         queryset = ReserveMovement.objects.select_related("reserve", "bill")
         params = self.request.query_params
-        reserve_id = params.get("reserve_id")
+        reserve_id = int_param(params, "reserve_id")
         if reserve_id is not None:
-            queryset = queryset.filter(reserve_id=int(reserve_id))
+            queryset = queryset.filter(reserve_id=reserve_id)
         kind = params.get("kind")
         if kind is not None:
             queryset = queryset.filter(kind=kind)
@@ -422,12 +457,12 @@ class IncomeEntryViewSet(viewsets.ModelViewSet):
     def get_queryset(self) -> QuerySet[IncomeEntry]:
         queryset = IncomeEntry.objects.select_related("building", "category", "condominium")
         params = self.request.query_params
-        building_id = params.get("building_id")
+        building_id = int_param(params, "building_id")
         if building_id is not None:
-            queryset = queryset.filter(building_id=int(building_id))
-        category_id = params.get("category_id")
+            queryset = queryset.filter(building_id=building_id)
+        category_id = int_param(params, "category_id")
         if category_id is not None:
-            queryset = queryset.filter(category_id=int(category_id))
+            queryset = queryset.filter(category_id=category_id)
         is_received = params.get("is_received")
         if is_received is not None:
             queryset = queryset.filter(is_received=is_received.lower() == "true")

@@ -290,7 +290,11 @@ class PaymentSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "created_at", "updated_at"]
+        # amount and funded_from are set EXCLUSIVELY by BillPaymentService.pay (which also writes the
+        # matching PaymentAllocation rows and any reserve withdrawal). Editing them here would desync
+        # Σ(allocation) from amount and create a reserve ghost (§4.8), so they are read-only — a
+        # payment's value/funding only changes via unpay() + pay().
+        read_only_fields = ["id", "amount", "funded_from", "created_at", "updated_at"]
 
 
 class InstallmentSerializer(serializers.ModelSerializer):
@@ -484,37 +488,27 @@ class ReserveSerializer(serializers.ModelSerializer):
 
 class ReserveMovementSerializer(serializers.ModelSerializer):
     reserve = ReserveSimpleSerializer(read_only=True)
-    reserve_id = serializers.PrimaryKeyRelatedField(
-        queryset=Reserve.objects.all(), source="reserve", write_only=True
-    )
-    bill_id = serializers.PrimaryKeyRelatedField(
-        queryset=Bill.objects.all(),
-        source="bill",
-        write_only=True,
-        required=False,
-        allow_null=True,
-    )
 
     class Meta:
         model = ReserveMovement
         fields = [
             "id",
             "reserve",
-            "reserve_id",
             "kind",
             "amount",
             "movement_date",
             "bill",
-            "bill_id",
             "reference",
             "notes",
             "created_at",
             "updated_at",
         ]
-        # bill is exposed as a PK on read (set = withdrawal to pay a bill, null = cash transfer).
-        # The canonical write path is reserves/{id}/deposit|withdraw (the balance guard lives in
-        # the service); direct create is admin-only and unguarded by design.
-        read_only_fields = ["id", "bill", "created_at", "updated_at"]
+        # Read-only ledger: movements are written ONLY via reserves/{id}/deposit|withdraw, where
+        # ReserveService enforces the never-negative guard (design §4.3/§18). The viewset is a
+        # ReadOnlyModelViewSet, so exposing a write path here (which would bypass that guard) is
+        # neither offered nor needed — every field is read-only. bill is a PK on read (set =
+        # withdrawal to pay a bill, null = cash transfer).
+        read_only_fields = fields
 
 
 class IncomeEntrySerializer(serializers.ModelSerializer):

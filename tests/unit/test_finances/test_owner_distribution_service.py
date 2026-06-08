@@ -193,6 +193,22 @@ def test_salary_offset_lease_is_not_an_external_owner() -> None:
 
 
 @freeze_time("2026-07-15 12:00:00")
+def test_soft_deleted_owner_lease_excluded_from_externals() -> None:
+    """§18: a soft-deleted owner-repass Lease drops out of the external aggregation — confirming
+    the exclusion via displayable_leases' default manager, not merely assuming it."""
+    apartment = make_apartment(owner=make_person(name="Tiago", is_owner=True))
+    lease = make_lease(
+        apartment=apartment, rental_value=Decimal("800.00"), start_date=date(2026, 1, 1)
+    )
+    assert OwnerDistributionService.compute(2026, 7)["external_total"] == "800.00"
+
+    lease.delete()  # soft delete
+    after = OwnerDistributionService.compute(2026, 7)
+    assert after["external_owners"] == []
+    assert after["external_total"] == "0.00"
+
+
+@freeze_time("2026-07-15 12:00:00")
 def test_pre_tracking_hides_external_owners() -> None:
     FinancialSettings.objects.create(
         pk=1,

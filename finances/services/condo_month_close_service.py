@@ -152,12 +152,15 @@ class CondoMonthCloseService:
         """Set the frozen figures on a snapshot (DRY between close and the reopen cascade)."""
         year, month = snapshot.reference_month.year, snapshot.reference_month.month
         net_result = CondoBalanceService.result_of_month(year, month)
-        carry_in = CondoMonthCloseService.carried_in_for(snapshot.reference_month)
         reserve_balance_end = CondoBalanceService.reserve_balance()
         snapshot.net_result = net_result
         snapshot.cash_balance_end = cash_balance_end
         snapshot.reserve_balance_end = reserve_balance_end
-        _, snapshot.carry_forward_out = fold_step(net_result, carry_in)
+        # Pre-tracking isolation lives in folded_distribution: an untracked month freezes
+        # carry_forward_out = 0.00 so its net never leaks into the first tracked month's fold (§4.7).
+        _, _, snapshot.carry_forward_out = CondoMonthCloseService.folded_distribution(
+            snapshot.reference_month, net_result
+        )
         # overview()'s live cash_balance re-derives from sibling closes; during the reopen cascade
         # those are not yet persisted, so pin breakdown's cash/total to the frozen figures already
         # computed for THIS row (keeps the breakdown consistent with the stored columns).
@@ -173,6 +176,25 @@ class CondoMonthCloseService:
         breakdown["expenses_total"] = money_str(expense)
         snapshot.breakdown = breakdown
         snapshot.updated_by = user
+
+    @staticmethod
+    def folded_distribution(
+        reference_month: date, net: Decimal
+    ) -> tuple[Decimal, Decimal, Decimal]:
+        """(carried_in, available, carried_out) for a month's net, honoring pre-tracking isolation.
+
+        A TRACKED month folds the net with the anchored carried_in (§4.7 fold_step). A pre-tracking
+        month (before FinancialSettings.rent_tracking_start_date) is ISOLATED: its net is shown but
+        never accumulated — carried_in = carried_out = 0.00 — so it can never leak a spurious
+        negative into the first tracked month's fold. This is the SINGLE place that decision lives,
+        consumed by both close (which freezes carried_out) and OwnerDistributionService (which shows
+        all three), so the frozen snapshot and the distribution can never contradict each other.
+        """
+        if RentScheduleService.is_month_tracked(reference_month.year, reference_month.month):
+            carried_in = CondoMonthCloseService.carried_in_for(reference_month)
+            available, carried_out = fold_step(net, carried_in)
+            return carried_in, available, carried_out
+        return ZERO_MONEY, max(ZERO_MONEY, net), ZERO_MONEY
 
     @staticmethod
     def carried_in_for(reference_month: date) -> Decimal:

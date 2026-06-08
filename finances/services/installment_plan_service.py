@@ -7,7 +7,7 @@ the deferred Bill in a terminal state (CANCELED) outside every sum (design §4.4
 
 import logging
 from datetime import date
-from decimal import ROUND_HALF_UP, Decimal
+from decimal import ROUND_DOWN, Decimal
 from typing import Protocol, cast
 
 from dateutil.relativedelta import relativedelta
@@ -38,16 +38,20 @@ class _BillTotal(Protocol):
 _CENTS = Decimal("0.01")
 _NOT_DEFERRED_MSG = "Só é possível reparcelar uma conta adiada."
 _COUNT_POSITIVE_MSG = "O número de parcelas deve ser positivo."
+_TOTAL_NON_NEGATIVE_MSG = "O valor da conta a reparcelar não pode ser negativo."
 
 
 def _split_amount(total: Decimal, count: int) -> list[Decimal]:
-    """Split total into count parts (2 decimals, ROUND_HALF_UP), remainder on the last.
+    """Split total into count parts (2 decimals), remainder on the last; every part >= 0.
 
-    Σ result == total exactly (no lost cents). Example: 100/3 -> [33.33, 33.33, 33.34].
+    The base is rounded DOWN so Σ(base * (count-1)) <= total and the leftover cents land on the
+    LAST installment, which is therefore always >= base >= 0. (ROUND_HALF_UP could round the base UP
+    and make the last installment negative for tiny totals, e.g. 0.05/9, violating the
+    amount >= 0 constraint.) Σ result == total exactly. Example: 100/3 -> [33.33, 33.33, 33.34].
     """
-    base = (total / count).quantize(_CENTS, rounding=ROUND_HALF_UP)
+    base = (total / count).quantize(_CENTS, rounding=ROUND_DOWN)
     amounts = [base for _ in range(count - 1)]
-    last = (total - base * (count - 1)).quantize(_CENTS, rounding=ROUND_HALF_UP)
+    last = total - base * (count - 1)
     amounts.append(last)
     return amounts
 
@@ -93,6 +97,10 @@ class InstallmentPlanService:
 
             annotated = cast(_BillTotal, Bill.objects.with_amounts(today_sp()).get(pk=locked.pk))
             total: Decimal = annotated.amount_total
+            if total < 0:
+                # An offset-heavy bill can annotate a negative total; a plan with a negative
+                # total_amount/installments would violate the non-negative constraints. Reject (400).
+                raise ValidationError({"total": _TOTAL_NON_NEGATIVE_MSG})
 
             plan = InstallmentPlan.objects.create(
                 condominium=locked.condominium,
