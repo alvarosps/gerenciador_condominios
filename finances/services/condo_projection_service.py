@@ -169,7 +169,10 @@ class CondoProjectionService:
         reference_month = date(year, month, 1)
         total = ZERO
 
-        accounts = BillingAccount.objects.all()
+        # Same recurring predicate as generation (ACTIVE + exclude IPTU — design §10.3), so the
+        # projection never diverges from ensure_month_bills; is_account_eligible adds the per-month
+        # tracking/end/skip checks.
+        accounts = BillingAccount.objects.recurring_for_generation()
         if building_id is not None:
             accounts = accounts.filter(building_id=building_id)
         for account in accounts:

@@ -15,6 +15,8 @@ from rest_framework import serializers
 from core.models import Building, Condominium, Lease, Person
 from core.serializers import BuildingSerializer, LeaseSerializer, PersonSimpleSerializer
 from finances.models import (
+    _ERR_IDENTIFIER_REQUIRED,
+    _TYPED_IDENTITY_ACCOUNT_TYPES,
     Bill,
     BillingAccount,
     BillLineItem,
@@ -136,6 +138,11 @@ class BillingAccountSerializer(serializers.ModelSerializer):
             "category_id",
             "name",
             "external_identifier",
+            "account_type",
+            "holder_name",
+            "registered_address",
+            "secondary_identifier",
+            "supply_status",
             "description",
             "default_due_day",
             "expected_amount",
@@ -147,6 +154,27 @@ class BillingAccountSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
+        # The (building, account_type, external_identifier) uniqueness is a partial DB
+        # constraint (is_deleted=False); DRF's auto UniqueTogetherValidator would wrongly
+        # force building_id to always be present (a condo-level account has building=null).
+        validators: list[object] = []
+
+    def validate(self, attrs: dict[str, object]) -> dict[str, object]:
+        """Mirror BillingAccount.clean(): a typed account (water/power/IPTU) needs an
+        inscrição/UC. Resolve account_type/external_identifier from the payload with a fallback
+        to the existing instance (so a PATCH that only sets account_type is also caught)."""
+        account_type = attrs.get("account_type")
+        if account_type is None and self.instance is not None:
+            account_type = self.instance.account_type
+        external_identifier = attrs.get("external_identifier")
+        if external_identifier is None and self.instance is not None:
+            external_identifier = self.instance.external_identifier
+        if (
+            account_type in _TYPED_IDENTITY_ACCOUNT_TYPES
+            and not str(external_identifier or "").strip()
+        ):
+            raise serializers.ValidationError({"external_identifier": _ERR_IDENTIFIER_REQUIRED})
+        return attrs
 
 
 class BillLineItemSerializer(serializers.ModelSerializer):

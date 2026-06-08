@@ -66,6 +66,22 @@ class BillingAccountState(models.TextChoices):
     ENDED = "ended", "Encerrada"
 
 
+class BillingAccountType(models.TextChoices):
+    WATER = "water", "Água"
+    ELECTRICITY = "electricity", "Luz"
+    IPTU = "iptu", "IPTU"
+    INTERNET = "internet", "Internet"
+    GENERIC = "generic", "Genérica"
+
+
+class SupplyStatus(models.TextChoices):
+    """Physical supply line state (water/power) — distinct from BillingAccountState (the
+    account's lifecycle). A cut supply still has an active registry account (design §3.1)."""
+
+    ACTIVE = "active", "Ligada"
+    CUT = "cut", "Cortada"
+
+
 class FundedFrom(models.TextChoices):
     CAIXA = "caixa", "Caixa"
     RESERVE = "reserve", "Reserva"
@@ -106,6 +122,31 @@ class Category(AuditMixin, SoftDeleteMixin, models.Model):
         return self.name
 
 
+_TYPED_IDENTITY_ACCOUNT_TYPES = frozenset(
+    {BillingAccountType.WATER, BillingAccountType.ELECTRICITY, BillingAccountType.IPTU}
+)
+_ERR_IDENTIFIER_REQUIRED = "Informe a inscrição/UC para contas de água, luz ou IPTU."
+
+
+class BillingAccountQuerySet(models.QuerySet["BillingAccount"]):
+    def recurring_for_generation(self) -> "BillingAccountQuerySet":
+        """Active accounts that generate a recurring Bill — IPTU is registry-only (design §10.3).
+
+        Single shared predicate used by BillGenerationService.ensure_month_bills,
+        CondoProjectionService._projected_expenses, and (transitively, via materialized
+        bills) CondoCalendarService — so generation, projection and calendar never diverge.
+        IPTU installments live on STANDALONE plans (own Bill) and are NOT excluded here.
+        """
+        return self.filter(lifecycle_state=BillingAccountState.ACTIVE).exclude(
+            account_type=BillingAccountType.IPTU
+        )
+
+
+# SoftDeleteManager.get_queryset already filters is_deleted=False; from_queryset keeps that and
+# exposes recurring_for_generation()/with_deleted() on BillingAccount.objects (django-stubs friendly).
+BillingAccountManager = SoftDeleteManager.from_queryset(BillingAccountQuerySet)
+
+
 class BillingAccount(AuditMixin, SoftDeleteMixin, models.Model):
     """Recurring template (water/power/IPTU/internet). Generates a real Bill (S37)."""
 
@@ -119,7 +160,16 @@ class BillingAccount(AuditMixin, SoftDeleteMixin, models.Model):
         Category, null=True, blank=True, on_delete=models.PROTECT, related_name="billing_accounts"
     )
     name = models.CharField(max_length=200)
-    external_identifier = models.CharField(max_length=100, blank=True)
+    account_type = models.CharField(
+        max_length=20, choices=BillingAccountType.choices, default=BillingAccountType.GENERIC
+    )
+    external_identifier = models.CharField(max_length=100, blank=True)  # inscrição/UC principal
+    holder_name = models.CharField(max_length=200, blank=True)
+    registered_address = models.CharField(max_length=255, blank=True)
+    secondary_identifier = models.CharField(max_length=100, blank=True)  # imóvel/medidor/lançamento
+    supply_status = models.CharField(
+        max_length=10, choices=SupplyStatus.choices, default=SupplyStatus.ACTIVE
+    )
     description = models.TextField(blank=True)
     default_due_day = models.PositiveSmallIntegerField(
         validators=[MinValueValidator(1), MaxValueValidator(31)]
@@ -133,7 +183,7 @@ class BillingAccount(AuditMixin, SoftDeleteMixin, models.Model):
     notes = models.TextField(blank=True)
 
     all_objects = models.Manager()
-    objects = SoftDeleteManager()
+    objects = BillingAccountManager()
 
     class Meta:
         ordering = ["name"]
@@ -141,6 +191,11 @@ class BillingAccount(AuditMixin, SoftDeleteMixin, models.Model):
             models.CheckConstraint(
                 condition=Q(expected_amount__gte=0),
                 name="billing_account_expected_amount_non_negative",
+            ),
+            models.UniqueConstraint(
+                fields=["building", "account_type", "external_identifier"],
+                condition=Q(is_deleted=False),
+                name="unique_active_billing_account_identity",
             ),
         ]
 
@@ -153,6 +208,13 @@ class BillingAccount(AuditMixin, SoftDeleteMixin, models.Model):
             raise ValidationError({"expected_amount": "O valor esperado não pode ser negativo."})
         if self.tracking_start_month is not None:
             self.tracking_start_month = self.tracking_start_month.replace(day=1)
+        # Typed accounts (water/power/IPTU) must carry their inscrição/UC: '' = '' collides on the
+        # identity unique in Postgres, so this is the functional guard, not a structural one.
+        if (
+            self.account_type in _TYPED_IDENTITY_ACCOUNT_TYPES
+            and not (self.external_identifier or "").strip()
+        ):
+            raise ValidationError({"external_identifier": _ERR_IDENTIFIER_REQUIRED})
 
 
 class BillQuerySet(models.QuerySet["Bill"]):

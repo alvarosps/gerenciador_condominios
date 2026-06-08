@@ -114,6 +114,9 @@ class BillingAccountViewSet(viewsets.ModelViewSet):
         lifecycle_state = params.get("lifecycle_state")
         if lifecycle_state is not None:
             queryset = queryset.filter(lifecycle_state=lifecycle_state)
+        account_type = params.get("account_type")
+        if account_type is not None:
+            queryset = queryset.filter(account_type=account_type)
         return queryset
 
 
