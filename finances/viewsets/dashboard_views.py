@@ -29,6 +29,7 @@ from finances.services.condo_balance_service import CondoBalanceService, _next_m
 from finances.services.condo_calendar_service import CondoCalendarService
 from finances.services.condo_projection_service import CondoProjectionService
 from finances.services.condo_simulation_service import CondoSimulationService
+from finances.services.owner_distribution_service import OwnerDistributionService
 from finances.services.timezone import current_month_sp, today_sp
 
 MONTHS_IN_YEAR = 12
@@ -87,6 +88,14 @@ def _cached_monthly_balance(year: int, building_id: int | None) -> list[dict[str
 @cache_result(key_prefix=_CATEGORY_PREFIX)
 def _cached_by_category(year: int, month: int, building_id: int | None) -> list[dict[str, Any]]:
     return _by_category(year, month, building_id)
+
+
+_BY_OWNER_PREFIX = f"{FINANCE_DASHBOARD_PREFIX}-by-owner"
+
+
+@cache_result(key_prefix=_BY_OWNER_PREFIX)
+def _cached_by_owner(year: int, month: int, building_id: int | None) -> dict[str, Any]:
+    return OwnerDistributionService.compute(year, month, building_id)
 
 
 # Own sub-prefix under FINANCE_PROJECTION_PREFIX: cache_result keys on (prefix, *args) and ignores
@@ -270,6 +279,19 @@ class FinanceDashboardViewSet(viewsets.ViewSet):
         return Response(
             {"year": year, "month": month, "categories": data}, status=status.HTTP_200_OK
         )
+
+    @action(detail=False, methods=["get"])
+    def by_owner(self, request: Request) -> Response:
+        try:
+            year, month = _parse_year_month_query(request, current_month_sp())
+            building_id = _building_id_param(request)
+        except ValueError:
+            return Response(
+                {"error": "Parâmetros year/month/building_id inválidos (mês entre 1 e 12)."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        data = _cached_by_owner(year, month, building_id)
+        return Response(data, status=status.HTTP_200_OK)
 
 
 class FinanceCashFlowViewSet(viewsets.ViewSet):

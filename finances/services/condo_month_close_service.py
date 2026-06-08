@@ -42,6 +42,18 @@ def _prev_month(value: date) -> date:
     return date(value.year, value.month - 1, 1)
 
 
+def fold_step(net: Decimal, carried_in: Decimal) -> tuple[Decimal, Decimal]:
+    """One carry-forward fold step (design §4.7) — the single source of the formula.
+
+    available = max(0, net + carried_in) (the distributable result of the month);
+    carried_out = min(0, net + carried_in) (<= 0, carried into the next month).
+    Shared by CondoMonthCloseService.close (which freezes carried_out) and
+    OwnerDistributionService.compute (which shows both) so the fold is defined once.
+    """
+    combined = net + carried_in
+    return max(ZERO_MONEY, combined), min(ZERO_MONEY, combined)
+
+
 class CondoMonthCloseService:
     """Stateless chronological close / reopen / closed-month guard."""
 
@@ -140,12 +152,12 @@ class CondoMonthCloseService:
         """Set the frozen figures on a snapshot (DRY between close and the reopen cascade)."""
         year, month = snapshot.reference_month.year, snapshot.reference_month.month
         net_result = CondoBalanceService.result_of_month(year, month)
-        carry_in = CondoMonthCloseService._carry_in(snapshot.reference_month)
+        carry_in = CondoMonthCloseService.carried_in_for(snapshot.reference_month)
         reserve_balance_end = CondoBalanceService.reserve_balance()
         snapshot.net_result = net_result
         snapshot.cash_balance_end = cash_balance_end
         snapshot.reserve_balance_end = reserve_balance_end
-        snapshot.carry_forward_out = min(ZERO_MONEY, net_result + carry_in)
+        _, snapshot.carry_forward_out = fold_step(net_result, carry_in)
         # overview()'s live cash_balance re-derives from sibling closes; during the reopen cascade
         # those are not yet persisted, so pin breakdown's cash/total to the frozen figures already
         # computed for THIS row (keeps the breakdown consistent with the stored columns).
@@ -163,8 +175,9 @@ class CondoMonthCloseService:
         snapshot.updated_by = user
 
     @staticmethod
-    def _carry_in(reference_month: date) -> Decimal:
-        """carry_forward_out of the most recent closed month before ``reference_month`` (else 0)."""
+    def carried_in_for(reference_month: date) -> Decimal:
+        """carry_forward_out (<= 0) of the most recent closed month before ``reference_month``
+        (else 0.00) — the anchored fold's carried_in. Consumed by close and OwnerDistributionService."""
         previous = (
             CondoMonthClose.objects.filter(
                 reference_month__lt=reference_month, status=CondoMonthCloseStatus.CLOSED
