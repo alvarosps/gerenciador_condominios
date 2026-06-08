@@ -125,8 +125,23 @@ ALTER TABLE public.token_blacklist_outstandingtoken DISABLE ROW LEVEL SECURITY;
 
 
 class Migration(migrations.Migration):
+    # This migration ALTERs tables owned by other apps (account/auth/admin/contenttypes/sessions/
+    # sites/socialaccount/token_blacklist), so it must depend on them being fully migrated first.
+    # Without these deps a FRESH build (manage.py migrate / pytest --create-db) can topologically
+    # order this migration before those apps' initial migrations and fail with
+    # `relation "public.<table>" does not exist` (e.g. django_session). Adding dependencies is safe
+    # for already-applied databases (an applied migration is never re-run; deps only affect the
+    # ordering of a fresh build). django_migrations needs no dep — the framework creates it first.
     dependencies = [
         ("core", "0046_add_rent_tracking_start_date_to_financial_settings"),
+        ("account", "__latest__"),
+        ("admin", "__latest__"),
+        ("auth", "__latest__"),
+        ("contenttypes", "__latest__"),
+        ("sessions", "__latest__"),
+        ("sites", "__latest__"),
+        ("socialaccount", "__latest__"),
+        ("token_blacklist", "__latest__"),
     ]
 
     operations = [

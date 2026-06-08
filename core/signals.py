@@ -595,16 +595,30 @@ def invalidate_device_token_cache_on_delete(
 # =============================================================================
 
 
+# The receivers disconnect_all_signals()/connect_all_signals() toggle as a round-trip pair. The
+# @receiver decorators wire every signal once at import; only receivers disconnected with an
+# EXPLICIT receiver (these two) are actually removed by disconnect_all_signals — Django keys on
+# (receiver, sender), so the other sender-only disconnect() calls are silent no-ops. So these are
+# the only ones connect_all_signals must restore.
+_TOGGLEABLE_RECEIVERS: tuple[tuple[Any, Any, type], ...] = (
+    (post_save, sync_apartment_is_rented, Lease),
+    (post_delete, sync_apartment_is_rented_on_delete, Lease),
+)
+
+
 def connect_all_signals() -> None:
-    """
-    Explicitly connect all signals.
+    """(Re)connect the toggleable signals — idempotent, so disconnect_all_signals() + this is a
+    true round-trip.
 
-    This function is called in apps.py ready() method to ensure all signals
-    are connected when the application starts.
-
-    Note: Django automatically connects signals with @receiver decorator,
-    but this function provides explicit control and logging.
+    The @receiver decorators connect every signal at import; this restores the receivers that
+    disconnect_all_signals() removes (the Lease -> Apartment.is_rented sync). It is idempotent
+    (disconnect-then-connect guarantees exactly one connection), so it is safe whether or not a
+    disconnect happened — without a working reconnect, disconnect_all_signals() would leave the
+    is_rented sync permanently off (a real bug, and a source of cross-test pollution).
     """
+    for signal, handler, sender in _TOGGLEABLE_RECEIVERS:
+        signal.disconnect(handler, sender=sender)
+        signal.connect(handler, sender=sender)
     logger.info("All cache invalidation signals connected successfully")
 
 
