@@ -12,9 +12,7 @@ Handles all business logic related to contract generation including:
 """
 
 import logging
-import os
 import tempfile
-import warnings
 from pathlib import Path
 from typing import Any
 
@@ -22,7 +20,6 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from jinja2 import Environment, FileSystemLoader, select_autoescape
-from playwright.sync_api import sync_playwright
 
 from core.contract_rules import regras_condominio
 from core.infrastructure import (
@@ -61,7 +58,7 @@ class ContractService:
     Example usage:
         >>> # Using default implementations
         >>> lease = Lease.objects.get(pk=1)
-        >>> pdf_path = ContractService.generate_contract(lease)
+        >>> pdf_path = ContractService().generate_contract_with_infrastructure(lease)
         >>> print(f"Contract generated: {pdf_path}")
 
         >>> # Using custom implementations (dependency injection)
@@ -70,7 +67,7 @@ class ContractService:
         ...     pdf_generator=WeasyPrintPDFGenerator(),
         ...     document_storage=S3DocumentStorage(bucket_name="my-bucket"),
         ... )
-        >>> pdf_path = service.generate_contract_instance(lease)
+        >>> pdf_path = service.generate_contract_with_infrastructure(lease)
     """
 
     # Class-level default implementations
@@ -251,39 +248,6 @@ class ContractService:
         return relative_path
 
     @staticmethod
-    def get_contract_pdf_path(lease: Lease) -> str:
-        """
-        Calculate the full PDF output path for a lease contract (backward compatibility).
-
-        DEPRECATED: This method is maintained for backward compatibility.
-        New code should use get_contract_relative_path() with IDocumentStorage.
-
-        Creates the directory structure if it doesn't exist.
-        Path format: {PDF_OUTPUT_DIR}/{building_number}/contract_apto_{apt_number}_{lease_id}.pdf
-
-        Args:
-            lease: The lease object
-
-        Returns:
-            Absolute path to the PDF file
-
-        Examples:
-            >>> lease = Lease.objects.get(pk=1)
-            >>> path = ContractService.get_contract_pdf_path(lease)
-            >>> print(path)  # 'C:/path/contracts/836/contract_apto_101_1.pdf'
-        """
-        base_dir = Path(settings.BASE_DIR)
-        contracts_dir = (
-            base_dir / settings.PDF_OUTPUT_DIR / str(lease.apartment.building.street_number)
-        )
-        contracts_dir.mkdir(parents=True, exist_ok=True)
-
-        pdf_path = contracts_dir / f"contract_apto_{lease.apartment.number}_{lease.id}.pdf"
-
-        logger.debug(f"PDF path for lease {lease.id}: {pdf_path}")
-        return str(pdf_path)
-
-    @staticmethod
     def render_contract_template(context: dict[str, Any]) -> str:
         """
         Render the contract HTML template with the given context.
@@ -368,69 +332,6 @@ class ContractService:
             except OSError as e:
                 logger.warning(f"Failed to delete temporary PDF {temp_pdf_path}: {e}")
 
-    @staticmethod
-    def generate_pdf_from_html(html_content: str, pdf_path: str, lease_id: int) -> None:
-        """
-        Generate PDF from HTML content using Playwright (headless Chromium).
-
-        Creates a temporary HTML file, opens it in headless Chrome,
-        and generates a PDF. Cleans up the temporary file afterward.
-
-        Args:
-            html_content: The HTML string to convert to PDF
-            pdf_path: Output path for the PDF file
-            lease_id: Lease ID for temporary file naming
-
-        Raises:
-            Exception: If PDF generation fails
-        """
-
-        contracts_dir = Path(pdf_path).parent
-        temp_html_path = contracts_dir / f"temp_contract_{lease_id}.html"
-        temp_html_path.write_text(html_content, encoding="utf-8")
-
-        try:
-            os.environ["PLAYWRIGHT_BROWSERS_PATH"] = "0"
-            chrome_path = getattr(settings, "CHROME_EXECUTABLE_PATH", None)
-
-            with sync_playwright() as p:
-                launch_args: dict[str, Any] = {
-                    "headless": True,
-                    "args": [
-                        "--no-sandbox",
-                        "--disable-setuid-sandbox",
-                        "--disable-dev-shm-usage",
-                        "--disable-gpu",
-                    ],
-                }
-                if chrome_path:
-                    launch_args["executable_path"] = chrome_path
-
-                browser = p.chromium.launch(**launch_args)
-                try:
-                    page = browser.new_page()
-                    page.goto(
-                        f"file:///{temp_html_path}",
-                        wait_until="networkidle",
-                    )
-                    page.pdf(
-                        path=pdf_path,
-                        format="A4",
-                        print_background=True,
-                        prefer_css_page_size=False,
-                        margin={
-                            "top": "1cm",
-                            "right": "1.5cm",
-                            "bottom": "1cm",
-                            "left": "1.5cm",
-                        },
-                    )
-                    logger.info(f"PDF generated successfully for lease {lease_id}: {pdf_path}")
-                finally:
-                    browser.close()
-        finally:
-            temp_html_path.unlink(missing_ok=True)
-
     def generate_contract_with_infrastructure(self, lease: Lease) -> str:
         """
         Generate a complete PDF contract for a lease using infrastructure abstractions.
@@ -488,64 +389,3 @@ class ContractService:
 
         logger.info(f"Contract generation complete for lease {lease.id}: {stored_path}")
         return stored_path
-
-    @staticmethod
-    def generate_contract(lease: Lease) -> str:
-        """
-        Generate a complete PDF contract for a lease (backward compatibility).
-
-        DEPRECATED: This static method is maintained for backward compatibility.
-        New code should use generate_contract_with_infrastructure() for better testability
-        and flexibility (supports custom PDF generators and storage backends).
-
-        Main orchestration method that:
-        1. Prepares contract context
-        2. Renders HTML template
-        3. Calculates PDF output path
-        4. Generates PDF from HTML (async with asyncio.run)
-        5. Updates lease status
-
-        Args:
-            lease: The lease object
-
-        Returns:
-            Path to the generated PDF file
-
-        Raises:
-            Exception: If any step of contract generation fails
-
-        Examples:
-            >>> lease = Lease.objects.get(pk=1)
-            >>> pdf_path = ContractService.generate_contract(lease)
-            >>> assert lease.contract_generated is True
-        """
-        # Emit deprecation warning
-        warnings.warn(
-            "ContractService.generate_contract() is deprecated. "
-            "Use ContractService().generate_contract_with_infrastructure() instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-
-        logger.info(f"Starting contract generation for lease {lease.id} (legacy mode)")
-
-        # Prepare context
-        context = ContractService.prepare_contract_context(lease)
-
-        # Render template
-        html_content = ContractService.render_contract_template(context)
-
-        # Calculate output path
-        pdf_path = ContractService.get_contract_pdf_path(lease)
-
-        # Generate PDF
-        ContractService.generate_pdf_from_html(html_content, pdf_path, lease.id)
-
-        # Update lease status atomically
-        with transaction.atomic():
-            lease.refresh_from_db()
-            lease.contract_generated = True
-            lease.save(update_fields=["contract_generated"])
-
-        logger.info(f"Contract generation complete for lease {lease.id}")
-        return pdf_path

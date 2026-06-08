@@ -7,6 +7,7 @@ This module provides shared fixtures and configuration for all tests.
 import os
 from datetime import date
 from decimal import Decimal
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -35,6 +36,24 @@ def configure_test_cache():
             "LOCATION": "condominios-test-cache",
         }
     }
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _pin_throttle_timer_to_real_clock():
+    """Keep DRF throttling's clock immune to freezegun.
+
+    ``SimpleRateThrottle.timer = time.time`` is captured when ``rest_framework.throttling`` is first
+    imported. If that first import happens inside a ``freeze_time`` test, ``timer`` captures
+    freezegun's ``fake_time`` — a plain function, so accessing ``self.timer`` binds ``self`` and
+    ``allow_request`` raises ``TypeError: fake_time() takes 0 positional arguments but 1 was given``.
+    Pinning ``timer`` to a ``staticmethod`` wrapping the real ``time.time`` once at session start
+    (before any freeze) makes throttling use the real wall clock regardless of import order.
+    """
+    import time
+
+    from rest_framework.throttling import SimpleRateThrottle
+
+    SimpleRateThrottle.timer = staticmethod(time.time)
 
 
 @pytest.fixture(autouse=True)
@@ -232,21 +251,37 @@ def mock_chrome_path(monkeypatch):
 @pytest.fixture
 def mock_pdf_generation(mocker, mock_pdf_output_dir):
     """
-    Mocks the PDF generation process to avoid actually launching Chrome/Playwright.
-    This allows the generate_contract code to execute without external dependencies.
+    Mocks the external boundaries of contract PDF generation so tests never launch Chrome or
+    write to the real contracts directory.
+
+    The contract task runs ``ContractService().generate_contract_with_infrastructure``, which
+    renders the PDF via ``PlaywrightPDFGenerator`` (headless Chrome — external) and persists it via
+    ``FileSystemDocumentStorage`` (filesystem — external). Only those two boundaries are mocked, at
+    the class level so the cached default singletons are covered too. The real orchestration —
+    context preparation, template rendering and the lease status update — runs unmocked.
 
     Usage:
         def test_generate_contract(mock_pdf_generation):
-            response = client.post('/api/leases/1/generate_contract/')
+            response = client.post(f'/api/leases/{lease.id}/generate_contract/')
             assert response.status_code == 200
     """
-    # Mock Playwright's sync_playwright to prevent actual browser launch
-    mock_playwright = mocker.patch(
-        "core.services.contract_service.ContractService.generate_pdf_from_html"
-    )
-    mock_playwright.return_value = None
 
-    return mock_playwright
+    def fake_render_pdf(output_path, **_kwargs):
+        Path(output_path).write_bytes(b"%PDF-1.4\n%mock contract\n")
+
+    def fake_save(file_path, **_kwargs):
+        # Mirror FileSystemDocumentStorage.save: the returned path embeds the relative path
+        # (building/apartment/lease ids), which some callers assert on.
+        return f"contracts/{file_path}"
+
+    mocker.patch(
+        "core.infrastructure.pdf_generator.PlaywrightPDFGenerator.generate_pdf",
+        side_effect=fake_render_pdf,
+    )
+    return mocker.patch(
+        "core.infrastructure.storage.FileSystemDocumentStorage.save",
+        side_effect=fake_save,
+    )
 
 
 @pytest.fixture
