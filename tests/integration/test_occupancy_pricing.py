@@ -22,6 +22,7 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from core.models import Apartment, Building, Dependent, Landlord, Lease, Tenant
+from tests.constants import TEST_PASSWORD
 
 
 @pytest.fixture
@@ -29,7 +30,7 @@ def admin_user(django_user_model):
     return django_user_model.objects.create_user(
         username="admin_occ",
         email="admin_occ@test.com",
-        password="testpass123",
+        password=TEST_PASSWORD,
         is_staff=True,
         is_superuser=True,
         is_active=True,
