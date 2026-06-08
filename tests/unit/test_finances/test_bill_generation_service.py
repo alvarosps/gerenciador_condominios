@@ -42,7 +42,7 @@ def test_generation_is_idempotent() -> None:
     BillGenerationService.ensure_month_bills(2026, 6)
     bills = Bill.all_objects.filter(billing_account=account, competence_month=date(2026, 6, 1))
     assert bills.count() == 1
-    assert bills.first().line_items.count() == 1
+    assert bills.get().line_items.count() == 1
 
 
 def test_suspended_account_does_not_generate() -> None:

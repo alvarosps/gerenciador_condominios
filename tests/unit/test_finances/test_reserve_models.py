@@ -62,7 +62,7 @@ def test_movement_reserve_cascade_on_hard_delete() -> None:
 
 def test_movement_kind_choices_required() -> None:
     field = ReserveMovement._meta.get_field("kind")
-    assert {choice[0] for choice in field.choices} == {"deposit", "withdrawal"}
+    assert {choice[0] for choice in (field.choices or [])} == {"deposit", "withdrawal"}
     assert not field.has_default()
     reserve = make_reserve()
     assert make_reserve_movement(reserve=reserve, kind="deposit").kind == "deposit"
