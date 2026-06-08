@@ -4,13 +4,15 @@ import pytest
 from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from tests.constants import TEST_PASSWORD
+
 
 @pytest.mark.integration
 class TestCookieLogin:
     def test_login_sets_httponly_cookies(self, api_client, admin_user):
         response = api_client.post(
             "/api/auth/token/",
-            {"username": "admin", "password": "testpass123"},
+            {"username": "admin", "password": TEST_PASSWORD},
             format="json",
         )
         assert response.status_code == status.HTTP_200_OK
@@ -22,7 +24,7 @@ class TestCookieLogin:
     def test_login_returns_user_in_body_not_tokens(self, api_client, admin_user):
         response = api_client.post(
             "/api/auth/token/",
-            {"username": "admin", "password": "testpass123"},
+            {"username": "admin", "password": TEST_PASSWORD},
             format="json",
         )
         assert response.status_code == status.HTTP_200_OK
@@ -36,7 +38,7 @@ class TestCookieLogin:
     def test_login_sets_is_authenticated_readable_cookie(self, api_client, admin_user):
         response = api_client.post(
             "/api/auth/token/",
-            {"username": "admin", "password": "testpass123"},
+            {"username": "admin", "password": TEST_PASSWORD},
             format="json",
         )
         assert response.status_code == status.HTTP_200_OK

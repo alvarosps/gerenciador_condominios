@@ -18,6 +18,7 @@ from freezegun import freeze_time as _freeze_time
 from model_bakery import baker
 from rest_framework.test import APIClient
 
+from tests.constants import TEST_PASSWORD
 from tests.factories import make_apartment, make_building, make_person
 
 # Ensure test settings are applied
@@ -150,7 +151,7 @@ def admin_user(django_user_model):
     return django_user_model.objects.create_user(
         username="admin",
         email="admin@test.com",
-        password="testpass123",
+        password=TEST_PASSWORD,
         is_staff=True,
         is_superuser=True,
         is_active=True,
@@ -188,7 +189,7 @@ def regular_user(django_user_model):
     return django_user_model.objects.create_user(
         username="user",
         email="user@test.com",
-        password="testpass123",
+        password=TEST_PASSWORD,
         is_staff=False,
         is_superuser=False,
         is_active=True,
