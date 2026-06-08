@@ -31,7 +31,7 @@ def test_has_audit_but_no_soft_delete() -> None:
 
 def test_status_choices_and_default() -> None:
     assert CondoMonthClose().status == "open"  # field-level default
-    valid = {choice[0] for choice in CondoMonthClose._meta.get_field("status").choices}
+    valid = {choice[0] for choice in (CondoMonthClose._meta.get_field("status").choices or [])}
     assert valid == {"open", "closed"}
 
 
