@@ -96,6 +96,29 @@ def admin_user(django_user_model):
 
 
 @pytest.fixture
+def active_landlord(admin_user):
+    """An active Landlord — required by ContractService.prepare_contract_context (and therefore by
+    contract generation AND template preview). Tests that render a contract/preview need this."""
+    from core.models import Landlord
+
+    return Landlord.objects.create(
+        name="Locador Teste",
+        marital_status="Casado(a)",
+        cpf_cnpj="12345678901",
+        phone="11999990000",
+        street="Rua Locador",
+        street_number="100",
+        neighborhood="Centro",
+        city="São Paulo",
+        state="SP",
+        zip_code="01310-100",
+        is_active=True,
+        created_by=admin_user,
+        updated_by=admin_user,
+    )
+
+
+@pytest.fixture
 def regular_user(django_user_model):
     """
     Creates a test regular user without admin privileges.

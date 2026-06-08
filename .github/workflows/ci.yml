@@ -44,6 +44,10 @@ jobs:
       run: |
         echo "SECRET_KEY=test-secret-key-for-ci" > .env
         echo "DEBUG=True" >> .env
+        # No Redis service in CI — empty REDIS_URL makes settings use the in-memory LocMemCache
+        # (the same backend the test suite forces via conftest), so cache invalidation never tries
+        # to reach 127.0.0.1:6379.
+        echo "REDIS_URL=" >> .env
         echo "DB_NAME=condominio_test" >> .env
         echo "DB_USER=postgres" >> .env
         echo "DB_PASSWORD=postgres" >> .env
@@ -85,6 +89,14 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt -r requirements-dev.txt
+
+    - name: Create .env file
+      run: |
+        # mypy's django-stubs plugin initializes Django, which imports settings.py and reads
+        # SECRET_KEY (no default). Provide it (plus an empty REDIS_URL) so the plugin can load.
+        echo "SECRET_KEY=test-secret-key-for-ci" > .env
+        echo "DEBUG=True" >> .env
+        echo "REDIS_URL=" >> .env
 
     - name: Lint and format with Ruff
       run: |
