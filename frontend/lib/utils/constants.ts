@@ -75,4 +75,5 @@ export const ROUTES = {
   FINANCES_MONTH_CLOSE: '/finances/month-close',
   FINANCES_INSTALLMENT_PLANS: '/finances/installment-plans',
   FINANCES_EMPLOYEES: '/finances/employees',
+  FINANCES_PROJECTION: '/finances/projection',
 };

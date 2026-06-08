@@ -33,6 +33,8 @@ import {
   createMockByCategory,
   createMockCombinedCalendar,
   createMockCondoMonthClose,
+  createMockCondoProjection,
+  createMockCondoSimulation,
   createMockEmployee,
   createMockFinanceCategory,
   createMockFinanceOverview,
@@ -2611,6 +2613,18 @@ const financesDashboardHandlers = [
 
   http.get(`${API_BASE}/finances/finance-dashboard/by_category/`, () => {
     return HttpResponse.json(createMockByCategory());
+  }),
+
+  // Phase 5 (Session 48): 12-month projection + ephemeral what-if simulation.
+  http.get(`${API_BASE}/finances/finance-cash-flow/projection/`, ({ request }) => {
+    const monthsParam = new URL(request.url).searchParams.get('months');
+    const months = monthsParam ? Number(monthsParam) : 12;
+    return HttpResponse.json(createMockCondoProjection(months));
+  }),
+
+  http.post(`${API_BASE}/finances/finance-cash-flow/simulate/`, async ({ request }) => {
+    const body = (await request.json()) as { months?: number };
+    return HttpResponse.json(createMockCondoSimulation(body.months ?? 12));
   }),
 ];
 
