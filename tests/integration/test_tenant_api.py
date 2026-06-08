@@ -175,6 +175,31 @@ def tenant_user_no_lease(admin_user):
     return tenant, user, client
 
 
+@pytest.fixture
+def contract_pdf_on_disk(tenant_user):
+    """Write the on-disk contract PDF the tenant download endpoint serves, and GUARANTEE it (and the
+    building dir, if this fixture created it) is removed afterwards — even if the test fails.
+
+    The endpoint reads a hardcoded ``BASE_DIR/contracts/<building>/contract_apto_<apt>_<lease>.pdf``
+    path, so the file cannot live in a tmp dir; the teardown is what keeps the working tree clean.
+    """
+    _, _, lease = tenant_user
+    lease.contract_generated = True
+    lease.save(update_fields=["contract_generated"])
+    apt = lease.apartment
+    building_dir = Path(settings.BASE_DIR) / "contracts" / str(apt.building.street_number)
+    created_dir = not building_dir.exists()
+    building_dir.mkdir(parents=True, exist_ok=True)
+    pdf_path = building_dir / f"contract_apto_{apt.number}_{lease.pk}.pdf"
+    pdf_path.write_bytes(b"%PDF-1.4\ntest contract\n")
+    try:
+        yield lease, pdf_path
+    finally:
+        pdf_path.unlink(missing_ok=True)
+        if created_dir and building_dir.is_dir() and not any(building_dir.iterdir()):
+            building_dir.rmdir()
+
+
 @pytest.mark.integration
 @pytest.mark.django_db
 class TestTenantContract:
@@ -194,27 +219,14 @@ class TestTenantContract:
         assert response.status_code == 404
         assert "não encontrado" in response.data["detail"]
 
-    def test_success_streams_pdf(self, tenant_client, tenant_user):
-        _, _, lease = tenant_user
-        lease.contract_generated = True
-        lease.save(update_fields=["contract_generated"])
-        apt = lease.apartment
-        pdf_path = (
-            Path(settings.BASE_DIR)
-            / "contracts"
-            / str(apt.building.street_number)
-            / f"contract_apto_{apt.number}_{lease.pk}.pdf"
-        )
-        pdf_path.parent.mkdir(parents=True, exist_ok=True)
-        pdf_path.write_bytes(b"%PDF-1.4\ntest contract\n")
+    def test_success_streams_pdf(self, tenant_client, contract_pdf_on_disk):
+        response = tenant_client.get("/api/tenant/contract/")
         try:
-            response = tenant_client.get("/api/tenant/contract/")
             assert response.status_code == 200
             assert response["Content-Type"] == "application/pdf"
-            # FileResponse keeps the file handle open; close it so Windows can unlink it.
-            response.close()
         finally:
-            pdf_path.unlink(missing_ok=True)
+            # Release the FileResponse handle so the fixture teardown can unlink on Windows.
+            response.close()
 
     def test_no_lease_returns_404(self, tenant_user_no_lease):
         _, _, client = tenant_user_no_lease
