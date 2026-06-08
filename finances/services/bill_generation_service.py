@@ -153,13 +153,23 @@ class BillGenerationService:
 
     @staticmethod
     def _generate_embedded_lines(year: int, month: int, user: User | None) -> None:
-        """Embedded installment -> a line on the recurring account's Bill (dedup, never own Bill)."""
+        """Embedded installment -> a line on the recurring account's Bill (dedup, never own Bill).
+
+        Skipped when the host account is not eligible that month (suspended / deferred / past
+        end_date / BillSkip / before tracking_start): an embedded parcela rides on the recurring
+        account's Bill, so a dormant account materializes neither consumo nor parcela (design
+        §7/§8/§18). This is the SAME eligibility predicate CondoProjectionService._projected_expenses
+        applies to embedded parcelas, keeping generation and projection in lockstep.
+        """
+        month_start = date(year, month, 1)
         for installment in BillGenerationService._active_installments_for_month(
             year, month, embedded=True
         ):
             plan = installment.plan
             account = plan.linked_billing_account
             if account is None:  # defensive — clean() enforces embedded ⇒ linked set.
+                continue
+            if not BillGenerationService.is_account_eligible(account, month_start):
                 continue
             bill = BillGenerationService._ensure_account_bill(account, year, month, user)
             # Dedup on (bill, installment): one active embedded line per installment.

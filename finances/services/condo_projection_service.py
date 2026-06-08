@@ -176,15 +176,36 @@ class CondoProjectionService:
             if BillGenerationService.is_account_eligible(account, reference_month):
                 total += account.expected_amount
 
-        installments = Installment.objects.filter(
+        # Standalone parcelas always count when active+due; embedded parcelas count ONLY when their
+        # host recurring account is eligible that month (they ride on its bill — design §7/§8/§18),
+        # mirroring BillGenerationService._generate_embedded_lines so projection never diverges from
+        # generation.
+        standalone = Installment.objects.filter(
             due_date__year=year,
             due_date__month=month,
             plan__is_deleted=False,
             plan__lifecycle_state=InstallmentPlanState.ACTIVE,
+            plan__embedded=False,
         )
         if building_id is not None:
-            installments = installments.filter(plan__building_id=building_id)
-        total += installments.aggregate(total=Sum("amount"))["total"] or ZERO
+            standalone = standalone.filter(plan__building_id=building_id)
+        total += standalone.aggregate(total=Sum("amount"))["total"] or ZERO
+
+        embedded = Installment.objects.filter(
+            due_date__year=year,
+            due_date__month=month,
+            plan__is_deleted=False,
+            plan__lifecycle_state=InstallmentPlanState.ACTIVE,
+            plan__embedded=True,
+        ).select_related("plan__linked_billing_account")
+        if building_id is not None:
+            embedded = embedded.filter(plan__building_id=building_id)
+        for installment in embedded:
+            host_account = installment.plan.linked_billing_account
+            if host_account is not None and BillGenerationService.is_account_eligible(
+                host_account, reference_month
+            ):
+                total += installment.amount
 
         if building_id is None:
             total += CondoProjectionService._projected_payroll(reference_month)

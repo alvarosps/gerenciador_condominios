@@ -14,7 +14,7 @@ import pytest
 from freezegun import freeze_time
 from rest_framework import status
 
-from core.models import Lease
+from core.models import Landlord, Lease
 from tests.factories import (
     make_apartment,
     make_building,
@@ -229,13 +229,32 @@ class TestCalculateLateFee:
         ) == Decimal("0.00")
 
 
+@pytest.fixture
+def landlord(admin_user):
+    return Landlord.objects.create(
+        name="Locador Lease Actions",
+        marital_status="Casado(a)",
+        cpf_cnpj="12345678901",
+        phone="11999990000",
+        street="Rua Locador",
+        street_number="100",
+        neighborhood="Centro",
+        city="São Paulo",
+        state="SP",
+        zip_code="01310-100",
+        is_active=True,
+        created_by=admin_user,
+        updated_by=admin_user,
+    )
+
+
 @pytest.mark.integration
 @pytest.mark.django_db
 class TestGenerateContract:
     url_template = "/api/leases/{pk}/generate_contract/"
 
     def test_generate_contract_succeeds(
-        self, authenticated_api_client, lease, tenant, mock_pdf_generation
+        self, authenticated_api_client, lease, tenant, landlord, mock_pdf_generation
     ):
         """generate_contract should return 200 with pdf_path when PDF mock is active."""
         # Add tenant to M2M so calculate_tag_fee receives num_tenants >= 1
@@ -247,7 +266,7 @@ class TestGenerateContract:
         assert "pdf_path" in response.data
 
     def test_generate_contract_marks_lease_contract_generated(
-        self, authenticated_api_client, lease, tenant, mock_pdf_generation
+        self, authenticated_api_client, lease, tenant, landlord, mock_pdf_generation
     ):
         """After generating contract, lease.contract_generated should be True."""
         lease.tenants.add(tenant)
@@ -256,6 +275,17 @@ class TestGenerateContract:
 
         lease.refresh_from_db()
         assert lease.contract_generated is True
+
+    def test_generate_contract_without_active_landlord_returns_400(
+        self, authenticated_api_client, lease, tenant, mock_pdf_generation
+    ):
+        """No active landlord is a configuration error → 400 (not 500), in Portuguese."""
+        lease.tenants.add(tenant)
+        url = self.url_template.format(pk=lease.pk)
+        response = authenticated_api_client.post(url)
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "locador" in str(response.data).lower()
 
     def test_generate_contract_unauthenticated_returns_401(self, api_client, lease):
         url = self.url_template.format(pk=lease.pk)

@@ -13,6 +13,7 @@ from tests.factories import (
     make_bill,
     make_bill_line_item,
     make_building,
+    make_condominium,
     make_finance_category,
     make_lease,
     make_rent_payment,
@@ -53,6 +54,7 @@ def test_overview_kpis(authenticated_api_client):
 
 @freeze_time("2026-07-01 12:00:00")
 def test_monthly_balance_series(authenticated_api_client):
+    make_condominium()  # close() needs the default condominium (self-contained, no ambient state)
     authenticated_api_client.post(
         "/api/finances/condo-month-closes/close/", {"year": 2026, "month": 7}, format="json"
     )
@@ -66,6 +68,20 @@ def test_monthly_balance_series(authenticated_api_client):
     assert july["is_closed"] is True
     assert august["is_closed"] is False
     assert isinstance(july["cash_balance_end"], str)
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "/api/finances/finance-dashboard/overview/?year=2026&month=7&building_id=abc",
+        "/api/finances/finance-dashboard/monthly_balance/?year=2026&building_id=abc",
+        "/api/finances/finance-dashboard/by_category/?year=2026&month=7&building_id=abc",
+        "/api/finances/finance-dashboard/combined_calendar/?year=2026&month=7&building_id=abc",
+        "/api/finances/finance-dashboard/overdue/?building_id=abc",
+    ],
+)
+def test_malformed_building_id_is_400_not_500(authenticated_api_client, url):
+    assert authenticated_api_client.get(url).status_code == status.HTTP_400_BAD_REQUEST
 
 
 @freeze_time("2026-07-01 12:00:00")

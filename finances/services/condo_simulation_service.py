@@ -24,6 +24,11 @@ VALID_SCENARIO_TYPES = frozenset([ADD_EXPENSE, REMOVE_EXPENSE, CHANGE_RENT, ADD_
 
 ZERO_MONEY = Decimal("0.00")
 
+# A money value must fit DecimalField(max_digits=12, decimal_places=2): |value| < 10**10. This also
+# keeps quantize_money safely under the Decimal context precision, so a finite-but-huge input like
+# "1e1000" is rejected in validation (400) instead of raising InvalidOperation later (500).
+_MAX_MONEY_MAGNITUDE = Decimal(10) ** 10
+
 _ERR_NOT_OBJECT = "Cenário {index}: cada cenário deve ser um objeto."
 _ERR_TYPE_REQUIRED = "Cenário {index}: o campo 'type' é obrigatório."
 _ERR_TYPE_INVALID = "Cenário {index}: tipo '{type}' inválido. Tipos válidos: {valid}."
@@ -37,11 +42,13 @@ def _scenario_value_field(scenario_type: str) -> str:
 
 
 def _decimal_or_none(value: object) -> Decimal | None:
-    """Finite Decimal of a scalar, or None when missing / not a number / NaN / Infinity.
+    """Finite, in-range money Decimal of a scalar, or None when missing / not a number / out of range.
 
-    ``Decimal('NaN')`` / ``Decimal('Infinity')`` parse WITHOUT raising, so a non-finite value
-    would otherwise slip past validation and either corrupt the projection with the literal
-    string "NaN" or blow up arithmetic in ``_apply`` — reject them here at the single entry point.
+    ``Decimal('NaN')`` / ``Decimal('Infinity')`` parse WITHOUT raising, so a non-finite value would
+    otherwise slip past validation and corrupt the projection or blow up ``_apply``. A finite but
+    huge value (e.g. ``"1e1000"``) is also rejected: quantizing it later would raise InvalidOperation
+    (HTTP 500). Both are caught here at the single entry point so validate_scenarios returns a clean
+    400 instead.
     """
     if value is None:
         return None
@@ -49,7 +56,7 @@ def _decimal_or_none(value: object) -> Decimal | None:
         result = Decimal(str(value))
     except (InvalidOperation, ValueError, TypeError):
         return None
-    if not result.is_finite():
+    if not result.is_finite() or abs(result) >= _MAX_MONEY_MAGNITUDE:
         return None
     return result
 
@@ -110,7 +117,7 @@ class CondoSimulationService:
             return simulated
         for scenario in scenarios:
             CondoSimulationService._apply(simulated, scenario)
-        CondoSimulationService._refold(base, simulated)
+        CondoSimulationService._refold(simulated)
         return simulated
 
     @staticmethod
@@ -168,14 +175,17 @@ class CondoSimulationService:
                 row["expenses_total"] = money_str(reduced)
 
     @staticmethod
-    def _refold(base: list[dict[str, Any]], simulated: list[dict[str, Any]]) -> None:
+    def _refold(simulated: list[dict[str, Any]]) -> None:
         """Recompute net + cumulative_cash for future months, anchored on the baseline cash.
 
         Real/closed/current months keep their figures and re-anchor the running cash to their
         frozen cumulative; future months recompute net from the (possibly delta'd) pontas and fold
         the running cash forward.
         """
-        running = quantize_money(Decimal(base[0]["cumulative_cash"]) - Decimal(base[0]["net"]))
+        # The projection's first row is always the current (actual) month, so the first iteration
+        # re-anchors `running` to that frozen cumulative before any future row is folded — this
+        # initial value is just a definite starting point, never the anchor itself.
+        running = ZERO_MONEY
         for row in simulated:
             if row["is_actual"]:
                 running = Decimal(row["cumulative_cash"])

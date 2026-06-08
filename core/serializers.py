@@ -41,6 +41,16 @@ User = get_user_model()
 
 _DOUBLE_OCCUPANCY = 2  # number_of_tenants tier that uses rental_value_double
 
+# Mirrors the DB UniqueConstraint (unique_active_lease_per_apartment, condition is_deleted=False):
+# an apartment may have at most one active (non-soft-deleted) lease. Surfaced as a clean 400
+# instead of letting the constraint raise IntegrityError 500. Reused by the onboarding service.
+APARTMENT_ALREADY_LEASED_ERROR = "Este apartamento já possui um contrato ativo."
+
+# Transient attribute set by TenantSerializer on the created/updated Tenant, holding the
+# Dependent instances created during this save() in input order (the model has no Meta.ordering).
+# Consumed by the onboarding service to resolve a newly-created resident dependent by index.
+_CREATED_DEPENDENTS_ATTR = "_created_dependents"
+
 
 class BuildingSerializer(serializers.ModelSerializer):
     class Meta:
@@ -295,6 +305,22 @@ class TenantSerializer(serializers.ModelSerializer):
 
         return attrs
 
+    @staticmethod
+    def _create_dependent(
+        tenant: Tenant, dep_data: dict[str, Any], validated_data: dict[str, Any]
+    ) -> Dependent:
+        """Create a Dependent, propagating audit fields from the parent save() kwargs.
+
+        created_by/updated_by arrive in validated_data when the caller uses
+        serializer.save(created_by=user, updated_by=user); they are None when omitted.
+        """
+        return Dependent.objects.create(
+            tenant=tenant,
+            created_by=validated_data.get("created_by"),
+            updated_by=validated_data.get("updated_by"),
+            **dep_data,
+        )
+
     def create(self, validated_data: dict[str, Any]) -> Tenant:
         dependents_data = validated_data.pop("dependents", [])
         furniture_ids = validated_data.pop("furniture_ids", [])
@@ -303,8 +329,12 @@ class TenantSerializer(serializers.ModelSerializer):
         tenant.save()
         if furniture_ids:
             tenant.furnitures.set(furniture_ids)
-        for dep_data in dependents_data:
-            Dependent.objects.create(tenant=tenant, **dep_data)
+        # Capture created dependents in input order so callers can resolve one by index
+        # (the model has no Meta.ordering); also propagate created_by/updated_by.
+        created = [
+            self._create_dependent(tenant, dep_data, validated_data) for dep_data in dependents_data
+        ]
+        setattr(tenant, _CREATED_DEPENDENTS_ATTR, created)
         return tenant
 
     def update(self, instance: Tenant, validated_data: dict[str, Any]) -> Tenant:
@@ -318,6 +348,7 @@ class TenantSerializer(serializers.ModelSerializer):
         if furniture_ids is not None:
             instance.furnitures.set(furniture_ids)
 
+        created: list[Dependent] = []
         if dependents_data is not None:
             # Smart update: only delete removed dependents, update existing, create new
             existing_ids = {d.id for d in instance.dependents.all()}
@@ -335,9 +366,10 @@ class TenantSerializer(serializers.ModelSerializer):
                     # Update existing dependent
                     instance.dependents.filter(id=dep_id).update(**dep_data)
                 else:
-                    # Create new dependent
-                    Dependent.objects.create(tenant=instance, **dep_data)
+                    # Create new dependent (audit propagated, captured in input order)
+                    created.append(self._create_dependent(instance, dep_data, validated_data))
 
+        setattr(instance, _CREATED_DEPENDENTS_ATTR, created)
         return instance
 
 
@@ -445,7 +477,26 @@ class LeaseSerializer(serializers.ModelSerializer):
                         }
                     )
 
+        self._validate_apartment_available(apartment)
+
         return attrs
+
+    def _validate_apartment_available(self, apartment: Apartment | None) -> None:
+        """Reject an apartment that already has an active (non-soft-deleted) lease.
+
+        Mirrors the DB UniqueConstraint condition (is_deleted=False) so callers get a clean,
+        namespaced 400 instead of an IntegrityError 500. On edit, the lease being updated does
+        not count against itself.
+        """
+        if apartment is None:
+            return
+
+        qs = Lease.objects.filter(apartment=apartment)  # SoftDeleteManager excludes deleted
+        if self.instance is not None:
+            qs = qs.exclude(pk=self.instance.pk)
+
+        if qs.exists():
+            raise serializers.ValidationError({"apartment": [APARTMENT_ALREADY_LEASED_ERROR]})
 
     def create(self, validated_data: dict[str, Any]) -> Lease:
         """Create lease with tenant relationships.

@@ -9,7 +9,7 @@ from freezegun import freeze_time
 from rest_framework import status
 
 from core.models import FinancialSettings
-from tests.factories import make_bill, make_bill_line_item
+from tests.factories import make_bill, make_bill_line_item, make_condominium
 
 pytestmark = [pytest.mark.integration, pytest.mark.django_db]
 
@@ -22,6 +22,7 @@ def _active_bill(amount: str, competence_month: date):
 
 @freeze_time("2026-07-15")
 def test_list_and_close(authenticated_api_client):
+    make_condominium()  # close() needs the default condominium (self-contained, no ambient state)
     resp = authenticated_api_client.post(
         "/api/finances/condo-month-closes/close/", {"year": 2026, "month": 7}, format="json"
     )
@@ -68,6 +69,7 @@ def test_close_already_closed(authenticated_api_client):
 
 @freeze_time("2026-07-15")
 def test_reopen(authenticated_api_client):
+    make_condominium()
     authenticated_api_client.post(
         "/api/finances/condo-month-closes/close/", {"year": 2026, "month": 7}, format="json"
     )

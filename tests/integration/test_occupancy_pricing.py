@@ -21,7 +21,7 @@ from freezegun import freeze_time
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from core.models import Apartment, Building, Dependent, Lease, Tenant
+from core.models import Apartment, Building, Dependent, Landlord, Lease, Tenant
 
 
 @pytest.fixture
@@ -78,6 +78,25 @@ def apartment_double(building, admin_user):
         rental_value_double=Decimal("1100.00"),
         cleaning_fee=Decimal("200.00"),
         max_tenants=2,
+        created_by=admin_user,
+        updated_by=admin_user,
+    )
+
+
+@pytest.fixture
+def landlord(admin_user):
+    return Landlord.objects.create(
+        name="Locador Occupancy",
+        marital_status="Casado(a)",
+        cpf_cnpj="12345678901",
+        phone="11999990000",
+        street="Rua Locador",
+        street_number="100",
+        neighborhood="Centro",
+        city="São Paulo",
+        state="SP",
+        zip_code="01310-100",
+        is_active=True,
         created_by=admin_user,
         updated_by=admin_user,
     )
@@ -339,7 +358,7 @@ class TestLeaseOccupancyPricing:
         assert response.data["resident_dependent"]["id"] == dependent.id
 
     def test_contract_generation_uses_lease_rental_value(
-        self, api_client, lease_single, tenant, mock_pdf_generation
+        self, api_client, lease_single, tenant, landlord, mock_pdf_generation
     ):
         """generate_contract must use lease.rental_value, not apartment.rental_value."""
         lease_single.tenants.add(tenant)

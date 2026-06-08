@@ -257,6 +257,10 @@ def test_wedge_with_pendencies_residual_zero() -> None:
     make_reserve_movement(
         reserve=make_reserve(), kind="deposit", amount=Decimal("50.00"), movement_date=JUNE
     )
+    # Pin the concrete KPIs so this is NOT a vacuous residual==0 check: a definitional drift in
+    # either public method would break these assertions and the now-independent wedge.
+    assert CondoBalanceService.result_of_month(2026, 6) == Decimal("300.00")  # 1000 unpaid - 700
+    assert CondoBalanceService.cash_change_of_month(2026, 6) == Decimal("-50.00")  # -50 deposit out
     assert CondoBalanceService._wedge_residual(2026, 6) == Decimal("0.00")
     assert CondoBalanceService.overview(2026, 6)["wedge_ok"] is True
 
@@ -309,6 +313,24 @@ def test_building_scoped_figures() -> None:
     make_bill_line_item(bill=overdue, amount=Decimal("70.00"))
     assert CondoBalanceService.overdue_bills_total(building.id) == Decimal("70.00")
     assert CondoBalanceService.overdue_bills_count(building.id) == 1
+    # Reserve/total are condo-level — a per-building overview reports them as None, never a
+    # building-cash + whole-condo-reserve mix.
+    overview = CondoBalanceService.overview(2026, 6, building.id)
+    assert overview["reserve_balance"] is None
+    assert overview["total_balance"] is None
+    assert overview["cash_change_of_month"] == "-80.00"  # building-scoped figures still present
+
+
+@freeze_time("2026-06-15")
+def test_soft_deleted_reserve_excluded_from_reserve_balance() -> None:
+    reserve = make_reserve()
+    make_reserve_movement(
+        reserve=reserve, kind="deposit", amount=Decimal("500.00"), movement_date=JUNE
+    )
+    assert CondoBalanceService.reserve_balance() == Decimal("500.00")
+    reserve.delete()  # soft delete: its movements must drop out of the balance
+    assert CondoBalanceService.reserve_balance() == Decimal("0.00")
+    assert CondoBalanceService.total_balance(date(2026, 7, 1)) == Decimal("0.00")
 
 
 @freeze_time("2026-06-15")

@@ -12,12 +12,13 @@ tests/unit/test_finances/test_finance_cache_signals.py.
 from core.cache import CacheManager
 
 FINANCE_DASHBOARD_PREFIX = "finance-dashboard"
-FINANCE_CASH_FLOW_PREFIX = "finance-cash-flow"
 FINANCE_PROJECTION_PREFIX = "finance-projection"
 
+# Only prefixes a @cache_result actually keys on (dashboard/by_owner + the cash-flow projection,
+# which caches under FINANCE_PROJECTION_PREFIX-cashflow). The cash-flow viewset has no cache of its
+# own, so there is no finance-cash-flow* key to invalidate.
 FINANCE_CACHE_PREFIXES = (
     FINANCE_DASHBOARD_PREFIX,
-    FINANCE_CASH_FLOW_PREFIX,
     FINANCE_PROJECTION_PREFIX,
 )
 
