@@ -7,6 +7,7 @@ This module provides shared fixtures and configuration for all tests.
 import os
 from datetime import date
 from decimal import Decimal
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -37,6 +38,24 @@ def configure_test_cache():
     }
 
 
+@pytest.fixture(scope="session", autouse=True)
+def _pin_throttle_timer_to_real_clock():
+    """Keep DRF throttling's clock immune to freezegun.
+
+    ``SimpleRateThrottle.timer = time.time`` is captured when ``rest_framework.throttling`` is first
+    imported. If that first import happens inside a ``freeze_time`` test, ``timer`` captures
+    freezegun's ``fake_time`` — a plain function, so accessing ``self.timer`` binds ``self`` and
+    ``allow_request`` raises ``TypeError: fake_time() takes 0 positional arguments but 1 was given``.
+    Pinning ``timer`` to a ``staticmethod`` wrapping the real ``time.time`` once at session start
+    (before any freeze) makes throttling use the real wall clock regardless of import order.
+    """
+    import time
+
+    from rest_framework.throttling import SimpleRateThrottle
+
+    SimpleRateThrottle.timer = staticmethod(time.time)
+
+
 @pytest.fixture(autouse=True)
 def _clear_caches_between_tests():
     """Clear all in-memory (locmem) caches before each test to prevent cross-test pollution.
@@ -53,6 +72,49 @@ def _clear_caches_between_tests():
         store.clear()
     for store in locmem._expire_info.values():
         store.clear()
+
+
+@pytest.fixture(autouse=True)
+def _isolate_media_root(tmp_path, settings):
+    """Redirect MEDIA_ROOT to a per-test temp dir so file uploads never pollute the repo.
+
+    ``settings.MEDIA_ROOT`` defaults to ``BASE_DIR / "contracts"`` and ``PaymentProof.file`` (plus
+    any other ``FileField``) uploads under it. Without this, every test that saves an uploaded file
+    writes a real artifact into the repo's ``contracts/payment_proofs/`` directory (which is not
+    git-ignored). A tmp dir keeps the working tree clean and the upload auto-cleaned. The ``settings``
+    param is pytest-django's wrapper, so the assignment fires ``setting_changed`` (the file storage
+    picks up the new location) and is reverted after the test.
+    """
+    settings.MEDIA_ROOT = str(tmp_path / "media")
+
+
+@pytest.fixture(autouse=True)
+def _restore_signal_receivers():
+    """Restore the process-global Django signal registry after every test.
+
+    Signal connect/disconnect mutates a PROCESS-GLOBAL receiver list that the per-test DB rollback
+    does NOT undo. A test that disconnects a receiver and fails to fully reconnect (e.g.
+    core.signals.disconnect_all_signals, whose paired connect must restore the Lease ->
+    Apartment.is_rented sync) would silently break EVERY later test in the same xdist worker —
+    order-dependent flakiness that only surfaces under `-n` parallel scheduling. Snapshotting and
+    restoring the receiver lists here makes that whole class of cross-test pollution impossible.
+    """
+    from django.db.models.signals import (
+        m2m_changed,
+        post_delete,
+        post_save,
+        pre_delete,
+        pre_save,
+    )
+
+    tracked = (pre_save, post_save, pre_delete, post_delete, m2m_changed)
+    saved = {signal: list(signal.receivers) for signal in tracked}
+    yield
+    for signal in tracked:
+        if list(signal.receivers) != saved[signal]:
+            with signal.lock:
+                signal.receivers = saved[signal]
+                signal.sender_receivers_cache.clear()
 
 
 @pytest.fixture(scope="session")
@@ -92,6 +154,29 @@ def admin_user(django_user_model):
         is_staff=True,
         is_superuser=True,
         is_active=True,
+    )
+
+
+@pytest.fixture
+def active_landlord(admin_user):
+    """An active Landlord — required by ContractService.prepare_contract_context (and therefore by
+    contract generation AND template preview). Tests that render a contract/preview need this."""
+    from core.models import Landlord
+
+    return Landlord.objects.create(
+        name="Locador Teste",
+        marital_status="Casado(a)",
+        cpf_cnpj="12345678901",
+        phone="11999990000",
+        street="Rua Locador",
+        street_number="100",
+        neighborhood="Centro",
+        city="São Paulo",
+        state="SP",
+        zip_code="01310-100",
+        is_active=True,
+        created_by=admin_user,
+        updated_by=admin_user,
     )
 
 
@@ -180,21 +265,37 @@ def mock_chrome_path(monkeypatch):
 @pytest.fixture
 def mock_pdf_generation(mocker, mock_pdf_output_dir):
     """
-    Mocks the PDF generation process to avoid actually launching Chrome/Playwright.
-    This allows the generate_contract code to execute without external dependencies.
+    Mocks the external boundaries of contract PDF generation so tests never launch Chrome or
+    write to the real contracts directory.
+
+    The contract task runs ``ContractService().generate_contract_with_infrastructure``, which
+    renders the PDF via ``PlaywrightPDFGenerator`` (headless Chrome — external) and persists it via
+    ``FileSystemDocumentStorage`` (filesystem — external). Only those two boundaries are mocked, at
+    the class level so the cached default singletons are covered too. The real orchestration —
+    context preparation, template rendering and the lease status update — runs unmocked.
 
     Usage:
         def test_generate_contract(mock_pdf_generation):
-            response = client.post('/api/leases/1/generate_contract/')
+            response = client.post(f'/api/leases/{lease.id}/generate_contract/')
             assert response.status_code == 200
     """
-    # Mock Playwright's sync_playwright to prevent actual browser launch
-    mock_playwright = mocker.patch(
-        "core.services.contract_service.ContractService.generate_pdf_from_html"
-    )
-    mock_playwright.return_value = None
 
-    return mock_playwright
+    def fake_render_pdf(output_path, **_kwargs):
+        Path(output_path).write_bytes(b"%PDF-1.4\n%mock contract\n")
+
+    def fake_save(file_path, **_kwargs):
+        # Mirror FileSystemDocumentStorage.save: the returned path embeds the relative path
+        # (building/apartment/lease ids), which some callers assert on.
+        return f"contracts/{file_path}"
+
+    mocker.patch(
+        "core.infrastructure.pdf_generator.PlaywrightPDFGenerator.generate_pdf",
+        side_effect=fake_render_pdf,
+    )
+    return mocker.patch(
+        "core.infrastructure.storage.FileSystemDocumentStorage.save",
+        side_effect=fake_save,
+    )
 
 
 @pytest.fixture

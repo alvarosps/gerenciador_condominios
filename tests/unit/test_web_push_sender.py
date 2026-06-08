@@ -1,10 +1,9 @@
 """Unit tests for the Web Push channel of notification_service.
 
-Mocks only the external boundary (``pywebpush.webpush`` for web push and the
-channel functions ``send_expo_push``/``send_web_push`` when asserting that
-``send_push_notification`` fans out to both — these are the send boundaries,
-mirroring ``test_notification_service.py``). The ORM, the model and the
-internal logic of ``send_web_push`` are exercised for real.
+Mocks ONLY the external send boundaries — ``pywebpush.webpush`` (web push) and
+``http_requests.post`` (the Expo HTTP API). The ORM, the models, and the real internal logic of
+``send_web_push``/``send_expo_push``/``send_push_notification`` are exercised for real, so a bug in
+any of them fails the test instead of being hidden behind a mocked internal function.
 """
 
 import json
@@ -15,7 +14,7 @@ import pytest
 from django.conf import settings
 from pywebpush import WebPushException
 
-from core.models import WebPushSubscription
+from core.models import DeviceToken, WebPushSubscription
 from core.services.notification_service import send_push_notification, send_web_push
 
 
@@ -89,12 +88,25 @@ class TestSendWebPush:
 
 @pytest.mark.unit
 class TestSendPushNotificationDualChannel:
-    def test_send_push_notification_calls_both_channels(self, admin_user):
+    def test_send_push_notification_reaches_both_external_channels(self, admin_user, subscription):
+        """The real dispatcher runs the real Expo + Web Push channels; only the external send
+        boundaries are mocked. ``subscription`` seeds an active Web Push sub; add an active Expo
+        device so both real channels reach their boundary."""
+        DeviceToken.objects.create(
+            user=admin_user,
+            token="ExpoToken[dual-channel]",
+            platform="android",
+            is_active=True,
+            created_by=admin_user,
+            updated_by=admin_user,
+        )
+
         with (
-            patch("core.services.notification_service.send_expo_push") as mock_expo,
-            patch("core.services.notification_service.send_web_push") as mock_web,
+            patch("core.services.notification_service.http_requests.post") as mock_expo_post,
+            patch("core.services.notification_service.webpush") as mock_webpush,
         ):
             send_push_notification(admin_user, "T", "B", {"k": "v"})
 
-        mock_expo.assert_called_once_with(admin_user, "T", "B", {"k": "v"})
-        mock_web.assert_called_once_with(admin_user, "T", "B", {"k": "v"})
+        # The real send_expo_push and send_web_push each hit their external boundary exactly once.
+        mock_expo_post.assert_called_once()
+        mock_webpush.assert_called_once()

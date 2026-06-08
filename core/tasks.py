@@ -12,5 +12,5 @@ def generate_contract_pdf(self: Any, lease_id: int) -> str:
     from core.services.contract_service import ContractService
 
     lease = Lease.objects.select_related("apartment", "apartment__building").get(id=lease_id)
-    path = ContractService.generate_contract(lease)
+    path = ContractService().generate_contract_with_infrastructure(lease)
     return str(path)
