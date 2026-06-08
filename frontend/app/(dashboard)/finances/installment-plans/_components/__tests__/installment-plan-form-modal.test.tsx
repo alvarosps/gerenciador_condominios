@@ -52,7 +52,7 @@ describe('InstallmentPlanFormModal', () => {
       installment_count: 3,
       start_due_date: '2026-07-10',
       embedded: false,
-      linked_billing_account_id: null,
+      billing_account_id: null,
       lifecycle_state: 'active',
     });
   });
@@ -103,8 +103,8 @@ describe('InstallmentPlanFormModal', () => {
       category_id: null,
       building: null,
       building_id: null,
-      linked_billing_account: null,
-      linked_billing_account_id: null,
+      billing_account: null,
+      billing_account_id: null,
       installments: [],
       notes: '',
     };

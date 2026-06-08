@@ -149,7 +149,7 @@ class BillGenerationService:
                 "plan__condominium",
                 "plan__building",
                 "plan__category",
-                "plan__linked_billing_account",
+                "plan__billing_account",
             )
         )
 
@@ -168,8 +168,8 @@ class BillGenerationService:
             year, month, embedded=True
         ):
             plan = installment.plan
-            account = plan.linked_billing_account
-            if account is None:  # defensive — clean() enforces embedded ⇒ linked set.
+            account = plan.billing_account
+            if account is None:  # defensive — clean() enforces embedded ⇒ billing_account set.
                 continue
             if not BillGenerationService.is_account_eligible(account, month_start):
                 continue

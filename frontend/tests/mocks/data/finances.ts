@@ -224,8 +224,8 @@ export function createMockInstallmentPlan(
     category_id: null,
     building: null,
     building_id: null,
-    linked_billing_account: null,
-    linked_billing_account_id: null,
+    billing_account: null,
+    billing_account_id: null,
     installments: [
       createMockInstallment({ id: 1, number: 1, amount: 500, due_date: '2026-07-10' }),
       createMockInstallment({ id: 2, number: 2, amount: 500, due_date: '2026-08-10' }),

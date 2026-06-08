@@ -58,7 +58,7 @@ function emptyDefaults(): InstallmentPlanFormValues {
     start_due_date: '',
     default_due_day: 10,
     embedded: false,
-    linked_billing_account_id: null,
+    billing_account_id: null,
     notes: '',
   };
 }
@@ -73,8 +73,7 @@ function planToDefaults(plan: InstallmentPlan): InstallmentPlanFormValues {
     start_due_date: plan.start_due_date,
     default_due_day: plan.default_due_day,
     embedded: plan.embedded,
-    linked_billing_account_id:
-      plan.linked_billing_account_id ?? plan.linked_billing_account?.id ?? null,
+    billing_account_id: plan.billing_account_id ?? plan.billing_account?.id ?? null,
     notes: plan.notes ?? '',
   };
 }
@@ -117,7 +116,7 @@ export function InstallmentPlanFormModal({ open, plan, onClose }: InstallmentPla
       start_due_date: values.start_due_date,
       default_due_day: values.default_due_day,
       embedded: values.embedded,
-      linked_billing_account_id: values.embedded ? values.linked_billing_account_id : null,
+      billing_account_id: values.embedded ? values.billing_account_id : null,
       notes: values.notes,
     };
 
@@ -342,7 +341,7 @@ export function InstallmentPlanFormModal({ open, plan, onClose }: InstallmentPla
             {embedded && (
               <FormField
                 control={form.control}
-                name="linked_billing_account_id"
+                name="billing_account_id"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Conta recorrente vinculada</FormLabel>

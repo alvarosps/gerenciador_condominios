@@ -476,6 +476,17 @@ class EmployeePaymentType(models.TextChoices):
     MIXED = "mixed", "Misto"
 
 
+# Consumption account types: an embedded parcela rides on the host account's recurring Bill,
+# so it must point at a consumption account (water/power/internet) — never IPTU (registry-only,
+# its installments are standalone) nor generic. Single source for clean() and serializer.validate().
+_CONSUMPTION_TYPES = frozenset(
+    {BillingAccountType.WATER, BillingAccountType.ELECTRICITY, BillingAccountType.INTERNET}
+)
+_EMBEDDED_NEEDS_CONSUMPTION_MSG = (
+    "Plano embutido exige uma conta de consumo (água, luz ou internet)."
+)
+
+
 class InstallmentPlan(AuditMixin, SoftDeleteMixin, models.Model):
     """Installment plan (embedded OR standalone). Materializes Installments (schedule)."""
 
@@ -503,13 +514,13 @@ class InstallmentPlan(AuditMixin, SoftDeleteMixin, models.Model):
     embedded = models.BooleanField(
         default=False
     )  # True = the parcela is a line on the account's Bill
-    linked_billing_account = models.ForeignKey(
+    billing_account = models.ForeignKey(
         BillingAccount,
         null=True,
         blank=True,
         on_delete=models.PROTECT,
         related_name="installment_plans",
-    )  # only for embedded plans
+    )  # owner of any plan: consumption account (embedded) or IPTU account / None (standalone)
     notes = models.TextField(blank=True)
 
     all_objects = models.Manager()
@@ -537,15 +548,12 @@ class InstallmentPlan(AuditMixin, SoftDeleteMixin, models.Model):
             raise ValidationError({"total_amount": "O valor total não pode ser negativo."})
         if self.installment_count is not None and self.installment_count <= 0:
             raise ValidationError({"installment_count": "O número de parcelas deve ser positivo."})
-        # embedded ⇒ linked account required; standalone ⇒ no linked account (design §7).
-        if self.embedded and self.linked_billing_account_id is None:
-            raise ValidationError(
-                {"linked_billing_account": "Plano embutido exige uma conta recorrente vinculada."}
-            )
-        if not self.embedded and self.linked_billing_account_id is not None:
-            raise ValidationError(
-                {"linked_billing_account": "Plano avulso não pode ter conta recorrente vinculada."}
-            )
+        # embedded ⇒ billing_account required AND of a consumption type (water/power/internet);
+        # standalone is free (IPTU account, or None for a generic loan) — design §4.
+        if self.embedded:
+            account = self.billing_account
+            if account is None or account.account_type not in _CONSUMPTION_TYPES:
+                raise ValidationError({"billing_account": _EMBEDDED_NEEDS_CONSUMPTION_MSG})
 
 
 class Installment(AuditMixin, SoftDeleteMixin, models.Model):

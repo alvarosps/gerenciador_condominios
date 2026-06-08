@@ -5,17 +5,38 @@ from decimal import Decimal
 
 import pytest
 from django.core.exceptions import ValidationError
-from finances.models import Bill, BillLifecycleState, InstallmentPlan, InstallmentPlanState
+from finances.models import (
+    Bill,
+    BillingAccount,
+    BillingAccountType,
+    BillLifecycleState,
+    InstallmentPlan,
+    InstallmentPlanState,
+)
 from finances.services.installment_plan_service import InstallmentPlanService, _split_amount
 from freezegun import freeze_time
 
-from tests.factories import make_bill, make_bill_line_item
+from tests.factories import make_bill, make_bill_line_item, make_billing_account
 
 pytestmark = pytest.mark.django_db
 
 
+def _iptu_account(condominium=None) -> BillingAccount:
+    return make_billing_account(
+        condominium=condominium,
+        account_type=BillingAccountType.IPTU,
+        external_identifier="IPTU-1",
+    )
+
+
 def _deferred_bill(amount: str) -> Bill:
-    bill = make_bill(behavior="one_time", lifecycle_state=BillLifecycleState.DEFERRED)
+    account = _iptu_account()
+    bill = make_bill(
+        condominium=account.condominium,
+        behavior="one_time",
+        lifecycle_state=BillLifecycleState.DEFERRED,
+        billing_account=account,
+    )
     make_bill_line_item(bill=bill, amount=Decimal(amount))
     return bill
 
@@ -67,7 +88,13 @@ def test_split_amount_parts_are_non_negative_and_sum_exact(total: str, count: in
 
 @freeze_time("2026-06-15")
 def test_convert_deferred_rejects_negative_total() -> None:
-    bill = make_bill(behavior="one_time", lifecycle_state=BillLifecycleState.DEFERRED)
+    account = _iptu_account()
+    bill = make_bill(
+        condominium=account.condominium,
+        behavior="one_time",
+        lifecycle_state=BillLifecycleState.DEFERRED,
+        billing_account=account,
+    )
     make_bill_line_item(bill=bill, amount=Decimal("10.00"), is_offset=False)
     make_bill_line_item(bill=bill, amount=Decimal("50.00"), is_offset=True)  # net total -40
     with pytest.raises(ValidationError):
@@ -82,8 +109,13 @@ def test_convert_deferred_rejects_negative_total() -> None:
 
 @freeze_time("2026-08-15")
 def test_deferred_bill_becomes_terminal_outside_all_sums() -> None:
+    account = _iptu_account()
     bill = make_bill(
-        behavior="one_time", lifecycle_state=BillLifecycleState.DEFERRED, due_date=date(2026, 1, 10)
+        condominium=account.condominium,
+        behavior="one_time",
+        lifecycle_state=BillLifecycleState.DEFERRED,
+        due_date=date(2026, 1, 10),
+        billing_account=account,
     )
     make_bill_line_item(bill=bill, amount=Decimal("1200.00"))
     plan = InstallmentPlanService.convert_deferred(
@@ -126,4 +158,60 @@ def test_convert_deferred_requires_deferred_state() -> None:
             start_due_date=date(2026, 7, 10),
             default_due_day=10,
         )
+    assert InstallmentPlan.objects.count() == 0
+
+
+@freeze_time("2026-06-15")
+def test_convert_deferred_inherits_iptu_billing_account() -> None:
+    """convert_deferred de um Bill(deferred) com billing_account IPTU → plan.billing_account == conta."""
+    account = _iptu_account()
+    bill = make_bill(
+        condominium=account.condominium,
+        behavior="one_time",
+        lifecycle_state=BillLifecycleState.DEFERRED,
+        billing_account=account,
+    )
+    make_bill_line_item(bill=bill, amount=Decimal("1500.00"))
+    plan = InstallmentPlanService.convert_deferred(
+        deferred_bill=bill,
+        installment_count=3,
+        start_due_date=date(2026, 7, 10),
+        default_due_day=10,
+    )
+    assert plan.embedded is False
+    assert plan.billing_account_id == account.id
+    assert plan.billing_account.account_type == BillingAccountType.IPTU
+
+
+@freeze_time("2026-06-15")
+def test_convert_deferred_rejects_non_iptu_billing_account() -> None:
+    """convert_deferred de um Bill(deferred) sem conta / conta não-IPTU → ValidationError PT."""
+    water = make_billing_account(account_type=BillingAccountType.WATER, external_identifier="UC-9")
+    bill_water = make_bill(
+        condominium=water.condominium,
+        behavior="one_time",
+        lifecycle_state=BillLifecycleState.DEFERRED,
+        billing_account=water,
+    )
+    make_bill_line_item(bill=bill_water, amount=Decimal("100.00"))
+    with pytest.raises(ValidationError) as exc:
+        InstallmentPlanService.convert_deferred(
+            deferred_bill=bill_water,
+            installment_count=3,
+            start_due_date=date(2026, 7, 10),
+            default_due_day=10,
+        )
+    assert "billing_account" in exc.value.message_dict
+    assert InstallmentPlan.objects.count() == 0
+
+    bill_none = make_bill(behavior="one_time", lifecycle_state=BillLifecycleState.DEFERRED)
+    make_bill_line_item(bill=bill_none, amount=Decimal("100.00"))
+    with pytest.raises(ValidationError) as exc:
+        InstallmentPlanService.convert_deferred(
+            deferred_bill=bill_none,
+            installment_count=3,
+            start_due_date=date(2026, 7, 10),
+            default_due_day=10,
+        )
+    assert "billing_account" in exc.value.message_dict
     assert InstallmentPlan.objects.count() == 0
