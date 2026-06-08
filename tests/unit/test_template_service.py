@@ -256,7 +256,7 @@ class TestPreviewTemplate:
         with pytest.raises(ValueError, match="não encontrada"):
             TemplateManagementService.preview_template("<html>{{ tenant }}</html>", lease_id=999999)
 
-    def test_renders_template_with_lease_data(self, template_file, lease):
+    def test_renders_template_with_lease_data(self, template_file, lease, active_landlord):
         # Use a minimal template with a known variable
         html_content = TemplateManagementService.preview_template(
             "<html><body>Contract for lease {{ lease.id }}</body></html>"
@@ -264,7 +264,7 @@ class TestPreviewTemplate:
         assert isinstance(html_content, str)
         assert str(lease.id) in html_content
 
-    def test_renders_template_with_specific_lease_id(self, template_file, lease):
+    def test_renders_template_with_specific_lease_id(self, template_file, lease, active_landlord):
         html_content = TemplateManagementService.preview_template(
             "<html><body>{{ lease.id }}</body></html>",
             lease_id=lease.id,

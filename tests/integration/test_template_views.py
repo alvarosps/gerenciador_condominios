@@ -145,7 +145,9 @@ class TestSaveTemplateEndpoint:
 class TestPreviewTemplateEndpoint:
     url = "/api/templates/preview/"
 
-    def test_returns_200_with_rendered_html(self, authenticated_api_client, template_dir, lease):
+    def test_returns_200_with_rendered_html(
+        self, authenticated_api_client, template_dir, lease, active_landlord
+    ):
         response = authenticated_api_client.post(
             self.url,
             {"content": "<html><body>Preview {{ lease.id }}</body></html>"},
@@ -155,7 +157,9 @@ class TestPreviewTemplateEndpoint:
         assert "html" in response.data
         assert str(lease.id) in response.data["html"]
 
-    def test_renders_with_specific_lease_id(self, authenticated_api_client, template_dir, lease):
+    def test_renders_with_specific_lease_id(
+        self, authenticated_api_client, template_dir, lease, active_landlord
+    ):
         response = authenticated_api_client.post(
             self.url,
             {
