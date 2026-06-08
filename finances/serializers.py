@@ -9,6 +9,7 @@ value is defensive and mypy/ruff stay clean) — never recomputed in Python (des
 from datetime import date
 from decimal import Decimal
 
+from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Sum
 from rest_framework import serializers
 
@@ -25,6 +26,7 @@ from finances.models import (
     BillSkip,
     Category,
     CondoMonthClose,
+    ElectricityBillStatement,
     Employee,
     IncomeEntry,
     Installment,
@@ -35,6 +37,7 @@ from finances.models import (
     Reserve,
     ReserveMovement,
     ReserveMovementKind,
+    WaterBillStatement,
 )
 from finances.money import money_str
 from finances.services.timezone import today_sp
@@ -188,6 +191,38 @@ class BillLineItemSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+class WaterBillStatementSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WaterBillStatement
+        fields = [
+            "id",
+            "consumo_m3",
+            "leitura_anterior",
+            "leitura_atual",
+            "leitura_dias",
+            "data_leitura",
+            "agua_status",
+            "esgoto_status",
+        ]
+        read_only_fields = fields
+
+
+class ElectricityBillStatementSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ElectricityBillStatement
+        fields = [
+            "id",
+            "consumo_kwh",
+            "energia_injetada_kwh",
+            "leitura_anterior",
+            "leitura_atual",
+            "leitura_dias",
+            "classe",
+            "bandeira",
+        ]
+        read_only_fields = fields
+
+
 class BillSerializer(serializers.ModelSerializer):
     condominium = CondominiumSimpleSerializer(read_only=True)
     condominium_id = serializers.PrimaryKeyRelatedField(
@@ -218,6 +253,8 @@ class BillSerializer(serializers.ModelSerializer):
         allow_null=True,
     )
     line_items = BillLineItemSerializer(many=True, read_only=True)
+    water_statement = serializers.SerializerMethodField()
+    electricity_statement = serializers.SerializerMethodField()
     amount_total = serializers.SerializerMethodField()
     amount_paid = serializers.SerializerMethodField()
     amount_remaining = serializers.SerializerMethodField()
@@ -245,6 +282,8 @@ class BillSerializer(serializers.ModelSerializer):
             "lifecycle_state",
             "notes",
             "line_items",
+            "water_statement",
+            "electricity_statement",
             "amount_total",
             "amount_paid",
             "amount_remaining",
@@ -262,6 +301,26 @@ class BillSerializer(serializers.ModelSerializer):
     def validate_competence_month(self, value: date) -> date:
         # DRF.create() does not call Model.clean(); normalize to the 1st here too.
         return value.replace(day=1)
+
+    def get_water_statement(self, obj: Bill) -> dict[str, object] | None:
+        # The reverse OneToOne is loaded via _base_manager (select_related), so a soft-deleted
+        # statement is still attached — exclude it explicitly so a hidden bill never exposes one.
+        try:
+            statement = obj.water_statement
+        except ObjectDoesNotExist:
+            return None
+        if statement.is_deleted:
+            return None
+        return WaterBillStatementSerializer(statement).data
+
+    def get_electricity_statement(self, obj: Bill) -> dict[str, object] | None:
+        try:
+            statement = obj.electricity_statement
+        except ObjectDoesNotExist:
+            return None
+        if statement.is_deleted:
+            return None
+        return ElectricityBillStatementSerializer(statement).data
 
     def get_amount_total(self, obj: Bill) -> str:
         return money_str(getattr(obj, "amount_total", Decimal(0)))

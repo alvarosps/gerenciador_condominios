@@ -459,3 +459,25 @@ def make_condo_month_close(condominium=None, user=None, **kwargs):
         defaults["updated_by"] = user
     defaults.update(kwargs)
     return baker.make("finances.CondoMonthClose", condominium=condominium, **defaults)
+
+
+def make_water_statement(bill=None, user=None, **kwargs):
+    if bill is None:
+        bill = make_bill(user=user)
+    defaults = {"consumo_m3": 158}
+    if user:
+        defaults["created_by"] = user
+        defaults["updated_by"] = user
+    defaults.update(kwargs)
+    return baker.make("finances.WaterBillStatement", bill=bill, **defaults)
+
+
+def make_electricity_statement(bill=None, user=None, **kwargs):
+    if bill is None:
+        bill = make_bill(user=user)
+    defaults = {"consumo_kwh": 1752}
+    if user:
+        defaults["created_by"] = user
+        defaults["updated_by"] = user
+    defaults.update(kwargs)
+    return baker.make("finances.ElectricityBillStatement", bill=bill, **defaults)
