@@ -15,7 +15,7 @@ from rest_framework.response import Response
 from core.cache import cache_result
 from core.permissions import FinancialReadOnly
 from core.services.rent_schedule_service import RentScheduleService
-from finances.cache import FINANCE_DASHBOARD_PREFIX
+from finances.cache import FINANCE_DASHBOARD_PREFIX, FINANCE_PROJECTION_PREFIX
 from finances.models import (
     Bill,
     BillLifecycleState,
@@ -27,9 +27,13 @@ from finances.money import money_str, quantize_money
 from finances.serializers import BillSerializer
 from finances.services.condo_balance_service import CondoBalanceService, _next_month
 from finances.services.condo_calendar_service import CondoCalendarService
+from finances.services.condo_projection_service import CondoProjectionService
+from finances.services.condo_simulation_service import CondoSimulationService
 from finances.services.timezone import current_month_sp, today_sp
 
 MONTHS_IN_YEAR = 12
+DEFAULT_PROJECTION_MONTHS = 12
+MAX_PROJECTION_MONTHS = 36  # cap the fold loop (a what-if horizon, not an absurd 100-month run)
 ZERO = Decimal(0)
 ZERO_MONEY = Decimal("0.00")
 
@@ -43,9 +47,21 @@ def _parse_year_month_query(request: Request, current: date) -> tuple[int, int]:
     return year, month
 
 
-def _building_id_param(request: Request) -> int | None:
-    raw = request.query_params.get("building_id")
+def _coerce_building_id(raw: str | int | None) -> int | None:
+    """Coerce a raw building_id value (query param or body) to int; raise ValueError if bad."""
     return int(raw) if raw is not None else None
+
+
+def _building_id_param(request: Request) -> int | None:
+    return _coerce_building_id(request.query_params.get("building_id"))
+
+
+def _validated_months(raw: str | int | None) -> int:
+    """Parse a projection-months value (default 12) clamped to [1, MAX]; raise ValueError if bad."""
+    months = int(raw) if raw is not None else DEFAULT_PROJECTION_MONTHS
+    if not (1 <= months <= MAX_PROJECTION_MONTHS):
+        raise ValueError
+    return months
 
 
 # Distinct sub-prefixes per endpoint: cache_result keys on (prefix, *args) and ignores the
@@ -71,6 +87,17 @@ def _cached_monthly_balance(year: int, building_id: int | None) -> list[dict[str
 @cache_result(key_prefix=_CATEGORY_PREFIX)
 def _cached_by_category(year: int, month: int, building_id: int | None) -> list[dict[str, Any]]:
     return _by_category(year, month, building_id)
+
+
+# Own sub-prefix under FINANCE_PROJECTION_PREFIX: cache_result keys on (prefix, *args) and ignores
+# the function name (core/cache.py), so a distinct sub-prefix avoids colliding with any other
+# finance-projection consumer while still matching invalidate_pattern("finance-projection*").
+_PROJECTION_PREFIX = f"{FINANCE_PROJECTION_PREFIX}-cashflow"
+
+
+@cache_result(key_prefix=_PROJECTION_PREFIX)
+def _cached_projection(months: int, building_id: int | None) -> list[dict[str, Any]]:
+    return CondoProjectionService.project(months, building_id)
 
 
 def _monthly_balance(year: int, building_id: int | None) -> list[dict[str, Any]]:
@@ -242,4 +269,65 @@ class FinanceDashboardViewSet(viewsets.ViewSet):
         data = _cached_by_category(year, month, _building_id_param(request))
         return Response(
             {"year": year, "month": month, "categories": data}, status=status.HTTP_200_OK
+        )
+
+
+class FinanceCashFlowViewSet(viewsets.ViewSet):
+    """Read-only cash-flow projection + ephemeral what-if simulation (Session 47).
+
+    GET projection is cached (finance-projection, invalidated by any finances write); POST simulate
+    is never cached (depends on the body and is ephemeral). FinancialReadOnly: any authenticated
+    user reads the projection; only is_staff may POST a simulation.
+    """
+
+    permission_classes = [FinancialReadOnly]
+
+    @action(detail=False, methods=["get"])
+    def projection(self, request: Request) -> Response:
+        try:
+            months = _validated_months(request.query_params.get("months"))
+        except ValueError:
+            return Response(
+                {
+                    "error": f"O parâmetro 'months' deve ser um inteiro entre 1 e {MAX_PROJECTION_MONTHS}."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            building_id = _building_id_param(request)
+        except ValueError:
+            return Response(
+                {"error": "O parâmetro 'building_id' deve ser um inteiro."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        data = _cached_projection(months, building_id)
+        return Response(data, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["post"])
+    def simulate(self, request: Request) -> Response:
+        scenarios = request.data.get("scenarios")
+        if not isinstance(scenarios, list) or len(scenarios) == 0:
+            return Response(
+                {"error": "O campo 'scenarios' é obrigatório e deve ser uma lista não vazia."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        errors = CondoSimulationService.validate_scenarios(scenarios)
+        if errors:
+            return Response({"errors": errors}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            months = _validated_months(request.data.get("months"))
+            building_id = _coerce_building_id(request.data.get("building_id"))
+        except (ValueError, TypeError):
+            return Response(
+                {
+                    "error": f"Parâmetros 'months' (1 a {MAX_PROJECTION_MONTHS}) / 'building_id' inválidos."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        base = CondoProjectionService.project(months, building_id)
+        simulated = CondoSimulationService.simulate(base, scenarios)
+        comparison = CondoSimulationService.compare(base, simulated)
+        return Response(
+            {"base": base, "simulated": simulated, "comparison": comparison},
+            status=status.HTTP_200_OK,
         )

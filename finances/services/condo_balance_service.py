@@ -79,6 +79,21 @@ class CondoBalanceService:
         return quantize_money(revenue - comp.expense_competence)
 
     @staticmethod
+    def competence_pontas(
+        year: int, month: int, building_id: int | None = None
+    ) -> tuple[Decimal, Decimal]:
+        """(revenue, expense) competence pontas of the month (raw Decimals), from one source.
+
+        Surfaces the same component split that feeds result_of_month, so a consumer can show the
+        income/expense halves without re-deriving them: ``revenue - expense`` equals
+        result_of_month by construction. Used by CondoProjectionService for the current/closed
+        month display pontas (DRY — design §8).
+        """
+        comp = CondoBalanceService._components(year, month, building_id)
+        revenue = comp.received_collectible + comp.expected_unpaid + comp.income_competence
+        return revenue, comp.expense_competence
+
+    @staticmethod
     def cash_change_of_month(year: int, month: int, building_id: int | None = None) -> Decimal:
         """Cash change (by payment date) = cash in - cash out (design §4.2/§4.3).
 

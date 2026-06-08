@@ -9,7 +9,7 @@ from finances.viewsets.crud_views import (
     ReserveMovementViewSet,
     ReserveViewSet,
 )
-from finances.viewsets.dashboard_views import FinanceDashboardViewSet
+from finances.viewsets.dashboard_views import FinanceCashFlowViewSet, FinanceDashboardViewSet
 from finances.viewsets.installment_payroll_views import (
     EmployeeViewSet,
     InstallmentPlanViewSet,
@@ -23,6 +23,7 @@ __all__ = [
     "CategoryViewSet",
     "CondoMonthCloseViewSet",
     "EmployeeViewSet",
+    "FinanceCashFlowViewSet",
     "FinanceDashboardViewSet",
     "IncomeEntryViewSet",
     "InstallmentPlanViewSet",
