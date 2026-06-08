@@ -37,24 +37,32 @@ describe('useReserves', () => {
 });
 
 describe('useCreateReserve', () => {
-  it('creates a reserve and returns schema-parsed data (balance number)', async () => {
-    const { result } = renderHook(() => useCreateReserve(), { wrapper: createWrapper() });
+  it('creates a reserve (schema-parsed, balance number) and invalidates reserves + overview', async () => {
+    const queryClient = createTestQueryClient();
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+    const { result } = renderHook(() => useCreateReserve(), { wrapper: createWrapper(queryClient) });
     let created: unknown;
     await act(async () => {
       created = await result.current.mutateAsync({ name: 'Nova Reserva', notes: '' });
     });
     expect(created).toMatchObject({ name: 'Nova Reserva' });
     expect(created).toEqual(expect.objectContaining({ balance: expect.any(Number) }));
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['finances', 'reserves'] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['finances', 'overview'] });
   });
 });
 
 describe('useDeleteReserve', () => {
-  it('deletes a reserve successfully', async () => {
-    const { result } = renderHook(() => useDeleteReserve(), { wrapper: createWrapper() });
+  it('deletes a reserve and invalidates reserves + overview', async () => {
+    const queryClient = createTestQueryClient();
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+    const { result } = renderHook(() => useDeleteReserve(), { wrapper: createWrapper(queryClient) });
     await act(async () => {
       await result.current.mutateAsync(1);
     });
     expect(result.current.isSuccess).toBe(true);
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['finances', 'reserves'] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['finances', 'overview'] });
   });
 });
 
@@ -90,5 +98,21 @@ describe('useDepositReserve', () => {
       }
     });
     expect(result.current.isError).toBe(true);
+  });
+});
+
+describe('useWithdrawReserve', () => {
+  it('withdraws and invalidates reserves + reserve-movements + overview', async () => {
+    const queryClient = createTestQueryClient();
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+    const { result } = renderHook(() => useWithdrawReserve(), {
+      wrapper: createWrapper(queryClient),
+    });
+    await act(async () => {
+      await result.current.mutateAsync({ reserveId: 1, payload: { amount: 100 } });
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['finances', 'reserves'] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['finances', 'reserve-movements'] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['finances', 'overview'] });
   });
 });

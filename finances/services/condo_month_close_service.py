@@ -33,7 +33,6 @@ _MONTH_CLOSED = "Este mês está fechado e não aceita lançamentos."
 _GAP = "Feche os meses anteriores antes de fechar este mês."
 _ALREADY_CLOSED = "Este mês já está fechado."
 _NOT_FOUND = "Não há fechamento registrado para este mês."
-_NO_CONDOMINIUM = "Nenhum condomínio configurado."
 
 
 def _prev_month(value: date) -> date:
@@ -200,5 +199,5 @@ class CondoMonthCloseService:
     def _condominium() -> Condominium:
         condominium = Condominium.get_default()
         if condominium is None:
-            raise ValidationError(_NO_CONDOMINIUM)
+            raise ValidationError(Condominium.NOT_CONFIGURED_MESSAGE)
         return condominium

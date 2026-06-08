@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, fireEvent } from '@testing-library/react';
 import { renderWithProviders, createTestQueryClient } from '@/tests/test-utils';
 import IncomeEntriesPage from '../page';
 import { createMockIncomeEntry } from '@/tests/mocks/data/finances';
@@ -86,6 +86,30 @@ describe('IncomeEntriesPage', () => {
     await waitFor(() => {
       expect(screen.queryByRole('button', { name: /Nova Receita/i })).not.toBeInTheDocument();
     });
+  });
+
+  it('forwards the date filter to useIncomeEntries when it changes', async () => {
+    mockUseAuthStore.mockReturnValue({ user: { is_staff: false } } as unknown);
+    mockUseIncomeEntries.mockReturnValue({
+      isLoading: false,
+      error: null,
+      data: [],
+    } as unknown as IncomeEntriesResult);
+
+    const { container } = renderWithProviders(<IncomeEntriesPage />, {
+      queryClient: createTestQueryClient(),
+    });
+
+    // The two filter date inputs are plain <input type="date"> (the form modal is stubbed).
+    const dateFrom = container.querySelectorAll('input[type="date"]')[0];
+    if (!dateFrom) throw new Error('date filter input not found');
+    fireEvent.change(dateFrom, { target: { value: '2026-06-01' } });
+
+    await waitFor(() =>
+      expect(mockUseIncomeEntries).toHaveBeenLastCalledWith(
+        expect.objectContaining({ date_from: '2026-06-01' }),
+      ),
+    );
   });
 
   it('renders income entries in the table', async () => {

@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { renderHook, waitFor, act } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import {
@@ -7,7 +7,7 @@ import {
   useUpdateIncomeEntry,
   useDeleteIncomeEntry,
 } from '../use-income-entries';
-import { createWrapper } from '@/tests/test-utils';
+import { createWrapper, createTestQueryClient } from '@/tests/test-utils';
 import { server } from '@/tests/mocks/server';
 
 const API_BASE = 'http://localhost:8008/api';
@@ -68,11 +68,14 @@ describe('useIncomeEntries', () => {
 });
 
 describe('useCreateIncomeEntry', () => {
-  it('creates an income entry', async () => {
-    const { result } = renderHook(() => useCreateIncomeEntry(), { wrapper: createWrapper() });
-    let created: unknown;
+  it('creates an income entry and invalidates incomeEntries + overview (refreshes KPIs)', async () => {
+    const queryClient = createTestQueryClient();
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+    const { result } = renderHook(() => useCreateIncomeEntry(), {
+      wrapper: createWrapper(queryClient),
+    });
     await act(async () => {
-      created = await result.current.mutateAsync({
+      await result.current.mutateAsync({
         description: 'Nova receita',
         amount: 500,
         income_date: '2026-06-05',
@@ -81,16 +84,20 @@ describe('useCreateIncomeEntry', () => {
         notes: '',
       });
     });
-    expect(created).toBeDefined();
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['finances', 'income-entries'] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['finances', 'overview'] });
   });
 });
 
 describe('useUpdateIncomeEntry', () => {
-  it('updates an income entry', async () => {
-    const { result } = renderHook(() => useUpdateIncomeEntry(), { wrapper: createWrapper() });
-    let updated: unknown;
+  it('updates an income entry and invalidates incomeEntries + overview', async () => {
+    const queryClient = createTestQueryClient();
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+    const { result } = renderHook(() => useUpdateIncomeEntry(), {
+      wrapper: createWrapper(queryClient),
+    });
     await act(async () => {
-      updated = await result.current.mutateAsync({
+      await result.current.mutateAsync({
         id: 1,
         description: 'Receita atualizada',
         amount: 600,
@@ -100,16 +107,23 @@ describe('useUpdateIncomeEntry', () => {
         notes: '',
       });
     });
-    expect(updated).toBeDefined();
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['finances', 'income-entries'] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['finances', 'overview'] });
   });
 });
 
 describe('useDeleteIncomeEntry', () => {
-  it('deletes an income entry', async () => {
-    const { result } = renderHook(() => useDeleteIncomeEntry(), { wrapper: createWrapper() });
+  it('deletes an income entry and invalidates incomeEntries + overview', async () => {
+    const queryClient = createTestQueryClient();
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+    const { result } = renderHook(() => useDeleteIncomeEntry(), {
+      wrapper: createWrapper(queryClient),
+    });
     await act(async () => {
       await result.current.mutateAsync(1);
     });
     expect(result.current.isSuccess).toBe(true);
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['finances', 'income-entries'] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['finances', 'overview'] });
   });
 });

@@ -30,6 +30,18 @@ describe('FinanceKpiRow', () => {
     expect(container.querySelector('[data-slot="skeleton"]') ?? container.querySelector('.animate-pulse')).toBeTruthy();
   });
 
+  it('renders a PT error card when the overview query fails', () => {
+    mockUseFinanceOverview.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+    } as unknown as FinanceOverviewResult);
+    renderWithProviders(<FinanceKpiRow year={2026} month={6} />, {
+      queryClient: createTestQueryClient(),
+    });
+    expect(screen.getByText(/Erro ao carregar/i)).toBeInTheDocument();
+  });
+
   it('renders nothing when not loading but no data', () => {
     mockUseFinanceOverview.mockReturnValue({ data: undefined, isLoading: false } as unknown as FinanceOverviewResult);
     const { container } = renderWithProviders(<FinanceKpiRow year={2026} month={6} />, {
@@ -93,11 +105,12 @@ describe('FinanceKpiRow', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText(/Aluguel atrasado/i)).toBeInTheDocument();
+      // §4.4 — both figures are shown side by side (bills count AND rent overdue), not mutually exclusive.
+      expect(screen.getByText(/3 contas em atraso.*Aluguel/i)).toBeInTheDocument();
     });
   });
 
-  it('shows "Sem atrasos" when overdue_bills_count is 0', async () => {
+  it('shows "Sem contas atrasadas" when overdue_bills_count is 0', async () => {
     mockUseFinanceOverview.mockReturnValue({
       isLoading: false,
       data: {
@@ -120,7 +133,7 @@ describe('FinanceKpiRow', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText('Sem atrasos')).toBeInTheDocument();
+      expect(screen.getByText('Sem contas atrasadas')).toBeInTheDocument();
     });
   });
 

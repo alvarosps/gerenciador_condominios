@@ -208,6 +208,10 @@ class Condominium(AuditMixin, SoftDeleteMixin, models.Model):
     soft delete capability (is_deleted, deleted_at, deleted_by).
     """
 
+    # Single source of the PT message raised by callers when no condominium exists yet
+    # (the reserve/income serializers and the month-close service share this).
+    NOT_CONFIGURED_MESSAGE = "Nenhum condomínio configurado."
+
     name = models.CharField(max_length=100, help_text="Nome do condomínio")
     notes = models.TextField(blank=True, default="", help_text="Observações internas")
 
@@ -228,6 +232,11 @@ class Condominium(AuditMixin, SoftDeleteMixin, models.Model):
         re-deriving it. ``Building.save`` bootstraps the record on first use, so in
         practice this never returns None. Multi-condomínio (future) requires explicit
         assignment instead of this fallback.
+
+        Uses the soft-delete-aware default manager, so it intentionally ignores a
+        soft-deleted singleton. Invariant: the default condominium is never soft-deleted
+        (it is created by migration and there is no UI to delete it); if that invariant
+        were broken, ``Building.save`` would bootstrap a fresh one on the next save.
         """
         return cls.objects.order_by("id").first()
 
