@@ -66,6 +66,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
     { key: ROUTES.FINANCES_RESERVE, label: 'Reserva' },
     { key: ROUTES.FINANCES_INCOME, label: 'Receitas' },
     { key: ROUTES.FINANCES_MONTH_CLOSE, label: 'Fechamento' },
+    { key: ROUTES.FINANCES_PROJECTION, label: 'Projeção' },
   ];
 
   const mainMenuItems: MenuItem[] = [

@@ -18,6 +18,10 @@ import type { Reserve } from '@/lib/schemas/finances/reserve.schema';
 import type { ReserveMovement } from '@/lib/schemas/finances/reserve-movement.schema';
 import type { IncomeEntry } from '@/lib/schemas/finances/income-entry.schema';
 import type { CondoMonthClose } from '@/lib/schemas/finances/condo-month-close.schema';
+import type {
+  CondoProjectionMonth,
+  CondoSimulationResult,
+} from '@/lib/api/hooks/use-condo-projection';
 
 export function createMockFinanceCategory(
   overrides: Partial<FinanceCategory> = {},
@@ -370,4 +374,51 @@ export function createMockByCategory(overrides: Record<string, unknown> = {}) {
     ],
     ...overrides,
   };
+}
+
+// --- Phase 5: 12-month projection + what-if simulation (Session 48) ---
+
+export function createMockCondoProjection(months = 12): CondoProjectionMonth[] {
+  let cumulative = 5000;
+  return Array.from({ length: months }, (_, i) => {
+    const month = ((6 + i) % 12) + 1; // first item is the current month (July 2026)
+    const year = 2026 + Math.floor((6 + i) / 12);
+    const income = 4000;
+    const expenses = 3200;
+    const net = income - expenses;
+    cumulative += net;
+    return {
+      year,
+      month,
+      income_total: income.toFixed(2),
+      expenses_total: expenses.toFixed(2),
+      net: net.toFixed(2),
+      cumulative_cash: cumulative.toFixed(2),
+      is_actual: i === 0, // current month is Real; the rest are Projetado
+      is_closed: false,
+    };
+  });
+}
+
+export function createMockCondoSimulation(months = 12): CondoSimulationResult {
+  const base = createMockCondoProjection(months);
+  const simulated = base.map((m) => ({ ...m }));
+  const comparison = {
+    months: base.map((b, i) => {
+      const sim = simulated[i] ?? b;
+      return {
+        year: b.year,
+        month: b.month,
+        base_net: b.net,
+        simulated_net: sim.net,
+        net_delta: '0.00',
+        base_cumulative_cash: b.cumulative_cash,
+        simulated_cumulative_cash: sim.cumulative_cash,
+        cumulative_delta: '0.00',
+      };
+    }),
+    final_cumulative_delta: '0.00',
+    total_net_delta: '0.00',
+  };
+  return { base, simulated, comparison };
 }

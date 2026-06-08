@@ -234,6 +234,13 @@ export const queryKeys = {
       month: (year: number, month: number, buildingId?: number | null) =>
         [...queryKeys.finances.byCategory.all, 'month', year, month, buildingId ?? null] as const,
     },
+    projection: {
+      all: ['finances', 'projection'] as const,
+      list: (months: number) => [...queryKeys.finances.projection.all, months] as const,
+    },
+    simulation: {
+      all: ['finances', 'simulation'] as const,
+    },
   },
   rentAdjustments: {
     all: ['rent-adjustments'] as const,
