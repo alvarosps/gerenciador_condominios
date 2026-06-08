@@ -14,14 +14,17 @@ TEST_CPFS = [
     "11144477735",
     "12345678909",
     "98765432100",
-    "45612378901",
-    "78901234567",
-    "32165498700",
-    "65498732100",
-    "14725836900",
-    "25836914700",
-    "36914725800",
-    "74185296300",
+    # The remaining entries are valid CPFs (correct check digits) — the previous values had
+    # invalid check digits, which intermittently failed core.Tenant.save()'s full_clean once
+    # the module-global cycle reached them under the full suite (cross-test pollution).
+    "20000000027",
+    "30000000035",
+    "40000000043",
+    "50000000051",
+    "60000000060",
+    "70000000078",
+    "81000000001",
+    "91000000001",
 ]
 
 _cpf_cycle = itertools.cycle(TEST_CPFS)
@@ -31,13 +34,26 @@ def _next_cpf() -> str:
     return next(_cpf_cycle)
 
 
-def make_building(street_number: int = 100, user=None, **kwargs):
-    defaults = {}
+def make_condominium(user=None, **kwargs):
+    defaults = {"name": "Test Condominium"}
     if user:
         defaults["created_by"] = user
         defaults["updated_by"] = user
     defaults.update(kwargs)
-    return baker.make("core.Building", street_number=street_number, **defaults)
+    return baker.make("core.Condominium", **defaults)
+
+
+def make_building(street_number: int = 100, user=None, condominium=None, **kwargs):
+    defaults = {}
+    if user:
+        defaults["created_by"] = user
+        defaults["updated_by"] = user
+    if condominium is None:
+        condominium = make_condominium(user=user)
+    defaults.update(kwargs)
+    return baker.make(
+        "core.Building", street_number=street_number, condominium=condominium, **defaults
+    )
 
 
 def make_apartment(building=None, number: int = 101, user=None, **kwargs):
@@ -249,3 +265,197 @@ def make_person_payment(person=None, user=None, **kwargs):
         defaults["updated_by"] = user
     defaults.update(kwargs)
     return baker.make("core.PersonPayment", person=person, **defaults)
+
+
+def make_finance_category(condominium=None, user=None, **kwargs):
+    if condominium is None:
+        condominium = make_condominium(user=user)
+    defaults = {"name": "Categoria Teste", "sort_order": 0}
+    if user:
+        defaults["created_by"] = user
+        defaults["updated_by"] = user
+    defaults.update(kwargs)
+    return baker.make("finances.Category", condominium=condominium, **defaults)
+
+
+def make_billing_account(condominium=None, user=None, **kwargs):
+    if condominium is None:
+        condominium = make_condominium(user=user)
+    defaults = {
+        "name": "Conta de Água",
+        "default_due_day": 10,
+        "expected_amount": Decimal("100.00"),
+    }
+    if user:
+        defaults["created_by"] = user
+        defaults["updated_by"] = user
+    defaults.update(kwargs)
+    return baker.make("finances.BillingAccount", condominium=condominium, **defaults)
+
+
+def make_bill(condominium=None, user=None, **kwargs):
+    if condominium is None:
+        condominium = make_condominium(user=user)
+    defaults = {
+        "competence_month": date(2026, 6, 1),
+        "due_date": date(2026, 6, 10),
+        "description": "Conta Teste",
+        "behavior": "recurring",
+    }
+    if user:
+        defaults["created_by"] = user
+        defaults["updated_by"] = user
+    defaults.update(kwargs)
+    return baker.make("finances.Bill", condominium=condominium, **defaults)
+
+
+def make_bill_line_item(bill=None, user=None, **kwargs):
+    if bill is None:
+        bill = make_bill(user=user)
+    defaults = {"description": "Linha Teste", "amount": Decimal("100.00"), "is_offset": False}
+    if user:
+        defaults["created_by"] = user
+        defaults["updated_by"] = user
+    defaults.update(kwargs)
+    return baker.make("finances.BillLineItem", bill=bill, **defaults)
+
+
+def make_installment_plan(condominium=None, user=None, **kwargs):
+    if condominium is None:
+        condominium = make_condominium(user=user)
+    defaults = {
+        "description": "Parcelamento Teste",
+        "total_amount": Decimal("1200.00"),
+        "installment_count": 12,
+        "start_due_date": date(2026, 6, 10),
+        "default_due_day": 10,
+        "embedded": False,
+    }
+    if user:
+        defaults["created_by"] = user
+        defaults["updated_by"] = user
+    defaults.update(kwargs)
+    return baker.make("finances.InstallmentPlan", condominium=condominium, **defaults)
+
+
+def make_installment(plan=None, user=None, **kwargs):
+    if plan is None:
+        plan = make_installment_plan(user=user)
+    defaults = {"number": 1, "due_date": date(2026, 6, 10), "amount": Decimal("100.00")}
+    if user:
+        defaults["created_by"] = user
+        defaults["updated_by"] = user
+    defaults.update(kwargs)
+    return baker.make("finances.Installment", plan=plan, **defaults)
+
+
+def make_employee(condominium=None, user=None, **kwargs):
+    if condominium is None:
+        condominium = make_condominium(user=user)
+    defaults = {
+        "name": "Funcionário Teste",
+        "payment_type": "fixed",
+        "base_salary": Decimal("2000.00"),
+        "default_due_day": 5,
+        "is_active": True,
+    }
+    if user:
+        defaults["created_by"] = user
+        defaults["updated_by"] = user
+    defaults.update(kwargs)
+    return baker.make("finances.Employee", condominium=condominium, **defaults)
+
+
+def make_bill_skip(billing_account=None, user=None, **kwargs):
+    if billing_account is None:
+        billing_account = make_billing_account(user=user)
+    defaults = {"reference_month": date(2026, 6, 1)}
+    if user:
+        defaults["created_by"] = user
+        defaults["updated_by"] = user
+    defaults.update(kwargs)
+    return baker.make("finances.BillSkip", billing_account=billing_account, **defaults)
+
+
+def make_payment(condominium=None, user=None, **kwargs):
+    if condominium is None:
+        condominium = make_condominium(user=user)
+    defaults = {
+        "payment_date": date(2026, 6, 5),
+        "amount": Decimal("100.00"),
+        "funded_from": "caixa",
+    }
+    if user:
+        defaults["created_by"] = user
+        defaults["updated_by"] = user
+    defaults.update(kwargs)
+    return baker.make("finances.Payment", condominium=condominium, **defaults)
+
+
+def make_payment_allocation(payment=None, bill=None, user=None, **kwargs):
+    if payment is None:
+        payment = make_payment(user=user)
+    if bill is None:
+        bill = make_bill(user=user)
+    defaults = {"amount": Decimal("100.00")}
+    if user:
+        defaults["created_by"] = user
+        defaults["updated_by"] = user
+    defaults.update(kwargs)
+    return baker.make("finances.PaymentAllocation", payment=payment, bill=bill, **defaults)
+
+
+def make_reserve(condominium=None, user=None, **kwargs):
+    if condominium is None:
+        condominium = make_condominium(user=user)
+    defaults = {"name": "Reserva Teste"}
+    if user:
+        defaults["created_by"] = user
+        defaults["updated_by"] = user
+    defaults.update(kwargs)
+    return baker.make("finances.Reserve", condominium=condominium, **defaults)
+
+
+def make_reserve_movement(reserve=None, user=None, **kwargs):
+    if reserve is None:
+        reserve = make_reserve(user=user)
+    defaults = {
+        "kind": "deposit",
+        "amount": Decimal("100.00"),
+        "movement_date": date(2026, 6, 5),
+    }
+    if user:
+        defaults["created_by"] = user
+        defaults["updated_by"] = user
+    defaults.update(kwargs)
+    return baker.make("finances.ReserveMovement", reserve=reserve, **defaults)
+
+
+def make_income_entry(condominium=None, user=None, **kwargs):
+    if condominium is None:
+        condominium = make_condominium(user=user)
+    defaults = {
+        "description": "Receita Teste",
+        "amount": Decimal("100.00"),
+        "income_date": date(2026, 6, 5),
+        "is_received": False,
+    }
+    if user:
+        defaults["created_by"] = user
+        defaults["updated_by"] = user
+    defaults.update(kwargs)
+    return baker.make("finances.IncomeEntry", condominium=condominium, **defaults)
+
+
+def make_condo_month_close(condominium=None, user=None, **kwargs):
+    if condominium is None:
+        condominium = make_condominium(user=user)
+    defaults = {
+        "reference_month": date(2026, 6, 1),
+        "status": "open",
+    }
+    if user:
+        defaults["created_by"] = user
+        defaults["updated_by"] = user
+    defaults.update(kwargs)
+    return baker.make("finances.CondoMonthClose", condominium=condominium, **defaults)

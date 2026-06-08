@@ -12,6 +12,7 @@ import {
   BookOpen,
   Settings,
   DollarSign,
+  Wallet,
   ChevronDown,
   ChevronRight,
 } from 'lucide-react';
@@ -57,6 +58,18 @@ export function Sidebar({ onNavigate }: SidebarProps) {
     { key: ROUTES.FINANCIAL_SETTINGS, label: 'Configurações' },
   ];
 
+  // New "Condomínio" finances module — separate from the legacy "Financeiro" group.
+  const condominioChildren: SubMenuItem[] = [
+    { key: ROUTES.FINANCES_BILLS, label: 'Contas' },
+    { key: ROUTES.FINANCES_INSTALLMENT_PLANS, label: 'Parcelas' },
+    { key: ROUTES.FINANCES_EMPLOYEES, label: 'Folha' },
+    { key: ROUTES.FINANCES_RESERVE, label: 'Reserva' },
+    { key: ROUTES.FINANCES_INCOME, label: 'Receitas' },
+    { key: ROUTES.FINANCES_MONTH_CLOSE, label: 'Fechamento' },
+    { key: ROUTES.FINANCES_PROJECTION, label: 'Projeção' },
+    { key: ROUTES.FINANCES_DISTRIBUTION, label: 'Distribuição' },
+  ];
+
   const mainMenuItems: MenuItem[] = [
     {
       key: ROUTES.DASHBOARD,
@@ -98,6 +111,12 @@ export function Sidebar({ onNavigate }: SidebarProps) {
       icon: <DollarSign className="h-5 w-5" />,
       label: 'Financeiro',
       children: financialChildren,
+    },
+    {
+      key: ROUTES.FINANCES_BILLS,
+      icon: <Wallet className="h-5 w-5" />,
+      label: 'Condomínio',
+      children: condominioChildren,
     },
     {
       key: ROUTES.SETTINGS,

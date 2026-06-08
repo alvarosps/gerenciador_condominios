@@ -384,3 +384,59 @@ claude -n "session-13-dashboard"      # Terminal 3
 - `app/sw.ts`: criado por **29**, apenas **anexado** por **33** → 29 antes de 33.
 - `core/models.py` (31), `core/services/notification_service.py` + `core/viewsets/__init__.py` + `core/urls.py` (32) → 31 antes de 32.
 - `27` (data-table) e `28` (manifest/ícones/layout) tocam arquivos distintos → seguros em paralelo após 26.
+
+
+---
+
+# Roadmap - Feature: Modulo Financeiro do Condominio (Saidas, Saldo, Reserva, Distribuicao)
+
+**Design Doc**: `docs/plans/2026-06-06-condominium-finance-design.md` (v3)
+**Sessoes**: 34-50 (17) - **Branch sugerida**: `feat/condo-finance`
+**Status**: prompts escritos (34-50) + revisao de consistencia aplicada. **S34 concluída** (Fase 1a — fundação `finances` + `core.Condominium` + `Building.condominium` faseada + helper TZ + gate ampliado; branch `feat/condo-finance`). S35–50 pendentes.
+
+## Grafo de dependencias (fases sec.14 do design)
+
+```
+1a 34  app finances + Condominium + Building.condominium + gate ampliado + TZ + factories   -- MAIOR RISCO PROD
+        |
+   +----+-------------------------------+
+   v                                    v
+1b 35 forms owner/salary/prepaid        Fase 2 BE: 36 models -> 37 services+cache -> 38 serializers/viewsets/calendar
+   (so core; paralelo a 36)                                          |
+                                                                     v
+                                              Fase 2 FE: 39 data layer -> 40 calendario+contas UI
+Fase 3 (apos 36/37): 41 installment/employee models+services -> 42 api -> 43 frontend
+Fase 4 (apos 37):    44 reserve/income/close models -> 45 balance/close services+api -> 46 frontend
+Fase 5 (apos 45):    47 projection/simulation backend -> 48 frontend
+Fase 6 (apos 45/48): 49 owner distribution backend -> 50 frontend + e2e/polish
+```
+
+Cadeia: 34 -> (35 || 36); 36->37->38->39->40; 41->42->43; 44->45->46; 47->48; 49->50. Modelos antes de servicos antes de serializers/viewsets antes de frontend.
+
+## Contratos cross-session AUTORITATIVOS (se um prompt divergir, ISTO prevalece)
+
+- **Owner = NAO-INVASIVO**: `owner=null`=condominio; sem mudanca no income SSOT, sem migracao de owner (design sec.6/sec.17; PROD confirmado).
+- **`Bill` fontes (FKs nullaveis)**: S36 cria so `Bill.billing_account`; **S41** adiciona `Bill.installment` (+unique `(installment)`) **e** `Bill.employee` (+unique `(employee, competence_month)`) via `add_field` - `Installment`/`Employee` nascem na **S41** (Fase 3). NAO em S44.
+- **`BillPaymentService.pay`/`unpay`**: base **caixa** na **S37**; extensao `funded_from=reserve` (-> `ReserveMovement(withdrawal, bill=...)` + guarda de saldo) **e** guard `assert_open` de mes fechado = **S45**. S44 e models-only e NAO toca `pay()`.
+- **Cache cross-app**: receivers que invalidam `finance-*` em escritas de `Apartment`/`Apartment.owner`/`Lease`/`RentPayment`/`FinancialSettings`/`RentAdjustment`/`MonthSnapshot`(finalize/rollback) = **S37** (prefixos `finance-dashboard`/`finance-cash-flow`/`finance-projection` num bloco unico). `combined_calendar` fica **sem cache**.
+- **Calendario combinado (S38 = fonte)**: dia tem `rent_entries` (entradas) e `bill_exits` (saidas); frontend (S39/S40) consome esses nomes verbatim.
+- **Projecao (S47 = fonte)**: por mes `year`/`month`/`income_total`/`expenses_total`/`net`/`cumulative_cash`/`is_actual`/`is_closed` (Decimais string); frontend (S48) consome `net`/`cumulative_cash` verbatim.
+- **`formatMonthYear`** produz **"Junho de 2026"** (com " de ", nao barra).
+- **RLS**: toda tabela nova do `finances` habilita RLS na **mesma migracao** (PROD tem RLS em todas as publicas via 0047; `.claude/rules/database.md`). Policy/escopo por condominio = futuro (design sec.15).
+- **Gate ampliado (S34)**: `--cov=finances` + coverage source + pyright include + `mypy core/ finances/`; **>=90% standalone em `finances`** nas fases backend.
+- **TZ**: helper unico `America/Sao_Paulo` (`finances/services/timezone.py`, S34) para "hoje/mes atual".
+- **Wedge (S45)**: incluir teste de wedge com **termos mistos** (a-receber/a-pagar pendentes + transferencia de reserva simultaneos) - design sec.4.2.
+
+## Waves
+| Wave | Sessoes | Paralelo |
+|------|---------|----------|
+| 1 | 34 | fundacao sozinha |
+| 2 | 35 || 36 | 35 (FE, so core) || 36 (BE models) |
+| 3 | 37 -> 38 | apos 36 |
+| 4 | 39 -> 40 | Fase 2 frontend |
+| 5 | 41 -> 42 -> 43 | Fase 3 |
+| 6 | 44 -> 45 -> 46 | Fase 4 |
+| 7 | 47 -> 48 | Fase 5 |
+| 8 | 49 -> 50 | Fase 6 |
+
+> **Execucao recomendada**: estritamente sequencial 34->50 (gate 100% + >=90% em `finances` por fase antes de avancar - design sec.16 / feedback_quality_gate). Paralelismo so na wave 2 (35||36) se desejado.

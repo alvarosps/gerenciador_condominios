@@ -68,4 +68,13 @@ export const ROUTES = {
   FINANCIAL_SETTINGS: '/financial/settings',
   FINANCIAL_DAILY: '/financial/daily',
   FINANCIAL_PERSON_INCOMES: '/financial/person-incomes',
+  // Condomínio (new finances module — coexists with the legacy /financial/* routes)
+  FINANCES_BILLS: '/finances/bills',
+  FINANCES_RESERVE: '/finances/reserve',
+  FINANCES_INCOME: '/finances/income-entries',
+  FINANCES_MONTH_CLOSE: '/finances/month-close',
+  FINANCES_INSTALLMENT_PLANS: '/finances/installment-plans',
+  FINANCES_EMPLOYEES: '/finances/employees',
+  FINANCES_PROJECTION: '/finances/projection',
+  FINANCES_DISTRIBUTION: '/finances/distribution',
 };
