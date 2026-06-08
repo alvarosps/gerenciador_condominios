@@ -43,6 +43,7 @@ import {
   createMockInstallmentPlan,
   createMockMonthlyBalance,
   createMockOverdueResponse,
+  createMockOwnerDistribution,
   createMockPayment,
   createMockReserve,
   createMockReserveMovement,
@@ -2613,6 +2614,19 @@ const financesDashboardHandlers = [
 
   http.get(`${API_BASE}/finances/finance-dashboard/by_category/`, () => {
     return HttpResponse.json(createMockByCategory());
+  }),
+
+  // Phase 6 (Session 49/50): per-owner distribution (household + external owners).
+  http.get(`${API_BASE}/finances/finance-dashboard/by_owner/`, ({ request }) => {
+    const params = new URL(request.url).searchParams;
+    const year = params.get('year');
+    const month = params.get('month');
+    return HttpResponse.json(
+      createMockOwnerDistribution({
+        ...(year ? { year: Number(year) } : {}),
+        ...(month ? { month: Number(month) } : {}),
+      }),
+    );
   }),
 
   // Phase 5 (Session 48): 12-month projection + ephemeral what-if simulation.

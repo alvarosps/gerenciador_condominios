@@ -22,6 +22,7 @@ import type {
   CondoProjectionMonth,
   CondoSimulationResult,
 } from '@/lib/api/hooks/use-condo-projection';
+import type { OwnerDistribution } from '@/lib/api/hooks/use-owner-distribution';
 
 export function createMockFinanceCategory(
   overrides: Partial<FinanceCategory> = {},
@@ -398,6 +399,28 @@ export function createMockCondoProjection(months = 12): CondoProjectionMonth[] {
       is_closed: false,
     };
   });
+}
+
+export function createMockOwnerDistribution(
+  overrides: Partial<OwnerDistribution> = {},
+): OwnerDistribution {
+  return {
+    year: 2026,
+    month: 7,
+    household: {
+      name: 'Raul & Célia',
+      result_of_month: '600.00',
+      carried_in: '-50.00',
+      available: '550.00',
+      carried_out: '0.00',
+    },
+    external_owners: [
+      { owner_id: 2, owner_name: 'Tiago', leases_count: 2, rent_total: '1600.00' },
+      { owner_id: 3, owner_name: 'Alvaro', leases_count: 2, rent_total: '1500.00' },
+    ],
+    external_total: '3100.00',
+    ...overrides,
+  };
 }
 
 export function createMockCondoSimulation(months = 12): CondoSimulationResult {
