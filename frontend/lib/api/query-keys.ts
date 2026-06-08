@@ -241,6 +241,11 @@ export const queryKeys = {
     simulation: {
       all: ['finances', 'simulation'] as const,
     },
+    ownerDistribution: {
+      all: ['finances', 'owner-distribution'] as const,
+      month: (year: number, month: number, buildingId?: number) =>
+        [...queryKeys.finances.ownerDistribution.all, year, month, buildingId ?? null] as const,
+    },
   },
   rentAdjustments: {
     all: ['rent-adjustments'] as const,
