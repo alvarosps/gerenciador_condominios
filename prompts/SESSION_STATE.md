@@ -13,12 +13,12 @@
 **Roadmap**: `prompts/ROADMAP.md` (seção "Contas de serviço / parser / IPTU")
 **Total de Sessões**: 9 (56–64)
 **Branch**: `feat/condo-utility-bills` (a partir de `master`)
-**Status**: **prompts escritos (56–64)** — nenhuma sessão executada.
+**Status**: **em execução** — Sessão **56 concluída** (gate verde no branch da feature). Próxima: 57.
 **Decisões de produto** (design §2): contas tipadas (`account_type` water/electricity/iptu/internet/generic) + identidade (inscrição/UC/medidor/titular/endereço cadastrado); **statements 1:1 só leituras** (dinheiro = `BillLineItem`, fonte única); **parser DMAE+CEEE em memória, SEM anexar o PDF** (upload→lê→insere); refactor `InstallmentPlan.linked_billing_account → billing_account`; IPTU = conta-registro (não auto-gera) + planos avulsos + dívida diferida; **alerta IPTU = banner load-bearing + push best-effort agregado SP-aware**; seed das parcelas de abertura com `competence_month=2026-06`; "Atrasados" inclui IPTU (banner = drill-down). Prod = última alteração (após deploy).
 
 | # | Sessão | Camada | Status | Arquivo |
 |---|--------|--------|--------|---------|
-| 56 | Tipo + identidade da conta (`account_type`/`SupplyStatus`/identidade/unique) + `recurring_for_generation()` (exclui IPTU) | BE | pendente | `prompts/56-finances-account-type-identity.md` |
+| 56 | Tipo + identidade da conta (`account_type`/`SupplyStatus`/identidade/unique) + `recurring_for_generation()` (exclui IPTU) | BE | **concluída** | `prompts/56-finances-account-type-identity.md` |
 | 57 | Refactor `InstallmentPlan.billing_account` (rename + clean cross-model + serializer.validate + todos consumidores + convert_deferred herda IPTU) | BE+FE | pendente | `prompts/57-finances-installmentplan-billing-account-refactor.md` |
 | 58 | `WaterBillStatement`/`ElectricityBillStatement` (readings-only, RLS) + `create_with_lines`/`update_with_lines` (statement + `installment_id`) | BE | pendente | `prompts/58-finances-bill-statements.md` |
 | 59 | Parser core `invoice_parsing/` (DMAE+CEEE posicional, registry, deps/mypy, fixtures sanitizadas) | BE | pendente | `prompts/59-finances-invoice-parser-core.md` |
@@ -42,6 +42,12 @@
 - **Seed**: parcelas de abertura `competence_month=2026-06` (due_date real); dívidas diferidas com 1 `BillLineItem` + `billing_account=<conta IPTU>`; sem backfill pré-tracking.
 
 **Fora de escopo / posterior**: storage durável de anexos (Supabase Storage — futuro, serve contratos + conserta durabilidade do `PaymentProof`); fallback e-mail p/ CRITICAL; OCR; parser de IPTU; regra de risco genérica (hoje só IPTU).
+
+### Sessão 56 — concluída
+- **Criados**: `tests/unit/test_finances/test_billing_account_identity.py` (14), `tests/unit/test_finances/test_recurring_for_generation.py` (8), `tests/integration/test_billing_account_account_type_api.py` (8).
+- **Modificados**: `finances/models.py` (enums `BillingAccountType`/`SupplyStatus`; `BillingAccountQuerySet.recurring_for_generation()` + `BillingAccountManager`; 5 campos novos; `objects` trocado; unique `unique_active_billing_account_identity` parcial; `clean()` rejeita `external_identifier` em branco p/ água/luz/IPTU — constantes `_TYPED_IDENTITY_ACCOUNT_TYPES`/`_ERR_IDENTIFIER_REQUIRED`); `finances/migrations/0004_billingaccount_account_type_identity.py` (AddField×5 + AddConstraint, sem RLS novo, reversível); `finances/services/bill_generation_service.py` (iter recorrente → `recurring_for_generation()`); `finances/services/condo_projection_service.py` (iter recorrente → `recurring_for_generation()`, preserva `building_id`); `finances/serializers.py` (`BillingAccountSerializer` 5 campos + `validate()` + `validators=[]` p/ a unique parcial, espelhando `CategorySerializer`); `finances/viewsets/crud_views.py` (filtro `?account_type=`).
+- **Gate (no branch da feature)**: 30 novos testes ✓ (100% nas linhas tocadas dos 5 módulos), `ruff check`/`format` limpos, `mypy core/ finances/` ✓, `pyright finances/` 0 erros, `makemigrations --check` "No changes", migração 0004 forward/backward ✓, regressão (generation/projection/calendar/installments-payroll/bill_models) 120 verdes. Zero suppressions.
+- **Decisão**: `validators: list[object] = []` no `BillingAccountSerializer.Meta` (a unique parcial de identidade faria o DRF exigir `building_id`; conta de nível-condomínio tem `building=null`) — mesmo padrão do `CategorySerializer`; unicidade fica no DB. IPTU exclui só o ramo recorrente; parcela avulsa IPTU intacta; geração==projeção ao centavo.
 
 ---
 
