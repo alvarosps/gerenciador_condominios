@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from playwright.sync_api import sync_playwright
@@ -37,6 +38,10 @@ from .date_calculator import DateCalculatorService
 from .fee_calculator import FeeCalculatorService
 
 logger = logging.getLogger(__name__)
+
+NO_ACTIVE_LANDLORD_ERROR = (
+    "Nenhum locador ativo configurado. Cadastre o locador antes de gerar o contrato."
+)
 
 
 class ContractService:
@@ -187,8 +192,11 @@ class ContractService:
         # Calculate lease furniture
         lease_furnitures = ContractService.calculate_lease_furniture(lease)
 
-        # Get active landlord for contract
+        # Get active landlord for contract — required, otherwise the contract would render
+        # without a landlord (an invalid contract). Surface a domain error instead.
         landlord = Landlord.get_active()
+        if landlord is None:
+            raise ValidationError(NO_ACTIVE_LANDLORD_ERROR)
 
         # Get rules from database, fallback to hardcoded rules if none exist
         db_rules = ContractRule.get_active_rules()

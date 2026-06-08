@@ -19,7 +19,7 @@ from freezegun import freeze_time
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from core.models import Apartment, Building, Lease, Tenant
+from core.models import Apartment, Building, Landlord, Lease, Tenant
 
 pytestmark = pytest.mark.integration
 
@@ -41,12 +41,30 @@ CPF_SOFIA = "32505476462"  # generated — verified valid
 class TestPropertyLifecycleE2E:
     """Complete property management lifecycle from creation through deletion."""
 
-    def test_full_property_lifecycle(self, authenticated_api_client, mock_pdf_generation):
+    def test_full_property_lifecycle(
+        self, authenticated_api_client, admin_user, mock_pdf_generation
+    ):
         """
         Full workflow: building → apartment → tenant → lease → contract →
         late fee → due date change → soft delete → re-lease.
         """
         client = authenticated_api_client
+        # An active landlord is required to generate a contract (Step 5).
+        Landlord.objects.create(
+            name="Locador Lifecycle",
+            marital_status="Casado(a)",
+            cpf_cnpj="12345678901",
+            phone="11999990000",
+            street="Rua Locador",
+            street_number="100",
+            neighborhood="Centro",
+            city="São Paulo",
+            state="SP",
+            zip_code="01310-100",
+            is_active=True,
+            created_by=admin_user,
+            updated_by=admin_user,
+        )
 
         # Step 1: Create building and verify in list
         building_resp = client.post(
