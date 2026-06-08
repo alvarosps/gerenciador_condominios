@@ -4,11 +4,18 @@ Real API calls through an authenticated admin client — no internal mocks. Exer
 UserAdminSerializer create/update (password hashing) and the AdminNotificationViewSet actions.
 """
 
+import secrets
+
 import pytest
 from django.contrib.auth.models import User
 from django.utils import timezone
 
 from core.models import Notification
+
+# Test-only passwords generated per run — never hardcoded literals, so secret scanners don't flag
+# them. They carry no security relevance; they only exercise the serializer's password hashing.
+_PW = secrets.token_urlsafe(12)
+_PW_NEW = secrets.token_urlsafe(12)
 
 
 @pytest.mark.integration
@@ -20,7 +27,7 @@ class TestUserAdminViewSet:
             data={
                 "username": "novo_admin",
                 "email": "novo@test.com",
-                "password": "segredo123",
+                "password": _PW,
                 "is_staff": True,
             },
             format="json",
@@ -28,7 +35,7 @@ class TestUserAdminViewSet:
         assert response.status_code == 201
         assert "password" not in response.data  # write-only
         user = User.objects.get(username="novo_admin")
-        assert user.check_password("segredo123")
+        assert user.check_password(_PW)
         assert user.is_staff is True
 
     def test_create_user_without_password(self, authenticated_api_client):
@@ -43,18 +50,18 @@ class TestUserAdminViewSet:
         assert user.password == ""
 
     def test_update_user_password(self, authenticated_api_client):
-        target = User.objects.create_user(username="alvo", password="antiga123")
+        target = User.objects.create_user(username="alvo", password=_PW)
         response = authenticated_api_client.patch(
             f"/api/admin/users/{target.pk}/",
-            data={"password": "nova_senha123"},
+            data={"password": _PW_NEW},
             format="json",
         )
         assert response.status_code == 200
         target.refresh_from_db()
-        assert target.check_password("nova_senha123")
+        assert target.check_password(_PW_NEW)
 
     def test_update_user_fields_without_password(self, authenticated_api_client):
-        target = User.objects.create_user(username="alvo2", password="x123abcd")
+        target = User.objects.create_user(username="alvo2", password=_PW)
         response = authenticated_api_client.patch(
             f"/api/admin/users/{target.pk}/",
             data={"email": "atualizado@test.com"},
@@ -64,7 +71,7 @@ class TestUserAdminViewSet:
         target.refresh_from_db()
         assert target.email == "atualizado@test.com"
         # Password unchanged because the `if password` branch was skipped.
-        assert target.check_password("x123abcd")
+        assert target.check_password(_PW)
 
     def test_list_users(self, authenticated_api_client):
         response = authenticated_api_client.get("/api/admin/users/")
