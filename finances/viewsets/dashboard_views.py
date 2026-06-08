@@ -9,6 +9,7 @@ from django.db.models import Q, Sum
 from django.db.models.functions import Coalesce
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.request import Request
 from rest_framework.response import Response
 
@@ -49,8 +50,17 @@ def _parse_year_month_query(request: Request, current: date) -> tuple[int, int]:
 
 
 def _coerce_building_id(raw: str | int | None) -> int | None:
-    """Coerce a raw building_id value (query param or body) to int; raise ValueError if bad."""
-    return int(raw) if raw is not None else None
+    """Coerce a raw building_id (query param or body) to int; 400 (PT) on a non-numeric value.
+
+    Raises a DRF ValidationError so every caller fails closed with a 400 uniformly (no per-action
+    try/except), instead of an unguarded int() ValueError escaping the action as a 500.
+    """
+    if raw is None:
+        return None
+    try:
+        return int(raw)
+    except (TypeError, ValueError) as exc:
+        raise DRFValidationError({"building_id": "Deve ser um número inteiro."}) from exc
 
 
 def _building_id_param(request: Request) -> int | None:
@@ -110,7 +120,12 @@ def _cached_projection(months: int, building_id: int | None) -> list[dict[str, A
 
 
 def _monthly_balance(year: int, building_id: int | None) -> list[dict[str, Any]]:
-    """12-month series: closed months read the frozen CondoMonthClose, open months compute on-read."""
+    """12-month series: closed months read the frozen CondoMonthClose, open months compute on-read.
+
+    Reserve and total_balance are CONDO-LEVEL (one Reserve per condominium); a per-building request
+    reports them as None rather than mixing one building's cash with the whole-condo reserve.
+    """
+    condo_wide = building_id is None
     closes = {
         close.reference_month.month: close
         for close in CondoMonthClose.objects.filter(
@@ -123,7 +138,7 @@ def _monthly_balance(year: int, building_id: int | None) -> list[dict[str, Any]]
         if close is not None:
             result = close.net_result
             cash_end = close.cash_balance_end
-            reserve_end = close.reserve_balance_end
+            reserve_end = close.reserve_balance_end if condo_wide else None
             cash_change = Decimal(str(close.breakdown.get("cash_change_of_month", "0.00")))
             is_closed = True
         else:
@@ -132,16 +147,17 @@ def _monthly_balance(year: int, building_id: int | None) -> list[dict[str, Any]]
             cash_end = CondoBalanceService.cash_balance(
                 _next_month(date(year, month, 1)), building_id
             )
-            reserve_end = CondoBalanceService.reserve_balance()
+            reserve_end = CondoBalanceService.reserve_balance() if condo_wide else None
             is_closed = False
+        total = quantize_money(cash_end + reserve_end) if reserve_end is not None else None
         rows.append(
             {
                 "month": month,
                 "result_of_month": money_str(result),
                 "cash_change_of_month": money_str(cash_change),
                 "cash_balance_end": money_str(cash_end),
-                "reserve_balance_end": money_str(reserve_end),
-                "total_balance": money_str(quantize_money(cash_end + reserve_end)),
+                "reserve_balance_end": money_str(reserve_end) if reserve_end is not None else None,
+                "total_balance": money_str(total) if total is not None else None,
                 "is_closed": is_closed,
             }
         )
@@ -199,15 +215,13 @@ class FinanceDashboardViewSet(viewsets.ViewSet):
             return Response(
                 {"error": "O mês deve estar entre 1 e 12."}, status=status.HTTP_400_BAD_REQUEST
             )
-        building_id_raw = request.query_params.get("building_id")
-        building_id = int(building_id_raw) if building_id_raw is not None else None
+        building_id = _building_id_param(request)
         data = CondoCalendarService.combined_month(year, month, building_id)
         return Response(data, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=["get"])
     def overdue(self, request: Request) -> Response:
-        building_id_raw = request.query_params.get("building_id")
-        building_id = int(building_id_raw) if building_id_raw is not None else None
+        building_id = _building_id_param(request)
         # is_overdue is a with_amounts annotation — pass it through a dict variable so the
         # django-stubs plugin does not reject the annotation name as an unknown field.
         overdue_lookup: dict[str, object] = {"is_overdue": True}
@@ -226,9 +240,12 @@ class FinanceDashboardViewSet(viewsets.ViewSet):
         for bill in bills:
             overdue_total += getattr(bill, "amount_remaining", ZERO)
 
-        # Rent overdue is a SEPARATE sub-total (not summed with bills) — design §4.4.
+        # Rent overdue is a SEPARATE sub-total (not summed with bills) — design §4.4. as_of=today_sp()
+        # keeps the rent overdue sub-block on São Paulo's date, consistent with the bills half.
         current = current_month_sp()
-        rent_stats = RentScheduleService.get_month_stats(current.year, current.month, building_id)
+        rent_stats = RentScheduleService.get_month_stats(
+            current.year, current.month, building_id, as_of=today_sp()
+        )
         serializer = BillSerializer(bills, many=True, context={"request": request})
         return Response(
             {
@@ -315,14 +332,8 @@ class FinanceCashFlowViewSet(viewsets.ViewSet):
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        try:
-            building_id = _building_id_param(request)
-        except ValueError:
-            return Response(
-                {"error": "O parâmetro 'building_id' deve ser um inteiro."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        data = _cached_projection(months, building_id)
+        # _building_id_param raises a DRF ValidationError (-> 400) on a malformed value.
+        data = _cached_projection(months, _building_id_param(request))
         return Response(data, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=["post"])

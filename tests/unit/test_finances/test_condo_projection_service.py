@@ -208,6 +208,28 @@ def test_projected_expenses_respects_bill_skip() -> None:
     assert CondoProjectionService._projected_expenses(2026, 7) == Decimal("100.00")
 
 
+def test_projected_expenses_excludes_embedded_parcela_on_ineligible_account() -> None:
+    """An embedded parcela rides on its host account's bill, so a dormant account excludes BOTH
+    the consumo and the parcela — lockstep with BillGenerationService (§7/§8/§18)."""
+    account = make_billing_account(
+        expected_amount=Decimal("600.00"), lifecycle_state=BillingAccountState.SUSPENDED
+    )
+    plan = make_installment_plan(
+        condominium=account.condominium,
+        embedded=True,
+        linked_billing_account=account,
+        installment_count=1,
+    )
+    make_installment(plan=plan, number=1, due_date=date(2026, 7, 10), amount=Decimal("400.00"))
+
+    assert CondoProjectionService._projected_expenses(2026, 7) == Decimal("0.00")
+
+    account.lifecycle_state = BillingAccountState.ACTIVE
+    account.save()
+    # Eligible again: consumo 600 + embedded parcela 400.
+    assert CondoProjectionService._projected_expenses(2026, 7) == Decimal("1000.00")
+
+
 def test_projected_expenses_respects_tracking_start_month() -> None:
     make_billing_account(expected_amount=Decimal("100.00"), tracking_start_month=date(2026, 8, 1))
     assert CondoProjectionService._projected_expenses(2026, 7) == Decimal("0.00")  # before start

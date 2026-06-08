@@ -68,7 +68,14 @@ export function SimulationPanel({ onSimulate, isPending }: SimulationPanelProps)
     // amount-based types (only change_rent's delta may be negative).
     if (!value.trim() || Number.isNaN(magnitude) || magnitude === 0) return;
     if (type !== 'change_rent' && magnitude < 0) return;
-    const windowField = monthsWindow.trim() ? { months: Number(monthsWindow) } : {};
+    // The months window, when present, must be a positive integer — a decimal would be a silent
+    // 400 from the backend and a 0 would silently apply to no month.
+    let windowField: { months?: number } = {};
+    if (monthsWindow.trim()) {
+      const parsedMonths = Number(monthsWindow);
+      if (!Number.isInteger(parsedMonths) || parsedMonths < 1) return;
+      windowField = { months: parsedMonths };
+    }
     const scenario: CondoSimulationScenario =
       type === 'change_rent'
         ? { type, delta: value, ...windowField }
@@ -126,7 +133,8 @@ export function SimulationPanel({ onSimulate, isPending }: SimulationPanelProps)
           <Label>Meses afetados (opcional)</Label>
           <Input
             type="number"
-            min={0}
+            min={1}
+            step={1}
             value={monthsWindow}
             onChange={(e) => setMonthsWindow(e.target.value)}
             placeholder="todos os meses futuros"

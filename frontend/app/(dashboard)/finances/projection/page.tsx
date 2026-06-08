@@ -37,7 +37,12 @@ export default function ProjectionPage() {
       { scenarios, months: PROJECTION_MONTHS },
       {
         onSuccess: (data) => setSimulationResult(data),
-        onError: () => toast.error('Erro ao executar a simulação. Tente novamente.'),
+        onError: () => {
+          // Clear the previous result so a failed re-simulation never leaves a stale comparison
+          // on screen that no longer matches the current scenario list.
+          setSimulationResult(null);
+          toast.error('Erro ao executar a simulação. Tente novamente.');
+        },
       },
     );
   }

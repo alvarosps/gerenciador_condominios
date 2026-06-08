@@ -4,12 +4,13 @@ from datetime import date
 from decimal import Decimal
 
 import pytest
-from finances.models import Bill, BillBehavior, InstallmentPlanState
+from finances.models import Bill, BillBehavior, BillingAccountState, InstallmentPlanState
 from finances.services.bill_generation_service import BillGenerationService
 from freezegun import freeze_time
 
 from core.services.rent_schedule_service import RentScheduleService
 from tests.factories import (
+    make_bill_skip,
     make_billing_account,
     make_employee,
     make_installment,
@@ -96,6 +97,49 @@ def test_embedded_installment_dedup_on_rerun() -> None:
 
     bill = Bill.all_objects.get(billing_account=account, competence_month=date(2026, 6, 1))
     assert bill.line_items.count() == 2  # consumo + 1 parcela (june only)
+
+
+def _embedded_plan_on(account: object) -> object:
+    plan = make_installment_plan(
+        condominium=account.condominium,
+        embedded=True,
+        linked_billing_account=account,
+        installment_count=1,
+        description="TV parcelada",
+    )
+    make_installment(plan=plan, number=1, due_date=date(2026, 6, 10), amount=Decimal("400.00"))
+    return plan
+
+
+def test_embedded_installment_skipped_when_account_suspended() -> None:
+    """A dormant host account materializes neither consumo nor the embedded parcela (§7/§8/§18)."""
+    account = make_billing_account(
+        expected_amount=Decimal("600.00"), lifecycle_state=BillingAccountState.SUSPENDED
+    )
+    _embedded_plan_on(account)
+
+    BillGenerationService.ensure_month_bills(2026, 6)
+
+    assert Bill.all_objects.filter(billing_account=account).count() == 0
+
+
+def test_embedded_installment_skipped_when_account_skipped_for_month() -> None:
+    account = make_billing_account(expected_amount=Decimal("600.00"))
+    make_bill_skip(billing_account=account, reference_month=date(2026, 6, 1))
+    _embedded_plan_on(account)
+
+    BillGenerationService.ensure_month_bills(2026, 6)
+
+    assert Bill.all_objects.filter(billing_account=account).count() == 0
+
+
+def test_embedded_installment_skipped_when_account_ended() -> None:
+    account = make_billing_account(expected_amount=Decimal("600.00"), end_date=date(2026, 5, 31))
+    _embedded_plan_on(account)
+
+    BillGenerationService.ensure_month_bills(2026, 6)
+
+    assert Bill.all_objects.filter(billing_account=account).count() == 0
 
 
 # --- sync schedule -> realized ---

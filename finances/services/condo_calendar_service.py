@@ -36,7 +36,9 @@ class CondoCalendarService:
     @staticmethod
     def combined_month(year: int, month: int, building_id: int | None = None) -> dict[str, Any]:
         today = today_sp()
-        rent = RentScheduleService.get_month_schedule(year, month, building_id)
+        # as_of=today_sp() keeps the rent half on São Paulo's date too, so the rent overdue/toggle
+        # flags never disagree with the bill half (and the `today` marker) at the UTC↔SP day boundary.
+        rent = RentScheduleService.get_month_schedule(year, month, building_id, as_of=today)
 
         bills = (
             Bill.objects.with_amounts(today)
