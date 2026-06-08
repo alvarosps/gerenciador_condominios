@@ -57,6 +57,7 @@ INSTALLED_APPS = [
     "allauth.socialaccount.providers.google",  # Google OAuth provider
     # Project apps
     "core",
+    "finances",
 ]
 
 MIDDLEWARE = [

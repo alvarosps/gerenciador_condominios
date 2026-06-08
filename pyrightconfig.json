@@ -5,6 +5,7 @@
   "include": [
     "core",
     "condominios_manager",
+    "finances",
     "scripts",
     "tests"
   ],
@@ -61,7 +62,7 @@
   "reportIncompatibleMethodOverride": "none",
   "reportIncompatibleVariableOverride": "none",
   "reportOverlappingOverload": "error",
-  "reportPossiblyUnbound": "error",
+  "reportPossiblyUnboundVariable": "error",
   // Service/infra classes inherit object/Protocol/Generic; super().__init__() is a no-op here.
   "reportMissingSuperCall": "none",
   "reportPropertyTypeMismatch": "error",
@@ -80,7 +81,8 @@
   "reportDeprecated": "warning",
   "reportInconsistentConstructor": "error",
   "reportMatchNotExhaustive": "error",
-  "reportShadowedImports": "error",
+  // reportShadowedImports (files overriding a stdlib module) exists upstream but is not in the
+  // pinned pyright 1.1.408 bundle — it emitted an "unrecognized setting" warning. Re-add on upgrade.
   "reportImplicitOverride": false,
 
   // Django/django-stubs <-> pyright (see note above): ORM dynamics pyright cannot resolve
@@ -96,7 +98,7 @@
   "reportOperatorIssue": "none",
   "reportCallIssue": "none",
   "reportAssignmentType": "error",
-  "reportRedefinedVariable": "warning",
+  "reportRedeclaration": "warning",
   "reportAbstractUsage": "error",
 
   "stubPath": "",

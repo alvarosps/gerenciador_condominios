@@ -68,6 +68,8 @@ urlpatterns = [
     path("accounts/", include("allauth.urls")),
     # Core API endpoints
     path("", include("core.urls")),
+    # Condominium-finance API
+    path("api/finances/", include("finances.urls")),
 ]
 
 # API docs and schema only in development

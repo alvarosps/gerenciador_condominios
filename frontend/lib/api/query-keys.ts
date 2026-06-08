@@ -133,6 +133,120 @@ export const queryKeys = {
     month: (year: number, month: number, buildingId?: number) =>
       [...queryKeys.rentCalendar.all, 'month', year, month, buildingId ?? null] as const,
   },
+  finances: {
+    all: ['finances'] as const,
+    billingAccounts: {
+      all: ['finances', 'billing-accounts'] as const,
+      list: (filters?: Record<string, unknown>) =>
+        [...queryKeys.finances.billingAccounts.all, filters ?? null] as const,
+      detail: (id: number) => [...queryKeys.finances.billingAccounts.all, id] as const,
+    },
+    bills: {
+      all: ['finances', 'bills'] as const,
+      list: (filters?: Record<string, unknown>) =>
+        [...queryKeys.finances.bills.all, filters ?? null] as const,
+      detail: (id: number) => [...queryKeys.finances.bills.all, id] as const,
+    },
+    payments: {
+      all: ['finances', 'payments'] as const,
+      list: (filters?: Record<string, unknown>) =>
+        [...queryKeys.finances.payments.all, filters ?? null] as const,
+      detail: (id: number) => [...queryKeys.finances.payments.all, id] as const,
+    },
+    financeCategories: {
+      all: ['finances', 'finance-categories'] as const,
+      list: () => [...queryKeys.finances.financeCategories.all, 'list'] as const,
+    },
+    billSkips: {
+      all: ['finances', 'bill-skips'] as const,
+      list: (filters?: Record<string, unknown>) =>
+        [...queryKeys.finances.billSkips.all, filters ?? null] as const,
+    },
+    combinedCalendar: {
+      all: ['finances', 'combined-calendar'] as const,
+      month: (year: number, month: number, buildingId?: number) =>
+        [
+          ...queryKeys.finances.combinedCalendar.all,
+          'month',
+          year,
+          month,
+          buildingId ?? null,
+        ] as const,
+    },
+    overdueBills: {
+      all: ['finances', 'overdue-bills'] as const,
+      list: (buildingId?: number) =>
+        [...queryKeys.finances.overdueBills.all, buildingId ?? null] as const,
+    },
+    installmentPlans: {
+      all: ['finances', 'installment-plans'] as const,
+      list: (filters?: Record<string, unknown>) =>
+        [...queryKeys.finances.installmentPlans.all, filters ?? null] as const,
+      detail: (id: number) => [...queryKeys.finances.installmentPlans.all, id] as const,
+    },
+    installments: {
+      all: ['finances', 'installments'] as const,
+      list: (filters?: Record<string, unknown>) =>
+        [...queryKeys.finances.installments.all, filters ?? null] as const,
+      detail: (id: number) => [...queryKeys.finances.installments.all, id] as const,
+    },
+    employees: {
+      all: ['finances', 'employees'] as const,
+      list: (filters?: Record<string, unknown>) =>
+        [...queryKeys.finances.employees.all, filters ?? null] as const,
+      detail: (id: number) => [...queryKeys.finances.employees.all, id] as const,
+    },
+    reserves: {
+      all: ['finances', 'reserves'] as const,
+      list: (filters?: Record<string, unknown>) =>
+        [...queryKeys.finances.reserves.all, filters ?? null] as const,
+      detail: (id: number) => [...queryKeys.finances.reserves.all, id] as const,
+    },
+    reserveMovements: {
+      all: ['finances', 'reserve-movements'] as const,
+      list: (filters?: Record<string, unknown>) =>
+        [...queryKeys.finances.reserveMovements.all, filters ?? null] as const,
+      detail: (id: number) => [...queryKeys.finances.reserveMovements.all, id] as const,
+    },
+    incomeEntries: {
+      all: ['finances', 'income-entries'] as const,
+      list: (filters?: Record<string, unknown>) =>
+        [...queryKeys.finances.incomeEntries.all, filters ?? null] as const,
+      detail: (id: number) => [...queryKeys.finances.incomeEntries.all, id] as const,
+    },
+    condoMonthCloses: {
+      all: ['finances', 'condo-month-closes'] as const,
+      list: (filters?: Record<string, unknown>) =>
+        [...queryKeys.finances.condoMonthCloses.all, filters ?? null] as const,
+      detail: (id: number) => [...queryKeys.finances.condoMonthCloses.all, id] as const,
+    },
+    overview: {
+      all: ['finances', 'overview'] as const,
+      month: (year: number, month: number, buildingId?: number | null) =>
+        [...queryKeys.finances.overview.all, 'month', year, month, buildingId ?? null] as const,
+    },
+    monthlyBalance: {
+      all: ['finances', 'monthly-balance'] as const,
+      year: (year: number) => [...queryKeys.finances.monthlyBalance.all, year] as const,
+    },
+    byCategory: {
+      all: ['finances', 'by-category'] as const,
+      month: (year: number, month: number, buildingId?: number | null) =>
+        [...queryKeys.finances.byCategory.all, 'month', year, month, buildingId ?? null] as const,
+    },
+    projection: {
+      all: ['finances', 'projection'] as const,
+      list: (months: number) => [...queryKeys.finances.projection.all, months] as const,
+    },
+    simulation: {
+      all: ['finances', 'simulation'] as const,
+    },
+    ownerDistribution: {
+      all: ['finances', 'owner-distribution'] as const,
+      month: (year: number, month: number, buildingId?: number) =>
+        [...queryKeys.finances.ownerDistribution.all, year, month, buildingId ?? null] as const,
+    },
+  },
   rentAdjustments: {
     all: ['rent-adjustments'] as const,
     byLease: (leaseId: number | null) => [...queryKeys.rentAdjustments.all, leaseId] as const,
