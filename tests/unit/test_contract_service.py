@@ -1,6 +1,5 @@
 """Unit tests for core/services/contract_service.py."""
 
-import warnings
 from decimal import Decimal
 from pathlib import Path
 
@@ -210,20 +209,6 @@ class TestGetContractRelativePath:
 
 
 @pytest.mark.unit
-class TestGetContractPdfPath:
-    def test_returns_absolute_path_string(self, lease, mock_pdf_output_dir):
-        path = ContractService.get_contract_pdf_path(lease)
-        assert isinstance(path, str)
-        assert "contract_apto" in path
-        assert path.endswith(".pdf")
-
-    def test_creates_directory(self, lease, mock_pdf_output_dir):
-        ContractService.get_contract_pdf_path(lease)
-        building_dir = mock_pdf_output_dir / str(lease.apartment.building.street_number)
-        assert building_dir.exists()
-
-
-@pytest.mark.unit
 class TestRenderContractTemplate:
     def test_returns_html_string(self, lease, landlord):
         context = ContractService.prepare_contract_context(lease)
@@ -309,24 +294,6 @@ class TestGeneratePdfWithInfrastructure:
 
 
 @pytest.mark.unit
-class TestGenerateContractDeprecated:
-    def test_emits_deprecation_warning(self, lease, landlord, mock_pdf_generation):
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            ContractService.generate_contract(lease)
-            deprecation_warnings = [x for x in w if issubclass(x.category, DeprecationWarning)]
-            assert len(deprecation_warnings) >= 1
-            assert "deprecated" in str(deprecation_warnings[0].message).lower()
-
-    def test_marks_lease_contract_generated(self, lease, landlord, mock_pdf_generation):
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", DeprecationWarning)
-            ContractService.generate_contract(lease)
-        lease.refresh_from_db()
-        assert lease.contract_generated is True
-
-
-@pytest.mark.unit
 class TestGenerateContractWithInfrastructure:
     def test_marks_lease_contract_generated(self, lease, landlord, mocker):
         mock_gen = mocker.MagicMock()
@@ -363,78 +330,8 @@ class TestGenerateContractWithInfrastructure:
 
 
 @pytest.mark.unit
-class TestGeneratePdfFromHtml:
-    """Tests for the static generate_pdf_from_html method (lines 376-419)."""
-
-    def test_generate_pdf_from_html_calls_playwright(self, tmp_path, mocker, landlord):
-        """Covers lines 376-419: static method creates temp HTML and calls Playwright."""
-        mock_playwright_ctx = mocker.MagicMock()
-        mock_browser = mocker.MagicMock()
-        mock_page = mocker.MagicMock()
-
-        mock_playwright_ctx.chromium.launch.return_value = mock_browser
-        mock_browser.new_page.return_value = mock_page
-
-        mock_sync_playwright = mocker.patch("core.services.contract_service.sync_playwright")
-        mock_sync_playwright.return_value.__enter__ = mocker.MagicMock(
-            return_value=mock_playwright_ctx
-        )
-        mock_sync_playwright.return_value.__exit__ = mocker.MagicMock(return_value=False)
-
-        pdf_path = str(tmp_path / "output.pdf")
-        ContractService.generate_pdf_from_html("<html><body>Test</body></html>", pdf_path, 42)
-
-        mock_playwright_ctx.chromium.launch.assert_called_once()
-        mock_browser.new_page.assert_called_once()
-        mock_page.pdf.assert_called_once()
-
-    def test_generate_pdf_from_html_with_chrome_path(self, tmp_path, mocker, landlord):
-        """Covers lines 393-394: chrome_path setting used in launch args."""
-        mock_playwright_ctx = mocker.MagicMock()
-        mock_browser = mocker.MagicMock()
-        mock_page = mocker.MagicMock()
-
-        mock_playwright_ctx.chromium.launch.return_value = mock_browser
-        mock_browser.new_page.return_value = mock_page
-
-        mock_sync_playwright = mocker.patch("core.services.contract_service.sync_playwright")
-        mock_sync_playwright.return_value.__enter__ = mocker.MagicMock(
-            return_value=mock_playwright_ctx
-        )
-        mock_sync_playwright.return_value.__exit__ = mocker.MagicMock(return_value=False)
-
-        mocker.patch.object(settings, "CHROME_EXECUTABLE_PATH", "/usr/bin/chromium")
-
-        pdf_path = str(tmp_path / "out.pdf")
-        ContractService.generate_pdf_from_html("<html></html>", pdf_path, 99)
-
-        launch_kwargs = mock_playwright_ctx.chromium.launch.call_args[1]
-        assert launch_kwargs.get("executable_path") == "/usr/bin/chromium"
-
-    def test_generate_pdf_from_html_cleans_up_temp_html(self, tmp_path, mocker, landlord):
-        """Covers lines 418-419: temp HTML file is deleted after PDF generation."""
-        mock_playwright_ctx = mocker.MagicMock()
-        mock_browser = mocker.MagicMock()
-        mock_page = mocker.MagicMock()
-
-        mock_playwright_ctx.chromium.launch.return_value = mock_browser
-        mock_browser.new_page.return_value = mock_page
-
-        mock_sync_playwright = mocker.patch("core.services.contract_service.sync_playwright")
-        mock_sync_playwright.return_value.__enter__ = mocker.MagicMock(
-            return_value=mock_playwright_ctx
-        )
-        mock_sync_playwright.return_value.__exit__ = mocker.MagicMock(return_value=False)
-
-        contracts_dir = tmp_path / "contracts"
-        contracts_dir.mkdir()
-        pdf_path = str(contracts_dir / "output.pdf")
-
-        ContractService.generate_pdf_from_html("<html></html>", pdf_path, 77)
-
-        # Temp HTML file should be gone
-        temp_html = contracts_dir / "temp_contract_77.html"
-        assert not temp_html.exists()
+class TestGeneratePdfWithInfrastructureCleanup:
+    """Error and temp-file cleanup paths of generate_pdf_with_infrastructure."""
 
     def test_generate_pdf_with_infrastructure_cleans_up_temp_on_error(
         self, tmp_path, mocker, lease, landlord

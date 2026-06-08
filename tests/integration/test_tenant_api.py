@@ -1,13 +1,23 @@
 """Integration tests for tenant portal API endpoints (/api/tenant/*)."""
 
+from datetime import date
 from decimal import Decimal
+from pathlib import Path
 
 import pytest
+from django.conf import settings
 from django.contrib.auth.models import User
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from core.models import Notification, Tenant
+from core.models import (
+    Notification,
+    PaymentProof,
+    Person,
+    RentAdjustment,
+    Tenant,
+)
 from tests.factories import (
     make_apartment,
     make_building,
@@ -143,3 +153,206 @@ class TestTenantNotifications:
         response = tenant_client.post("/api/tenant/notifications/read-all/")
         assert response.status_code == 200
         assert response.data["marked_read"] == 3
+
+
+@pytest.fixture
+def tenant_user_no_lease(admin_user):
+    """A tenant linked to a Django user but WITHOUT any lease."""
+    user = User.objects.create_user(username="tenant_no_lease", is_staff=False)
+    tenant = Tenant.objects.create(
+        name="Sem Locação",
+        cpf_cnpj="11144477735",
+        phone="(11) 90000-0000",
+        marital_status="Solteiro(a)",
+        profession="Autônomo",
+        due_day=10,
+        user=user,
+        created_by=admin_user,
+        updated_by=admin_user,
+    )
+    client = APIClient()
+    client.force_authenticate(user=user)
+    return tenant, user, client
+
+
+@pytest.mark.integration
+@pytest.mark.django_db
+class TestTenantContract:
+    def test_not_generated_returns_404(self, tenant_client, tenant_user):
+        _, _, lease = tenant_user
+        lease.contract_generated = False
+        lease.save(update_fields=["contract_generated"])
+        response = tenant_client.get("/api/tenant/contract/")
+        assert response.status_code == 404
+        assert "ainda não foi gerado" in response.data["detail"]
+
+    def test_generated_but_file_missing_returns_404(self, tenant_client, tenant_user):
+        _, _, lease = tenant_user
+        lease.contract_generated = True
+        lease.save(update_fields=["contract_generated"])
+        response = tenant_client.get("/api/tenant/contract/")
+        assert response.status_code == 404
+        assert "não encontrado" in response.data["detail"]
+
+    def test_success_streams_pdf(self, tenant_client, tenant_user):
+        _, _, lease = tenant_user
+        lease.contract_generated = True
+        lease.save(update_fields=["contract_generated"])
+        apt = lease.apartment
+        pdf_path = (
+            Path(settings.BASE_DIR)
+            / "contracts"
+            / str(apt.building.street_number)
+            / f"contract_apto_{apt.number}_{lease.pk}.pdf"
+        )
+        pdf_path.parent.mkdir(parents=True, exist_ok=True)
+        pdf_path.write_bytes(b"%PDF-1.4\ntest contract\n")
+        try:
+            response = tenant_client.get("/api/tenant/contract/")
+            assert response.status_code == 200
+            assert response["Content-Type"] == "application/pdf"
+            # FileResponse keeps the file handle open; close it so Windows can unlink it.
+            response.close()
+        finally:
+            pdf_path.unlink(missing_ok=True)
+
+    def test_no_lease_returns_404(self, tenant_user_no_lease):
+        _, _, client = tenant_user_no_lease
+        response = client.get("/api/tenant/contract/")
+        assert response.status_code == 404
+        assert "Nenhuma locação ativa" in response.data["detail"]
+
+
+@pytest.mark.integration
+@pytest.mark.django_db
+class TestTenantRentAdjustments:
+    def test_lists_adjustments(self, tenant_client, tenant_user, admin_user):
+        _, _, lease = tenant_user
+        RentAdjustment.objects.create(
+            lease=lease,
+            adjustment_date=date(2026, 1, 1),
+            previous_value=Decimal("1400.00"),
+            new_value=Decimal("1500.00"),
+            percentage=Decimal("7.14"),
+            created_by=admin_user,
+            updated_by=admin_user,
+        )
+        response = tenant_client.get("/api/tenant/rent-adjustments/")
+        assert response.status_code == 200
+        assert len(response.data) == 1
+        assert Decimal(response.data[0]["new_value"]) == Decimal("1500.00")
+
+    def test_no_lease_returns_404(self, tenant_user_no_lease):
+        _, _, client = tenant_user_no_lease
+        response = client.get("/api/tenant/rent-adjustments/")
+        assert response.status_code == 404
+
+
+@pytest.mark.integration
+@pytest.mark.django_db
+class TestTenantPix:
+    def test_owner_pix_key_used(self, tenant_client, tenant_user, admin_user):
+        _, _, lease = tenant_user
+        owner = Person.objects.create(
+            name="Dona do Apto",
+            relationship="Proprietário",
+            phone="11955554444",
+            pix_key="dona@apto.com",
+            pix_key_type="email",
+            is_owner=True,
+            created_by=admin_user,
+            updated_by=admin_user,
+        )
+        apt = lease.apartment
+        apt.owner = owner
+        apt.save(update_fields=["owner"])
+
+        response = tenant_client.post("/api/tenant/payments/pix/")
+        assert response.status_code == 200
+        assert "pix_copy_paste" in response.data
+
+    def test_missing_pix_key_returns_400(self, tenant_client):
+        # No apartment owner pix key and no FinancialSettings default → ValueError → 400.
+        response = tenant_client.post("/api/tenant/payments/pix/")
+        assert response.status_code == 400
+        assert "Chave PIX" in response.data["detail"]
+
+    def test_no_lease_returns_404(self, tenant_user_no_lease):
+        _, _, client = tenant_user_no_lease
+        response = client.post("/api/tenant/payments/pix/")
+        assert response.status_code == 404
+
+
+@pytest.mark.integration
+@pytest.mark.django_db
+class TestTenantProof:
+    def test_upload_proof_succeeds(self, tenant_client):
+        proof_file = SimpleUploadedFile(
+            "comprovante.png", b"\x89PNG\r\n\x1a\nfake", content_type="image/png"
+        )
+        response = tenant_client.post(
+            "/api/tenant/payments/proof/",
+            data={"reference_month": "2026-03-01", "file": proof_file, "pix_code": "ABC123"},
+            format="multipart",
+        )
+        assert response.status_code == 201
+        assert response.data["status"] == "pending"
+        assert PaymentProof.objects.filter(pk=response.data["id"]).exists()
+
+    def test_upload_rejects_disallowed_file_type(self, tenant_client):
+        bad_file = SimpleUploadedFile(
+            "malware.exe", b"MZ binary", content_type="application/octet-stream"
+        )
+        response = tenant_client.post(
+            "/api/tenant/payments/proof/",
+            data={"reference_month": "2026-03-01", "file": bad_file},
+            format="multipart",
+        )
+        assert response.status_code == 400
+
+    def test_proof_status_returns_proof(self, tenant_client, tenant_user):
+        _, _, lease = tenant_user
+        proof = PaymentProof.objects.create(
+            lease=lease,
+            reference_month=date(2026, 3, 1),
+            file=SimpleUploadedFile("p.png", b"img", content_type="image/png"),
+        )
+        response = tenant_client.get(f"/api/tenant/payments/proof/{proof.pk}/")
+        assert response.status_code == 200
+        assert response.data["id"] == proof.pk
+
+    def test_proof_status_not_found_returns_404(self, tenant_client):
+        response = tenant_client.get("/api/tenant/payments/proof/999999/")
+        assert response.status_code == 404
+
+
+@pytest.mark.integration
+@pytest.mark.django_db
+class TestTenantDueDateSimulate:
+    def test_simulate_success(self, tenant_client):
+        response = tenant_client.post(
+            "/api/tenant/due-date/simulate/", data={"new_due_day": 20}, format="json"
+        )
+        assert response.status_code == 200
+        assert response.data["new_due_day"] == 20
+        assert "fee" in response.data
+        assert "days_difference" in response.data
+
+    def test_missing_param_returns_400(self, tenant_client):
+        response = tenant_client.post("/api/tenant/due-date/simulate/", data={}, format="json")
+        assert response.status_code == 400
+        assert "obrigatório" in response.data["detail"]
+
+    def test_non_integer_returns_400(self, tenant_client):
+        response = tenant_client.post(
+            "/api/tenant/due-date/simulate/", data={"new_due_day": "abc"}, format="json"
+        )
+        assert response.status_code == 400
+        assert "inteiro" in response.data["detail"]
+
+    def test_out_of_range_returns_400(self, tenant_client):
+        response = tenant_client.post(
+            "/api/tenant/due-date/simulate/", data={"new_due_day": 40}, format="json"
+        )
+        assert response.status_code == 400
+        assert "entre" in response.data["detail"]
