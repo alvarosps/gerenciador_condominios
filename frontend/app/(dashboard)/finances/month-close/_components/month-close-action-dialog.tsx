@@ -10,7 +10,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { formatMonthYear } from '@/lib/utils/formatters';
+import { formatReferenceMonth } from '@/lib/utils/finances';
 import type { CondoMonthClose } from '@/lib/schemas/finances/condo-month-close.schema';
 
 interface Props {
@@ -22,11 +22,6 @@ interface Props {
   onCancel: () => void;
 }
 
-function monthLabel(referenceMonth: string): string {
-  const [year, month] = referenceMonth.split('-');
-  return formatMonthYear(Number(year), Number(month));
-}
-
 export function MonthCloseActionDialog({
   open,
   close,
@@ -36,7 +31,7 @@ export function MonthCloseActionDialog({
   onCancel,
 }: Props) {
   const isClose = action === 'close';
-  const label = close ? monthLabel(close.reference_month) : '';
+  const label = close ? formatReferenceMonth(close.reference_month) : '';
 
   return (
     <AlertDialog open={open} onOpenChange={(v) => { if (!v) onCancel(); }}>

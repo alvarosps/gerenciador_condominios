@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { ArrowDownCircle, ArrowUpCircle } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -43,7 +44,19 @@ function movementColumns(): Column<ReserveMovement>[] {
       key: 'kind',
       width: 110,
       render: (_, rec) => (
-        <Badge className={rec.kind === 'deposit' ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}>
+        <Badge
+          className={cn(
+            'inline-flex items-center gap-1',
+            rec.kind === 'deposit'
+              ? 'bg-success/10 text-success'
+              : 'bg-destructive/10 text-destructive',
+          )}
+        >
+          {rec.kind === 'deposit' ? (
+            <ArrowDownCircle className="h-3 w-3" />
+          ) : (
+            <ArrowUpCircle className="h-3 w-3" />
+          )}
           {kindLabel[rec.kind]}
         </Badge>
       ),
@@ -64,7 +77,9 @@ function movementColumns(): Column<ReserveMovement>[] {
       title: 'Vínculo',
       key: 'bill',
       render: (_, rec) =>
-        rec.bill !== null ? `Pagamento de conta #${rec.bill}` : 'Transferência (caixa)',
+        typeof rec.bill === 'number'
+          ? `Pagamento de conta #${rec.bill}`
+          : 'Transferência (caixa)',
     },
     {
       title: 'Referência',

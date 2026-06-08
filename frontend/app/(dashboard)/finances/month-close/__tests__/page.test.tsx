@@ -1,10 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor, fireEvent } from '@testing-library/react';
+import { screen, waitFor, fireEvent, within } from '@testing-library/react';
 import { renderWithProviders, createTestQueryClient } from '@/tests/test-utils';
 import MonthClosePage from '../page';
 import { createMockCondoMonthClose } from '@/tests/mocks/data/finances';
 import type * as closeHooks from '@/lib/api/hooks/use-condo-month-closes';
 import type * as authStore from '@/store/auth-store';
+
+vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+import { toast } from 'sonner';
 
 type CondoMonthClosesResult = ReturnType<typeof closeHooks.useCondoMonthCloses>;
 type CloseMonthResult = ReturnType<typeof closeHooks.useCloseMonth>;
@@ -152,5 +155,70 @@ describe('MonthClosePage', () => {
     await waitFor(() => {
       expect(screen.getByText(/Fechar o mês congela/i)).toBeInTheDocument();
     });
+  });
+
+  it('confirming a close derives {year,month} by split, calls mutateAsync and toasts success', async () => {
+    vi.mocked(toast.success).mockReset();
+    mockUseAuthStore.mockReturnValue({ user: { is_staff: true } } as unknown);
+    const mutateAsync = vi.fn().mockResolvedValue(createMockCondoMonthClose());
+    mockUseCloseMonth.mockReturnValue({
+      ...idleMutation,
+      mutateAsync,
+    } as unknown as CloseMonthResult);
+    mockUseCondoMonthCloses.mockReturnValue({
+      isLoading: false,
+      error: null,
+      data: [createMockCondoMonthClose({ id: 1, reference_month: '2026-05-01', status: 'open' })],
+    } as unknown as CondoMonthClosesResult);
+
+    renderWithProviders(<MonthClosePage />, { queryClient: createTestQueryClient() });
+
+    const [openBtn] = await screen.findAllByRole('button', { name: /Fechar mês/i });
+    if (!openBtn) throw new Error('open button not found');
+    fireEvent.click(openBtn);
+    const dialog = await screen.findByRole('alertdialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Fechar mês' }));
+
+    // 2026-05-01 → {year:2026, month:5} via split (NOT new Date) — no off-by-one/TZ shift.
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalledWith({ year: 2026, month: 5 }));
+    expect(toast.success).toHaveBeenCalledWith('Mês fechado com sucesso');
+  });
+
+  it('surfaces the backend PT error (chronological gap) via toast.error on reject', async () => {
+    vi.mocked(toast.error).mockReset();
+    mockUseAuthStore.mockReturnValue({ user: { is_staff: true } } as unknown);
+    const mutateAsync = vi.fn().mockRejectedValue(
+      Object.assign(new Error('request failed'), {
+        isAxiosError: true,
+        response: {
+          status: 400,
+          data: { error: 'Feche os meses anteriores antes de fechar este mês.' },
+        },
+      }),
+    );
+    mockUseCloseMonth.mockReturnValue({
+      ...idleMutation,
+      mutateAsync,
+    } as unknown as CloseMonthResult);
+    mockUseCondoMonthCloses.mockReturnValue({
+      isLoading: false,
+      error: null,
+      data: [createMockCondoMonthClose({ id: 1, reference_month: '2026-05-01', status: 'open' })],
+    } as unknown as CondoMonthClosesResult);
+
+    renderWithProviders(<MonthClosePage />, { queryClient: createTestQueryClient() });
+
+    const [openBtn] = await screen.findAllByRole('button', { name: /Fechar mês/i });
+    if (!openBtn) throw new Error('open button not found');
+    fireEvent.click(openBtn);
+    const dialog = await screen.findByRole('alertdialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Fechar mês' }));
+
+    // The front never validates chronology — it shows the server's PT message verbatim (§18).
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(
+        'Feche os meses anteriores antes de fechar este mês.',
+      ),
+    );
   });
 });

@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Plus, Pencil, Trash2, Loader2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, CheckCircle2, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import { DataTable, type Column } from '@/components/tables/data-table';
 import { DeleteConfirmDialog } from '@/components/shared/delete-confirm-dialog';
@@ -94,9 +94,11 @@ function createColumns(handlers: {
       render: (_, rec) => (
         <Badge
           className={cn(
+            'inline-flex items-center gap-1',
             rec.is_received ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning',
           )}
         >
+          {rec.is_received ? <CheckCircle2 className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
           {rec.is_received ? 'Recebido' : 'Pendente'}
         </Badge>
       ),

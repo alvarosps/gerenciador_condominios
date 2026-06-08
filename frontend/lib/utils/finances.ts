@@ -7,9 +7,22 @@
  * subtotal of line items while a bill is being edited in the form.
  */
 
+import { formatMonthYear } from '@/lib/utils/formatters';
+
 export interface LineTotalInput {
   amount: number;
   is_offset?: boolean;
+}
+
+/**
+ * Format a `reference_month` (`YYYY-MM-01`) as "Junho de 2026".
+ *
+ * Parses by split (never `new Date(iso)` — timezone-safe) and delegates to `formatMonthYear`.
+ * Shared by the month-close page and its action dialog (single source).
+ */
+export function formatReferenceMonth(referenceMonth: string): string {
+  const [year, month] = referenceMonth.split('-');
+  return formatMonthYear(Number(year), Number(month));
 }
 
 /**

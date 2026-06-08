@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { renderHook, waitFor, act } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import {
@@ -6,7 +6,7 @@ import {
   useCloseMonth,
   useReopenMonth,
 } from '../use-condo-month-closes';
-import { createWrapper } from '@/tests/test-utils';
+import { createWrapper, createTestQueryClient } from '@/tests/test-utils';
 import { server } from '@/tests/mocks/server';
 
 const API_BASE = 'http://localhost:8008/api';
@@ -57,13 +57,16 @@ describe('useCondoMonthCloses', () => {
 });
 
 describe('useCloseMonth', () => {
-  it('closes a month successfully', async () => {
-    const { result } = renderHook(() => useCloseMonth(), { wrapper: createWrapper() });
-    let closed: unknown;
+  it('closes a month and invalidates condoMonthCloses + overview + monthlyBalance', async () => {
+    const queryClient = createTestQueryClient();
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+    const { result } = renderHook(() => useCloseMonth(), { wrapper: createWrapper(queryClient) });
     await act(async () => {
-      closed = await result.current.mutateAsync({ year: 2026, month: 5 });
+      await result.current.mutateAsync({ year: 2026, month: 5 });
     });
-    expect(closed).toBeDefined();
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['finances', 'condo-month-closes'] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['finances', 'overview'] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['finances', 'monthly-balance'] });
   });
 
   it('handles already-closed error (400)', async () => {
@@ -85,12 +88,15 @@ describe('useCloseMonth', () => {
 });
 
 describe('useReopenMonth', () => {
-  it('reopens a closed month', async () => {
-    const { result } = renderHook(() => useReopenMonth(), { wrapper: createWrapper() });
-    let reopened: unknown;
+  it('reopens a closed month and invalidates condoMonthCloses + overview + monthlyBalance', async () => {
+    const queryClient = createTestQueryClient();
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+    const { result } = renderHook(() => useReopenMonth(), { wrapper: createWrapper(queryClient) });
     await act(async () => {
-      reopened = await result.current.mutateAsync({ year: 2026, month: 5 });
+      await result.current.mutateAsync({ year: 2026, month: 5 });
     });
-    expect(reopened).toBeDefined();
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['finances', 'condo-month-closes'] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['finances', 'overview'] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['finances', 'monthly-balance'] });
   });
 });

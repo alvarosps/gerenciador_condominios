@@ -1,26 +1,24 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { Lock, Unlock } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { DataTable, type Column } from '@/components/tables/data-table';
 import { AmountDisplay } from '@/components/ui/amount-display';
+import { cn } from '@/lib/utils';
 import {
   useCondoMonthCloses,
   useCloseMonth,
   useReopenMonth,
 } from '@/lib/api/hooks/use-condo-month-closes';
 import { useAuthStore } from '@/store/auth-store';
-import { formatDate, formatMonthYear } from '@/lib/utils/formatters';
+import { formatDate } from '@/lib/utils/formatters';
+import { formatReferenceMonth } from '@/lib/utils/finances';
 import { getErrorMessage, handleError } from '@/lib/utils/error-handler';
 import type { CondoMonthClose } from '@/lib/schemas/finances/condo-month-close.schema';
 import { MonthCloseActionDialog } from './_components/month-close-action-dialog';
-
-function monthLabel(referenceMonth: string): string {
-  const [year, month] = referenceMonth.split('-');
-  return formatMonthYear(Number(year), Number(month));
-}
 
 function createColumns(handlers: {
   onClose: (record: CondoMonthClose) => void;
@@ -32,7 +30,7 @@ function createColumns(handlers: {
       title: 'Mês de Referência',
       key: 'reference_month',
       primary: true,
-      render: (_, rec) => monthLabel(rec.reference_month),
+      render: (_, rec) => formatReferenceMonth(rec.reference_month),
       sorter: (a, b) => a.reference_month.localeCompare(b.reference_month),
     },
     {
@@ -40,7 +38,13 @@ function createColumns(handlers: {
       key: 'status',
       width: 110,
       render: (_, rec) => (
-        <Badge className={rec.status === 'closed' ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'}>
+        <Badge
+          className={cn(
+            'inline-flex items-center gap-1',
+            rec.status === 'closed' ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning',
+          )}
+        >
+          {rec.status === 'closed' ? <Lock className="h-3 w-3" /> : <Unlock className="h-3 w-3" />}
           {rec.status === 'closed' ? 'Fechado' : 'Aberto'}
         </Badge>
       ),

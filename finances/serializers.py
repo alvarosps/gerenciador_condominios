@@ -35,8 +35,6 @@ from finances.models import (
 from finances.money import money_str
 from finances.services.timezone import today_sp
 
-_NO_CONDOMINIUM = "Nenhum condomínio configurado."
-
 
 def _apply_default_condominium(instance: object, attrs: dict[str, object]) -> None:
     """Inject the singleton condominium on create when ``condominium_id`` is omitted.
@@ -48,7 +46,9 @@ def _apply_default_condominium(instance: object, attrs: dict[str, object]) -> No
     if instance is None and attrs.get("condominium") is None:
         default = Condominium.get_default()
         if default is None:
-            raise serializers.ValidationError({"condominium_id": _NO_CONDOMINIUM})
+            raise serializers.ValidationError(
+                {"condominium_id": Condominium.NOT_CONFIGURED_MESSAGE}
+            )
         attrs["condominium"] = default
 
 
