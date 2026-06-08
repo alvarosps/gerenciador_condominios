@@ -75,6 +75,20 @@ def _clear_caches_between_tests():
 
 
 @pytest.fixture(autouse=True)
+def _isolate_media_root(tmp_path, settings):
+    """Redirect MEDIA_ROOT to a per-test temp dir so file uploads never pollute the repo.
+
+    ``settings.MEDIA_ROOT`` defaults to ``BASE_DIR / "contracts"`` and ``PaymentProof.file`` (plus
+    any other ``FileField``) uploads under it. Without this, every test that saves an uploaded file
+    writes a real artifact into the repo's ``contracts/payment_proofs/`` directory (which is not
+    git-ignored). A tmp dir keeps the working tree clean and the upload auto-cleaned. The ``settings``
+    param is pytest-django's wrapper, so the assignment fires ``setting_changed`` (the file storage
+    picks up the new location) and is reverted after the test.
+    """
+    settings.MEDIA_ROOT = str(tmp_path / "media")
+
+
+@pytest.fixture(autouse=True)
 def _restore_signal_receivers():
     """Restore the process-global Django signal registry after every test.
 
