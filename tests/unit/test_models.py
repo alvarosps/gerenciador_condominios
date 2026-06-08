@@ -16,6 +16,7 @@ from core.models import (
     Lease,
     Tenant,
 )
+from tests.constants import TEST_PASSWORD
 from tests.factories import (
     make_apartment,
     make_building,
@@ -368,7 +369,9 @@ class TestSoftDeleteManager:
         assert not deleted.filter(pk=active.pk).exists()
 
     def test_restore_with_user(self, django_user_model: type) -> None:
-        user = django_user_model.objects.create_user(username="restoreruser", password="pass")
+        user = django_user_model.objects.create_user(
+            username="restoreruser", password=TEST_PASSWORD
+        )
         b = make_building(street_number=781, name="Predio E", address="Rua E")
         b.delete()
         b.restore(restored_by=user)

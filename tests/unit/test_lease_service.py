@@ -5,6 +5,7 @@ from django.contrib.auth import get_user_model
 
 from core.models import Apartment, Building, Lease, Tenant
 from core.services.lease_service import terminate_lease, transfer_lease
+from tests.constants import TEST_PASSWORD
 
 User = get_user_model()
 
@@ -62,7 +63,7 @@ def second_tenant():
 
 @pytest.fixture
 def staff_user():
-    return User.objects.create_user(username="admin_lease", password="pass", is_staff=True)
+    return User.objects.create_user(username="admin_lease", password=TEST_PASSWORD, is_staff=True)
 
 
 @pytest.fixture

@@ -8,6 +8,7 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from core.models import Apartment, Building, Lease, RentPayment, Tenant
+from tests.constants import TEST_PASSWORD
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
@@ -58,7 +59,7 @@ def _make_tenant_setup(
     )
     user = django_user_model.objects.create_user(
         username=tenant_username,
-        password="tenantpass123",
+        password=TEST_PASSWORD,
         is_staff=False,
         is_active=True,
     )

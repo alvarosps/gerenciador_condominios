@@ -28,6 +28,7 @@ from core.models import (
     Person,
     Tenant,
 )
+from tests.constants import TEST_PASSWORD
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -50,7 +51,7 @@ def _make_tenant_with_user(cpf: str, name: str, due_day: int, admin_user: User) 
     user = User.objects.create_user(
         username=f"user_{cpf}",
         email=f"{cpf}@test.com",
-        password="testpass123",
+        password=TEST_PASSWORD,
         is_active=True,
     )
     return Tenant.objects.create(

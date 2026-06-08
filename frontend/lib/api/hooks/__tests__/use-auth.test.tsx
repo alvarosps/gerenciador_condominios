@@ -9,6 +9,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
+
+import { TEST_PASSWORD, TEST_PASSWORD_WRONG } from '@/tests/constants';
 import { del } from 'idb-keyval';
 import {
   useLogin,
@@ -71,7 +73,7 @@ describe('useAuth hooks', () => {
 
       result.current.mutate({
         username: 'wronguser',
-        password: 'wrongpassword',
+        password: TEST_PASSWORD_WRONG,
       });
 
       await waitFor(() => expect(result.current.isError).toBe(true), { timeout: 5000 });
@@ -86,8 +88,8 @@ describe('useAuth hooks', () => {
 
       result.current.mutate({
         email: 'newuser@example.com',
-        password: 'password123',
-        password2: 'differentpassword',
+        password: TEST_PASSWORD,
+        password2: TEST_PASSWORD_WRONG,
         first_name: 'New',
         last_name: 'User',
       });
@@ -105,8 +107,8 @@ describe('useAuth hooks', () => {
 
       result.current.mutate({
         email: 'newuser@example.com',
-        password: 'Password123!',
-        password2: 'Password123!',
+        password: TEST_PASSWORD,
+        password2: TEST_PASSWORD,
         first_name: 'New',
         last_name: 'User',
       });

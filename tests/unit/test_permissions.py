@@ -26,6 +26,7 @@ from core.permissions import (
     ReadOnlyForNonAdmin,
     get_permission_classes,
 )
+from tests.constants import TEST_PASSWORD
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -342,7 +343,7 @@ class TestIsAuthenticatedAndActive:
     def test_inactive_user_denied(self, django_user_model):
         inactive = django_user_model.objects.create_user(
             username="inactive_perm_test",
-            password="pass",
+            password=TEST_PASSWORD,
             is_active=False,
         )
         request = make_request("GET")
@@ -381,7 +382,7 @@ def _make_tenant_user(django_user_model, username: str) -> tuple:
     """Create a non-staff User and a linked Tenant. Returns (user, tenant)."""
     user = django_user_model.objects.create_user(
         username=username,
-        password="pass",
+        password=TEST_PASSWORD,
         is_staff=False,
         is_active=True,
     )

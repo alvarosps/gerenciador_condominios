@@ -7,6 +7,8 @@
 
 import type { Expense } from '@/lib/schemas/expense.schema';
 import { delay, http, HttpResponse } from 'msw';
+
+import { TEST_PASSWORD } from '@/tests/constants';
 import {
   createMockApartment,
   createMockBuilding,
@@ -451,7 +453,7 @@ const authHandlers = [
   http.post(`${API_BASE}/auth/login/`, async ({ request }) => {
     await delay(100);
     const data = (await request.json()) as { email: string; password: string };
-    if (data.email === 'test@example.com' && data.password === 'password123') {
+    if (data.email === 'test@example.com' && data.password === TEST_PASSWORD) {
       return HttpResponse.json({
         user: {
           id: 1,
@@ -502,7 +504,7 @@ const authHandlers = [
   http.post(`${API_BASE}/auth/token/`, async ({ request }) => {
     await delay(100);
     const data = (await request.json()) as { username: string; password: string };
-    if (data.username === 'testuser' && data.password === 'password123') {
+    if (data.username === 'testuser' && data.password === TEST_PASSWORD) {
       return HttpResponse.json({
         user: {
           id: 1,
