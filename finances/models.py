@@ -835,3 +835,49 @@ class CondoMonthClose(AuditMixin, models.Model):
             raise ValidationError({"closed_at": _ERR_CLOSED_NEEDS_DATE})
         if self.carry_forward_out is not None and self.carry_forward_out > 0:
             raise ValidationError({"carry_forward_out": _ERR_CARRY_FORWARD_NON_POSITIVE})
+
+
+class WaterBillStatement(AuditMixin, SoftDeleteMixin, models.Model):
+    """1:1 reading detail of a WATER (DMAE) Bill — consumo/leituras only. Money lives on
+    BillLineItem (single source, design §3.2); this model carries zero currency fields."""
+
+    bill = models.OneToOneField(Bill, on_delete=models.CASCADE, related_name="water_statement")
+    consumo_m3 = models.PositiveIntegerField()
+    leitura_anterior = models.PositiveIntegerField(null=True, blank=True)
+    leitura_atual = models.PositiveIntegerField(null=True, blank=True)
+    leitura_dias = models.PositiveSmallIntegerField(null=True, blank=True)
+    data_leitura = models.DateField(null=True, blank=True)
+    agua_status = models.CharField(
+        max_length=10, choices=SupplyStatus.choices, default=SupplyStatus.ACTIVE
+    )
+    esgoto_status = models.CharField(
+        max_length=10, choices=SupplyStatus.choices, default=SupplyStatus.ACTIVE
+    )
+
+    all_objects = models.Manager()
+    objects = SoftDeleteManager()
+
+    def __str__(self) -> str:
+        return f"Água {self.consumo_m3} m³ — {self.bill}"
+
+
+class ElectricityBillStatement(AuditMixin, SoftDeleteMixin, models.Model):
+    """1:1 reading detail of an ELECTRICITY (CEEE) Bill — consumo/leituras only. Money lives
+    on BillLineItem (single source, design §3.2); this model carries zero currency fields."""
+
+    bill = models.OneToOneField(
+        Bill, on_delete=models.CASCADE, related_name="electricity_statement"
+    )
+    consumo_kwh = models.PositiveIntegerField()
+    energia_injetada_kwh = models.PositiveIntegerField(null=True, blank=True)  # null = no solar
+    leitura_anterior = models.PositiveIntegerField(null=True, blank=True)
+    leitura_atual = models.PositiveIntegerField(null=True, blank=True)
+    leitura_dias = models.PositiveSmallIntegerField(null=True, blank=True)
+    classe = models.CharField(max_length=60, blank=True)
+    bandeira = models.CharField(max_length=40, blank=True)
+
+    all_objects = models.Manager()
+    objects = SoftDeleteManager()
+
+    def __str__(self) -> str:
+        return f"Luz {self.consumo_kwh} kWh — {self.bill}"

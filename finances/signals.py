@@ -19,6 +19,7 @@ from finances.models import (
     BillSkip,
     Category,
     CondoMonthClose,
+    ElectricityBillStatement,
     Employee,
     IncomeEntry,
     Installment,
@@ -27,6 +28,7 @@ from finances.models import (
     PaymentAllocation,
     Reserve,
     ReserveMovement,
+    WaterBillStatement,
 )
 
 logger = logging.getLogger(__name__)
@@ -46,6 +48,8 @@ _FINANCE_MODELS = (
     ReserveMovement,
     IncomeEntry,
     CondoMonthClose,
+    WaterBillStatement,
+    ElectricityBillStatement,
 )
 
 

@@ -31,6 +31,7 @@ from finances.models import (
     CondoMonthClose,
     FundedFrom,
     IncomeEntry,
+    Installment,
     Payment,
     Reserve,
     ReserveMovement,
@@ -49,7 +50,12 @@ from finances.serializers import (
 from finances.services.bill_generation_service import BillGenerationService
 from finances.services.bill_lifecycle_service import BillLifecycleService
 from finances.services.bill_payment_service import BillPaymentService
-from finances.services.bill_service import BillDraft, BillLineInput, BillService
+from finances.services.bill_service import (
+    BillDraft,
+    BillLineInput,
+    BillService,
+    StatementInput,
+)
 from finances.services.condo_month_close_service import CondoMonthCloseService
 from finances.services.reserve_service import ReserveService
 from finances.services.timezone import today_sp
@@ -174,6 +180,71 @@ class PaymentViewSet(viewsets.ModelViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+_INT_STATEMENT_FIELDS = frozenset(
+    {
+        "consumo_m3",
+        "consumo_kwh",
+        "energia_injetada_kwh",
+        "leitura_anterior",
+        "leitura_atual",
+        "leitura_dias",
+    }
+)
+_DATE_STATEMENT_FIELDS = frozenset({"data_leitura"})
+
+_ERR_STATEMENT_OBJECT = "statement deve ser um objeto."
+_ERR_LINE_OBJECT = "Cada linha deve ser um objeto."
+
+
+def _coerce_statement_value(field: str, raw: object) -> object:
+    """Coerce a single raw statement field (int / date / str) — raises on a bad value."""
+    if raw is None:
+        return None
+    if field in _INT_STATEMENT_FIELDS:
+        return int(str(raw))  # bad value -> ValueError -> 400 PT in the action
+    if field in _DATE_STATEMENT_FIELDS:
+        return date.fromisoformat(str(raw))
+    return str(raw)
+
+
+def _parse_statement(raw: object) -> StatementInput | None:
+    """Build a typed statement dict from the raw request payload (None passes through).
+
+    The statement TYPE (water vs electricity) is decided by the billing account in the
+    service; here we only coerce values (int/date/str) and surface a 400 PT on a bad one.
+    """
+    if raw is None:
+        return None
+    if not isinstance(raw, dict):
+        raise ValidationError(_ERR_STATEMENT_OBJECT)
+    coerced = {field: _coerce_statement_value(field, value) for field, value in raw.items()}
+    return cast(StatementInput, coerced)
+
+
+def _parse_lines(line_items: list[object]) -> list[BillLineInput]:
+    """Build BillLineInput list from the raw line_items payload (resolves category/installment)."""
+    lines: list[BillLineInput] = []
+    for raw in line_items:
+        if not isinstance(raw, dict):
+            raise ValidationError(_ERR_LINE_OBJECT)
+        category_id = raw.get("category_id")
+        installment_id = raw.get("installment_id")
+        lines.append(
+            BillLineInput(
+                description=str(raw["description"]),
+                amount=Decimal(str(raw["amount"])),
+                is_offset=bool(raw.get("is_offset", False)),
+                category=(Category.objects.filter(pk=category_id).first() if category_id else None),
+                installment=(
+                    Installment.objects.filter(pk=installment_id).first()
+                    if installment_id
+                    else None
+                ),
+            )
+        )
+    return lines
+
+
 class BillViewSet(viewsets.ModelViewSet):
     serializer_class = BillSerializer
     permission_classes = [FinancialReadOnly]
@@ -182,7 +253,14 @@ class BillViewSet(viewsets.ModelViewSet):
     def get_queryset(self) -> QuerySet[Bill]:
         queryset = (
             Bill.objects.with_amounts(today_sp())
-            .select_related("building", "category", "billing_account", "condominium")
+            .select_related(
+                "building",
+                "category",
+                "billing_account",
+                "condominium",
+                "water_statement",
+                "electricity_statement",
+            )
             .prefetch_related("line_items", "allocations")
         )
         return self._apply_filters(queryset, self.request.query_params)
@@ -352,24 +430,47 @@ class BillViewSet(viewsets.ModelViewSet):
                 lifecycle_state=validated.get("lifecycle_state", BillLifecycleState.ACTIVE),
                 notes=validated.get("notes", ""),
             )
-            lines: list[BillLineInput] = [
-                BillLineInput(
-                    description=str(item["description"]),
-                    amount=Decimal(str(item["amount"])),
-                    is_offset=bool(item.get("is_offset", False)),
-                    category=(
-                        Category.objects.filter(pk=item.get("category_id")).first()
-                        if item.get("category_id")
-                        else None
-                    ),
-                )
-                for item in line_items
-            ]
-            bill = BillService.create_with_lines(draft, lines, user=cast(User, request.user))
+            lines = _parse_lines(line_items)
+            statement = _parse_statement(request.data.get("statement"))
+            bill = BillService.create_with_lines(
+                draft, lines, statement=statement, user=cast(User, request.user)
+            )
         except (KeyError, ValueError, InvalidOperation, ValidationError) as exc:
             message = exc.messages[0] if isinstance(exc, ValidationError) else str(exc)
             return Response({"error": message}, status=status.HTTP_400_BAD_REQUEST)
         return Response(self._serialized_bill(bill), status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=["post"])
+    def update_with_lines(self, request: Request, pk: str | None = None) -> Response:
+        """Replace a bill's lines + upsert its statement on the SAME Bill (UNPAID + OPEN only)."""
+        bill = self.get_object()
+        line_items = request.data.get("line_items", [])
+        if not isinstance(line_items, list):
+            return Response(
+                {"error": "Payload inválido: 'line_items' (lista) é obrigatório."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            lines = _parse_lines(line_items)
+            statement = _parse_statement(request.data.get("statement"))
+            BillService.update_with_lines(
+                bill, lines, statement=statement, user=cast(User, request.user)
+            )
+        except (KeyError, ValueError, InvalidOperation, ValidationError) as exc:
+            message = exc.messages[0] if isinstance(exc, ValidationError) else str(exc)
+            return Response({"error": message}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(self._serialized_bill(bill), status=status.HTTP_200_OK)
+
+    def destroy(self, request: Request, *args: object, **kwargs: object) -> Response:
+        """Soft-delete the bill through BillService.delete, which cascades to its statement.
+
+        The default destroy would SoftDeleteMixin.delete() only the Bill row, leaving a live
+        water/electricity statement orphaned (it would still surface via the reverse accessor on
+        a re-fetched soft-deleted bill — design §7.3). delete soft-deletes the statement first.
+        """
+        bill = self.get_object()
+        BillService.delete(bill, user=cast(User, request.user))
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class ReserveViewSet(viewsets.ModelViewSet):
