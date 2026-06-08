@@ -18,6 +18,17 @@ LOCMEM_CACHE = {
     }
 }
 
+# Drives the REAL _is_redis_backend() to True from config (no live Redis needed — the only external
+# boundary, get_redis_connection, is mocked). This replaces patching the internal _is_redis_backend
+# helper, so a parsing bug in that helper would now actually fail the Redis-branch tests.
+REDIS_CACHE = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": "redis://127.0.0.1:6379/1",
+        "OPTIONS": {"CLIENT_CLASS": "django_redis.client.DefaultClient"},
+    }
+}
+
 
 @pytest.mark.unit
 class TestGetCacheKey:
@@ -234,10 +245,9 @@ class TestGetCacheKeyWithModelInstance:
 class TestCacheManagerInvalidateWithRedis:
     """Covers the Redis-backend path in invalidate_pattern/get_cache_stats by simulating it."""
 
-    @override_settings(CACHES=LOCMEM_CACHE)
+    @override_settings(CACHES=REDIS_CACHE)
     def test_invalidate_pattern_with_redis_exception_returns_zero(self, mocker):
         """Covers lines 232-237: get_redis_connection raises, exception caught → returns 0."""
-        mocker.patch("core.cache._is_redis_backend", return_value=True)
         mocker.patch(
             "core.cache.get_redis_connection",
             side_effect=Exception("Redis connection refused"),
@@ -245,23 +255,21 @@ class TestCacheManagerInvalidateWithRedis:
         count = CacheManager.invalidate_pattern("*anything*")
         assert count == 0
 
-    @override_settings(CACHES=LOCMEM_CACHE)
+    @override_settings(CACHES=REDIS_CACHE)
     def test_invalidate_pattern_with_redis_no_matching_keys(self, mocker):
         """Covers lines 239-244: keys found is empty → returns 0."""
         mock_redis = mocker.MagicMock()
         mock_redis.scan.return_value = (0, [])
-        mocker.patch("core.cache._is_redis_backend", return_value=True)
         mocker.patch("core.cache.get_redis_connection", return_value=mock_redis)
         count = CacheManager.invalidate_pattern("*no_match*")
         assert count == 0
 
-    @override_settings(CACHES=LOCMEM_CACHE)
+    @override_settings(CACHES=REDIS_CACHE)
     def test_invalidate_pattern_with_redis_deletes_matching_keys(self, mocker):
         """Covers lines 239-242: keys found and deleted."""
         mock_redis = mocker.MagicMock()
         mock_redis.scan.return_value = (0, [b"condominios:1:SomeModel:1"])
         mock_redis.delete.return_value = 1
-        mocker.patch("core.cache._is_redis_backend", return_value=True)
         mocker.patch("core.cache.get_redis_connection", return_value=mock_redis)
         count = CacheManager.invalidate_pattern("*SomeModel*")
         assert count == 1
@@ -276,22 +284,20 @@ class TestCacheManagerInvalidateWithRedis:
         assert result is False
 
     @override_settings(CACHES=LOCMEM_CACHE)
-    def test_get_cache_stats_without_redis_returns_zeros(self, mocker):
-        """Covers line 281: HAS_DJANGO_REDIS=False branch returns zero stats."""
-        mocker.patch("core.cache._is_redis_backend", return_value=False)
+    def test_get_cache_stats_without_redis_returns_zeros(self):
+        """Covers line 281: a non-Redis backend returns zero stats (real _is_redis_backend → False)."""
         stats = CacheManager.get_cache_stats()
         assert stats["total_keys"] == 0
         assert stats["keyspace_hits"] == 0
         assert stats["keyspace_misses"] == 0
         assert stats["hit_rate"] == 0.0
 
-    @override_settings(CACHES=LOCMEM_CACHE)
+    @override_settings(CACHES=REDIS_CACHE)
     def test_get_cache_stats_with_redis(self, mocker):
-        """Covers lines 288-306: HAS_DJANGO_REDIS=True, get_redis_connection used."""
+        """Covers lines 288-306: Redis backend, get_redis_connection used."""
         mock_redis = mocker.MagicMock()
         mock_redis.info.return_value = {"keyspace_hits": 100, "keyspace_misses": 20}
         mock_redis.keys.return_value = [b"key1", b"key2"]
-        mocker.patch("core.cache._is_redis_backend", return_value=True)
         mocker.patch("core.cache.get_redis_connection", return_value=mock_redis)
         stats = CacheManager.get_cache_stats()
         assert stats["total_keys"] == 2
@@ -299,10 +305,9 @@ class TestCacheManagerInvalidateWithRedis:
         assert stats["keyspace_misses"] == 20
         assert stats["hit_rate"] > 0
 
-    @override_settings(CACHES=LOCMEM_CACHE)
+    @override_settings(CACHES=REDIS_CACHE)
     def test_get_cache_stats_exception_returns_zeros(self, mocker):
         """Covers lines 307-314: get_redis_connection raises in get_cache_stats → zeros."""
-        mocker.patch("core.cache._is_redis_backend", return_value=True)
         mocker.patch(
             "core.cache.get_redis_connection",
             side_effect=Exception("Redis down"),
