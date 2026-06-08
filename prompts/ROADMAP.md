@@ -440,3 +440,50 @@ Cadeia: 34 -> (35 || 36); 36->37->38->39->40; 41->42->43; 44->45->46; 47->48; 49
 | 8 | 49 -> 50 | Fase 6 |
 
 > **Execucao recomendada**: estritamente sequencial 34->50 (gate 100% + >=90% em `finances` por fase antes de avancar - design sec.16 / feedback_quality_gate). Paralelismo so na wave 2 (35||36) se desejado.
+
+---
+
+# Roadmap — Feature: Fluxo "Novo inquilino + contrato" (web)
+
+**Design Doc**: `docs/plans/2026-06-07-tenant-lease-onboarding-design.md`
+**Sessões**: 51–55 (5) · **Branch sugerida**: `feat/tenant-lease-onboarding` (a partir de `master`)
+**Status**: prompts escritos (51–55). Nenhuma sessão executada. **Plano 2 (mobile) é posterior** (após a sessão de installments/payroll terminar) e reusa o endpoint transacional desta feature.
+
+## Grafo de dependências
+
+```
+51 BE root fixes (disponibilidade apto + captura dependentes/auditoria + guard locador)
+   |
+   v
+52 BE endpoint transacional POST /api/onboarding/tenant-lease/ (service + serializer + view + rota)
+   |                                   53 FE extração DRY (derivações/date/resident-dependent +
+   |                                      remoção email/phone_alternate)  [paralelo a 51/52]
+   +-------------------+-------------------+
+                       v
+                  54 FE wizard combinado + useOnboardTenantLease + schema  (precisa 52 + 53)
+                       |
+                       v
+                  55 FE CTA dashboard + passo PDF (eager/202/400) + e2e/polish/audit
+```
+
+Cadeia: `51 → 52`; `53` independente (FE, paralelo); `54` depende de **52 + 53**; `55` depende de **54** (e do guard da 51).
+
+## Waves
+| Wave | Sessões | Paralelo | Observação |
+|------|---------|----------|------------|
+| 1 | **51** (BE) ‖ **53** (FE) | 2 trabalhadores | stacks diferentes, sem conflito de arquivo |
+| 2 | **52** (BE) | 1 | depende de 51 |
+| 3 | **54** (FE) | 1 | depende de 52 (contrato API) + 53 (utils) |
+| 4 | **55** (FE) | 1 | depende de 54 |
+
+> **Caminho crítico**: `51 → 52 → 54 → 55`. `53` corre em paralelo (não bloqueia até a 54).
+
+## Contratos cross-session AUTORITATIVOS (se um prompt divergir, ISTO prevalece)
+- **Endpoint**: `POST /api/onboarding/tenant-lease/` (admin-only). Body `{ tenant{...,id?}, lease{... SEM responsible_tenant_id/tenant_ids}, resident_dependent{name,phone,cpf_cnpj?}? ⊕ resident_dependent_id? }`. 201 `{ tenant, lease }`. Erros `400 {tenant:{...}}`/`400 {lease:{...}}` (apto → `lease.apartment`); `403`/`401`. Servidor injeta `responsible_tenant_id`/`tenant_ids`.
+- **S51 fornece**: `LeaseSerializer.validate` rejeita apto ocupado (`{"apartment": ["Este apartamento já possui um contrato ativo."]}`); `TenantSerializer.create/update` setam `tenant._created_dependents` (ordem do array) + propagam auditoria; `prepare_contract_context` levanta `ValidationError` PT sem locador → `generate_contract` 400.
+- **S52 fornece**: `TenantOnboardingService.onboard` (`@transaction.atomic`, `select_for_update` no `Apartment`, `except IntegrityError`→400 `apartment`).
+- **S53 fornece**: `@/lib/utils/lease-derivations` (`deriveRentalValue`,`deriveDueDayFromStartDate`); `@/lib/utils/date` (`parseLocalDate`); `@/lib/schemas/lease.schema` (`leaseValuesSchemaShape`); `@/app/(dashboard)/_components/shared/resident-dependent-field`; **email/phone_alternate removidos** do domínio do inquilino.
+- **S54 fornece**: `TenantLeaseOnboardingWizard` props `{open,onOpenChange,onSuccess(tenant,lease)}`; `useOnboardTenantLease` → `{tenant,lease}`; prefill converte `furnitures`→`furniture_ids` (NÃO usar `useUpdateTenant`).
+- **S55 fornece**: `useGenerateContract` união discriminada `{pdf_path} | {task_id,status}` (consumidor `contract-generate-modal` atualizado); CTA gated `is_staff`; passo 6 trata 200/202/400.
+- **Sem migração/RLS** (nenhum model novo). **Sem regra "1 contrato ativo por inquilino"** (constraint de apto + filtro do front).
+- **Gate por sessão** (memória `feedback_testing_scope` + `coding-standards`): rodar testes só nos arquivos editados + regressão dirigida; BE `ruff`+`mypy core/`+`pyright`; FE `type-check`+`eslint`; zero erros/warnings; sem suppressions.
