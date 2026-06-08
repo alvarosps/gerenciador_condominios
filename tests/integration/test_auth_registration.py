@@ -5,6 +5,8 @@ from django.contrib.auth import get_user_model
 from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from tests.constants import TEST_PASSWORD, TEST_PASSWORD_NEW
+
 User = get_user_model()
 
 
@@ -15,8 +17,8 @@ class TestRegisterEndpoint:
             "/api/auth/register/",
             {
                 "email": "newuser@example.com",
-                "password": "StrongPass123!",
-                "password2": "StrongPass123!",
+                "password": TEST_PASSWORD,
+                "password2": TEST_PASSWORD,
                 "first_name": "João",
                 "last_name": "Silva",
             },
@@ -47,8 +49,8 @@ class TestRegisterEndpoint:
             "/api/auth/register/",
             {
                 "email": "mismatch@example.com",
-                "password": "StrongPass123!",
-                "password2": "DifferentPass123!",
+                "password": TEST_PASSWORD,
+                "password2": TEST_PASSWORD_NEW,
                 "first_name": "Ana",
                 "last_name": "Costa",
             },
@@ -64,8 +66,8 @@ class TestRegisterEndpoint:
             "/api/auth/register/",
             {
                 "email": "admin@test.com",
-                "password": "StrongPass123!",
-                "password2": "StrongPass123!",
+                "password": TEST_PASSWORD,
+                "password2": TEST_PASSWORD,
                 "first_name": "Dup",
                 "last_name": "User",
             },
@@ -103,8 +105,8 @@ class TestRegisterEndpoint:
             "/api/auth/register/",
             {
                 "email": "staff_attempt@example.com",
-                "password": "StrongPass123!",
-                "password2": "StrongPass123!",
+                "password": TEST_PASSWORD,
+                "password2": TEST_PASSWORD,
                 "first_name": "Normal",
                 "last_name": "User",
             },

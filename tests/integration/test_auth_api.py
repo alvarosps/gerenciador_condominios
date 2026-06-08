@@ -3,13 +3,15 @@
 import pytest
 from rest_framework import status
 
+from tests.constants import TEST_PASSWORD, WRONG_PASSWORD
+
 
 @pytest.mark.integration
 class TestJWTTokenEndpoints:
     def test_obtain_token_with_valid_credentials(self, api_client, admin_user):
         response = api_client.post(
             "/api/auth/token/",
-            {"username": "admin", "password": "testpass123"},
+            {"username": "admin", "password": TEST_PASSWORD},
             format="json",
         )
         assert response.status_code == status.HTTP_200_OK
@@ -21,7 +23,7 @@ class TestJWTTokenEndpoints:
     def test_obtain_token_with_invalid_credentials(self, api_client):
         response = api_client.post(
             "/api/auth/token/",
-            {"username": "admin", "password": "wrongpassword"},
+            {"username": "admin", "password": WRONG_PASSWORD},
             format="json",
         )
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
@@ -34,7 +36,7 @@ class TestJWTTokenEndpoints:
         # Login to get refresh_token cookie
         api_client.post(
             "/api/auth/token/",
-            {"username": "admin", "password": "testpass123"},
+            {"username": "admin", "password": TEST_PASSWORD},
             format="json",
         )
         # Refresh uses the cookie set by login (APIClient carries cookies automatically)

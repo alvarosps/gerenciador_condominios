@@ -8,6 +8,8 @@ Covers:
 import pytest
 from rest_framework import status
 
+from tests.constants import TEST_PASSWORD, TEST_PASSWORD_NEW, WRONG_PASSWORD
+
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
 UPDATE_URL = "/api/auth/me/update/"
@@ -63,17 +65,17 @@ class TestChangePassword:
     def test_change_password_success(self, authenticated_api_client, admin_user):
         response = authenticated_api_client.post(
             CHANGE_PASSWORD_URL,
-            {"old_password": "testpass123", "new_password": "newpass456"},
+            {"old_password": TEST_PASSWORD, "new_password": TEST_PASSWORD_NEW},
             format="json",
         )
         assert response.status_code == status.HTTP_200_OK
         admin_user.refresh_from_db()
-        assert admin_user.check_password("newpass456")
+        assert admin_user.check_password(TEST_PASSWORD_NEW)
 
     def test_wrong_old_password_returns_400(self, authenticated_api_client):
         response = authenticated_api_client.post(
             CHANGE_PASSWORD_URL,
-            {"old_password": "wrongpassword", "new_password": "newpass456"},
+            {"old_password": WRONG_PASSWORD, "new_password": TEST_PASSWORD_NEW},
             format="json",
         )
         assert response.status_code == status.HTTP_400_BAD_REQUEST
@@ -82,7 +84,7 @@ class TestChangePassword:
     def test_short_new_password_returns_400(self, authenticated_api_client):
         response = authenticated_api_client.post(
             CHANGE_PASSWORD_URL,
-            {"old_password": "testpass123", "new_password": "abc"},
+            {"old_password": TEST_PASSWORD, "new_password": "abc"},
             format="json",
         )
         assert response.status_code == status.HTTP_400_BAD_REQUEST
@@ -91,7 +93,7 @@ class TestChangePassword:
     def test_missing_old_password_returns_400(self, authenticated_api_client):
         response = authenticated_api_client.post(
             CHANGE_PASSWORD_URL,
-            {"new_password": "newpass456"},
+            {"new_password": TEST_PASSWORD_NEW},
             format="json",
         )
         assert response.status_code == status.HTTP_400_BAD_REQUEST
@@ -100,7 +102,7 @@ class TestChangePassword:
     def test_missing_new_password_returns_400(self, authenticated_api_client):
         response = authenticated_api_client.post(
             CHANGE_PASSWORD_URL,
-            {"old_password": "testpass123"},
+            {"old_password": TEST_PASSWORD},
             format="json",
         )
         assert response.status_code == status.HTTP_400_BAD_REQUEST
@@ -109,7 +111,7 @@ class TestChangePassword:
     def test_unauthenticated_returns_401(self, api_client):
         response = api_client.post(
             CHANGE_PASSWORD_URL,
-            {"old_password": "testpass123", "new_password": "newpass456"},
+            {"old_password": TEST_PASSWORD, "new_password": TEST_PASSWORD_NEW},
             format="json",
         )
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
