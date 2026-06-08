@@ -55,6 +55,35 @@ def _clear_caches_between_tests():
         store.clear()
 
 
+@pytest.fixture(autouse=True)
+def _restore_signal_receivers():
+    """Restore the process-global Django signal registry after every test.
+
+    Signal connect/disconnect mutates a PROCESS-GLOBAL receiver list that the per-test DB rollback
+    does NOT undo. A test that disconnects a receiver and fails to fully reconnect (e.g.
+    core.signals.disconnect_all_signals, whose paired connect must restore the Lease ->
+    Apartment.is_rented sync) would silently break EVERY later test in the same xdist worker —
+    order-dependent flakiness that only surfaces under `-n` parallel scheduling. Snapshotting and
+    restoring the receiver lists here makes that whole class of cross-test pollution impossible.
+    """
+    from django.db.models.signals import (
+        m2m_changed,
+        post_delete,
+        post_save,
+        pre_delete,
+        pre_save,
+    )
+
+    tracked = (pre_save, post_save, pre_delete, post_delete, m2m_changed)
+    saved = {signal: list(signal.receivers) for signal in tracked}
+    yield
+    for signal in tracked:
+        if list(signal.receivers) != saved[signal]:
+            with signal.lock:
+                signal.receivers = saved[signal]
+                signal.sender_receivers_cache.clear()
+
+
 @pytest.fixture(scope="session")
 def django_db_setup(django_db_setup, django_db_blocker):
     """

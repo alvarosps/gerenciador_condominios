@@ -360,9 +360,10 @@ class TestSignalConnectDisconnect:
         from core.signals import connect_all_signals, disconnect_all_signals
 
         disconnect_all_signals()
-        connect_all_signals()
+        connect_all_signals()  # must genuinely restore the receivers (not a no-op)
 
-        # Lease creation should still sync is_rented
+        # The reconnect must restore the Lease -> Apartment.is_rented sync: creating a lease flips
+        # is_rented to True. (If connect_all_signals regresses to a no-op, this assertion fails.)
         lease = Lease.objects.create(
             apartment=apartment,
             responsible_tenant=tenant,
@@ -371,9 +372,8 @@ class TestSignalConnectDisconnect:
             rental_value=Decimal("1200.00"),
         )
         apartment.refresh_from_db()
-        # Signal reconnected — but disconnect removed receivers; behavior may differ
-        # Main goal: no exception raised
         assert lease.pk is not None
+        assert apartment.is_rented is True
 
 
 # =============================================================================
