@@ -10,6 +10,7 @@ from finances.viewsets import (
     CategoryViewSet,
     CondoMonthCloseViewSet,
     EmployeeViewSet,
+    FinanceCashFlowViewSet,
     FinanceDashboardViewSet,
     IncomeEntryViewSet,
     InstallmentPlanViewSet,
@@ -35,5 +36,6 @@ router.register(r"reserve-movements", ReserveMovementViewSet, basename="reserve-
 router.register(r"income-entries", IncomeEntryViewSet, basename="income-entries")
 router.register(r"condo-month-closes", CondoMonthCloseViewSet, basename="condo-month-closes")
 router.register(r"finance-dashboard", FinanceDashboardViewSet, basename="finance-dashboard")
+router.register(r"finance-cash-flow", FinanceCashFlowViewSet, basename="finance-cash-flow")
 
 urlpatterns = [path("", include(router.urls))]

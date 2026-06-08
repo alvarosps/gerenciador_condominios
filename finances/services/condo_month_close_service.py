@@ -154,6 +154,11 @@ class CondoMonthCloseService:
         breakdown["total_balance"] = money_str(
             quantize_money(cash_balance_end + reserve_balance_end)
         )
+        # Freeze the competence pontas (income/expense halves) so a consumer (the projection)
+        # can show a closed month's bars without a live recompute drifting from the frozen net.
+        revenue, expense = CondoBalanceService.competence_pontas(year, month)
+        breakdown["income_total"] = money_str(revenue)
+        breakdown["expenses_total"] = money_str(expense)
         snapshot.breakdown = breakdown
         snapshot.updated_by = user
 

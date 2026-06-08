@@ -46,8 +46,12 @@ class BillGenerationService:
         )
 
     @staticmethod
-    def _is_account_eligible(account: BillingAccount, month_start: date) -> bool:
-        """Active, within tracking_start_month..end_date, and not skipped for the month."""
+    def is_account_eligible(account: BillingAccount, month_start: date) -> bool:
+        """Active, within tracking_start_month..end_date, and not skipped for the month.
+
+        Single source of the "this account generates a recurring bill in month M" predicate,
+        shared with CondoProjectionService (the projection must never diverge from generation).
+        """
         if account.lifecycle_state != BillingAccountState.ACTIVE:
             return False
         if account.tracking_start_month is not None and account.tracking_start_month > month_start:
@@ -71,7 +75,7 @@ class BillGenerationService:
         bills: list[Bill] = []
         # (1) recurring accounts + seed line (S37).
         for account in BillingAccount.objects.filter(lifecycle_state=BillingAccountState.ACTIVE):
-            if not BillGenerationService._is_account_eligible(account, month_start):
+            if not BillGenerationService.is_account_eligible(account, month_start):
                 continue
             bills.append(BillGenerationService._ensure_account_bill(account, year, month, user))
         # (2) embedded installments -> line on the recurring account's Bill (needs step 1).
