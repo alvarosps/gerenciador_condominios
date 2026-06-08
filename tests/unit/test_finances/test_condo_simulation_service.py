@@ -105,6 +105,19 @@ def test_validate_scenarios_rejects_non_finite_amount() -> None:
         assert len(errors) == 1, bad
 
 
+def test_validate_scenarios_rejects_finite_but_out_of_range_amount() -> None:
+    # finite yet huge: passes is_finite() but quantizing it later would raise InvalidOperation (500),
+    # so it must be rejected at validation (400) — both the string and the bare-float forms.
+    for bad in ("1e1000", "1e30", 1e30, "10000000000"):
+        errors = CondoSimulationService.validate_scenarios([{"type": "add_expense", "amount": bad}])
+        assert len(errors) == 1, bad
+    # a normal large condo value is still accepted
+    assert (
+        CondoSimulationService.validate_scenarios([{"type": "add_expense", "amount": "5000.00"}])
+        == []
+    )
+
+
 def test_validate_scenarios_rejects_non_dict_element() -> None:
     scenarios: list[Any] = ["nope", 123, None]
     assert len(CondoSimulationService.validate_scenarios(scenarios)) == 3

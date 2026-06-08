@@ -7,6 +7,7 @@ import pytest
 from finances.services.condo_calendar_service import CondoCalendarService
 from freezegun import freeze_time
 
+from core.services.rent_schedule_service import RentScheduleService
 from tests.factories import make_apartment, make_bill, make_bill_line_item, make_lease, make_tenant
 
 pytestmark = pytest.mark.django_db
@@ -70,3 +71,15 @@ def test_building_filter_and_soft_deleted_excluded() -> None:
 def test_empty_month() -> None:
     result = CondoCalendarService.combined_month(2026, 7)
     assert all(not d["bill_exits"] for d in result["days"])
+
+
+@freeze_time("2026-07-01 02:00:00")
+def test_today_is_sao_paulo_date_for_both_halves_at_utc_boundary() -> None:
+    # 2026-07-01 02:00 UTC is still 2026-06-30 23:00 in São Paulo. Both the calendar's `today`
+    # marker AND the rent half (via as_of) must report the SP date — not the UTC date (July 1).
+    result = CondoCalendarService.combined_month(2026, 6)
+    assert result["today"] == "2026-06-30"
+    # The rent half's stats `today` rides on the same SP date (no UTC/SP split in one payload).
+    assert RentScheduleService.get_month_schedule(2026, 6, as_of=date(2026, 6, 30))["today"] == (
+        "2026-06-30"
+    )

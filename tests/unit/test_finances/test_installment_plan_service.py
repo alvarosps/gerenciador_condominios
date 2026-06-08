@@ -6,7 +6,7 @@ from decimal import Decimal
 import pytest
 from django.core.exceptions import ValidationError
 from finances.models import Bill, BillLifecycleState, InstallmentPlan, InstallmentPlanState
-from finances.services.installment_plan_service import InstallmentPlanService
+from finances.services.installment_plan_service import InstallmentPlanService, _split_amount
 from freezegun import freeze_time
 
 from tests.factories import make_bill, make_bill_line_item
@@ -52,6 +52,32 @@ def test_convert_deferred_remainder_on_last_installment() -> None:
     amounts = [i.amount for i in plan.installments.order_by("number")]
     assert amounts == [Decimal("33.33"), Decimal("33.33"), Decimal("33.34")]
     assert sum(amounts) == Decimal("100.00")
+
+
+@pytest.mark.parametrize(
+    ("total", "count"),
+    [("0.05", 9), ("0.54", 12), ("0.01", 3), ("100.00", 3), ("1200.00", 12), ("7.00", 24)],
+)
+def test_split_amount_parts_are_non_negative_and_sum_exact(total: str, count: int) -> None:
+    parts = _split_amount(Decimal(total), count)
+    assert len(parts) == count
+    assert all(part >= Decimal("0.00") for part in parts), (total, count, parts)
+    assert sum(parts) == Decimal(total)
+
+
+@freeze_time("2026-06-15")
+def test_convert_deferred_rejects_negative_total() -> None:
+    bill = make_bill(behavior="one_time", lifecycle_state=BillLifecycleState.DEFERRED)
+    make_bill_line_item(bill=bill, amount=Decimal("10.00"), is_offset=False)
+    make_bill_line_item(bill=bill, amount=Decimal("50.00"), is_offset=True)  # net total -40
+    with pytest.raises(ValidationError):
+        InstallmentPlanService.convert_deferred(
+            deferred_bill=bill,
+            installment_count=3,
+            start_due_date=date(2026, 7, 10),
+            default_due_day=10,
+        )
+    assert InstallmentPlan.objects.count() == 0  # atomic: nothing created
 
 
 @freeze_time("2026-08-15")

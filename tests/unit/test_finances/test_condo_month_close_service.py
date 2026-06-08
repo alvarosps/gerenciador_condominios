@@ -23,6 +23,7 @@ from tests.factories import (
     make_bill,
     make_bill_line_item,
     make_building,
+    make_condominium,
     make_lease,
     make_rent_payment,
 )
@@ -67,6 +68,7 @@ def test_close_freezes_values() -> None:
 
 @freeze_time("2026-06-15")
 def test_close_rejects_chronological_gap() -> None:
+    make_condominium()  # close() resolves the default condominium (self-contained, no ambient state)
     FinancialSettings.objects.create(
         pk=1,
         initial_balance=Decimal("0.00"),
@@ -84,6 +86,7 @@ def test_close_rejects_chronological_gap() -> None:
 
 @freeze_time("2026-06-15")
 def test_close_already_closed_rejected() -> None:
+    make_condominium()
     CondoMonthCloseService.close(2026, 6)
     with pytest.raises(ValidationError):
         CondoMonthCloseService.close(2026, 6)
@@ -111,6 +114,29 @@ def test_fold_anchor_excludes_pre_tracking_month() -> None:
     # June is the anchor; it can be closed without closing May first (May precedes the anchor).
     june = CondoMonthCloseService.close(2026, 6)
     assert june.carry_forward_out == Decimal("0.00")  # June net 0, May's -80 not folded in
+
+
+@freeze_time("2026-06-15")
+def test_closing_pre_tracking_month_does_not_leak_into_first_tracked_fold() -> None:
+    """§18: a pre-tracking month CAN be closed (it precedes the anchor), but its net is ISOLATED —
+    it freezes carry_forward_out=0.00 and never accumulates into the first tracked month's fold,
+    so the frozen snapshot and OwnerDistributionService agree (§4.7)."""
+    FinancialSettings.objects.create(
+        pk=1,
+        initial_balance=Decimal("0.00"),
+        initial_balance_date=date(2026, 5, 1),
+        rent_tracking_start_date=date(2026, 6, 1),
+    )
+    _active_bill("80.00", date(2026, 5, 1))  # pre-tracking month → net -80
+    _active_bill("50.00", date(2026, 6, 1))  # first tracked month → net -50
+
+    may = CondoMonthCloseService.close(2026, 5)  # closing the pre-tracking month directly
+    assert may.net_result == Decimal("-80.00")  # net is still SHOWN
+    assert may.carry_forward_out == Decimal("0.00")  # but NOT folded forward (isolated)
+
+    june = CondoMonthCloseService.close(2026, 6)
+    # Only June's own -50 — NOT -130 (the pre-tracking -80 must not leak into the tracked fold).
+    assert june.carry_forward_out == Decimal("-50.00")
 
 
 @freeze_time("2026-06-15")
@@ -142,6 +168,7 @@ def test_reopen_nonexistent_month_rejected() -> None:
 
 @freeze_time("2026-06-15")
 def test_assert_open() -> None:
+    make_condominium()
     CondoMonthCloseService.assert_open(date(2026, 6, 1))  # no close → no-op
     CondoMonthCloseService.close(2026, 6)
     with pytest.raises(ValidationError):
@@ -162,6 +189,7 @@ def test_pay_blocked_on_closed_month_and_unblocked_on_reopen() -> None:
 @freeze_time("2026-01-15")
 def test_close_january_handles_year_boundary() -> None:
     # _prev_month(January) crosses to December of the prior year (chronological guard path).
+    make_condominium()
     close = CondoMonthCloseService.close(2026, 1)
     assert close.status == CondoMonthCloseStatus.CLOSED
     assert close.reference_month == date(2026, 1, 1)

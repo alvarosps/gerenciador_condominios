@@ -40,6 +40,7 @@ from .models import (
     MonthSnapshot,
     Notification,
     PaymentProof,
+    Person,
     PersonPayment,
     PersonPaymentSchedule,
     RentAdjustment,
@@ -55,7 +56,7 @@ logger = logging.getLogger(__name__)
 # locked by tests/unit/test_finances/test_finance_cache_signals.py. Writes to
 # Apartment / Lease / RentAdjustment / MonthSnapshot / RentPayment / FinancialSettings
 # change condominium revenue, projection or close state, so they invalidate finance-*.
-_FINANCE_CACHE_PREFIXES = ("finance-dashboard", "finance-cash-flow", "finance-projection")
+_FINANCE_CACHE_PREFIXES = ("finance-dashboard", "finance-projection")
 
 
 def _invalidate_finance_module_caches() -> None:
@@ -322,6 +323,24 @@ def _invalidate_financial_caches(model_name: str, pk: int) -> None:
     # RentPayment / FinancialSettings route through here, so the condominium-finance
     # module caches are invalidated for them too (DRY).
     _invalidate_finance_module_caches()
+
+
+@receiver(post_save, sender=Person)
+def invalidate_person_cache_on_save(
+    sender: type[Person], instance: Person, created: bool, **kwargs: Any
+) -> None:
+    # Person.name is surfaced in the condominium-finance by_owner card (external owners) and in the
+    # legacy financial dashboards, so a rename must invalidate both, not just leave a stale name.
+    action = "created" if created else "updated"
+    logger.info(f"Person {instance.pk} {action}, invalidating financial caches")
+    _invalidate_financial_caches("Person", instance.pk)
+
+
+@receiver(post_delete, sender=Person)
+def invalidate_person_cache_on_delete(
+    sender: type[Person], instance: Person, **kwargs: Any
+) -> None:
+    _invalidate_financial_caches("Person", instance.pk)
 
 
 @receiver(post_save, sender=PersonPayment)

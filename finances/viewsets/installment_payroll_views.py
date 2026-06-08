@@ -26,6 +26,7 @@ from finances.serializers import (
     InstallmentSerializer,
 )
 from finances.services.installment_plan_service import InstallmentPlanService
+from finances.viewsets.query_params import date_param, int_param
 
 
 class InstallmentPlanViewSet(viewsets.ModelViewSet):
@@ -38,15 +39,15 @@ class InstallmentPlanViewSet(viewsets.ModelViewSet):
             "category", "building", "linked_billing_account", "condominium"
         ).prefetch_related("installments")
         params = self.request.query_params
-        condominium_id = params.get("condominium_id")
+        condominium_id = int_param(params, "condominium_id")
         if condominium_id is not None:
-            queryset = queryset.filter(condominium_id=int(condominium_id))
-        building_id = params.get("building_id")
+            queryset = queryset.filter(condominium_id=condominium_id)
+        building_id = int_param(params, "building_id")
         if building_id is not None:
-            queryset = queryset.filter(building_id=int(building_id))
-        category_id = params.get("category_id")
+            queryset = queryset.filter(building_id=building_id)
+        category_id = int_param(params, "category_id")
         if category_id is not None:
-            queryset = queryset.filter(category_id=int(category_id))
+            queryset = queryset.filter(category_id=category_id)
         lifecycle_state = params.get("lifecycle_state")
         if lifecycle_state is not None:
             queryset = queryset.filter(lifecycle_state=lifecycle_state)
@@ -121,15 +122,15 @@ class InstallmentViewSet(viewsets.ModelViewSet):
     def get_queryset(self) -> QuerySet[Installment]:
         queryset = Installment.objects.select_related("plan", "plan__category")
         params = self.request.query_params
-        plan_id = params.get("plan_id")
+        plan_id = int_param(params, "plan_id")
         if plan_id is not None:
-            queryset = queryset.filter(plan_id=int(plan_id))
-        due_date_from = params.get("due_date_from")
+            queryset = queryset.filter(plan_id=plan_id)
+        due_date_from = date_param(params, "due_date_from")
         if due_date_from is not None:
-            queryset = queryset.filter(due_date__gte=date.fromisoformat(due_date_from))
-        due_date_to = params.get("due_date_to")
+            queryset = queryset.filter(due_date__gte=due_date_from)
+        due_date_to = date_param(params, "due_date_to")
         if due_date_to is not None:
-            queryset = queryset.filter(due_date__lte=date.fromisoformat(due_date_to))
+            queryset = queryset.filter(due_date__lte=due_date_to)
         return queryset
 
 
@@ -143,19 +144,19 @@ class EmployeeViewSet(viewsets.ModelViewSet):
             "person", "lease", "lease__apartment", "lease__apartment__building", "condominium"
         )
         params = self.request.query_params
-        condominium_id = params.get("condominium_id")
+        condominium_id = int_param(params, "condominium_id")
         if condominium_id is not None:
-            queryset = queryset.filter(condominium_id=int(condominium_id))
+            queryset = queryset.filter(condominium_id=condominium_id)
         is_active = params.get("is_active")
         if is_active is not None:
             queryset = queryset.filter(is_active=is_active.lower() == "true")
         payment_type = params.get("payment_type")
         if payment_type is not None:
             queryset = queryset.filter(payment_type=payment_type)
-        person_id = params.get("person_id")
+        person_id = int_param(params, "person_id")
         if person_id is not None:
-            queryset = queryset.filter(person_id=int(person_id))
-        lease_id = params.get("lease_id")
+            queryset = queryset.filter(person_id=person_id)
+        lease_id = int_param(params, "lease_id")
         if lease_id is not None:
-            queryset = queryset.filter(lease_id=int(lease_id))
+            queryset = queryset.filter(lease_id=lease_id)
         return queryset

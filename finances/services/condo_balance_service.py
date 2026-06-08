@@ -132,8 +132,12 @@ class CondoBalanceService:
 
     @staticmethod
     def reserve_balance(condominium_id: int | None = None) -> Decimal:
-        """Reserve = Σ deposits - Σ withdrawals (never negative; the guard lives in withdraw/pay)."""
-        movements = ReserveMovement.objects.all()
+        """Reserve = Σ deposits - Σ withdrawals (never negative; the guard lives in withdraw/pay).
+
+        Movements of a soft-deleted Reserve are excluded (a forward-FK join does not apply the
+        parent's default manager, so this must be explicit — soft-delete rule).
+        """
+        movements = ReserveMovement.objects.filter(reserve__is_deleted=False)
         if condominium_id is not None:
             movements = movements.filter(reserve__condominium_id=condominium_id)
         deposits = (
@@ -176,14 +180,22 @@ class CondoBalanceService:
 
     @staticmethod
     def overview(year: int, month: int, building_id: int | None = None) -> dict[str, Any]:
-        """Month KPIs (money as quantized string at the boundary), consuming the figures (DRY)."""
+        """Month KPIs (money as quantized string at the boundary), consuming the figures (DRY).
+
+        Reserve and total_balance are CONDO-LEVEL (one Reserve per condominium); a per-building
+        request (building_id set) reports them as None instead of mixing one building's cash with
+        the whole-condo reserve into a meaningless total.
+        """
         reference_month = date(year, month, 1)
         result = CondoBalanceService.result_of_month(year, month, building_id)
         cash_change = CondoBalanceService.cash_change_of_month(year, month, building_id)
         cash = CondoBalanceService.cash_balance(_next_month(reference_month), building_id)
-        reserve = CondoBalanceService.reserve_balance()
-        total = quantize_money(cash + reserve)
-        rent_stats = RentScheduleService.get_month_stats(year, month, building_id)
+        condo_wide = building_id is None
+        reserve = CondoBalanceService.reserve_balance() if condo_wide else None
+        total = quantize_money(cash + reserve) if reserve is not None else None
+        # as_of=today_sp(): the rent overdue/late-fee sub-block stays on SP's date, like every other
+        # finances "today" — never the UTC server date.
+        rent_stats = RentScheduleService.get_month_stats(year, month, building_id, as_of=today_sp())
         residual = CondoBalanceService._wedge_residual(year, month, building_id)
         return {
             "year": year,
@@ -191,8 +203,8 @@ class CondoBalanceService:
             "result_of_month": str(result),
             "cash_change_of_month": str(cash_change),
             "cash_balance": str(cash),
-            "reserve_balance": str(reserve),
-            "total_balance": str(total),
+            "reserve_balance": str(reserve) if reserve is not None else None,
+            "total_balance": str(total) if total is not None else None,
             "overdue_bills_total": str(CondoBalanceService.overdue_bills_total(building_id)),
             "overdue_bills_count": CondoBalanceService.overdue_bills_count(building_id),
             "rent_overdue": {
@@ -277,7 +289,10 @@ class CondoBalanceService:
 
     @staticmethod
     def _caixa_outflow(year: int, month: int, building_id: int | None) -> Decimal:
+        # payment__is_deleted=False: a soft-deleted Payment's allocation must not count (the forward
+        # FK join does not apply Payment's default manager) — defense in depth with unpay's cascade.
         queryset = PaymentAllocation.objects.filter(
+            payment__is_deleted=False,
             payment__funded_from=FundedFrom.CAIXA,
             payment__payment_date__year=year,
             payment__payment_date__month=month,
@@ -291,7 +306,10 @@ class CondoBalanceService:
         year: int, month: int, kind: str, bill_isnull: bool | None
     ) -> Decimal:
         queryset = ReserveMovement.objects.filter(
-            kind=kind, movement_date__year=year, movement_date__month=month
+            reserve__is_deleted=False,
+            kind=kind,
+            movement_date__year=year,
+            movement_date__month=month,
         )
         if bill_isnull is not None:
             queryset = queryset.filter(bill__isnull=bill_isnull)
@@ -330,31 +348,23 @@ class CondoBalanceService:
 
     @staticmethod
     def _wedge_residual(year: int, month: int, building_id: int | None = None) -> Decimal:
-        """Reconcile the two KPIs (design §4.2). Identity (closes to 0.00 by construction):
+        """Reconcile the two PUBLIC KPIs against an INDEPENDENT component delta (design §4.2):
 
-        result - cash_change == Δreceivables - Δpayables - reserve_net, where
-        Δreceivables = expected_unpaid + (income_competence - income_cash),
-        Δpayables    = expense_competence - caixa_outflow,
-        reserve_net  = reserve_to_cash - deposit_out.
-        A non-zero residual means the figures were combined inconsistently (a bug), so
-        overview.wedge_ok reports the reconciliation rather than silently diverging.
+            result_of_month - cash_change_of_month == Δreceivables - Δpayables - reserve_net, where
+            Δreceivables = expected_unpaid + (income_competence - income_cash),
+            Δpayables    = expense_competence - caixa_outflow,
+            reserve_net  = reserve_to_cash - deposit_out.
+
+        The left side reads the public, quantized result_of_month()/cash_change_of_month() — NOT an
+        inline copy of their formulas — so a real definitional or quantization drift in either KPI
+        yields a non-zero residual. overview.wedge_ok therefore reports a genuine reconciliation,
+        not an algebraic tautology that can never fail.
         """
+        result = CondoBalanceService.result_of_month(year, month, building_id)
+        cash_change = CondoBalanceService.cash_change_of_month(year, month, building_id)
         comp = CondoBalanceService._components(year, month, building_id)
-        result = (
-            comp.received_collectible
-            + comp.expected_unpaid
-            + comp.income_competence
-            - comp.expense_competence
-        )
-        cash_change = (
-            comp.received_collectible
-            + comp.income_cash
-            + comp.reserve_to_cash
-            - comp.caixa_outflow
-            - comp.deposit_out
-        )
         delta_receivables = comp.expected_unpaid + (comp.income_competence - comp.income_cash)
         delta_payables = comp.expense_competence - comp.caixa_outflow
         reserve_net = comp.reserve_to_cash - comp.deposit_out
-        residual = (result - cash_change) - (delta_receivables - delta_payables - reserve_net)
-        return quantize_money(residual)
+        expected_difference = delta_receivables - delta_payables - reserve_net
+        return quantize_money((result - cash_change) - expected_difference)

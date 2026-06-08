@@ -237,15 +237,19 @@ class RentScheduleService:
         return result
 
     @staticmethod
-    def get_month_schedule(year: int, month: int, building_id: int | None = None) -> dict[str, Any]:
+    def get_month_schedule(
+        year: int, month: int, building_id: int | None = None, as_of: date | None = None
+    ) -> dict[str, Any]:
         """Full month structure for the rent calendar.
 
         Returns ``year``, ``month``, ``today`` (iso), ``next_due_date`` (iso|None),
         ``days`` (each with ``items``) and ``stats``. The month label is derived on
-        the frontend (not returned here).
+        the frontend (not returned here). ``as_of`` overrides "today" so a caller on a
+        specific timezone (the condominium-finance calendar uses São Paulo) keeps both halves of
+        its payload on the same day; it defaults to the server date for the legacy rent calendar.
         """
         reference_month = date(year, month, 1)
-        today = timezone.now().date()
+        today = as_of if as_of is not None else timezone.now().date()
         context = _MonthContext(
             reference_month=reference_month,
             today=today,
@@ -301,21 +305,25 @@ class RentScheduleService:
             "today": today.isoformat(),
             "next_due_date": next_due_date.isoformat() if next_due_date else None,
             "days": days,
-            "stats": RentScheduleService.get_month_stats(year, month, building_id),
+            "stats": RentScheduleService.get_month_stats(year, month, building_id, as_of=today),
         }
 
     @staticmethod
-    def get_month_stats(year: int, month: int, building_id: int | None = None) -> dict[str, Any]:
+    def get_month_stats(
+        year: int, month: int, building_id: int | None = None, as_of: date | None = None
+    ) -> dict[str, Any]:
         """Aggregated month stats for the rent calendar.
 
         ``received_total`` sums ``amount_paid`` of ALL active RentPayments of the
         month (reference_month = day 1) WITHOUT a collectibility filter — this is
         the canonical definition of "rent received". ``to_receive_total`` and
         ``due_count`` are based on collectible leases. Late fee is only computed
-        for the current month (cross-month months report 0).
+        for the current month (cross-month months report 0). ``as_of`` overrides "today"
+        (the condominium-finance dashboard passes São Paulo's date so its overdue/late-fee
+        sub-totals match the bill half); it defaults to the server date for the legacy calendar.
         """
         reference_month = date(year, month, 1)
-        today = timezone.now().date()
+        today = as_of if as_of is not None else timezone.now().date()
         is_current_month = (year, month) == (today.year, today.month)
         is_current_or_past = (year, month) <= (today.year, today.month)
 

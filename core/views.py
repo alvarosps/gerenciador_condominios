@@ -374,29 +374,35 @@ class LeaseViewSet(viewsets.ModelViewSet):
             from core.tasks import generate_contract_pdf
 
             task = generate_contract_pdf.delay(lease.id)
-
-            # Se a task rodar sincronamente (eager), o resultado já estará pronto
-            if task.ready():
-                if task.successful():
-                    return Response(
-                        {"pdf_path": task.result, "message": "Contrato gerado com sucesso!"},
-                        status=status.HTTP_200_OK,
-                    )
-                return Response(
-                    {"error": "Falha na geração do contrato (task failed)."},
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                )
-
-            return Response(
-                {"task_id": task.id, "status": "processing"},
-                status=status.HTTP_202_ACCEPTED,
-            )
         except Exception:
             logger.exception("Failed to dispatch contract generation task")
             return Response(
                 {"error": "Falha ao iniciar geração do contrato."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+        # Async path: a real broker accepted the task; client polls later.
+        if not task.ready():
+            return Response(
+                {"task_id": task.id, "status": "processing"},
+                status=status.HTTP_202_ACCEPTED,
+            )
+
+        if task.successful():
+            return Response(
+                {"pdf_path": task.result, "message": "Contrato gerado com sucesso!"},
+                status=status.HTTP_200_OK,
+            )
+
+        # In eager mode the task captures the exception in task.result. A ValidationError
+        # (e.g. no active landlord) is a 400 configuration error, not a 500 — mirror the
+        # 400 shape used by change_due_date/apply_adjustment.
+        if isinstance(task.result, ValidationError):
+            return Response({"error": str(task.result)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            {"error": "Falha na geração do contrato (task failed)."},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
 
     # Endpoint para cálculo de multa de atraso
     @action(detail=True, methods=["get"], permission_classes=[IsTenantOrAdmin])

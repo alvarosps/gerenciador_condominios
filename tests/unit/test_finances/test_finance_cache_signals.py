@@ -12,7 +12,6 @@ import pytest
 from django.core.cache import cache
 from finances.cache import (
     FINANCE_CACHE_PREFIXES,
-    FINANCE_CASH_FLOW_PREFIX,
     FINANCE_DASHBOARD_PREFIX,
     FINANCE_PROJECTION_PREFIX,
     invalidate_finance_caches,
@@ -49,12 +48,22 @@ def _finance_probes_cleared() -> bool:
 
 def test_prefix_literals_match_and_invalidate() -> None:
     assert FINANCE_DASHBOARD_PREFIX == "finance-dashboard"
-    assert FINANCE_CASH_FLOW_PREFIX == "finance-cash-flow"
     assert FINANCE_PROJECTION_PREFIX == "finance-projection"
+    # Only prefixes a @cache_result actually keys on (no dead finance-cash-flow* namespace).
+    assert set(FINANCE_CACHE_PREFIXES) == {"finance-dashboard", "finance-projection"}
     # core/signals.py keeps a matching literal copy (no finances import) — locked here.
     assert set(CORE_PREFIXES) == set(FINANCE_CACHE_PREFIXES)
     _set_finance_probes()
     invalidate_finance_caches()
+    assert _finance_probes_cleared()
+
+
+def test_person_rename_invalidates_finance() -> None:
+    # Person.name is embedded in the by_owner card, so a rename must invalidate finance-* caches.
+    person = make_person()
+    _set_finance_probes()
+    person.name = "Tiago Renomeado"
+    person.save()
     assert _finance_probes_cleared()
 
 

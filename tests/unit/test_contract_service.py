@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 from django.conf import settings
+from django.core.exceptions import ValidationError
 
 from core.models import Landlord
 from core.services.contract_service import ContractService
@@ -171,9 +172,17 @@ class TestPrepareContractContext:
         for key in required_keys:
             assert key in context, f"Missing key: {key}"
 
-    def test_tag_unit_price_is_single_tag_fee(self, lease):
+    def test_tag_unit_price_is_single_tag_fee(self, lease, landlord):
         context = ContractService.prepare_contract_context(lease)
         assert context["tag_unit_price"] == Decimal(str(settings.DEFAULT_TAG_FEE_SINGLE))
+
+    def test_raises_when_no_active_landlord(self, lease):
+        assert Landlord.get_active() is None
+
+        with pytest.raises(ValidationError) as exc_info:
+            ContractService.prepare_contract_context(lease)
+
+        assert "locador" in str(exc_info.value).lower()
 
     def test_tenant_is_responsible_tenant(self, lease, tenant, landlord):
         context = ContractService.prepare_contract_context(lease)
