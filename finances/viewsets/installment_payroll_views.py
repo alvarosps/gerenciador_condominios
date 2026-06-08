@@ -36,7 +36,7 @@ class InstallmentPlanViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self) -> QuerySet[InstallmentPlan]:
         queryset = InstallmentPlan.objects.select_related(
-            "category", "building", "linked_billing_account", "condominium"
+            "category", "building", "billing_account", "condominium"
         ).prefetch_related("installments")
         params = self.request.query_params
         condominium_id = int_param(params, "condominium_id")

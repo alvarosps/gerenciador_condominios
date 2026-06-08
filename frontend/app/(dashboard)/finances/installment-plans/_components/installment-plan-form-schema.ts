@@ -5,7 +5,7 @@ import { z } from 'zod';
  *
  * Mirrors the writable InstallmentPlan fields. The schedule (Installments) is NOT edited
  * here — it is materialized by the service (S41) and edited in installment-schedule-field.
- * embedded=true requires linked_billing_account_id (design §7); enforced via superRefine (PT).
+ * embedded=true requires billing_account_id (design §4); enforced via superRefine (PT).
  */
 export const installmentPlanFormSchema = z
   .object({
@@ -17,14 +17,14 @@ export const installmentPlanFormSchema = z
     start_due_date: z.string().min(1, 'Data da primeira parcela é obrigatória'),
     default_due_day: z.number().int().min(1).max(31),
     embedded: z.boolean(),
-    linked_billing_account_id: z.number().nullable(),
+    billing_account_id: z.number().nullable(),
     notes: z.string(),
   })
   .superRefine((data, ctx) => {
-    if (data.embedded && data.linked_billing_account_id === null) {
+    if (data.embedded && data.billing_account_id === null) {
       ctx.addIssue({
         code: 'custom',
-        path: ['linked_billing_account_id'],
+        path: ['billing_account_id'],
         message: 'Conta recorrente vinculada é obrigatória para parcela embutida',
       });
     }

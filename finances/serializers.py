@@ -15,6 +15,8 @@ from rest_framework import serializers
 from core.models import Building, Condominium, Lease, Person
 from core.serializers import BuildingSerializer, LeaseSerializer, PersonSimpleSerializer
 from finances.models import (
+    _CONSUMPTION_TYPES,
+    _EMBEDDED_NEEDS_CONSUMPTION_MSG,
     _ERR_IDENTIFIER_REQUIRED,
     _TYPED_IDENTITY_ACCOUNT_TYPES,
     Bill,
@@ -362,10 +364,10 @@ class InstallmentPlanSerializer(serializers.ModelSerializer):
         required=False,
         allow_null=True,
     )
-    linked_billing_account = BillingAccountSerializer(read_only=True)
-    linked_billing_account_id = serializers.PrimaryKeyRelatedField(
+    billing_account = BillingAccountSerializer(read_only=True)
+    billing_account_id = serializers.PrimaryKeyRelatedField(
         queryset=BillingAccount.objects.all(),
-        source="linked_billing_account",
+        source="billing_account",
         write_only=True,
         required=False,
         allow_null=True,
@@ -382,8 +384,8 @@ class InstallmentPlanSerializer(serializers.ModelSerializer):
             "building_id",
             "category",
             "category_id",
-            "linked_billing_account",
-            "linked_billing_account_id",
+            "billing_account",
+            "billing_account_id",
             "description",
             "total_amount",
             "installment_count",
@@ -399,23 +401,17 @@ class InstallmentPlanSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "created_at", "updated_at"]
 
     def validate(self, attrs: dict[str, object]) -> dict[str, object]:
-        # DRF does not call Model.clean(); mirror the embedded <-> linked invariant (design §7)
-        # so the API cannot create an inconsistent plan.
+        # DRF does not call Model.clean(); mirror the embedded->consumption-account invariant
+        # (design §4) so the API cannot create an inconsistent plan. Single source of the rule
+        # is the model (_CONSUMPTION_TYPES / message), re-expressed here only because DRF skips clean().
         embedded = attrs.get("embedded", getattr(self.instance, "embedded", False))
-        linked = attrs.get(
-            "linked_billing_account", getattr(self.instance, "linked_billing_account", None)
-        )
-        if embedded and linked is None:
+        account = attrs.get("billing_account", getattr(self.instance, "billing_account", None))
+        if embedded and (
+            not isinstance(account, BillingAccount)
+            or account.account_type not in _CONSUMPTION_TYPES
+        ):
             raise serializers.ValidationError(
-                {
-                    "linked_billing_account_id": "Plano embutido exige uma conta recorrente vinculada."
-                }
-            )
-        if not embedded and linked is not None:
-            raise serializers.ValidationError(
-                {
-                    "linked_billing_account_id": "Plano avulso não pode ter conta recorrente vinculada."
-                }
+                {"billing_account_id": _EMBEDDED_NEEDS_CONSUMPTION_MSG}
             )
         return attrs
 

@@ -200,11 +200,11 @@ class CondoProjectionService:
             plan__is_deleted=False,
             plan__lifecycle_state=InstallmentPlanState.ACTIVE,
             plan__embedded=True,
-        ).select_related("plan__linked_billing_account")
+        ).select_related("plan__billing_account")
         if building_id is not None:
             embedded = embedded.filter(plan__building_id=building_id)
         for installment in embedded:
-            host_account = installment.plan.linked_billing_account
+            host_account = installment.plan.billing_account
             if host_account is not None and BillGenerationService.is_account_eligible(
                 host_account, reference_month
             ):
