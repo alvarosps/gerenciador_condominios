@@ -378,7 +378,9 @@ class RentScheduleService:
         return payments.aggregate(total=Sum("amount_paid"))["total"] or ZERO
 
     @staticmethod
-    def received_collectible_total(reference_month: date, building_id: int | None = None) -> Decimal:
+    def received_collectible_total(
+        reference_month: date, building_id: int | None = None
+    ) -> Decimal:
         """Rent received for the month, restricted to COLLECTIBLE leases (design §4.5).
 
         Mirrors ``received_total`` but pre-filters by ``collectible_leases`` so owner-repass
