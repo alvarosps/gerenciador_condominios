@@ -8,6 +8,7 @@ Web Push / VAPID (browser PWA).
 
 import json
 import logging
+from datetime import date
 
 import requests as http_requests
 from django.conf import settings
@@ -139,6 +140,19 @@ def is_notification_sent_today(user: User, notification_type: str) -> bool:
     today = timezone.now().date()
     return Notification.objects.filter(
         recipient=user, type=notification_type, sent_at__date=today
+    ).exists()
+
+
+def is_notification_sent_on(user: User, notification_type: str, day: date) -> bool:
+    """Whether a notification of the given type was sent to the user on ``day``.
+
+    SP-aware mirror of ``is_notification_sent_today`` (design §9.3): the caller passes
+    ``today_sp()`` (NOT the UTC date), so the idempotency window tracks the São Paulo
+    midnight rollover. The function only compares ``sent_at__date == day`` — the caller
+    owns the SP date.
+    """
+    return Notification.objects.filter(
+        recipient=user, type=notification_type, sent_at__date=day
     ).exists()
 
 

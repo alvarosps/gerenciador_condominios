@@ -1725,6 +1725,9 @@ class PaymentProof(AuditMixin, SoftDeleteMixin, models.Model):
 class Notification(AuditMixin, models.Model):
     """Push/in-app notifications for tenants and admins."""
 
+    TYPE_IPTU_OVERDUE_RISK = "iptu_overdue_risk"
+    TYPE_IPTU_PARCELAMENTO_LOST = "iptu_parcelamento_lost"
+
     TYPE_CHOICES = [
         ("due_reminder", "Lembrete de vencimento"),
         ("due_today", "Vencimento hoje"),
@@ -1736,6 +1739,8 @@ class Notification(AuditMixin, models.Model):
         ("new_proof", "Novo comprovante"),
         ("contract_expiring", "Contrato vencendo"),
         ("adjustment_eligible", "Reajuste elegível"),
+        (TYPE_IPTU_OVERDUE_RISK, "IPTU: parcela em risco"),
+        (TYPE_IPTU_PARCELAMENTO_LOST, "IPTU: parcelamento perdido"),
     ]
 
     recipient = models.ForeignKey(
