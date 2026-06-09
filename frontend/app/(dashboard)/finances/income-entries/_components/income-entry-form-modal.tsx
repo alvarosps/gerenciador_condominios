@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogHeader,
   DialogTitle,
@@ -54,7 +55,10 @@ const incomeEntryFormSchema = z
       if (data.is_received && !data.received_date) return false;
       return true;
     },
-    { message: 'Data de recebimento é obrigatória quando marcado como recebido', path: ['received_date'] },
+    {
+      message: 'Data de recebimento é obrigatória quando marcado como recebido',
+      path: ['received_date'],
+    }
   );
 
 type IncomeEntryFormValues = z.infer<typeof incomeEntryFormSchema>;
@@ -144,188 +148,192 @@ export function IncomeEntryFormModal({ open, entry, onClose }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>{entry ? 'Editar Receita' : 'Nova Receita'}</DialogTitle>
           <DialogDescription>
-            {entry ? 'Atualize os dados da receita do condomínio.' : 'Registre uma nova receita para o condomínio.'}
+            {entry
+              ? 'Atualize os dados da receita do condomínio.'
+              : 'Registre uma nova receita para o condomínio.'}
           </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Descrição *</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Descrição da receita" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="grid grid-cols-2 gap-4">
+          <form
+            onSubmit={form.handleSubmit(onSubmit)}
+            className="flex flex-1 flex-col overflow-hidden"
+          >
+            <DialogBody className="space-y-4 pr-1">
               <FormField
                 control={form.control}
-                name="amount"
+                name="description"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Valor (R$) *</FormLabel>
+                    <FormLabel>Descrição *</FormLabel>
                     <FormControl>
-                      <div className="relative">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
-                          R$
-                        </span>
-                        <Input
-                          type="number"
-                          min={0}
-                          step="0.01"
-                          placeholder="0.00"
-                          className="pl-10"
-                          {...field}
-                          onChange={(e) => field.onChange(Number(e.target.value))}
-                        />
-                      </div>
+                      <Input placeholder="Descrição da receita" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="income_date"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Data *</FormLabel>
-                    <FormControl>
-                      <Input type="date" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <FormField
-              control={form.control}
-              name="building_id"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Prédio (opcional)</FormLabel>
-                  <Select
-                    value={field.value ? String(field.value) : 'none'}
-                    onValueChange={(val) => field.onChange(val === 'none' ? null : Number(val))}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Condomínio (geral)" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="none">Condomínio (geral)</SelectItem>
-                      {buildings?.map((b) => (
-                        <SelectItem key={b.id} value={String(b.id)}>
-                          {b.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="category_id"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Categoria (opcional)</FormLabel>
-                  <Select
-                    value={field.value ? String(field.value) : 'none'}
-                    onValueChange={(val) => field.onChange(val === 'none' ? null : Number(val))}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Sem categoria" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="none">Sem categoria</SelectItem>
-                      {categories?.map((c) => (
-                        <SelectItem key={c.id} value={String(c.id)}>
-                          {c.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="rounded-md border p-4 space-y-3">
-              <FormField
-                control={form.control}
-                name="is_received"
-                render={({ field }) => (
-                  <FormItem className="flex items-center justify-between">
-                    <FormLabel>Recebido?</FormLabel>
-                    <FormControl>
-                      <Switch checked={field.value} onCheckedChange={field.onChange} />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-
-              {watchedIsReceived && (
+              <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
-                  name="received_date"
+                  name="amount"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Data de recebimento *</FormLabel>
+                      <FormLabel>Valor (R$) *</FormLabel>
                       <FormControl>
-                        <Input
-                          type="date"
-                          value={field.value ?? ''}
-                          onChange={(e) => field.onChange(e.target.value || null)}
-                        />
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                            R$
+                          </span>
+                          <Input
+                            type="number"
+                            min={0}
+                            step="0.01"
+                            placeholder="0.00"
+                            className="pl-10"
+                            {...field}
+                            onChange={(e) => field.onChange(Number(e.target.value))}
+                          />
+                        </div>
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-              )}
-            </div>
 
-            <FormField
-              control={form.control}
-              name="notes"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Observações</FormLabel>
-                  <FormControl>
-                    <Textarea rows={2} placeholder="Notas adicionais..." {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                <FormField
+                  control={form.control}
+                  name="income_date"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Data *</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
-            <DialogFooter>
+              <FormField
+                control={form.control}
+                name="building_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Prédio (opcional)</FormLabel>
+                    <Select
+                      value={field.value ? String(field.value) : 'none'}
+                      onValueChange={(val) => field.onChange(val === 'none' ? null : Number(val))}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Condomínio (geral)" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="none">Condomínio (geral)</SelectItem>
+                        {buildings?.map((b) => (
+                          <SelectItem key={b.id} value={String(b.id)}>
+                            {b.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="category_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Categoria (opcional)</FormLabel>
+                    <Select
+                      value={field.value ? String(field.value) : 'none'}
+                      onValueChange={(val) => field.onChange(val === 'none' ? null : Number(val))}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Sem categoria" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="none">Sem categoria</SelectItem>
+                        {categories?.map((c) => (
+                          <SelectItem key={c.id} value={String(c.id)}>
+                            {c.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="rounded-md border p-4 space-y-3">
+                <FormField
+                  control={form.control}
+                  name="is_received"
+                  render={({ field }) => (
+                    <FormItem className="flex items-center justify-between">
+                      <FormLabel>Recebido?</FormLabel>
+                      <FormControl>
+                        <Switch checked={field.value} onCheckedChange={field.onChange} />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+
+                {watchedIsReceived && (
+                  <FormField
+                    control={form.control}
+                    name="received_date"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Data de recebimento *</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="date"
+                            value={field.value ?? ''}
+                            onChange={(e) => field.onChange(e.target.value || null)}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+              </div>
+
+              <FormField
+                control={form.control}
+                name="notes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Observações</FormLabel>
+                    <FormControl>
+                      <Textarea rows={2} placeholder="Notas adicionais..." {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </DialogBody>
+
+            <DialogFooter className="pt-4">
               <Button type="button" variant="outline" onClick={handleClose}>
                 Cancelar
               </Button>
-              <Button
-                type="submit"
-                disabled={createMutation.isPending || updateMutation.isPending}
-              >
+              <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
                 {entry ? 'Atualizar' : 'Criar'}
               </Button>
             </DialogFooter>

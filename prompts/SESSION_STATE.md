@@ -13,7 +13,7 @@
 **Roadmap**: `prompts/ROADMAP.md` (seção "Contas de serviço / parser / IPTU")
 **Total de Sessões**: 9 (56–64)
 **Branch**: `feat/condo-utility-bills` (a partir de `master`)
-**Status**: **em execução** — Sessões **56–61 concluídas** (gate verde no branch da feature). Próxima: 62.
+**Status**: **em execução** — Sessões **56–62 concluídas** (gate verde no branch da feature). Próxima: 63.
 **Decisões de produto** (design §2): contas tipadas (`account_type` water/electricity/iptu/internet/generic) + identidade (inscrição/UC/medidor/titular/endereço cadastrado); **statements 1:1 só leituras** (dinheiro = `BillLineItem`, fonte única); **parser DMAE+CEEE em memória, SEM anexar o PDF** (upload→lê→insere); refactor `InstallmentPlan.linked_billing_account → billing_account`; IPTU = conta-registro (não auto-gera) + planos avulsos + dívida diferida; **alerta IPTU = banner load-bearing + push best-effort agregado SP-aware**; seed das parcelas de abertura com `competence_month=2026-06`; "Atrasados" inclui IPTU (banner = drill-down). Prod = última alteração (após deploy).
 
 | # | Sessão | Camada | Status | Arquivo |
@@ -24,7 +24,7 @@
 | 59 | Parser core `invoice_parsing/` (DMAE+CEEE posicional, registry, deps/mypy, fixtures sanitizadas) | BE | **concluída** | `prompts/59-finances-invoice-parser-core.md` |
 | 60 | Endpoint `POST bills/parse_invoice` (MultiPartParser) + reconciliação parcela + idempotência/replace | BE | **concluída** | `prompts/60-finances-parse-invoice-endpoint.md` |
 | 61 | `IptuAlertService` + `iptu_alerts` (uncached) + `Notification` types + `send_finance_alerts` (agregado, SP-aware) | BE | **concluída** | `prompts/61-finances-iptu-alert.md` |
-| 62 | `DialogBody` + modal responsivo (header/footer fixos) + campos novos + bloco statement (água/luz) + alinhar modais irmãos | FE | pendente | `prompts/62-finances-modal-responsive.md` |
+| 62 | `DialogBody` + modal responsivo (header/footer fixos) + campos novos + bloco statement (água/luz) + alinhar modais irmãos | FE | **concluída** | `prompts/62-finances-modal-responsive.md` |
 | 63 | `useParseInvoice` + "Importar fatura (PDF)" + prefill do parser + `useUpdateBillWithLines` + `IptuRiskBanner`/`use-iptu-alerts` | FE | pendente | `prompts/63-finances-import-fatura-banner.md` |
 | 64 | Seed real `scripts/data/condo_utilities_seed.json` + comando `seed_condo_utilities` (local → prod após deploy) | BE/data | pendente | `prompts/64-finances-seed-real-data.md` |
 
@@ -81,6 +81,12 @@
 - **Modificados**: `core/models.py` (`Notification.TYPE_IPTU_OVERDUE_RISK`/`TYPE_IPTU_PARCELAMENTO_LOST` constantes + TYPE_CHOICES); `core/services/notification_service.py` (`is_notification_sent_on(user,type,day)` SP-aware; legado UTC intacto); `finances/viewsets/dashboard_views.py` (`@action iptu_alerts` **UNCACHED**, `FinancialReadOnly`, shape plano `{alerts, warning_count, critical_count}` — não `{results,count}`).
 - **Gate (in-place)**: `ruff`/`mypy core/ finances/`/`pyright` limpos; **37 novos** ✓ (100% nos módulos tocados); `makemigrations --check` "No changes"; 0049 fwd/back ✓; regressão (notification_service/send_scheduled 11, dashboard/calendar/overdue 14) verde. Zero suppressions.
 - **Nota**: flake pré-existente `psycopg [BAD]` no modo single-process com coverage (afeta um teste irmão JÁ mergeado de forma idêntica) — verde sob o runner xdist padrão (5+ runs). Não é defeito de lógica (consistente com a memória de flakiness xdist/coverage do projeto).
+
+### Sessão 62 — concluída (FE)
+- **Criados**: `frontend/components/ui/__tests__/dialog-body.test.tsx` (4); `frontend/app/(dashboard)/finances/bills/_components/bill-statement-fields.tsx` (`BillStatementFields` — bloco condicional ao `account_type`: água `consumo_m3`/leituras/`agua/esgoto_status`, luz `consumo_kwh`/`energia_injetada_kwh`/leituras/`classe`/`bandeira`; `null` p/ generic/iptu/internet; **só leituras**).
+- **Modificados**: `frontend/components/ui/dialog.tsx` (`DialogBody = flex-1 overflow-y-auto`); `bill-form-modal.tsx` (`DialogContent max-h-[90vh] flex flex-col`; header fixo, `DialogBody` rolável, `DialogFooter` fixo; "Tipo de conta" select + Inscrição/UC + Emissão; `<BillStatementFields>`; alerta "Fase 3" → **link Planos de Parcelamento**); `bill-form-schema.ts` (campos UI-only `account_type`/`*_statement` — **NÃO** no payload; `bill.schema.ts` API intacto); `bill-form-modal.test.tsx` (reescreve teste do link + 3 novos); `employee-form-modal.tsx`/`installment-plan-form-modal.tsx`/`income-entry-form-modal.tsx` (migração de layout p/ `DialogBody`, sem mudar campos/hooks).
+- **Gate (in-place FE)**: vitest **25 escopados** ✓; `type-check`/`eslint` limpos; **suite completa 861/861** ✓ (`test:unit`). Zero suppressions (sem `as Tipo`/`!` em produção). *(8 "errors" = teardown MSW/happy-dom pré-existente em `bills-page.test.tsx` — não tocado; 7/7 isolado.)*
+- **Decisão**: `account_type`/`water_statement`/`electricity_statement` adicionados ao **bill-form-schema (form state UI-only)** p/ renderizar selector/inputs sob TS estrito; **fora** do payload create/update; `bill.schema.ts` (contrato API) intacto. **S63** liga o prefill do parser + persistência da statement nesses mesmos nomes de campo.
 
 ---
 

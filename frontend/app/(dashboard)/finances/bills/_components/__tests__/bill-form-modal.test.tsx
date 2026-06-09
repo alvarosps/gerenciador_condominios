@@ -60,10 +60,10 @@ describe('BillFormModal', () => {
     const creates: CreateCall[] = [];
     const updates: UpdateCall[] = [];
     vi.mocked(billHooks.useCreateBillWithLines).mockReturnValue(
-      makeMutation<CreateCall>(creates, 'payload') as never,
+      makeMutation<CreateCall>(creates, 'payload') as never
     );
     vi.mocked(billHooks.useUpdateBill).mockReturnValue(
-      makeMutation<UpdateCall>(updates, 'payload') as never,
+      makeMutation<UpdateCall>(updates, 'payload') as never
     );
     return { creates, updates };
   }
@@ -112,7 +112,9 @@ describe('BillFormModal', () => {
     expect(await screen.findByText('Conta recorrente')).toBeInTheDocument();
   });
 
-  it('blocks installment behavior with a Portuguese Phase 3 note', async () => {
+  it('links installment behavior to Planos de Parcelamento and blocks submission', async () => {
+    // The stale "Fase 3" copy is replaced by a real link to the Installment Plans
+    // screen; selecting "Parcelada" must still block create (handled elsewhere).
     const { creates } = mountCreate();
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     renderWithProviders(<BillFormModal open onClose={vi.fn()} />);
@@ -120,9 +122,78 @@ describe('BillFormModal', () => {
     await user.click(screen.getByLabelText('Tipo'));
     await user.click(await screen.findByRole('option', { name: 'Parcelada' }));
 
-    expect(await screen.findByText(/Fase 3/i)).toBeInTheDocument();
+    const link = await screen.findByRole('link', { name: /Planos de Parcelamento/i });
+    expect(link).toHaveAttribute('href', '/finances/installment-plans');
+
     await userEvent.click(screen.getByRole('button', { name: /^criar$/i }));
     expect(creates).toHaveLength(0);
+  });
+
+  it('renders Inscrição/UC and Emissão inputs and includes them in the create payload', async () => {
+    // external_identifier + issue_date are already in the schema/payload; this
+    // session only renders the inputs — assert they round-trip into the mutation.
+    const { creates } = mountCreate();
+    renderWithProviders(<BillFormModal open onClose={vi.fn()} />);
+
+    fireEvent.change(screen.getByPlaceholderText('Descrição da conta'), {
+      target: { value: 'Conta de Água' },
+    });
+    fireEvent.change(screen.getByLabelText('Competência'), { target: { value: '2026-06-01' } });
+    fireEvent.change(screen.getByLabelText('Vencimento'), { target: { value: '2026-06-10' } });
+    fireEvent.change(screen.getByLabelText('Inscrição / UC (opcional)'), {
+      target: { value: 'UC-12345' },
+    });
+    fireEvent.change(screen.getByLabelText('Emissão (opcional)'), {
+      target: { value: '2026-06-02' },
+    });
+    fireEvent.change(screen.getByPlaceholderText('Ex: Consumo de energia'), {
+      target: { value: 'Consumo' },
+    });
+    fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '120' } });
+
+    await userEvent.click(screen.getByRole('button', { name: /^criar$/i }));
+
+    await waitFor(() => {
+      expect(creates).toHaveLength(1);
+    });
+    expect(creates[0]?.payload.bill).toMatchObject({
+      external_identifier: 'UC-12345',
+      issue_date: '2026-06-02',
+    });
+  });
+
+  it('keeps the submit footer rendered (fixed) outside the scrolling body', () => {
+    // Footer lives as a sibling of DialogBody (not inside the overflow region),
+    // so the action buttons are always present regardless of body length.
+    mountCreate();
+    renderWithProviders(<BillFormModal open onClose={vi.fn()} />);
+    expect(screen.getByRole('button', { name: /^criar$/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^cancelar$/i })).toBeInTheDocument();
+  });
+
+  it('shows the statement block for water/electricity accounts and hides it for generic/iptu', async () => {
+    // The statement block (readings-only inputs) is conditional on the selected
+    // account_type: visible for water (consumo_m3) / electricity (consumo_kwh),
+    // hidden for generic and iptu. Manual flow: fields render empty and editable.
+    mountCreate();
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    renderWithProviders(<BillFormModal open onClose={vi.fn()} />);
+
+    // generic/iptu → no statement inputs
+    expect(screen.queryByLabelText('Consumo (m³)')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Consumo (kWh)')).not.toBeInTheDocument();
+
+    // select water → consumo_m3 input appears (editable, empty)
+    await user.click(screen.getByLabelText('Tipo de conta'));
+    await user.click(await screen.findByRole('option', { name: /Água/i }));
+    expect(await screen.findByLabelText('Consumo (m³)')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Consumo (kWh)')).not.toBeInTheDocument();
+
+    // select electricity → consumo_kwh input appears, consumo_m3 disappears
+    await user.click(screen.getByLabelText('Tipo de conta'));
+    await user.click(await screen.findByRole('option', { name: /Luz/i }));
+    expect(await screen.findByLabelText('Consumo (kWh)')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Consumo (m³)')).not.toBeInTheDocument();
   });
 
   it('blocks submission with validation messages when required fields are empty', async () => {
