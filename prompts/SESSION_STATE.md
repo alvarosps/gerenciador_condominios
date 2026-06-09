@@ -13,7 +13,7 @@
 **Roadmap**: `prompts/ROADMAP.md` (seção "Contas de serviço / parser / IPTU")
 **Total de Sessões**: 9 (56–64)
 **Branch**: `feat/condo-utility-bills` (a partir de `master`)
-**Status**: **em execução** — Sessões **56–63 concluídas** (gate verde no branch da feature). Próxima: 64 (última — seed).
+**Status**: **FEATURE COMPLETA (local)** — Sessões **56–64 concluídas**, gate verde no branch `feat/condo-utility-bills`. Falta só o **seed em PROD** (passo manual pós-deploy — runbook abaixo na nota da S64).
 **Decisões de produto** (design §2): contas tipadas (`account_type` water/electricity/iptu/internet/generic) + identidade (inscrição/UC/medidor/titular/endereço cadastrado); **statements 1:1 só leituras** (dinheiro = `BillLineItem`, fonte única); **parser DMAE+CEEE em memória, SEM anexar o PDF** (upload→lê→insere); refactor `InstallmentPlan.linked_billing_account → billing_account`; IPTU = conta-registro (não auto-gera) + planos avulsos + dívida diferida; **alerta IPTU = banner load-bearing + push best-effort agregado SP-aware**; seed das parcelas de abertura com `competence_month=2026-06`; "Atrasados" inclui IPTU (banner = drill-down). Prod = última alteração (após deploy).
 
 | # | Sessão | Camada | Status | Arquivo |
@@ -26,7 +26,7 @@
 | 61 | `IptuAlertService` + `iptu_alerts` (uncached) + `Notification` types + `send_finance_alerts` (agregado, SP-aware) | BE | **concluída** | `prompts/61-finances-iptu-alert.md` |
 | 62 | `DialogBody` + modal responsivo (header/footer fixos) + campos novos + bloco statement (água/luz) + alinhar modais irmãos | FE | **concluída** | `prompts/62-finances-modal-responsive.md` |
 | 63 | `useParseInvoice` + "Importar fatura (PDF)" + prefill do parser + `useUpdateBillWithLines` + `IptuRiskBanner`/`use-iptu-alerts` | FE | **concluída** | `prompts/63-finances-import-fatura-banner.md` |
-| 64 | Seed real `scripts/data/condo_utilities_seed.json` + comando `seed_condo_utilities` (local → prod após deploy) | BE/data | pendente | `prompts/64-finances-seed-real-data.md` |
+| 64 | Seed real `scripts/data/condo_utilities_seed.json` + comando `seed_condo_utilities` (local → prod após deploy) | BE/data | **concluída (local)** | `prompts/64-finances-seed-real-data.md` |
 
 **Ordem/dependências**: `56 → 57 → 58 → (59 → 60)`; `61` depende de **56+57**; `62` depende de **56+58**; `63` depende de **60+61+62**; `64` depende de **tudo**. Gate por sessão: ≥90% em `finances`, `ruff && mypy core/ finances/ && pyright && pytest` (BE) / `lint && type-check && test:unit` (FE), zero warnings, sem suppressions.
 
@@ -93,6 +93,20 @@
 - **Modificados**: `use-bills.ts` (`BillLineInput.installment_id`, `CreateBillWithLines.statement`, `UpdateBillWithLines`, `useParseInvoice` FormData `Content-Type: undefined` sem invalidação, `useUpdateBillWithLines` POST `{id}/update_with_lines/`); `bill.schema.ts` (aninha `water_statement`/`electricity_statement`); `billing-account.schema.ts` (**fix**: adiciona `account_type`/`secondary_identifier`/`holder_name`/`registered_address`/`supply_status` que o schema zod estava descartando + `ACCOUNT_TYPE_LABELS`/`accountLabel`); `query-keys.ts` (`iptuAlerts`); `bill-form-modal.tsx` (`draft?` prop, `draftToDefaults`, prefill statement, **save roteia por `existing_bill_id`**, select desambiguado, Alert de warnings, `createWithLines` único — DRY); `bill-form-schema.ts`/`bill-line-items-field.tsx` (`installment_id` + linha de parcela **travada**); `bills/page.tsx` + `(dashboard)/page.tsx` ("Importar fatura (PDF)" no bloco `{isAdmin}` + `<IptuRiskBanner/>`); mocks (`handlers.ts` 3 rotas, `finances.ts` factories).
 - **Gate (in-place FE)**: vitest **19 escopados + 52 regressão** ✓; `lint`/`type-check` limpos; **suite completa 880/880** ✓. Zero suppressions/`as`/`!` em produção; sem barrel; DRY (1 `createWithLines`).
 - **Decisão/fix**: `billing-account.schema.ts` estava removendo os campos novos que o backend serializa (S56) → adicionados (necessário p/ `accountLabel`/desambiguação). *(Warning a11y benigno "DialogContent missing Description" é estrutura pré-existente dos modais, não introduzido aqui; nenhum teste falha.)*
+
+### Sessão 64 — concluída (local) — FEATURE COMPLETA
+- **Criados**: `scripts/data/condo_utilities_seed.json` (inventário real Apêndice A — **8 contas** [2 água + 3 luz + 3 IPTU], 3 planos embutidos, **9 termos IPTU**, **3 dívidas 2026 diferidas**, settings; **sem CPF** — titulares por nome); `finances/management/commands/seed_condo_utilities.py` (idempotente `get_or_create`/`update_or_create` por chaves naturais, `--dry-run`); `tests/unit/test_finances/test_seed_condo_utilities.py` (15, 100% cov). Sem alterar models/services/etc.
+- **Seed aplicado no DB LOCAL** (backup antes; prod NÃO tocado): após apply → `BillingAccount 8, InstallmentPlan 12 (3 embutidos + 9 IPTU), Installment 18, Bill 21, BillLineItem 21`; **2º apply = 0 novos** (idempotente). `IptuAlertService.evaluate(today_sp())` = **9 WARNING**; 3 dívidas diferidas (1 linha cheia + `billing_account` IPTU); 836-água `supply_status=cut`. `convert_deferred` (rollback) → herda IPTU, total `10308.70` exato.
+- **Decisões**: (1) inventário **por conta** (Apêndice A) é canônico — 3 luz / 3 IPTU (não 4/4 da linha-resumo do prompt). (2) Bill de parcela de abertura seta `Bill.installment` (materializado como o caminho S41, `competence_month=2026-06`, due_date real) — `create_with_lines` não suporta `installment`; **nenhum service alterado**. (3) Bill de parcela **não** seta `billing_account` (colidiria na `unique_active_bill_per_account_month`); vínculo IPTU via `installment.plan.billing_account`; só a **dívida diferida** carrega `billing_account`. (4) Valores das parcelas via `_split_amount(saldo, count)`; termo 992269 sem saldo original → `total_amount`=restante (9+10). (5) Estado de pagamento "a confirmar" registrado em `_premissas` (sem chute).
+- **Gate (in-place)**: `ruff`/`mypy core/ finances/`/`pyright` limpos; **15 novos** ✓ (100% cov do comando); regressão **finances 430** verde. Zero suppressions.
+
+### ⚠️ RUNBOOK — seed em PRODUÇÃO (passo manual pós-deploy, NÃO automatizado)
+Após o merge de `feat/condo-utility-bills` e o deploy (migrations `finances 0004–0006` + `core 0049` aplicadas em prod):
+1. **Backup prod** (pegar a connection string no Supabase Dashboard → Connect; NÃO ler `.env`): `pg_dump "<prod-uri>" --schema=public --no-owner --no-acl -F p -f backups/backup_PROD_<ts>.sql`.
+2. **Confirmar migrations aplicadas** em prod (`finances` 0006 + `core` 0049). *(Lembrete: prod `django_migrations` estava em 0046; a 0047 foi aplicada out-of-band — conferir o estado real antes.)*
+3. **Rodar o seed** apontando para prod (`DATABASE_URL`/settings de prod): `python manage.py seed_condo_utilities --dry-run` → revisar → `python manage.py seed_condo_utilities`.
+4. **Advisor de segurança** (Supabase MCP `get_advisors type=security`): confirmar **0** `rls_disabled` (as tabelas novas `waterbillstatement`/`electricitybillstatement` já habilitam RLS na migração 0006).
+5. Confirmar os 9 alertas de IPTU no dashboard de prod e ajustar status de pagamento real (luz/água de junho) conforme `_premissas`.
 
 ---
 
