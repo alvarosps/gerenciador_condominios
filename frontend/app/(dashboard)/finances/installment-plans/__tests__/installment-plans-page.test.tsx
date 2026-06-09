@@ -8,10 +8,17 @@ import InstallmentPlansPage from '../page';
 
 const deleteMutate = vi.fn();
 const deleteMutateAsync = vi.fn().mockResolvedValue(undefined);
-let plansData: InstallmentPlan[] = [];
+let plansData: InstallmentPlan[] | undefined = [];
+let hookIsError = false;
+let hookError: Error | null = null;
 
 vi.mock('@/lib/api/hooks/use-installment-plans', () => ({
-  useInstallmentPlans: () => ({ data: plansData, isLoading: false }),
+  useInstallmentPlans: () => ({
+    data: plansData,
+    isLoading: false,
+    isError: hookIsError,
+    error: hookError,
+  }),
   useDeleteInstallmentPlan: () => ({
     mutate: deleteMutate,
     mutateAsync: deleteMutateAsync,
@@ -60,6 +67,8 @@ beforeEach(() => {
   deleteMutate.mockClear();
   deleteMutateAsync.mockClear();
   plansData = [makePlan()];
+  hookIsError = false;
+  hookError = null;
   useAuthStore.setState({ user: null, isAuthenticated: false });
 });
 
@@ -146,5 +155,18 @@ describe('InstallmentPlansPage', () => {
     await waitFor(() =>
       expect(screen.getByText('Nenhum plano de parcelas cadastrado')).toBeInTheDocument(),
     );
+  });
+
+  it('shows an error state (not the empty state) when the query fails', async () => {
+    setAdmin(true);
+    plansData = undefined;
+    hookIsError = true;
+    hookError = new Error('boom');
+    renderWithProviders(<InstallmentPlansPage />);
+    await waitFor(() =>
+      expect(screen.getByText(/Erro ao carregar planos de parcelas/)).toBeInTheDocument(),
+    );
+    // A failed request must NOT masquerade as "no data".
+    expect(screen.queryByText('Nenhum plano de parcelas cadastrado')).not.toBeInTheDocument();
   });
 });
