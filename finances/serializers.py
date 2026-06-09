@@ -42,6 +42,8 @@ from finances.models import (
 from finances.money import money_str
 from finances.services.timezone import today_sp
 
+_ERR_DUPLICATE_BILLING_ACCOUNT = "Já existe uma conta ativa com este prédio, tipo e inscrição/UC."
+
 
 def _apply_default_condominium(instance: object, attrs: dict[str, object]) -> None:
     """Inject the singleton condominium on create when ``condominium_id`` is omitted.
@@ -179,7 +181,38 @@ class BillingAccountSerializer(serializers.ModelSerializer):
             and not str(external_identifier or "").strip()
         ):
             raise serializers.ValidationError({"external_identifier": _ERR_IDENTIFIER_REQUIRED})
+        self._validate_identity_available(attrs)
         return attrs
+
+    def _validate_identity_available(self, attrs: dict[str, object]) -> None:
+        """Reject a duplicate active (building, account_type, external_identifier) identity.
+
+        Mirrors the partial DB UniqueConstraint (is_deleted=False) so a clash returns a clean PT 400
+        instead of an uncaught IntegrityError 500 (like LeaseSerializer._validate_apartment_available).
+        Each component falls back to the existing instance on PATCH; the row being edited is excluded.
+        """
+        instance = self.instance
+
+        def resolved(field: str, sentinel: object = None) -> object:
+            if field in attrs:
+                return attrs[field]
+            return getattr(instance, field) if instance is not None else sentinel
+
+        resolved_building = resolved("building")
+        building = resolved_building if isinstance(resolved_building, Building) else None
+        account_type = str(resolved("account_type") or "")
+        external_identifier = str(resolved("external_identifier", "") or "")
+        qs = BillingAccount.objects.filter(  # default manager excludes soft-deleted rows
+            building=building,  # None matches the condominium-level (building IS NULL) slot
+            account_type=account_type,
+            external_identifier=external_identifier,
+        )
+        if instance is not None:
+            qs = qs.exclude(pk=instance.pk)
+        if qs.exists():
+            raise serializers.ValidationError(
+                {"external_identifier": _ERR_DUPLICATE_BILLING_ACCOUNT}
+            )
 
 
 class BillLineItemSerializer(serializers.ModelSerializer):
@@ -226,7 +259,11 @@ class ElectricityBillStatementSerializer(serializers.ModelSerializer):
 class BillSerializer(serializers.ModelSerializer):
     condominium = CondominiumSimpleSerializer(read_only=True)
     condominium_id = serializers.PrimaryKeyRelatedField(
-        queryset=Condominium.objects.all(), source="condominium", write_only=True
+        queryset=Condominium.objects.all(),
+        source="condominium",
+        write_only=True,
+        required=False,
+        allow_null=True,
     )
     building = BuildingSerializer(read_only=True)
     building_id = serializers.PrimaryKeyRelatedField(
@@ -297,6 +334,13 @@ class BillSerializer(serializers.ModelSerializer):
         # DRF's auto UniqueTogetherValidator would wrongly force billing_account_id to be
         # present on every write (avulsa bills have billing_account=None).
         validators: list[object] = []
+
+    def validate(self, attrs: dict[str, object]) -> dict[str, object]:
+        # The condominium is an invisible singleton with no client-side selector (design §15);
+        # the parse-invoice draft + the bill modal never send condominium_id, so default it on
+        # create exactly as ReserveSerializer/IncomeEntrySerializer do (DRY).
+        _apply_default_condominium(self.instance, attrs)
+        return attrs
 
     def validate_competence_month(self, value: date) -> date:
         # DRF.create() does not call Model.clean(); normalize to the 1st here too.

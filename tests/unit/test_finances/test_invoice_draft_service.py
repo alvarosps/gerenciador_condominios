@@ -293,6 +293,24 @@ def test_build_draft_idempotency_ignores_soft_deleted_bill(admin_user):
     assert draft["existing_bill_id"] is None
 
 
+def test_build_draft_idempotency_matches_non_active_bill(admin_user):
+    """The Bill partial unique is WHERE is_deleted=False (NOT lifecycle-filtered): a non-deleted
+    SUSPENDED bill for (account, competence) still occupies the slot, so build_draft must flag it
+    for replacement (route to update_with_lines) — otherwise create_with_lines would 500."""
+    account = make_billing_account(
+        account_type=BillingAccountType.WATER, external_identifier=WATER_UC, user=admin_user
+    )
+    suspended = make_bill(
+        billing_account=account,
+        competence_month=date(2026, 5, 1),
+        lifecycle_state=BillLifecycleState.SUSPENDED,
+        user=admin_user,
+    )
+    draft = InvoiceDraftService.build_draft(_water_invoice(competence_month=date(2026, 5, 1)))
+    assert draft["existing_bill_id"] == suspended.pk
+    assert any("substituirá" in warning for warning in draft["warnings"])
+
+
 def test_build_draft_match_requires_active_account_state(admin_user):
     """recurring match is by type+identifier; an ended account still matches (admin decides)."""
     account = make_billing_account(

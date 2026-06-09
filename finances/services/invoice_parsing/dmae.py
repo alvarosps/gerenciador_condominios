@@ -23,6 +23,7 @@ from finances.services.invoice_parsing.base import (
     ParsedLine,
     PdfPage,
     PositionedRow,
+    consumo_or_zero,
     extract_rows,
     find_row,
     int_after,
@@ -168,7 +169,7 @@ class DmaeWaterParser:
 
         data_leitura_row = find_row(rows, _ANCHOR_DATA_LEITURA)
         statement: dict[str, object] = {
-            "consumo_m3": int_after(rows, _ANCHOR_CONSUMO),
+            "consumo_m3": consumo_or_zero(int_after(rows, _ANCHOR_CONSUMO), warnings),
             "leitura_anterior": leitura_anterior,
             "leitura_atual": leitura_atual,
             "leitura_dias": int_after(rows, _ANCHOR_LEITURA_DIAS),

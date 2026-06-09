@@ -2,13 +2,22 @@ import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vite
 import { screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '@/tests/test-utils';
-import { createMockBill } from '@/tests/mocks/data/finances';
+import {
+  createMockBill,
+  createMockBillingAccount,
+  createMockParsedInvoice,
+} from '@/tests/mocks/data/finances';
 import { BillFormModal } from '../bill-form-modal';
 import * as billHooks from '@/lib/api/hooks/use-bills';
 
 vi.mock('@/lib/api/hooks/use-bills', async (importOriginal) => {
   const actual = await importOriginal<typeof billHooks>();
-  return { ...actual, useCreateBillWithLines: vi.fn(), useUpdateBill: vi.fn() };
+  return {
+    ...actual,
+    useCreateBillWithLines: vi.fn(),
+    useUpdateBill: vi.fn(),
+    useUpdateBillWithLines: vi.fn(),
+  };
 });
 
 // Stub the select-source hooks so the modal renders without firing real XHRs (which would
@@ -59,13 +68,17 @@ describe('BillFormModal', () => {
   function mountCreate() {
     const creates: CreateCall[] = [];
     const updates: UpdateCall[] = [];
+    const updateWithLines: UpdateCall[] = [];
     vi.mocked(billHooks.useCreateBillWithLines).mockReturnValue(
       makeMutation<CreateCall>(creates, 'payload') as never
     );
     vi.mocked(billHooks.useUpdateBill).mockReturnValue(
       makeMutation<UpdateCall>(updates, 'payload') as never
     );
-    return { creates, updates };
+    vi.mocked(billHooks.useUpdateBillWithLines).mockReturnValue(
+      makeMutation<UpdateCall>(updateWithLines, 'payload') as never
+    );
+    return { creates, updates, updateWithLines };
   }
 
   it('creates a bill via useCreateBillWithLines with the expected fields and lines', async () => {
@@ -171,29 +184,64 @@ describe('BillFormModal', () => {
     expect(screen.getByRole('button', { name: /^cancelar$/i })).toBeInTheDocument();
   });
 
-  it('shows the statement block for water/electricity accounts and hides it for generic/iptu', async () => {
-    // The statement block (readings-only inputs) is conditional on the selected
-    // account_type: visible for water (consumo_m3) / electricity (consumo_kwh),
-    // hidden for generic and iptu. Manual flow: fields render empty and editable.
+  it('hides the statement block on the manual create flow even for water/electricity', async () => {
+    // Readings have no leg on the manual create/update payload — they would be silently dropped.
+    // So the statement block is gated on the parser-draft flow (isDraft) and never renders on a
+    // manual "Nova Conta", regardless of the selected account_type.
     mountCreate();
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     renderWithProviders(<BillFormModal open onClose={vi.fn()} />);
 
-    // generic/iptu → no statement inputs
     expect(screen.queryByLabelText('Consumo (m³)')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Consumo (kWh)')).not.toBeInTheDocument();
 
-    // select water → consumo_m3 input appears (editable, empty)
     await user.click(screen.getByLabelText('Tipo de conta'));
     await user.click(await screen.findByRole('option', { name: /Água/i }));
-    expect(await screen.findByLabelText('Consumo (m³)')).toBeInTheDocument();
-    expect(screen.queryByLabelText('Consumo (kWh)')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Consumo (m³)')).not.toBeInTheDocument();
 
-    // select electricity → consumo_kwh input appears, consumo_m3 disappears
     await user.click(screen.getByLabelText('Tipo de conta'));
     await user.click(await screen.findByRole('option', { name: /Luz/i }));
+    expect(screen.queryByLabelText('Consumo (kWh)')).not.toBeInTheDocument();
+  });
+
+  it('shows the statement block on an imported electricity draft and sends the reading', async () => {
+    const { creates } = mountCreate();
+    const draft = createMockParsedInvoice({
+      matched_account: createMockBillingAccount({ id: 7, account_type: 'electricity' }),
+      statement: { consumo_kwh: 320, classe: 'Residencial', bandeira: 'Verde' },
+    });
+    renderWithProviders(<BillFormModal open draft={draft} onClose={vi.fn()} />);
+
+    // The draft (account_type electricity) renders the readings block, prefilled from the draft.
     expect(await screen.findByLabelText('Consumo (kWh)')).toBeInTheDocument();
-    expect(screen.queryByLabelText('Consumo (m³)')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Consumo (kWh)')).toHaveValue('320');
+
+    await userEvent.click(screen.getByRole('button', { name: /^criar$/i }));
+
+    await waitFor(() => {
+      expect(creates).toHaveLength(1);
+    });
+    // A matched account is bound, so the statement IS sent (kind=electricity, consumo_kwh=320).
+    expect(creates[0]?.payload.statement).toMatchObject({ kind: 'electricity', consumo_kwh: 320 });
+  });
+
+  it('drops the statement on a no-match draft (billing_account_id null) but still creates', async () => {
+    const { creates } = mountCreate();
+    const draft = createMockParsedInvoice({
+      matched_account: null, // no-match: billing_account_id resolves to null
+      statement: { consumo_kwh: 99, classe: 'Residencial', bandeira: 'Verde' },
+      warnings: ['Nenhuma conta encontrada.'],
+    });
+    renderWithProviders(<BillFormModal open draft={draft} onClose={vi.fn()} />);
+
+    await userEvent.click(screen.getByRole('button', { name: /^criar$/i }));
+
+    await waitFor(() => {
+      expect(creates).toHaveLength(1);
+    });
+    // No account to type the statement → it must NOT be sent (backend would 400 on a null account).
+    expect(creates[0]?.payload.statement).toBeNull();
+    expect(creates[0]?.payload.bill).toMatchObject({ billing_account_id: null });
   });
 
   it('blocks submission with validation messages when required fields are empty', async () => {

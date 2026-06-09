@@ -14,6 +14,7 @@ from finances.models import (
     BillBehavior,
     BillingAccountType,
     BillLineItem,
+    InstallmentPlanState,
     WaterBillStatement,
 )
 from finances.services.bill_payment_service import BillPaymentService
@@ -27,6 +28,7 @@ from tests.factories import (
     make_condo_month_close,
     make_condominium,
     make_installment,
+    make_installment_plan,
     make_water_statement,
 )
 
@@ -70,6 +72,35 @@ def test_update_with_lines_replaces_unpaid_open(authenticated_api_client) -> Non
 
 
 @freeze_time(FROZEN)
+def test_update_with_lines_persists_corrected_header(authenticated_api_client) -> None:
+    """A re-imported corrected invoice carries a 'bill' header; its editable fields
+    (due_date/external_identifier/issue_date) are persisted alongside the line replace, but
+    competence_month stays immutable."""
+    bill = _water_bill()
+    original_competence = bill.competence_month
+    resp = authenticated_api_client.post(
+        f"/api/finances/bills/{bill.id}/update_with_lines/",
+        {
+            "bill": {
+                "due_date": "2026-06-20",
+                "external_identifier": "UC-CORRIGIDA",
+                "issue_date": "2026-06-02",
+                "competence_month": "2026-09-01",  # MUST be ignored (immutable)
+            },
+            "line_items": [{"description": "Consumo corrigido", "amount": "175.00"}],
+        },
+        format="json",
+    )
+    assert resp.status_code == status.HTTP_200_OK
+    bill.refresh_from_db()
+    assert bill.due_date == date(2026, 6, 20)
+    assert bill.external_identifier == "UC-CORRIGIDA"
+    assert bill.issue_date == date(2026, 6, 2)
+    assert bill.competence_month == original_competence  # unchanged — immutable
+    assert resp.data["amount_total"] == "175.00"
+
+
+@freeze_time(FROZEN)
 def test_update_with_lines_rejects_paid_bill(authenticated_api_client, admin_user) -> None:
     bill = _water_bill()
     BillPaymentService.pay(bill, date(2026, 6, 5), None, user=admin_user)
@@ -107,7 +138,13 @@ def test_create_with_lines_persists_statement_and_installment(authenticated_api_
     account = make_billing_account(
         condominium=cond, account_type=BillingAccountType.WATER, external_identifier="UC-9"
     )
-    installment = make_installment()
+    plan = make_installment_plan(
+        condominium=cond,
+        billing_account=account,
+        embedded=True,
+        lifecycle_state=InstallmentPlanState.ACTIVE,
+    )
+    installment = make_installment(plan=plan)
     resp = authenticated_api_client.post(
         "/api/finances/bills/create_with_lines/",
         {
@@ -132,6 +169,46 @@ def test_create_with_lines_persists_statement_and_installment(authenticated_api_
     assert get_resp.data["water_statement"]["consumo_m3"] == 158
     line = BillLineItem.objects.get(bill_id=bill_id)
     assert line.installment_id == installment.id
+
+
+@freeze_time(FROZEN)
+def test_create_with_lines_rejects_foreign_installment(authenticated_api_client) -> None:
+    """An installment_id that does NOT belong to the bill's embedded ACTIVE plan is rejected 400 PT
+    (ownership guard) — never silently bound to a foreign/standalone parcela."""
+    cond = make_condominium()
+    account = make_billing_account(
+        condominium=cond, account_type=BillingAccountType.WATER, external_identifier="UC-OWN"
+    )
+    # A standalone (embedded=False) plan of ANOTHER account — its installment must not bind here.
+    other_account = make_billing_account(
+        condominium=cond, account_type=BillingAccountType.WATER, external_identifier="UC-OTHER"
+    )
+    foreign_plan = make_installment_plan(
+        condominium=cond,
+        billing_account=other_account,
+        embedded=True,
+        lifecycle_state=InstallmentPlanState.ACTIVE,
+    )
+    foreign = make_installment(plan=foreign_plan)
+    resp = authenticated_api_client.post(
+        "/api/finances/bills/create_with_lines/",
+        {
+            "bill": {
+                "condominium_id": cond.id,
+                "billing_account_id": account.id,
+                "competence_month": "2026-06-01",
+                "due_date": "2026-06-10",
+                "description": "Água Junho",
+                "behavior": BillBehavior.RECURRING,
+            },
+            "line_items": [
+                {"description": "Consumo", "amount": "120.00", "installment_id": foreign.id}
+            ],
+        },
+        format="json",
+    )
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    assert "parcela" in resp.data["error"].lower()
 
 
 @freeze_time(FROZEN)
@@ -225,6 +302,71 @@ def test_update_with_lines_persists_statement_fields(authenticated_api_client) -
     assert statement["data_leitura"] == "2026-06-01"
     assert statement["agua_status"] == "cut"
     assert statement["leitura_anterior"] is None
+
+
+@freeze_time(FROZEN)
+def test_create_with_lines_duplicate_non_active_bill_returns_400_not_500(
+    authenticated_api_client,
+) -> None:
+    """Re-importing the same month after a water bill was SUSPENDED must not 500. The Bill partial
+    unique is WHERE is_deleted=False (NOT lifecycle-filtered), so the suspended (non-deleted) bill
+    still occupies (account, competence) → create_with_lines defensively catches the IntegrityError
+    and returns a PT 400."""
+    cond = make_condominium()
+    account = make_billing_account(
+        condominium=cond, account_type=BillingAccountType.WATER, external_identifier="UC-SUSP"
+    )
+    make_bill(
+        condominium=cond,
+        billing_account=account,
+        competence_month=date(2026, 6, 1),
+        due_date=date(2026, 6, 10),
+        behavior=BillBehavior.RECURRING,
+        lifecycle_state="suspended",
+    )
+    resp = authenticated_api_client.post(
+        "/api/finances/bills/create_with_lines/",
+        {
+            "bill": {
+                "condominium_id": cond.id,
+                "billing_account_id": account.id,
+                "competence_month": "2026-06-01",
+                "due_date": "2026-06-10",
+                "description": "Água Junho (reimport)",
+                "behavior": BillBehavior.RECURRING,
+            },
+            "line_items": [{"description": "Consumo", "amount": "120.00"}],
+        },
+        format="json",
+    )
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    assert "Já existe uma conta" in resp.data["error"]
+
+
+@freeze_time(FROZEN)
+def test_create_with_lines_defaults_condominium_when_omitted(authenticated_api_client) -> None:
+    """The parse-invoice draft + bill modal never send condominium_id; create_with_lines must
+    default to the singleton Condominium.get_default() (design §15) instead of 400-ing."""
+    from core.models import Condominium
+
+    default = Condominium.get_default()  # invisible singleton bootstrapped by the migration
+    assert default is not None
+    resp = authenticated_api_client.post(
+        "/api/finances/bills/create_with_lines/",
+        {
+            "bill": {
+                "competence_month": "2026-06-01",
+                "due_date": "2026-06-10",
+                "description": "Água Junho (sem condominium_id)",
+                "behavior": BillBehavior.ONE_TIME,
+            },
+            "line_items": [{"description": "Consumo", "amount": "120.00"}],
+        },
+        format="json",
+    )
+    assert resp.status_code == status.HTTP_201_CREATED
+    bill = Bill.objects.get(pk=resp.data["id"])
+    assert bill.condominium_id == default.id
 
 
 @freeze_time(FROZEN)

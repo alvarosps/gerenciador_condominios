@@ -13,7 +13,7 @@
 **Roadmap**: `prompts/ROADMAP.md` (seção "Contas de serviço / parser / IPTU")
 **Total de Sessões**: 9 (56–64)
 **Branch**: `feat/condo-utility-bills` (a partir de `master`)
-**Status**: **FEATURE COMPLETA (local)** — Sessões **56–64 concluídas**, gate verde no branch `feat/condo-utility-bills`. Falta só o **seed em PROD** (passo manual pós-deploy — runbook abaixo na nota da S64).
+**Status**: **FEATURE COMPLETA (local) + REVISÃO FINAL** — Sessões **56–64** + **14 achados de revisão adversarial corrigidos** (ver nota "Revisão final" abaixo), gate verde no branch `feat/condo-utility-bills`. Falta só o **seed em PROD** (passo manual pós-deploy — runbook na nota da S64).
 **Decisões de produto** (design §2): contas tipadas (`account_type` water/electricity/iptu/internet/generic) + identidade (inscrição/UC/medidor/titular/endereço cadastrado); **statements 1:1 só leituras** (dinheiro = `BillLineItem`, fonte única); **parser DMAE+CEEE em memória, SEM anexar o PDF** (upload→lê→insere); refactor `InstallmentPlan.linked_billing_account → billing_account`; IPTU = conta-registro (não auto-gera) + planos avulsos + dívida diferida; **alerta IPTU = banner load-bearing + push best-effort agregado SP-aware**; seed das parcelas de abertura com `competence_month=2026-06`; "Atrasados" inclui IPTU (banner = drill-down). Prod = última alteração (após deploy).
 
 | # | Sessão | Camada | Status | Arquivo |
@@ -107,6 +107,21 @@ Após o merge de `feat/condo-utility-bills` e o deploy (migrations `finances 000
 3. **Rodar o seed** apontando para prod (`DATABASE_URL`/settings de prod): `python manage.py seed_condo_utilities --dry-run` → revisar → `python manage.py seed_condo_utilities`.
 4. **Advisor de segurança** (Supabase MCP `get_advisors type=security`): confirmar **0** `rls_disabled` (as tabelas novas `waterbillstatement`/`electricitybillstatement` já habilitam RLS na migração 0006).
 5. Confirmar os 9 alertas de IPTU no dashboard de prod e ajustar status de pagamento real (luz/água de junho) conforme `_premissas`.
+
+### Revisão final (adversarial, 6 lentes + verificação) — 14 achados corrigidos
+Revisão completa do diff `master..feat/condo-utility-bills` (97 arquivos). Achados **verificados contra o código real** e corrigidos na raiz (teste de regressão por achado; sem migração nova):
+- **[BLOCKER] `condominium_id` ausente no fluxo import→criar** → `BillSerializer.condominium_id` `required=False` + injeta o singleton default no `validate()` (como Reserve/IncomeEntry). Importar fatura → Criar agora funciona.
+- **[BLOCKER] statement rejeitado em import sem conta casada** → `submitDraft` só envia `statement` quando há `billing_account_id`; bloco de leituras gated em `isDraft` (some no fluxo manual onde era descartado).
+- **[MAJOR] `is_notification_sent_on` truncava em UTC, não SP** → filtro por range datetime SP `[dia 00:00, +1d)` (idempotência correta na virada de meia-noite SP).
+- **[MAJOR] `update_with_lines` ignorava o header** → aplica o header editável (via `BillSerializer` partial, `competence_month` imutável) na mesma transação.
+- **[MAJOR] conta duplicada → 500** → guard de unicidade no `BillingAccountSerializer.validate()` (400 PT; soft-deletada ainda recriável).
+- **[MAJOR] create_with_lines 500 em bill não-deletado não-ACTIVE** → idempotência casa qualquer bill não-deletado + violação de constraint mapeada p/ 400 PT.
+- **[MAJOR] match CEEE quebrado** → parser lia o nº do cliente (`"UC "`); corrigido p/ a **"Número da UC"** (autoritativa, = a do seed); fixtures/testes alinhados.
+- **[MAJOR] planos embutidos seedados sem `Installment`** → `_seed_embedded_installments` materializa as parcelas going-forward; **re-seed local**: 86 installments criados; parcela embutida agora aparece no bill gerado (água-850 parcela 3 venc 04/06 = R$530,24).
+- **[MAJOR] parser podia emitir `consumo=None`** → `consumo_or_zero` (default 0 + warning PT).
+- **[MINOR] `installment_id` sem checagem de posse** → `_parse_lines` só vincula parcela do mesmo `billing_account` (plano embutido ACTIVE), senão 400 PT.
+- *(1 falso-positivo descartado: o "500" do achado 5 já era 400, mas com mensagem de constraint crua — agora PT.)*
+- **Gate pós-fix (in-place)**: BE `ruff`/`mypy`/`pyright` limpos, `makemigrations --check` "No changes", **202 + 542** testes; FE `lint`/`type-check` limpos, **882 vitest**. Zero suppressions.
 
 ---
 

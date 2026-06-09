@@ -32,7 +32,9 @@ pytestmark = [pytest.mark.integration, pytest.mark.django_db]
 PARSE_URL = "/api/finances/bills/parse_invoice/"
 
 DMAE_UC = "117.111.0049.0508.00"
-CEEE_UC = "900126780"
+# The authoritative CEEE consumer-unit id is the dotted "Número da UC"; ceee_850_solar's UC matches
+# the seeded electricity account 850 (scripts/data/condo_utilities_seed.json).
+CEEE_UC = "1.273.678.010-60"
 
 
 def _pdf_upload(fixture_name: str) -> SimpleUploadedFile:
@@ -104,7 +106,7 @@ def test_parse_invoice_dmae_water_returns_draft(authenticated_api_client, admin_
 
 
 def test_parse_invoice_ceee_electricity_returns_draft(authenticated_api_client, admin_user):
-    make_billing_account(
+    account = make_billing_account(
         account_type=BillingAccountType.ELECTRICITY, external_identifier=CEEE_UC, user=admin_user
     )
     resp = authenticated_api_client.post(
@@ -112,6 +114,9 @@ def test_parse_invoice_ceee_electricity_returns_draft(authenticated_api_client, 
     )
     assert resp.status_code == status.HTTP_200_OK
     assert resp.data["bill"]["account_type"] == BillingAccountType.ELECTRICITY
+    # The parsed Número da UC aligns with the seeded electricity account → build_draft matches it.
+    assert resp.data["bill"]["external_identifier"] == CEEE_UC
+    assert resp.data["matched_account"]["id"] == account.id
     assert resp.data["statement"]["consumo_kwh"] == 320
     assert resp.data["statement"]["energia_injetada_kwh"] == 145
 

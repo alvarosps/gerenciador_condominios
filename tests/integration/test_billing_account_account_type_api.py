@@ -107,6 +107,69 @@ def test_create_generic_blank_identifier_ok(authenticated_api_client) -> None:
     assert response.data["account_type"] == "generic"
 
 
+def test_create_duplicate_active_identity_returns_400_not_500(authenticated_api_client) -> None:
+    """A duplicate active (building, account_type, external_identifier) is caught by the serializer
+    (app-level guard mirroring the partial DB unique) → clean PT 400, never an IntegrityError 500."""
+    condo = make_condominium()
+    building = make_building(street_number=836, condominium=condo)
+    make_billing_account(
+        condominium=condo,
+        building=building,
+        account_type=BillingAccountType.WATER,
+        external_identifier="UC-DUP",
+    )
+    payload = {
+        "condominium_id": condo.id,
+        "building_id": building.id,
+        "name": "Água duplicada",
+        "account_type": "water",
+        "external_identifier": "UC-DUP",
+        "default_due_day": 10,
+    }
+    response = authenticated_api_client.post(ACCOUNTS_URL, payload, format="json")
+    assert response.status_code == 400
+    assert "external_identifier" in response.data
+    assert "Já existe uma conta ativa" in str(response.data["external_identifier"][0])
+
+
+def test_create_duplicate_identity_after_soft_delete_allowed(authenticated_api_client) -> None:
+    """A soft-deleted account frees the partial-unique slot — recreating the same identity is OK
+    (the guard uses the default manager, which excludes soft-deleted rows)."""
+    condo = make_condominium()
+    building = make_building(street_number=836, condominium=condo)
+    first = make_billing_account(
+        condominium=condo,
+        building=building,
+        account_type=BillingAccountType.WATER,
+        external_identifier="UC-REVIVE",
+    )
+    first.delete()  # soft delete
+    payload = {
+        "condominium_id": condo.id,
+        "building_id": building.id,
+        "name": "Água recriada",
+        "account_type": "water",
+        "external_identifier": "UC-REVIVE",
+        "default_due_day": 10,
+    }
+    response = authenticated_api_client.post(ACCOUNTS_URL, payload, format="json")
+    assert response.status_code == 201
+    assert response.data["external_identifier"] == "UC-REVIVE"
+
+
+def test_update_keeping_own_identity_allowed(authenticated_api_client) -> None:
+    """A PATCH editing other fields must not flag the row's own identity as a duplicate (self is
+    excluded from the uniqueness guard)."""
+    account = make_billing_account(
+        account_type=BillingAccountType.WATER, external_identifier="UC-SELF"
+    )
+    response = authenticated_api_client.patch(
+        f"{ACCOUNTS_URL}{account.id}/", {"name": "Novo nome"}, format="json"
+    )
+    assert response.status_code == 200
+    assert response.data["name"] == "Novo nome"
+
+
 def test_filter_by_account_type(authenticated_api_client) -> None:
     # Scope to a dedicated building so the assertion is deterministic regardless of any other
     # accounts (and exercises building_id + account_type together).

@@ -23,6 +23,7 @@ from finances.services.invoice_parsing.base import (
     ParsedLine,
     PdfPage,
     PositionedRow,
+    consumo_or_zero,
     extract_rows,
     find_row,
     int_after,
@@ -37,7 +38,10 @@ from finances.services.invoice_parsing.base import (
 
 _ANCHOR_CONTA_MES = "CONTA MES"
 _ANCHOR_VENCIMENTO = "VENCIMENTO"
-_ANCHOR_UC = "UC "
+# The authoritative consumer-unit identity is the CEEE "Número da UC" (dotted/dashed format, e.g.
+# 1.273.678.010-60) — NOT the cliente/C.C./instalação/boleto codes. external_identifier reads THAT
+# label so a parsed invoice matches the seeded electricity account (whose external_identifier is the UC).
+_ANCHOR_UC = "NUMERO DA UC"
 _ANCHOR_CLASSE = "CLASSE"
 _ANCHOR_BANDEIRA = "BANDEIRA"
 _ANCHOR_CONSUMO = "CONSUMO KWH"
@@ -130,7 +134,7 @@ class CeeeElectricityParser:
             warnings.append(_WARN_ARRECADADA)
 
         statement: dict[str, object] = {
-            "consumo_kwh": int_after(rows, _ANCHOR_CONSUMO),
+            "consumo_kwh": consumo_or_zero(int_after(rows, _ANCHOR_CONSUMO), warnings),
             "energia_injetada_kwh": int_after(rows, _ANCHOR_INJETADA),
             "leitura_anterior": int_after(rows, _ANCHOR_LEITURA_ANTERIOR),
             "leitura_atual": int_after(rows, _ANCHOR_LEITURA_ATUAL),

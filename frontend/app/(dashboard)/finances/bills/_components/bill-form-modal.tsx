@@ -296,7 +296,13 @@ export function BillFormModal({ open, bill, draft, onClose }: BillFormModalProps
   const isInstallment = behavior === 'installment';
 
   function submitDraft(values: BillFormValues) {
-    const statement = buildStatementInput(values.account_type, values);
+    // The statement is keyed by the billing account in the backend (_statement_model_for); a
+    // no-match draft (billing_account_id === null) has no account to type it, so sending the
+    // statement would 400. Only attach it when an account is bound (matched or selected).
+    const statement =
+      values.billing_account_id !== null
+        ? buildStatementInput(values.account_type, values)
+        : null;
     const billPayload: Record<string, unknown> = {
       description: values.description,
       building_id: values.building_id,
@@ -661,7 +667,10 @@ export function BillFormModal({ open, bill, draft, onClose }: BillFormModalProps
                 )}
               </div>
 
-              <BillStatementFields form={form} accountType={accountType} />
+              {/* Readings only ride along on the parser-draft flow; the manual create/update path
+                  has no statement leg (readings would be silently dropped), so the block is
+                  rendered only for an imported invoice draft. */}
+              {isDraft && <BillStatementFields form={form} accountType={accountType} />}
 
               {isDraft && draft && draft.warnings.length > 0 && (
                 <Alert>

@@ -121,3 +121,28 @@ def test_sp_aware_midnight_boundary(recipient: User) -> None:
         is_notification_sent_on(recipient, Notification.TYPE_IPTU_OVERDUE_RISK, date(2026, 7, 16))
         is False
     )
+
+
+@freeze_time("2026-07-16 02:30:00")
+def test_no_duplicate_digest_across_sp_midnight(recipient: User) -> None:
+    """Regression: TIME_ZONE=UTC truncates sent_at__date in UTC. At 02:30 UTC (= 23:30 SP on
+    2026-07-15) a digest sent NOW carries SP day 2026-07-15. A same-SP-day re-run
+    (is_notification_sent_on(today_sp()=2026-07-15)) must detect it → no duplicate. A naive
+    UTC sent_at__date=2026-07-15 lookup would miss it (the row's UTC date is 2026-07-16)."""
+    from finances.services.timezone import today_sp
+
+    # The send happens NOW (02:30 UTC). today_sp() at this instant is the SP calendar day.
+    assert today_sp() == date(2026, 7, 15)
+    create_notification(
+        recipient=recipient,
+        notification_type=Notification.TYPE_IPTU_OVERDUE_RISK,
+        title="t",
+        body="b",
+    )
+    # The persisted sent_at is 2026-07-16 02:30 UTC (its UTC date is the 16th, SP date the 15th).
+    notif = Notification.objects.get(recipient=recipient, type=Notification.TYPE_IPTU_OVERDUE_RISK)
+    assert notif.sent_at.date() == date(2026, 7, 16)  # UTC date — would fool a naive lookup
+    # Same-SP-day re-run must see it → idempotent (no duplicate digest near SP midnight).
+    assert (
+        is_notification_sent_on(recipient, Notification.TYPE_IPTU_OVERDUE_RISK, today_sp()) is True
+    )

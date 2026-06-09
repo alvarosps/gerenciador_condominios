@@ -1,0 +1,28 @@
+# Sanitized DMAE (water) invoice — building 850, May/2026, WITHOUT a parseable CONSUMO M3 line.
+# SANITIZED: synthetic values only, NO real CPF / NO barcode. CNPJ is public.
+# Format: "<x> <y> <text>" (one reportlab drawString per line; PDF points, origin bottom-left).
+#
+# The CONSUMO M3 anchor is absent (illegible meter section). The parser must default consumo_m3=0
+# and append a PT warning instead of emitting None (PositiveIntegerField / FE zod required field).
+# Invariant: sum(non-offset) - sum(offset) == printed total -> 100,00 == 100,00 (no residual).
+
+50  800  DMAE - DEPARTAMENTO MUNICIPAL DE AGUA E ESGOTOS
+50  788  CNPJ 92.924.901/0001-98
+50  776  FATURA 05/2026
+50  764  VENCIMENTO 04/06/2026
+50  752  INSCRICAO 117.111.0049.0508.00
+50  740  IMOVEL 000463540
+50  728  TITULAR TITULAR TESTE
+
+50  704  LEITURA ANTERIOR 1240
+50  692  LEITURA ATUAL 1268
+50  680  LEITURA DIAS 30
+50  668  SITUACAO AGUA LIGADA
+50  656  SITUACAO ESGOTO LIGADA
+
+50  624  DESCRICAO DOS SERVICOS E TARIFAS
+50  608  AGUA
+360 608  100,00
+
+50  576  TOTAL A PAGAR
+360 576  100,00
