@@ -4,7 +4,12 @@ from datetime import date, timedelta
 from decimal import Decimal
 
 import pytest
-from finances.models import BillLifecycleState, InstallmentPlan, InstallmentPlanState
+from finances.models import (
+    BillingAccountType,
+    BillLifecycleState,
+    InstallmentPlan,
+    InstallmentPlanState,
+)
 from finances.services.timezone import today_sp
 
 from tests.factories import (
@@ -48,8 +53,10 @@ def test_create_plan_returns_nested_read_and_string_money(authenticated_api_clie
     assert "category_id" not in response.data
 
 
-def test_create_embedded_plan_with_linked_account(authenticated_api_client) -> None:
-    account = make_billing_account()
+def test_create_embedded_plan_with_billing_account_id(authenticated_api_client) -> None:
+    account = make_billing_account(
+        account_type=BillingAccountType.WATER, external_identifier="UC-100"
+    )
     payload = {
         "condominium_id": account.condominium_id,
         "description": "TV embutida",
@@ -58,12 +65,47 @@ def test_create_embedded_plan_with_linked_account(authenticated_api_client) -> N
         "start_due_date": "2026-07-10",
         "default_due_day": 10,
         "embedded": True,
-        "linked_billing_account_id": account.id,
+        "billing_account_id": account.id,
     }
     response = authenticated_api_client.post(PLANS_URL, payload, format="json")
     assert response.status_code == 201
     assert response.data["embedded"] is True
-    assert response.data["linked_billing_account"]["id"] == account.id
+    assert response.data["billing_account"]["id"] == account.id
+
+
+def test_create_embedded_plan_with_iptu_account_id_is_rejected(authenticated_api_client) -> None:
+    account = make_billing_account(account_type=BillingAccountType.IPTU, external_identifier="9988")
+    payload = {
+        "condominium_id": account.condominium_id,
+        "description": "IPTU embutido inválido",
+        "total_amount": "400.00",
+        "installment_count": 4,
+        "start_due_date": "2026-07-10",
+        "default_due_day": 10,
+        "embedded": True,
+        "billing_account_id": account.id,
+    }
+    response = authenticated_api_client.post(PLANS_URL, payload, format="json")
+    assert response.status_code == 400
+    assert "billing_account_id" in response.data
+
+
+def test_create_standalone_plan_with_iptu_account_id(authenticated_api_client) -> None:
+    account = make_billing_account(account_type=BillingAccountType.IPTU, external_identifier="7766")
+    payload = {
+        "condominium_id": account.condominium_id,
+        "description": "IPTU avulso",
+        "total_amount": "1500.00",
+        "installment_count": 3,
+        "start_due_date": "2026-07-10",
+        "default_due_day": 10,
+        "embedded": False,
+        "billing_account_id": account.id,
+    }
+    response = authenticated_api_client.post(PLANS_URL, payload, format="json")
+    assert response.status_code == 201
+    assert response.data["embedded"] is False
+    assert response.data["billing_account"]["id"] == account.id
 
 
 def test_embedded_without_linked_account_is_rejected(authenticated_api_client) -> None:
@@ -120,7 +162,15 @@ def test_patch_and_soft_delete_plan(authenticated_api_client) -> None:
 
 
 def test_convert_deferred_creates_plan_and_terminates_bill(authenticated_api_client) -> None:
-    bill = make_bill(behavior="one_time", lifecycle_state=BillLifecycleState.DEFERRED)
+    account = make_billing_account(
+        account_type=BillingAccountType.IPTU, external_identifier="IPTU-42"
+    )
+    bill = make_bill(
+        condominium=account.condominium,
+        behavior="one_time",
+        lifecycle_state=BillLifecycleState.DEFERRED,
+        billing_account=account,
+    )
     make_bill_line_item(bill=bill, amount=Decimal("1200.00"))
     payload = {
         "bill_id": bill.id,
@@ -132,6 +182,7 @@ def test_convert_deferred_creates_plan_and_terminates_bill(authenticated_api_cli
     assert response.status_code == 201
     assert response.data["total_amount"] == "1200.00"  # value migrated whole (no dup/loss)
     assert len(response.data["installments"]) == 12
+    assert response.data["billing_account"]["id"] == account.id  # inherits the IPTU account (§10.2)
     bill.refresh_from_db()
     assert bill.lifecycle_state == BillLifecycleState.CANCELED  # terminal, outside all sums
 

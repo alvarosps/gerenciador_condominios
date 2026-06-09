@@ -18,6 +18,7 @@ from django.db import transaction
 from core.services.rent_schedule_service import RentScheduleService
 from finances.models import (
     Bill,
+    BillingAccountType,
     BillLifecycleState,
     Category,
     Installment,
@@ -39,6 +40,7 @@ _CENTS = Decimal("0.01")
 _NOT_DEFERRED_MSG = "Só é possível reparcelar uma conta adiada."
 _COUNT_POSITIVE_MSG = "O número de parcelas deve ser positivo."
 _TOTAL_NON_NEGATIVE_MSG = "O valor da conta a reparcelar não pode ser negativo."
+_DEFERRED_NEEDS_IPTU_MSG = "A dívida diferida precisa estar vinculada a uma conta de IPTU."
 
 
 def _split_amount(total: Decimal, count: int) -> list[Decimal]:
@@ -95,6 +97,15 @@ class InstallmentPlanService:
             if locked.lifecycle_state != BillLifecycleState.DEFERRED:
                 raise ValidationError(_NOT_DEFERRED_MSG)
 
+            # The deferred debt always belongs to an IPTU account (design §3.4/§10.2); the plan
+            # inherits it so IptuAlertService (S61) still sees the rescheduled debt via
+            # billing_account__account_type=IPTU.
+            if (
+                locked.billing_account is None
+                or locked.billing_account.account_type != BillingAccountType.IPTU
+            ):
+                raise ValidationError({"billing_account": _DEFERRED_NEEDS_IPTU_MSG})
+
             annotated = cast(_BillTotal, Bill.objects.with_amounts(today_sp()).get(pk=locked.pk))
             total: Decimal = annotated.amount_total
             if total < 0:
@@ -113,6 +124,7 @@ class InstallmentPlanService:
                 default_due_day=default_due_day,
                 lifecycle_state=InstallmentPlanState.ACTIVE,
                 embedded=False,
+                billing_account=locked.billing_account,
                 created_by=user,
                 updated_by=user,
             )

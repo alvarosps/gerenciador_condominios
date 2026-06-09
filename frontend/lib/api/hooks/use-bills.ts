@@ -3,6 +3,10 @@ import { apiClient } from '../client';
 import { queryKeys } from '../query-keys';
 import type { CombinedCalendar } from './use-combined-calendar';
 import { type Bill, type BillLineItem, billSchema } from '@/lib/schemas/finances/bill.schema';
+import {
+  type ParsedInvoice,
+  parsedInvoiceSchema,
+} from '@/lib/schemas/finances/invoice-parse.schema';
 import type { FundedFrom, PaymentStatus } from '@/lib/schemas/finances/category.schema';
 import { type PaginatedResponse, extractResults } from '@/lib/types/api';
 
@@ -23,11 +27,47 @@ export interface BillLineInput {
   amount: number;
   is_offset?: boolean;
   category_id?: number;
+  installment_id?: number; // binds the line to the embedded Installment (§7.1)
 }
+
+/**
+ * Readings-only statement payload (§3.2/§3.3): NO money fields. `kind` discriminates the
+ * water/electricity shape on the front; the backend `_parse_statement` only coerces the reading
+ * fields (the statement TYPE is decided by the billing account), so the extra `kind` is inert.
+ */
+export type BillStatementInput =
+  | {
+      kind: 'water';
+      consumo_m3: number;
+      leitura_anterior?: number | null;
+      leitura_atual?: number | null;
+      leitura_dias?: number | null;
+      data_leitura?: string | null;
+      agua_status?: string;
+      esgoto_status?: string;
+    }
+  | {
+      kind: 'electricity';
+      consumo_kwh: number;
+      energia_injetada_kwh?: number | null;
+      leitura_anterior?: number | null;
+      leitura_atual?: number | null;
+      leitura_dias?: number | null;
+      classe?: string;
+      bandeira?: string;
+    };
 
 export interface CreateBillWithLines {
   bill: Record<string, unknown>;
   line_items: BillLineInput[];
+  statement?: BillStatementInput | null;
+}
+
+export interface UpdateBillWithLines {
+  bill_id: number;
+  bill?: Record<string, unknown>;
+  line_items: BillLineInput[];
+  statement?: BillStatementInput | null;
 }
 
 export interface PayBillRequest {
@@ -87,6 +127,43 @@ export function useCreateBillWithLines() {
     mutationFn: async (payload: CreateBillWithLines) => {
       const { data } = await apiClient.post<Bill>(`${ENDPOINT}create_with_lines/`, payload);
       return data;
+    },
+    onSuccess: () => invalidateBillCaches(queryClient),
+  });
+}
+
+/**
+ * Parse a utility invoice PDF into a serialized DRAFT (S60). Multipart: send FormData with
+ * `Content-Type: undefined` so the browser sets the boundary. Writes NOTHING — no cache
+ * invalidation; the modal persists the draft later via create/update_with_lines (§5.2).
+ */
+export function useParseInvoice() {
+  return useMutation({
+    mutationFn: async (file: File): Promise<ParsedInvoice> => {
+      const formData = new FormData();
+      formData.append('file', file);
+      const { data } = await apiClient.post<unknown>(`${ENDPOINT}parse_invoice/`, formData, {
+        headers: { 'Content-Type': undefined },
+      });
+      return parsedInvoiceSchema.parse(data); // single draft object — returned raw
+    },
+  });
+}
+
+/**
+ * Replace a bill's lines + upsert its statement on the SAME Bill (UNPAID + OPEN only — the
+ * backend rejects paid/closed with a 400 PT). Routes here when the parse draft carries an
+ * `existing_bill_id` (idempotency, §5.5). Invalidates the bill caches on success.
+ */
+export function useUpdateBillWithLines() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: UpdateBillWithLines) => {
+      const { data } = await apiClient.post<Bill>(
+        `${ENDPOINT}${payload.bill_id}/update_with_lines/`,
+        { bill: payload.bill, line_items: payload.line_items, statement: payload.statement ?? null },
+      );
+      return billSchema.parse(data);
     },
     onSuccess: () => invalidateBillCaches(queryClient),
   });

@@ -100,3 +100,6 @@ nul
 
 # Visual Companion (brainstorming mockups)
 .superpowers/
+
+# Invoice-parser test fixtures: generated PDFs (regenerated from sanitized .txt by conftest; non-deterministic reportlab output). The .txt source is versioned.
+tests/unit/test_finances/fixtures/invoices/*.pdf

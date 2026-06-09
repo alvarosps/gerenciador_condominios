@@ -1,0 +1,12 @@
+# Malformed DMAE invoice: valid issuer + total but MISSING the description section.
+# detect_and_parse must raise a PT ValueError (malformed invoice).
+# Format: "<x> <y> <text>" (positional reportlab drawString).
+
+50  800  DMAE - DEPARTAMENTO MUNICIPAL DE AGUA E ESGOTOS
+50  788  CNPJ 92.924.901/0001-98
+50  776  FATURA 05/2026
+50  764  VENCIMENTO 04/06/2026
+50  752  INSCRICAO 117.111.0049.0508.00
+
+50  720  TOTAL A PAGAR
+360 720  50,00

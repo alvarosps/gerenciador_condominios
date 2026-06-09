@@ -73,8 +73,10 @@ class BillGenerationService:
         """
         month_start = date(year, month, 1)
         bills: list[Bill] = []
-        # (1) recurring accounts + seed line (S37).
-        for account in BillingAccount.objects.filter(lifecycle_state=BillingAccountState.ACTIVE):
+        # (1) recurring accounts + seed line (S37). recurring_for_generation() applies the
+        # ACTIVE filter and excludes IPTU (registry-only — design §10.3); is_account_eligible
+        # is still the per-month predicate (tracking/end/skip).
+        for account in BillingAccount.objects.recurring_for_generation():
             if not BillGenerationService.is_account_eligible(account, month_start):
                 continue
             bills.append(BillGenerationService._ensure_account_bill(account, year, month, user))
@@ -147,7 +149,7 @@ class BillGenerationService:
                 "plan__condominium",
                 "plan__building",
                 "plan__category",
-                "plan__linked_billing_account",
+                "plan__billing_account",
             )
         )
 
@@ -166,8 +168,8 @@ class BillGenerationService:
             year, month, embedded=True
         ):
             plan = installment.plan
-            account = plan.linked_billing_account
-            if account is None:  # defensive — clean() enforces embedded ⇒ linked set.
+            account = plan.billing_account
+            if account is None:  # defensive — clean() enforces embedded ⇒ billing_account set.
                 continue
             if not BillGenerationService.is_account_eligible(account, month_start):
                 continue

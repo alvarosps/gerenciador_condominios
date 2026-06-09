@@ -35,8 +35,8 @@ export const installmentPlanSchema = z
     category_id: z.number().nullable().optional(), // write
     building: buildingSchema.nullable().optional(),
     building_id: z.number().nullable().optional(), // null = condominium level
-    linked_billing_account: billingAccountSchema.nullable().optional(),
-    linked_billing_account_id: z.number().nullable().optional(), // only for embedded plans
+    billing_account: billingAccountSchema.nullable().optional(),
+    billing_account_id: z.number().nullable().optional(), // owner of any plan (consumption/IPTU/null)
     installments: z.array(installmentSchema).default([]), // nested read-only
     notes: z.string().optional().default(''),
     created_at: z.string().optional(),
@@ -45,11 +45,11 @@ export const installmentPlanSchema = z
   .superRefine((data, ctx) => {
     if (
       data.embedded &&
-      (data.linked_billing_account_id === null || data.linked_billing_account_id === undefined)
+      (data.billing_account_id === null || data.billing_account_id === undefined)
     ) {
       ctx.addIssue({
         code: 'custom',
-        path: ['linked_billing_account_id'],
+        path: ['billing_account_id'],
         message: 'Conta recorrente vinculada é obrigatória para parcela embutida',
       });
     }

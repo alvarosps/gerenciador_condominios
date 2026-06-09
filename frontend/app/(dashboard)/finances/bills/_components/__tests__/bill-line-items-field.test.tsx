@@ -43,7 +43,7 @@ function TestHost({ initialLines }: { initialLines: BillLineFormValues[] }) {
 }
 
 function line(amount: number, is_offset = false): BillLineFormValues {
-  return { category_id: null, description: 'Linha', amount, is_offset };
+  return { category_id: null, description: 'Linha', amount, is_offset, installment_id: null };
 }
 
 describe('BillLineItemsField', () => {

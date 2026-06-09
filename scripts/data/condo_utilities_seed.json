@@ -1,0 +1,299 @@
+{
+  "_instrucoes": [
+    "Inventário real das contas de serviço (água/luz/IPTU) dos prédios 836 e 850 — Apêndice A do design",
+    "docs/plans/2026-06-08-condo-utility-bills-parser-iptu-design.md.",
+    "Aplicar com: python manage.py seed_condo_utilities [--file <path>] [--dry-run].",
+    "Idempotente: chaves naturais — conta (predio,account_type,external_identifier), plano",
+    "(billing_account,embedded,description), dívida diferida (billing_account,competence_month),",
+    "installment (plan,number). Rerun não duplica. Valores numéricos sem R$/separador; datas YYYY-MM-DD.",
+    "Sem CPF real (titulares pelo primeiro nome, como no Apêndice A)."
+  ],
+  "_premissas": [
+    "Estado de pagamento (Apêndice A, 'a confirmar no seed'): luz paga até maio (junho não);",
+    "água 850 — junho informada como paga; água 836 não paga (cortada, aguardando reparcelamento DMAE).",
+    "Este seed NÃO materializa bills recorrentes de água/luz (geração é sob demanda, mensal); apenas",
+    "cria as contas tipadas + planos embutidos + termos IPTU (com parcela de abertura) + dívidas 2026.",
+    "Mês de origem dos embutidos derivado do nº da parcela atual relativo a 2026-06 (não usado pelo seed —",
+    "o seed só registra installment_count/total/parcela atual; a materialização mensal é do BillGenerationService).",
+    "NÃO backfilla parcelas pagas pré-tracking — só a parcela atual (atraso 29/05) e a próxima (aberto 30/06) por termo.",
+    "Valores das parcelas de abertura dos termos com saldo informado (todos exceto 992269) derivados do",
+    "saldo dividido pelo nº de parcelas (parcela base com piso em centavos, resto na última — mesmo algoritmo",
+    "de InstallmentPlanService._split_amount); a 'próxima' parcela coincide com a última (carrega o resto).",
+    "Termo 992269 (Casa 1): Apêndice A dá as parcelas 9=136,05 e 10=137,31 mas não o saldo original;",
+    "total_amount = saldo devedor restante (parcelas 9+10 = 273,36), pois 1..8 já foram pagas (não backfilladas)."
+  ],
+  "configuracoes": {
+    "saldo_inicial": 0,
+    "data_saldo_inicial": "2026-03-01",
+    "rent_tracking_start_date": "2026-06-01"
+  },
+  "contas": [
+    {
+      "predio_street_number": 836,
+      "account_type": "water",
+      "name": "Água DMAE 836",
+      "external_identifier": "117.111.0049.0519.00",
+      "secondary_identifier": "003419142",
+      "holder_name": "RAUL",
+      "registered_address": "Av Circular 828",
+      "supply_status": "cut",
+      "default_due_day": 4,
+      "expected_amount": 0
+    },
+    {
+      "predio_street_number": 836,
+      "account_type": "electricity",
+      "name": "Luz principal 840 (solar) 836",
+      "external_identifier": "1.273.798.010-05",
+      "secondary_identifier": "MD50721985",
+      "holder_name": "RAUL",
+      "registered_address": "Av Circular 828",
+      "supply_status": "active",
+      "default_due_day": 10,
+      "expected_amount": 921.49
+    },
+    {
+      "predio_street_number": 836,
+      "account_type": "electricity",
+      "name": "Luz 2º relógio 836 (tarifa social)",
+      "external_identifier": "650.847.010-16",
+      "secondary_identifier": "MD33457946",
+      "holder_name": "RAUL",
+      "registered_address": "Av Circular 828",
+      "supply_status": "active",
+      "default_due_day": 10,
+      "expected_amount": 97.62
+    },
+    {
+      "predio_street_number": 836,
+      "account_type": "iptu",
+      "name": "IPTU 836",
+      "external_identifier": "516449",
+      "holder_name": "RAUL",
+      "registered_address": "Av Circular 828",
+      "supply_status": "active",
+      "default_due_day": 30,
+      "expected_amount": 0
+    },
+    {
+      "predio_street_number": 850,
+      "account_type": "water",
+      "name": "Água DMAE 850",
+      "external_identifier": "117.111.0049.0508.00",
+      "secondary_identifier": "000463540",
+      "holder_name": "RAUL",
+      "registered_address": "Av Circular 838",
+      "supply_status": "active",
+      "default_due_day": 4,
+      "expected_amount": 0
+    },
+    {
+      "predio_street_number": 850,
+      "account_type": "electricity",
+      "name": "Luz 850 (solar)",
+      "external_identifier": "1.273.678.010-60",
+      "secondary_identifier": "MD50722005",
+      "holder_name": "CELIA",
+      "registered_address": "Av Circular 838",
+      "supply_status": "active",
+      "default_due_day": 10,
+      "expected_amount": 990.80
+    },
+    {
+      "predio_street_number": 850,
+      "account_type": "iptu",
+      "name": "IPTU 850 Casa 1",
+      "external_identifier": "516481",
+      "holder_name": "PRANAS BIELAVICIUS",
+      "registered_address": "Av Circular 838",
+      "supply_status": "active",
+      "default_due_day": 30,
+      "expected_amount": 0
+    },
+    {
+      "predio_street_number": 850,
+      "account_type": "iptu",
+      "name": "IPTU 850 Casa 2",
+      "external_identifier": "516503",
+      "holder_name": "PRANAS BIELAVICIUS",
+      "registered_address": "Av Circular 838",
+      "supply_status": "active",
+      "default_due_day": 30,
+      "expected_amount": 0
+    }
+  ],
+  "planos_embutidos": [
+    {
+      "predio_street_number": 836,
+      "account_type": "water",
+      "account_external_identifier": "117.111.0049.0519.00",
+      "description": "Parcelamento DMAE água 836",
+      "installment_count": 46,
+      "current_installment": 24,
+      "installment_amount": 94.48,
+      "default_due_day": 4
+    },
+    {
+      "predio_street_number": 850,
+      "account_type": "water",
+      "account_external_identifier": "117.111.0049.0508.00",
+      "description": "Parcelamento DMAE água 850",
+      "installment_count": 59,
+      "current_installment": 3,
+      "installment_amount": 530.24,
+      "default_due_day": 4
+    },
+    {
+      "predio_street_number": 850,
+      "account_type": "electricity",
+      "account_external_identifier": "1.273.678.010-60",
+      "description": "Parcelamento luz 850",
+      "installment_count": 24,
+      "current_installment": 19,
+      "installment_amount": 629.35,
+      "default_due_day": 10
+    }
+  ],
+  "termos_iptu": [
+    {
+      "predio_street_number": 836,
+      "account_external_identifier": "516449",
+      "termo": "992988",
+      "installment_count": 10,
+      "total_amount": 27181.69,
+      "current_number": 9,
+      "current_amount": 2718.16,
+      "current_due_date": "2026-05-29",
+      "next_number": 10,
+      "next_amount": 2718.25,
+      "next_due_date": "2026-06-30"
+    },
+    {
+      "predio_street_number": 836,
+      "account_external_identifier": "516449",
+      "termo": "992989",
+      "installment_count": 10,
+      "total_amount": 20669.56,
+      "current_number": 9,
+      "current_amount": 2066.95,
+      "current_due_date": "2026-05-29",
+      "next_number": 10,
+      "next_amount": 2067.01,
+      "next_due_date": "2026-06-30"
+    },
+    {
+      "predio_street_number": 836,
+      "account_external_identifier": "516449",
+      "termo": "992990",
+      "installment_count": 10,
+      "total_amount": 15036.95,
+      "current_number": 9,
+      "current_amount": 1503.69,
+      "current_due_date": "2026-05-29",
+      "next_number": 10,
+      "next_amount": 1503.74,
+      "next_due_date": "2026-06-30"
+    },
+    {
+      "predio_street_number": 836,
+      "account_external_identifier": "516449",
+      "termo": "992991",
+      "installment_count": 10,
+      "total_amount": 98.37,
+      "current_number": 9,
+      "current_amount": 9.83,
+      "current_due_date": "2026-05-29",
+      "next_number": 10,
+      "next_amount": 9.90,
+      "next_due_date": "2026-06-30"
+    },
+    {
+      "predio_street_number": 850,
+      "account_external_identifier": "516481",
+      "termo": "992269",
+      "installment_count": 10,
+      "total_amount": 273.36,
+      "current_number": 9,
+      "current_amount": 136.05,
+      "current_due_date": "2026-05-29",
+      "next_number": 10,
+      "next_amount": 137.31,
+      "next_due_date": "2026-06-30"
+    },
+    {
+      "predio_street_number": 850,
+      "account_external_identifier": "516503",
+      "termo": "1075071",
+      "installment_count": 56,
+      "total_amount": 4868.12,
+      "current_number": 55,
+      "current_amount": 86.93,
+      "current_due_date": "2026-05-29",
+      "next_number": 56,
+      "next_amount": 86.97,
+      "next_due_date": "2026-06-30"
+    },
+    {
+      "predio_street_number": 850,
+      "account_external_identifier": "516503",
+      "termo": "1075073",
+      "installment_count": 56,
+      "total_amount": 7712.87,
+      "current_number": 55,
+      "current_amount": 137.72,
+      "current_due_date": "2026-05-29",
+      "next_number": 56,
+      "next_amount": 138.27,
+      "next_due_date": "2026-06-30"
+    },
+    {
+      "predio_street_number": 850,
+      "account_external_identifier": "516503",
+      "termo": "992967",
+      "installment_count": 10,
+      "total_amount": 11932.12,
+      "current_number": 9,
+      "current_amount": 1193.21,
+      "current_due_date": "2026-05-29",
+      "next_number": 10,
+      "next_amount": 1193.23,
+      "next_due_date": "2026-06-30"
+    },
+    {
+      "predio_street_number": 850,
+      "account_external_identifier": "516503",
+      "termo": "992968",
+      "installment_count": 10,
+      "total_amount": 13409.87,
+      "current_number": 9,
+      "current_amount": 1340.98,
+      "current_due_date": "2026-05-29",
+      "next_number": 10,
+      "next_amount": 1341.05,
+      "next_due_date": "2026-06-30"
+    }
+  ],
+  "dividas_2026": [
+    {
+      "predio_street_number": 836,
+      "account_external_identifier": "516449",
+      "lancamento": "202600179949",
+      "amount": 10308.70,
+      "due_date": "2026-06-30"
+    },
+    {
+      "predio_street_number": 850,
+      "account_external_identifier": "516481",
+      "lancamento": "202600179981",
+      "amount": 682.39,
+      "due_date": "2026-06-30"
+    },
+    {
+      "predio_street_number": 850,
+      "account_external_identifier": "516503",
+      "lancamento": "202600179990",
+      "amount": 6741.33,
+      "due_date": "2026-06-30"
+    }
+  ]
+}

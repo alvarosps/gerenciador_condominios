@@ -5,18 +5,22 @@ the with_amounts(today) annotation (TZ-SP today). Actions are thin: they parse/v
 request data (400 PT) and delegate to the S37/S38 services.
 """
 
+import io
 from collections.abc import Callable
 from datetime import date
 from decimal import Decimal, InvalidOperation
 from typing import cast
 
+import pdfplumber
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import QuerySet
 from django.http import QueryDict
+from pdfplumber.utils.exceptions import PdfminerException
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
+from rest_framework.parsers import MultiPartParser
 from rest_framework.request import Request
 from rest_framework.response import Response
 
@@ -31,6 +35,8 @@ from finances.models import (
     CondoMonthClose,
     FundedFrom,
     IncomeEntry,
+    Installment,
+    InstallmentPlanState,
     Payment,
     Reserve,
     ReserveMovement,
@@ -49,8 +55,15 @@ from finances.serializers import (
 from finances.services.bill_generation_service import BillGenerationService
 from finances.services.bill_lifecycle_service import BillLifecycleService
 from finances.services.bill_payment_service import BillPaymentService
-from finances.services.bill_service import BillDraft, BillLineInput, BillService
+from finances.services.bill_service import (
+    BillDraft,
+    BillLineInput,
+    BillService,
+    StatementInput,
+)
 from finances.services.condo_month_close_service import CondoMonthCloseService
+from finances.services.invoice_draft_service import InvoiceDraftService
+from finances.services.invoice_parsing.registry import detect_and_parse
 from finances.services.reserve_service import ReserveService
 from finances.services.timezone import today_sp
 from finances.viewsets.query_params import int_param
@@ -114,6 +127,9 @@ class BillingAccountViewSet(viewsets.ModelViewSet):
         lifecycle_state = params.get("lifecycle_state")
         if lifecycle_state is not None:
             queryset = queryset.filter(lifecycle_state=lifecycle_state)
+        account_type = params.get("account_type")
+        if account_type is not None:
+            queryset = queryset.filter(account_type=account_type)
         return queryset
 
 
@@ -171,6 +187,99 @@ class PaymentViewSet(viewsets.ModelViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+_INT_STATEMENT_FIELDS = frozenset(
+    {
+        "consumo_m3",
+        "consumo_kwh",
+        "energia_injetada_kwh",
+        "leitura_anterior",
+        "leitura_atual",
+        "leitura_dias",
+    }
+)
+_DATE_STATEMENT_FIELDS = frozenset({"data_leitura"})
+
+_ERR_STATEMENT_OBJECT = "statement deve ser um objeto."
+_ERR_LINE_OBJECT = "Cada linha deve ser um objeto."
+_ERR_NO_FILE = "Envie o arquivo da fatura no campo 'file'."
+_ERR_NOT_PDF = "O arquivo enviado não é um PDF válido."
+_ERR_INSTALLMENT_NOT_OWNED = (
+    "A parcela informada não pertence ao plano embutido ativo desta conta recorrente."
+)
+
+
+def _coerce_statement_value(field: str, raw: object) -> object:
+    """Coerce a single raw statement field (int / date / str) — raises on a bad value."""
+    if raw is None:
+        return None
+    if field in _INT_STATEMENT_FIELDS:
+        return int(str(raw))  # bad value -> ValueError -> 400 PT in the action
+    if field in _DATE_STATEMENT_FIELDS:
+        return date.fromisoformat(str(raw))
+    return str(raw)
+
+
+def _parse_statement(raw: object) -> StatementInput | None:
+    """Build a typed statement dict from the raw request payload (None passes through).
+
+    The statement TYPE (water vs electricity) is decided by the billing account in the
+    service; here we only coerce values (int/date/str) and surface a 400 PT on a bad one.
+    """
+    if raw is None:
+        return None
+    if not isinstance(raw, dict):
+        raise ValidationError(_ERR_STATEMENT_OBJECT)
+    coerced = {field: _coerce_statement_value(field, value) for field, value in raw.items()}
+    return cast(StatementInput, coerced)
+
+
+def _resolve_owned_installment(
+    installment_id: object, billing_account: BillingAccount | None
+) -> Installment | None:
+    """Resolve an installment_id to an Installment ONLY if it belongs to this bill's embedded ACTIVE
+    plan; otherwise reject (400 PT). Without this an attacker could bind ANY installment id to a
+    line (cross-account leakage / a parcela that is not the account's). Mirrors the embedded-plan
+    invariant the draft reconciler (InvoiceDraftService._reconcile_line) already enforces."""
+    if not installment_id:
+        return None
+    pk = int(str(installment_id))  # bad id -> ValueError -> 400 PT in the action
+    installment = Installment.objects.filter(
+        pk=pk,
+        plan__billing_account=billing_account,
+        plan__embedded=True,
+        plan__lifecycle_state=InstallmentPlanState.ACTIVE,
+        plan__is_deleted=False,
+    ).first()
+    if installment is None:
+        raise ValidationError(_ERR_INSTALLMENT_NOT_OWNED)
+    return installment
+
+
+def _parse_lines(
+    line_items: list[object], billing_account: BillingAccount | None
+) -> list[BillLineInput]:
+    """Build BillLineInput list from the raw line_items payload (resolves category/installment).
+
+    An installment_id is bound ONLY when it belongs to the bill's embedded ACTIVE plan (ownership
+    guard); a foreign/standalone/inactive installment is rejected 400 PT.
+    """
+    lines: list[BillLineInput] = []
+    for raw in line_items:
+        if not isinstance(raw, dict):
+            raise ValidationError(_ERR_LINE_OBJECT)
+        category_id = raw.get("category_id")
+        lines.append(
+            BillLineInput(
+                description=str(raw["description"]),
+                amount=Decimal(str(raw["amount"])),
+                is_offset=bool(raw.get("is_offset", False)),
+                category=(Category.objects.filter(pk=category_id).first() if category_id else None),
+                installment=_resolve_owned_installment(raw.get("installment_id"), billing_account),
+            )
+        )
+    return lines
+
+
 class BillViewSet(viewsets.ModelViewSet):
     serializer_class = BillSerializer
     permission_classes = [FinancialReadOnly]
@@ -179,7 +288,14 @@ class BillViewSet(viewsets.ModelViewSet):
     def get_queryset(self) -> QuerySet[Bill]:
         queryset = (
             Bill.objects.with_amounts(today_sp())
-            .select_related("building", "category", "billing_account", "condominium")
+            .select_related(
+                "building",
+                "category",
+                "billing_account",
+                "condominium",
+                "water_statement",
+                "electricity_statement",
+            )
             .prefetch_related("line_items", "allocations")
         )
         return self._apply_filters(queryset, self.request.query_params)
@@ -349,24 +465,99 @@ class BillViewSet(viewsets.ModelViewSet):
                 lifecycle_state=validated.get("lifecycle_state", BillLifecycleState.ACTIVE),
                 notes=validated.get("notes", ""),
             )
-            lines: list[BillLineInput] = [
-                BillLineInput(
-                    description=str(item["description"]),
-                    amount=Decimal(str(item["amount"])),
-                    is_offset=bool(item.get("is_offset", False)),
-                    category=(
-                        Category.objects.filter(pk=item.get("category_id")).first()
-                        if item.get("category_id")
-                        else None
-                    ),
-                )
-                for item in line_items
-            ]
-            bill = BillService.create_with_lines(draft, lines, user=cast(User, request.user))
+            lines = _parse_lines(line_items, validated.get("billing_account"))
+            statement = _parse_statement(request.data.get("statement"))
+            bill = BillService.create_with_lines(
+                draft, lines, statement=statement, user=cast(User, request.user)
+            )
         except (KeyError, ValueError, InvalidOperation, ValidationError) as exc:
             message = exc.messages[0] if isinstance(exc, ValidationError) else str(exc)
             return Response({"error": message}, status=status.HTTP_400_BAD_REQUEST)
         return Response(self._serialized_bill(bill), status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=["post"])
+    def update_with_lines(self, request: Request, pk: str | None = None) -> Response:
+        """Replace a bill's lines + upsert its statement (+ corrected header) on the SAME Bill.
+
+        UNPAID + OPEN only. A re-imported (corrected) invoice carries a 'bill' header; its editable
+        fields (due_date/external_identifier/issue_date/building/category/…) are validated here via
+        the partial BillSerializer and persisted in the SAME atomic transaction as the line/statement
+        replace. competence_month stays IMMUTABLE — it is never forwarded to the service.
+        """
+        bill = self.get_object()
+        line_items = request.data.get("line_items", [])
+        if not isinstance(line_items, list):
+            return Response(
+                {"error": "Payload inválido: 'line_items' (lista) é obrigatório."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        bill_data = request.data.get("bill")
+        header: dict[str, object] | None = None
+        if bill_data is not None:
+            if not isinstance(bill_data, dict):
+                return Response(
+                    {"error": "Payload inválido: 'bill' deve ser um objeto."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            header_serializer = BillSerializer(instance=bill, data=bill_data, partial=True)
+            if not header_serializer.is_valid():
+                return Response(header_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            # competence_month is immutable; drop it (+ condominium, never reassigned) so the
+            # service only sees the editable header fields it accepts.
+            header = {
+                field: value
+                for field, value in header_serializer.validated_data.items()
+                if field not in ("competence_month", "condominium")
+            }
+        try:
+            lines = _parse_lines(line_items, bill.billing_account)
+            statement = _parse_statement(request.data.get("statement"))
+            BillService.update_with_lines(
+                bill, lines, statement=statement, header=header, user=cast(User, request.user)
+            )
+        except (KeyError, ValueError, InvalidOperation, ValidationError) as exc:
+            message = exc.messages[0] if isinstance(exc, ValidationError) else str(exc)
+            return Response({"error": message}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(self._serialized_bill(bill), status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["post"], parser_classes=[MultiPartParser])
+    def parse_invoice(self, request: Request) -> Response:
+        """Receive a utility invoice PDF (multipart), parse it in MEMORY and return a DRAFT.
+
+        Writes NOTHING (past-immutable, design §6): the draft is persisted later via
+        create_with_lines/update_with_lines (S58), from the modal (S63). is_staff is enforced by
+        FinancialReadOnly (POST write gate). The PDF is validated and discarded — never stored
+        (decisão #4). The only external I/O boundary is pdfplumber.open; the positional parsing
+        lives in the S59 registry.
+        """
+        uploaded = request.FILES.get("file")
+        if uploaded is None:
+            return Response({"error": _ERR_NO_FILE}, status=status.HTTP_400_BAD_REQUEST)
+        pdf_bytes = uploaded.read()
+        try:
+            with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+                has_pages = bool(pdf.pages)
+        except (PdfminerException, ValueError, OSError):
+            return Response({"error": _ERR_NOT_PDF}, status=status.HTTP_400_BAD_REQUEST)
+        if not has_pages:
+            return Response({"error": _ERR_NOT_PDF}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            parsed = detect_and_parse(pdf_bytes)
+        except ValueError as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+        draft = InvoiceDraftService.build_draft(parsed)
+        return Response(draft, status=status.HTTP_200_OK)
+
+    def destroy(self, request: Request, *args: object, **kwargs: object) -> Response:
+        """Soft-delete the bill through BillService.delete, which cascades to its statement.
+
+        The default destroy would SoftDeleteMixin.delete() only the Bill row, leaving a live
+        water/electricity statement orphaned (it would still surface via the reverse accessor on
+        a re-fetched soft-deleted bill — design §7.3). delete soft-deletes the statement first.
+        """
+        bill = self.get_object()
+        BillService.delete(bill, user=cast(User, request.user))
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class ReserveViewSet(viewsets.ModelViewSet):

@@ -1,0 +1,28 @@
+# Sanitized CEEE (electricity) invoice WITHOUT a parseable CONSUMO KWH line.
+# SANITIZED: synthetic values only, NO real CPF / NO barcode. CNPJ is public.
+# Format: "<x> <y> <text>" (positional reportlab drawString; PDF points, origin bottom-left).
+#
+# The CONSUMO KWH anchor is absent (illegible). The parser must default consumo_kwh=0 + warn.
+# Energia liquida = total - sum(itens) = 100,62 - 8,20 = 92,42
+
+50  800  CEEE EQUATORIAL ENERGIA
+50  788  CNPJ 08.467.115/0001-00
+50  776  EMISSAO 22/05/2026
+50  764  CONTA MES 05/2026
+50  752  VENCIMENTO 10/06/2026
+50  740  NUMERO DA UC 650.847.010-16
+50  728  MEDIDOR MD33457946
+50  716  TITULAR TITULAR TESTE
+50  704  CLASSE Baixa Renda
+50  692  BANDEIRA Amarela
+
+50  668  LEITURA ANTERIOR 4200
+50  656  LEITURA ATUAL 4290
+50  644  LEITURA DIAS 31
+
+50  600  DESCRICAO DOS VALORES FATURADOS
+50  584  CIP
+360 584  8,20
+
+50  538  TOTAL A PAGAR
+360 538  100,62

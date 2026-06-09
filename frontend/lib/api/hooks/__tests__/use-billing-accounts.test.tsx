@@ -97,6 +97,11 @@ describe('billing-account mutations', () => {
     result.current.mutate({
       name: 'Água - Prédio 836',
       external_identifier: '',
+      account_type: 'water',
+      holder_name: '',
+      registered_address: '',
+      secondary_identifier: '',
+      supply_status: 'active',
       description: '',
       default_due_day: 10,
       expected_amount: 120,

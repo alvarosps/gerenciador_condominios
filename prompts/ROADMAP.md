@@ -487,3 +487,72 @@ Cadeia: `51 → 52`; `53` independente (FE, paralelo); `54` depende de **52 + 53
 - **S55 fornece**: `useGenerateContract` união discriminada `{pdf_path} | {task_id,status}` (consumidor `contract-generate-modal` atualizado); CTA gated `is_staff`; passo 6 trata 200/202/400.
 - **Sem migração/RLS** (nenhum model novo). **Sem regra "1 contrato ativo por inquilino"** (constraint de apto + filtro do front).
 - **Gate por sessão** (memória `feedback_testing_scope` + `coding-standards`): rodar testes só nos arquivos editados + regressão dirigida; BE `ruff`+`mypy core/`+`pyright`; FE `type-check`+`eslint`; zero erros/warnings; sem suppressions.
+
+---
+
+# Roadmap — Feature: Contas de serviço / parser / IPTU (Sessões 56–64)
+
+**Design Doc**: `docs/plans/2026-06-08-condo-utility-bills-parser-iptu-design.md`
+**Sessões**: 56–64 (9) · **Branch**: `feat/condo-utility-bills` (a partir de `master`)
+**Status**: prompts escritos (56–64). Nenhuma sessão executada. Estende o módulo `finances` (S34–S50).
+
+## Grafo de dependências
+
+```
+56 BE tipo+identidade (account_type/SupplyStatus/identidade/unique + recurring_for_generation excl. IPTU)
+   |
+   v
+57 BE+FE refactor InstallmentPlan.linked_billing_account -> billing_account (clean cross-model + convert_deferred herda IPTU + TODOS consumidores)
+   |
+   v
+58 BE statements (Water/Electricity readings-only + RLS) + create_with_lines/update_with_lines (statement + installment_id)
+   |
+   +-----------------+
+   v                 v
+59 BE parser core    61 BE alerta IPTU (IptuAlertService + iptu_alerts uncached + Notification types + send_finance_alerts)  [precisa 56+57]
+   (invoice_parsing,    |
+    DMAE+CEEE,          |
+    fixtures sanit.)    |
+   |                    |
+   v                    |
+60 BE endpoint parse_invoice (+ reconciliação parcela + idempotência/replace)  [precisa 58+59]
+   |                    |
+   |    62 FE DialogBody + modal responsivo + campos + bloco statement + alinhar irmãos  [precisa 56+58]
+   |                    |        |
+   +----------+---------+--------+
+              v
+        63 FE useParseInvoice + Importar fatura + prefill + useUpdateBillWithLines + IptuRiskBanner  [precisa 60+61+62]
+              |
+              v
+        64 seed real (local) -> prod após deploy  [precisa tudo]
+```
+
+Cadeia crítica: `56 → 57 → 58 → 60 → 63 → 64`. `59` antes de `60`; `61` em paralelo após `57`; `62` em paralelo após `58`.
+
+## Waves
+| Wave | Sessões | Paralelo | Observação |
+|------|---------|----------|------------|
+| 1 | **56** (BE) | 1 | fundação (tipo+identidade); head da feature |
+| 2 | **57** (BE+FE) | 1 | refactor atômico do rename — gate BE+FE juntos |
+| 3 | **58** (BE) | 1 | statements + create/update_with_lines |
+| 4 | **59** (BE) ‖ **61** (BE) ‖ **62** (FE) | até 3 | 59 (parser core) + 61 (alerta, só precisa 56+57) + 62 (modal, precisa 56+58) — arquivos disjuntos |
+| 5 | **60** (BE) | 1 | endpoint parse_invoice (precisa 58+59) |
+| 6 | **63** (FE) | 1 | import+banner (precisa 60+61+62) |
+| 7 | **64** (seed) | 1 | local → prod (última, após deploy) |
+
+> **Execução recomendada**: sequencial 56→64 (gate ≥90% em `finances` + ruff/mypy/pyright/pytest por fase antes de avançar). Paralelismo só na wave 4 (59 ‖ 61 ‖ 62) se desejado.
+
+## Contratos cross-session AUTORITATIVOS (se um prompt divergir, ISTO prevalece)
+> Fonte única dos contratos: `prompts/SESSION_STATE.md` (seção "Contas de serviço tipadas…") e o design doc. Resumo:
+- **Enums**: `BillingAccountType` {WATER, ELECTRICITY, IPTU, INTERNET, GENERIC} (default GENERIC); `SupplyStatus` {ACTIVE, CUT}.
+- **S56 fornece**: campos de identidade + unique `(building, account_type, external_identifier)` `condition=Q(is_deleted=False)`; `recurring_for_generation()` (exclui IPTU) usado por geração/projeção/calendário; `external_identifier` obrigatório p/ WATER/ELECTRICITY/IPTU.
+- **S57 fornece**: `InstallmentPlan.billing_account` (rename de `linked_billing_account`); `embedded=True ⇒ billing_account` de tipo consumo (clean + serializer.validate); `convert_deferred` herda `billing_account` IPTU. Renomear TODOS os consumidores (3 `select_related` string-literal incl.).
+- **S58 fornece**: `WaterBillStatement`/`ElectricityBillStatement` (1:1 CASCADE, SoftDelete, readings-only, RLS); `create_with_lines(statement?, line.installment_id?)`; `update_with_lines` (`@action detail=True`, só UNPAID+OPEN); `bill.schema` aninha statements.
+- **S59 fornece**: `finances/services/invoice_parsing/` (`ParsedInvoice`/`ParsedLine`, `registry.detect_and_parse`, DMAE/CEEE posicional); `ParsedLine.installment_number` interno; deps `pdfplumber`+`pdfminer.six` (3 lugares + mypy override); fixtures sanitizadas.
+- **S60 fornece**: `POST bills/parse_invoice` (MultiPartParser, is_staff) → draft `{bill{…,description}, line_items[{…,category_id,installment_id}], statement, matched_account, existing_bill_id, warnings}` (parse em memória, sem anexo). `installment_id` resolvido aqui; `existing_bill_id` roteia create vs update.
+- **S61 fornece**: `IptuAlertService.evaluate(today_sp())`; `GET finance-dashboard/iptu_alerts` UNCACHED → `{alerts:[{plan_id,external_identifier,building_label,level,overdue_count,deadline,overdue_due_dates,message}], warning_count, critical_count}`; `Notification.TYPE_IPTU_OVERDUE_RISK`/`TYPE_IPTU_PARCELAMENTO_LOST` (+ migração core); `send_finance_alerts` agregado SP-aware (`is_notification_sent_on`).
+- **S62 fornece**: `DialogBody` em `components/ui/dialog.tsx`; modal header/footer fixos responsivo; campos `external_identifier`/`issue_date`; **bloco statement (água/luz) condicional** (S62 é dono — renderiza; S63 só prefill); modais irmãos alinhados.
+- **S63 fornece**: `useParseInvoice` (FormData, `Content-Type: undefined`); "Importar fatura (PDF)" gated `is_staff`; prefill do draft → modal (consome `existing_bill_id` p/ `useUpdateBillWithLines`); `IptuRiskBanner` + `use-iptu-alerts` (uncached) agrupado por (building_label, external_identifier).
+- **S64 fornece**: `scripts/data/condo_utilities_seed.json` + `seed_condo_utilities` (idempotente, `--dry-run`); parcelas de abertura `competence_month=2026-06`; dívidas diferidas com `BillLineItem` + `billing_account` IPTU; sem backfill pré-tracking; prod após deploy (backup + advisor).
+- **Sem anexo do PDF** (parse em memória); **Atrasados inclui IPTU** (banner = drill-down); storage durável de anexos = futuro.
+- **Gate por sessão**: ≥90% em `finances`; BE `ruff && ruff format --check && mypy core/ finances/ && pyright && pytest` (escopo editado + regressão dirigida); FE `lint && type-check && test:unit`; zero erros/warnings; sem suppressions.
