@@ -131,7 +131,7 @@ def test_projected_expenses_accounts_installments_dedup() -> None:
     embedded_plan = make_installment_plan(
         condominium=account.condominium,
         embedded=True,
-        linked_billing_account=account,
+        billing_account=account,
         installment_count=1,
     )
     make_installment(
@@ -151,7 +151,7 @@ def test_projected_expenses_matches_generated_bill_totals() -> None:
     embedded_plan = make_installment_plan(
         condominium=account.condominium,
         embedded=True,
-        linked_billing_account=account,
+        billing_account=account,
         installment_count=2,
     )
     make_installment(
@@ -217,7 +217,7 @@ def test_projected_expenses_excludes_embedded_parcela_on_ineligible_account() ->
     plan = make_installment_plan(
         condominium=account.condominium,
         embedded=True,
-        linked_billing_account=account,
+        billing_account=account,
         installment_count=1,
     )
     make_installment(plan=plan, number=1, due_date=date(2026, 7, 10), amount=Decimal("400.00"))

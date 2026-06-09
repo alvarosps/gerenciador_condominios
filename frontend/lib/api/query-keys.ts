@@ -178,6 +178,10 @@ export const queryKeys = {
       list: (buildingId?: number) =>
         [...queryKeys.finances.overdueBills.all, buildingId ?? null] as const,
     },
+    iptuAlerts: {
+      all: ['finances', 'iptu-alerts'] as const,
+      list: () => [...queryKeys.finances.iptuAlerts.all] as const,
+    },
     installmentPlans: {
       all: ['finances', 'installment-plans'] as const,
       list: (filters?: Record<string, unknown>) =>

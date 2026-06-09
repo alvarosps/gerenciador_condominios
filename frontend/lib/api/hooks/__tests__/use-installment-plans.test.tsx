@@ -100,7 +100,7 @@ describe('installment plan mutations', () => {
       embedded: false,
       category_id: 5,
       building_id: 4,
-      linked_billing_account_id: null,
+      billing_account_id: null,
       notes: '',
     });
 
@@ -127,7 +127,7 @@ describe('installment plan mutations', () => {
       condominium: { id: 1, name: 'Condominio' },
       category: null,
       building: null,
-      linked_billing_account: null,
+      billing_account: null,
       installments: [],
     });
     await waitFor(() => expect(result.current.isSuccess).toBe(true), { timeout: 5000 });
@@ -136,7 +136,7 @@ describe('installment plan mutations', () => {
     expect(sentBody).not.toHaveProperty('condominium');
     expect(sentBody).not.toHaveProperty('category');
     expect(sentBody).not.toHaveProperty('building');
-    expect(sentBody).not.toHaveProperty('linked_billing_account');
+    expect(sentBody).not.toHaveProperty('billing_account');
     expect(sentBody).not.toHaveProperty('installments');
   });
 

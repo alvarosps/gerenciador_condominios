@@ -4,6 +4,8 @@ import type {
 } from '@/lib/api/hooks/use-combined-calendar';
 import type { BillingAccount } from '@/lib/schemas/finances/billing-account.schema';
 import type { Bill, BillLineItem } from '@/lib/schemas/finances/bill.schema';
+import type { ParsedInvoice } from '@/lib/schemas/finances/invoice-parse.schema';
+import type { IptuAlertRow } from '@/lib/api/hooks/use-iptu-alerts';
 import type { BillSkip } from '@/lib/schemas/finances/bill-skip.schema';
 import type { FinanceCategory } from '@/lib/schemas/finances/category.schema';
 import type {
@@ -51,6 +53,11 @@ export function createMockBillingAccount(overrides: Partial<BillingAccount> = {}
     category_id: null,
     name: 'Conta de Luz - Prédio 836',
     external_identifier: '',
+    account_type: 'generic',
+    holder_name: '',
+    registered_address: '',
+    secondary_identifier: '',
+    supply_status: 'active',
     description: '',
     default_due_day: 10,
     expected_amount: 350,
@@ -101,6 +108,49 @@ export function createMockBill(overrides: Partial<Bill> = {}): Bill {
     is_overdue: false,
     created_at: '2026-06-01T00:00:00Z',
     updated_at: '2026-06-01T00:00:00Z',
+    ...overrides,
+  };
+}
+
+export function createMockParsedInvoice(overrides: Partial<ParsedInvoice> = {}): ParsedInvoice {
+  return {
+    bill: {
+      competence_month: '2026-06-01',
+      due_date: '2026-06-10',
+      external_identifier: '1.273.798.010-05',
+      behavior: 'recurring',
+      account_type: 'electricity',
+      building_id: null,
+      category_id: null,
+      description: 'Conta de Luz - Prédio 836',
+    },
+    line_items: [
+      {
+        description: 'Consumo de energia',
+        amount: 350,
+        is_offset: false,
+        category_id: null,
+        installment_id: null,
+      },
+    ],
+    statement: null,
+    matched_account: null,
+    existing_bill_id: null,
+    warnings: [],
+    ...overrides,
+  };
+}
+
+export function createMockIptuAlertRow(overrides: Partial<IptuAlertRow> = {}): IptuAlertRow {
+  return {
+    plan_id: 1,
+    external_identifier: '1.273.798.010-05',
+    building_label: '836',
+    level: 'warning',
+    overdue_count: 1,
+    deadline: '2026-07-10',
+    overdue_due_dates: ['2026-05-10'],
+    message: 'IPTU 1.273.798.010-05 (836): 1 parcela atrasada (venc. 10/05).',
     ...overrides,
   };
 }
@@ -224,8 +274,8 @@ export function createMockInstallmentPlan(
     category_id: null,
     building: null,
     building_id: null,
-    linked_billing_account: null,
-    linked_billing_account_id: null,
+    billing_account: null,
+    billing_account_id: null,
     installments: [
       createMockInstallment({ id: 1, number: 1, amount: 500, due_date: '2026-07-10' }),
       createMockInstallment({ id: 2, number: 2, amount: 500, due_date: '2026-08-10' }),

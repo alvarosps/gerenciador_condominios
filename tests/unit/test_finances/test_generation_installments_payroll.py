@@ -60,7 +60,7 @@ def test_embedded_installment_becomes_line_no_own_bill() -> None:
     plan = make_installment_plan(
         condominium=account.condominium,
         embedded=True,
-        linked_billing_account=account,
+        billing_account=account,
         installment_count=1,
         description="TV parcelada",
     )
@@ -86,7 +86,7 @@ def test_embedded_installment_dedup_on_rerun() -> None:
     plan = make_installment_plan(
         condominium=account.condominium,
         embedded=True,
-        linked_billing_account=account,
+        billing_account=account,
         installment_count=2,
     )
     make_installment(plan=plan, number=1, due_date=date(2026, 6, 10), amount=Decimal("400.00"))
@@ -103,7 +103,7 @@ def _embedded_plan_on(account: object) -> object:
     plan = make_installment_plan(
         condominium=account.condominium,
         embedded=True,
-        linked_billing_account=account,
+        billing_account=account,
         installment_count=1,
         description="TV parcelada",
     )

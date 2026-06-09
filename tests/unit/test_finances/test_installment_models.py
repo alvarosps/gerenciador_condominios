@@ -4,8 +4,13 @@ from decimal import Decimal
 
 import pytest
 from django.core.exceptions import ValidationError
-from django.db import IntegrityError, transaction
-from finances.models import Installment, InstallmentPlan, InstallmentPlanState
+from django.db import IntegrityError, models, transaction
+from finances.models import (
+    BillingAccountType,
+    Installment,
+    InstallmentPlan,
+    InstallmentPlanState,
+)
 
 from tests.factories import make_billing_account, make_installment, make_installment_plan
 
@@ -66,19 +71,71 @@ def test_partial_unique_plan_number_soft_delete_frees_slot() -> None:
     assert second.pk != first.pk
 
 
-def test_clean_embedded_requires_linked_account() -> None:
-    plan = InstallmentPlan(embedded=True, linked_billing_account=None)
+def test_embedded_plan_requires_billing_account() -> None:
+    """clean() rejeita embedded=True sem billing_account (chave 'billing_account', PT)."""
+    plan = InstallmentPlan(embedded=True, billing_account=None)
     with pytest.raises(ValidationError) as exc:
         plan.clean()
-    assert "linked_billing_account" in exc.value.message_dict
+    assert "billing_account" in exc.value.message_dict
 
 
-def test_clean_standalone_forbids_linked_account() -> None:
-    account = make_billing_account()
-    plan = InstallmentPlan(embedded=False, linked_billing_account=account)
-    with pytest.raises(ValidationError) as exc:
-        plan.clean()
-    assert "linked_billing_account" in exc.value.message_dict
+def test_embedded_plan_requires_consumption_account_type() -> None:
+    """clean() rejeita embedded=True com billing_account de tipo IPTU/GENERIC."""
+    iptu = make_billing_account(account_type=BillingAccountType.IPTU, external_identifier="123")
+    generic = make_billing_account(account_type=BillingAccountType.GENERIC)
+    for account in (iptu, generic):
+        plan = InstallmentPlan(embedded=True, billing_account=account)
+        with pytest.raises(ValidationError) as exc:
+            plan.clean()
+        assert "billing_account" in exc.value.message_dict
+
+
+def test_embedded_plan_accepts_water_account() -> None:
+    """clean() aceita embedded=True com billing_account account_type=WATER."""
+    account = make_billing_account(
+        account_type=BillingAccountType.WATER, external_identifier="UC-1"
+    )
+    plan = make_installment_plan(
+        condominium=account.condominium, embedded=True, billing_account=account
+    )
+    plan.clean()  # no error
+
+
+def test_embedded_plan_accepts_electricity_and_internet_accounts() -> None:
+    """clean() aceita embedded=True com ELECTRICITY e INTERNET (cobre os 3 tipos de consumo)."""
+    for account_type, identifier in (
+        (BillingAccountType.ELECTRICITY, "UC-2"),
+        (BillingAccountType.INTERNET, ""),
+    ):
+        account = make_billing_account(account_type=account_type, external_identifier=identifier)
+        plan = make_installment_plan(
+            condominium=account.condominium, embedded=True, billing_account=account
+        )
+        plan.clean()  # no error
+
+
+def test_standalone_plan_allows_iptu_billing_account() -> None:
+    """clean() aceita embedded=False COM billing_account de tipo IPTU."""
+    account = make_billing_account(account_type=BillingAccountType.IPTU, external_identifier="9988")
+    plan = make_installment_plan(
+        condominium=account.condominium, embedded=False, billing_account=account
+    )
+    plan.clean()  # no error: standalone plans may carry an IPTU account
+
+
+def test_standalone_plan_allows_null_billing_account() -> None:
+    """clean() aceita embedded=False com billing_account=None (empréstimo genérico)."""
+    plan = make_installment_plan(embedded=False, billing_account=None)
+    plan.clean()  # no error
+
+
+def test_billing_account_field_keeps_protect_and_related_name() -> None:
+    """billing_account é FK PROTECT related_name='installment_plans' (atributos preservados)."""
+    field = InstallmentPlan._meta.get_field("billing_account")
+    assert field.null is True
+    assert field.blank is True
+    assert field.remote_field.on_delete is models.PROTECT
+    assert field.remote_field.related_name == "installment_plans"
 
 
 def test_installment_is_cascade_child_on_hard_delete() -> None:

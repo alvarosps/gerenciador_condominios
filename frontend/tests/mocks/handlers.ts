@@ -42,6 +42,7 @@ import {
   createMockFinanceOverview,
   createMockIncomeEntry,
   createMockInstallment,
+  createMockParsedInvoice,
   createMockInstallmentPlan,
   createMockMonthlyBalance,
   createMockOverdueResponse,
@@ -2164,6 +2165,10 @@ const financeHandlers = [
     financeBills.push(bill);
     return HttpResponse.json(bill, { status: 201 });
   }),
+  http.post(`${API_BASE}/finances/bills/parse_invoice/`, async () => {
+    await delay(50);
+    return HttpResponse.json(createMockParsedInvoice());
+  }),
   http.post(`${API_BASE}/finances/bills/generate_month/`, async ({ request }) => {
     await delay(100);
     const body = (await request.json()) as { year: number; month: number };
@@ -2183,6 +2188,14 @@ const financeHandlers = [
     };
     if (index !== -1) financeBills[index] = paid;
     return HttpResponse.json(paid);
+  }),
+  http.post(`${API_BASE}/finances/bills/:id/update_with_lines/`, async ({ params }) => {
+    await delay(50);
+    const id = Number(params.id);
+    const index = financeBills.findIndex((b) => b.id === id);
+    const updated = createMockBill({ id });
+    if (index !== -1) financeBills[index] = updated;
+    return HttpResponse.json(updated);
   }),
   http.post(`${API_BASE}/finances/bills/:id/suspend/`, async ({ params }) => {
     await delay(50);
@@ -2326,6 +2339,9 @@ const financeHandlers = [
   }),
   http.get(`${API_BASE}/finances/finance-dashboard/overdue/`, () => {
     return HttpResponse.json(createMockOverdueResponse());
+  }),
+  http.get(`${API_BASE}/finances/finance-dashboard/iptu_alerts/`, () => {
+    return HttpResponse.json({ alerts: [], warning_count: 0, critical_count: 0 });
   }),
 ];
 

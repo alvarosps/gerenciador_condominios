@@ -1,0 +1,14 @@
+# Malformed CEEE invoice: valid issuer + total but MISSING the billed-items section.
+# detect_and_parse must raise a PT ValueError (malformed invoice).
+# Format: "<x> <y> <text>" (positional reportlab drawString).
+
+50  800  CEEE EQUATORIAL ENERGIA
+50  788  CNPJ 08.467.115/0001-00
+50  776  CONTA MES 05/2026
+50  764  VENCIMENTO 10/06/2026
+50  752  NUMERO DA UC 650.847.010-16
+50  740  CLASSE Baixa Renda
+50  728  BANDEIRA Amarela
+
+50  696  TOTAL A PAGAR
+360 696  97,62

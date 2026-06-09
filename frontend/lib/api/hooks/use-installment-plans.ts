@@ -40,7 +40,7 @@ type InstallmentPlanWrite = Omit<
   | 'condominium'
   | 'category'
   | 'building'
-  | 'linked_billing_account'
+  | 'billing_account'
   | 'installments'
   | 'created_at'
   | 'updated_at'
@@ -102,7 +102,7 @@ export function useUpdateInstallmentPlan() {
         condominium: _condominium,
         category: _category,
         building: _building,
-        linked_billing_account: _linked_billing_account,
+        billing_account: _billing_account,
         installments: _installments,
         ...updateData
       } = data;

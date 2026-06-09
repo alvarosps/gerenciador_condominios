@@ -169,7 +169,10 @@ class CondoProjectionService:
         reference_month = date(year, month, 1)
         total = ZERO
 
-        accounts = BillingAccount.objects.all()
+        # Same recurring predicate as generation (ACTIVE + exclude IPTU — design §10.3), so the
+        # projection never diverges from ensure_month_bills; is_account_eligible adds the per-month
+        # tracking/end/skip checks.
+        accounts = BillingAccount.objects.recurring_for_generation()
         if building_id is not None:
             accounts = accounts.filter(building_id=building_id)
         for account in accounts:
@@ -197,11 +200,11 @@ class CondoProjectionService:
             plan__is_deleted=False,
             plan__lifecycle_state=InstallmentPlanState.ACTIVE,
             plan__embedded=True,
-        ).select_related("plan__linked_billing_account")
+        ).select_related("plan__billing_account")
         if building_id is not None:
             embedded = embedded.filter(plan__building_id=building_id)
         for installment in embedded:
-            host_account = installment.plan.linked_billing_account
+            host_account = installment.plan.billing_account
             if host_account is not None and BillGenerationService.is_account_eligible(
                 host_account, reference_month
             ):

@@ -1,0 +1,28 @@
+# Sanitized DMAE (water) invoice — building 836: water CUT, sewer active, reading DECREASE.
+# Exercises supply_status CORTADO->CUT and the plausibility warning (leitura_atual < leitura_anterior).
+# Format: "<x> <y> <text>" (positional reportlab drawString; PDF points, origin bottom-left).
+#
+# 80,00 + 12,00 = 92,00 == printed total (no residual); reading 620 -> 615 (decrease).
+
+50  800  DMAE - DEPARTAMENTO MUNICIPAL DE AGUA E ESGOTOS
+50  788  CNPJ 92.924.901/0001-98
+50  776  FATURA 05/2026
+50  764  VENCIMENTO 04/06/2026
+50  752  INSCRICAO 117.111.0049.0519.00
+50  740  IMOVEL 003419142
+
+50  704  LEITURA ANTERIOR 620
+50  692  LEITURA ATUAL 615
+50  680  CONSUMO M3 5
+50  668  LEITURA DIAS 30
+50  656  SITUACAO AGUA CORTADO
+50  644  SITUACAO ESGOTO LIGADA
+
+50  600  DESCRICAO DOS SERVICOS E TARIFAS
+50  584  AGUA
+360 584  80,00
+50  570  ESGOTO
+360 570  12,00
+
+50  538  TOTAL A PAGAR
+360 538  92,00

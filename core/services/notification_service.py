@@ -8,11 +8,13 @@ Web Push / VAPID (browser PWA).
 
 import json
 import logging
+from datetime import date, datetime, time, timedelta
 
 import requests as http_requests
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.utils import timezone
+from finances.services.timezone import SAO_PAULO_TZ
 from pywebpush import WebPushException, webpush
 
 from core.models import DeviceToken, Notification, PaymentProof, WebPushSubscription
@@ -139,6 +141,23 @@ def is_notification_sent_today(user: User, notification_type: str) -> bool:
     today = timezone.now().date()
     return Notification.objects.filter(
         recipient=user, type=notification_type, sent_at__date=today
+    ).exists()
+
+
+def is_notification_sent_on(user: User, notification_type: str, day: date) -> bool:
+    """Whether a notification of the given type was sent to the user on the São-Paulo ``day``.
+
+    SP-aware mirror of ``is_notification_sent_today`` (design §9.3): the caller passes
+    ``today_sp()`` (NOT the UTC date). ``settings.TIME_ZONE`` is UTC, so a ``sent_at__date``
+    lookup would truncate in UTC and split the SP day around its midnight rollover (a digest
+    sent at 23:30 SP = 02:30 UTC next day would be missed, producing a duplicate). Filter the
+    half-open São-Paulo-local datetime range ``[combine(day, 00:00, SP), +1 day)`` so the
+    window matches the SP calendar day exactly.
+    """
+    start = datetime.combine(day, time.min, tzinfo=SAO_PAULO_TZ)
+    end = start + timedelta(days=1)
+    return Notification.objects.filter(
+        recipient=user, type=notification_type, sent_at__gte=start, sent_at__lt=end
     ).exists()
 
 

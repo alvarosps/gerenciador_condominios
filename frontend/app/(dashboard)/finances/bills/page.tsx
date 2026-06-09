@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { CalendarPlus, Plus } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { CalendarPlus, FileUp, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import {
@@ -22,13 +22,20 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { DataTable } from '@/components/tables/data-table';
-import { useBills, useDeleteBill, useGenerateMonthBills } from '@/lib/api/hooks/use-bills';
+import {
+  useBills,
+  useDeleteBill,
+  useGenerateMonthBills,
+  useParseInvoice,
+} from '@/lib/api/hooks/use-bills';
 import { useBuildings } from '@/lib/api/hooks/use-buildings';
 import { useAuthStore } from '@/store/auth-store';
 import { handleError } from '@/lib/utils/error-handler';
 import { useCrudPage } from '@/lib/hooks/use-crud-page';
 import type { Bill } from '@/lib/schemas/finances/bill.schema';
 import type { BillFilters } from '@/lib/api/hooks/use-bills';
+import type { ParsedInvoice } from '@/lib/schemas/finances/invoice-parse.schema';
+import { IptuRiskBanner } from '../_components/iptu-risk-banner';
 import { buildBillColumns } from './_components/bill-columns';
 import { BillFormModal } from './_components/bill-form-modal';
 import { BillPaymentDialog } from './_components/bill-payment-dialog';
@@ -51,6 +58,9 @@ export default function BillsPage() {
   const [buildingFilter, setBuildingFilter] = useState<string>(ALL);
   const [lifecycleFilter, setLifecycleFilter] = useState<string>(ALL);
   const [payingBill, setPayingBill] = useState<Bill | null>(null);
+  const [importDraft, setImportDraft] = useState<ParsedInvoice | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const parseInvoice = useParseInvoice();
 
   const filters: BillFilters = {
     ...(buildingFilter === ALL ? {} : { building_id: Number(buildingFilter) }),
@@ -95,6 +105,23 @@ export default function BillsPage() {
     );
   }
 
+  function handleInvoiceSelected(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    // Reset the input so re-selecting the same file fires change again. The PDF is sent and
+    // discarded by the backend — the frontend never persists it (design #4).
+    event.target.value = '';
+    if (!file) return;
+    parseInvoice.mutate(file, {
+      onSuccess: (draft) => {
+        setImportDraft(draft);
+      },
+      onError: (error) => {
+        handleError(error, 'Não foi possível ler a fatura');
+        toast.error('Não foi possível ler a fatura. Verifique o PDF.');
+      },
+    });
+  }
+
   return (
     <div>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -108,6 +135,21 @@ export default function BillsPage() {
               <CalendarPlus className="mr-2 h-4 w-4" />
               Gerar contas do mês
             </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="application/pdf"
+              hidden
+              onChange={handleInvoiceSelected}
+            />
+            <Button
+              variant="outline"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={parseInvoice.isPending}
+            >
+              <FileUp className="mr-2 h-4 w-4" />
+              {parseInvoice.isPending ? 'Lendo fatura...' : 'Importar fatura (PDF)'}
+            </Button>
             <Button onClick={crud.openCreateModal}>
               <Plus className="mr-2 h-4 w-4" />
               Nova Conta
@@ -115,6 +157,12 @@ export default function BillsPage() {
           </div>
         )}
       </div>
+
+      {isAdmin && (
+        <div className="mb-4">
+          <IptuRiskBanner />
+        </div>
+      )}
 
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <Select value={buildingFilter} onValueChange={setBuildingFilter}>
@@ -162,6 +210,14 @@ export default function BillsPage() {
       )}
 
       <BillFormModal open={crud.isModalOpen} bill={crud.editingItem} onClose={crud.closeModal} />
+
+      <BillFormModal
+        open={importDraft !== null}
+        draft={importDraft}
+        onClose={() => {
+          setImportDraft(null);
+        }}
+      />
 
       <BillPaymentDialog
         open={payingBill !== null}
