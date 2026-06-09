@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { buildingSchema } from '../building.schema';
-import { billingAccountSchema } from './billing-account.schema';
+import { billingAccountSchema, billingAccountTypeEnum } from './billing-account.schema';
 import {
   billBehaviorEnum,
   billLifecycleStateEnum,
@@ -68,6 +68,8 @@ export const billSchema = z.object({
   amount_remaining: moneyField.optional(),
   payment_status: paymentStatusEnum.optional(),
   is_overdue: z.boolean().optional(),
+  // Derived structural type (água/luz directly, IPTU parcela via installment→plan, else generic).
+  account_type: billingAccountTypeEnum.optional(),
   created_at: z.string().optional(),
   updated_at: z.string().optional(),
 });

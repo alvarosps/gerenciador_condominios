@@ -12,6 +12,7 @@ import {
 import { type Column } from '@/components/tables/data-table';
 import { formatCurrency, formatMonthYear } from '@/lib/utils/formatters';
 import type { Bill } from '@/lib/schemas/finances/bill.schema';
+import { ACCOUNT_TYPE_LABELS } from '@/lib/schemas/finances/billing-account.schema';
 import { BillStatusChip } from '../../../_components/finance-calendar/bill-status-chip';
 import { BillStatusActions } from './bill-status-actions';
 
@@ -54,6 +55,11 @@ export function buildBillColumns({
       title: 'Prédio',
       key: 'building',
       render: (_, record) => (record.building ? record.building.name : 'Condomínio'),
+    },
+    {
+      title: 'Tipo',
+      key: 'account_type',
+      render: (_, record) => ACCOUNT_TYPE_LABELS[record.account_type ?? 'generic'],
     },
     {
       title: 'Competência',

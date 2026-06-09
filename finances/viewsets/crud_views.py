@@ -283,7 +283,10 @@ def _parse_lines(
 class BillViewSet(viewsets.ModelViewSet):
     serializer_class = BillSerializer
     permission_classes = [FinancialReadOnly]
-    pagination_class = CustomPageNumberPagination
+    # No pagination: the Contas UI groups ALL bills per building (no page slicing). Returns a bare
+    # list; the frontend's extractResults handles both shapes. (CustomPageNumberPagination capped
+    # page_size at 500, silently dropping bills beyond it.)
+    pagination_class = None
 
     def get_queryset(self) -> QuerySet[Bill]:
         queryset = (
@@ -295,6 +298,7 @@ class BillViewSet(viewsets.ModelViewSet):
                 "condominium",
                 "water_statement",
                 "electricity_statement",
+                "installment__plan__billing_account",
             )
             .prefetch_related("line_items", "allocations")
         )
