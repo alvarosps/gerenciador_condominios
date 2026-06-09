@@ -162,3 +162,14 @@ def test_dmae_reading_decrease_emits_plausibility_warning(
     """DMAE: leitura_atual < leitura_anterior (no rollover) -> PT plausibility warning (not an exception)."""
     invoice = _parse(render_invoice_pdf, "dmae_836_cortada")
     assert any("leitura" in warning.lower() for warning in invoice.warnings)
+
+
+def test_dmae_missing_consumo_defaults_to_zero_with_warning(
+    render_invoice_pdf: RenderFixture,
+) -> None:
+    """DMAE without a parseable CONSUMO M3 line -> consumo_m3 defaults to 0 (NOT None — it is a
+    required PositiveIntegerField / FE zod field) and a PT warning is appended."""
+    invoice = _parse(render_invoice_pdf, "dmae_no_consumo")
+    assert invoice.statement is not None
+    assert invoice.statement["consumo_m3"] == 0
+    assert any("consumo" in warning.lower() for warning in invoice.warnings)

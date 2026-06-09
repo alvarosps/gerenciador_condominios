@@ -23,7 +23,7 @@ from typing import NotRequired, TypedDict
 
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
-from django.db import transaction
+from django.db import IntegrityError, transaction
 
 from core.models import Building, Condominium
 from finances.models import (
@@ -44,6 +44,13 @@ logger = logging.getLogger(__name__)
 
 _ERR_STATEMENT_TYPE = "Statement só é permitida para contas de água ou luz."
 _ERR_BILL_PAID = "Não é possível alterar uma conta com pagamento. Desfaça o pagamento primeiro."
+_ERR_BILL_ALREADY_EXISTS = (
+    "Já existe uma conta para esta conta recorrente neste mês de competência. "
+    "Atualize a conta existente em vez de criar uma nova."
+)
+# The Bill partial unique (is_deleted=False, NOT lifecycle-filtered): full_clean() reports its
+# violation under this constraint name, so the raw message is mapped to the PT one below.
+_ACCOUNT_MONTH_CONSTRAINT = "unique_active_bill_per_account_month"
 
 _STATEMENT_MODEL_BY_TYPE: dict[str, type[WaterBillStatement | ElectricityBillStatement]] = {
     BillingAccountType.WATER: WaterBillStatement,
@@ -97,6 +104,24 @@ class BillDraft:
     external_identifier: str = ""
     lifecycle_state: str = BillLifecycleState.ACTIVE
     notes: str = ""
+
+
+# The mutable header fields a re-imported (corrected) invoice may carry into update_with_lines.
+# competence_month is INTENTIONALLY absent — the (billing_account, competence_month) identity is
+# immutable once a bill exists; only the editable header is replaced alongside the lines (design §6).
+_EDITABLE_HEADER_FIELDS = frozenset(
+    {
+        "due_date",
+        "issue_date",
+        "description",
+        "behavior",
+        "external_identifier",
+        "building",
+        "category",
+        "billing_account",
+        "notes",
+    }
+)
 
 
 class BillService:
@@ -175,48 +200,87 @@ class BillService:
         type is decided by draft.billing_account.account_type (WATER/ELECTRICITY); any other
         type or no account with a statement raises (PT). Any line/statement failing validation
         rolls the whole Bill back. An empty lines list is accepted (amount_total == 0).
+
+        A non-deleted bill already occupying (billing_account, competence_month) — the partial
+        unique is WHERE is_deleted=False, NOT lifecycle-filtered, so a SUSPENDED/CANCELED bill also
+        collides — raises IntegrityError; it is caught here and surfaced as a PT ValidationError
+        (400) instead of a 500. The idempotency match (InvoiceDraftService) routes the modal to
+        update_with_lines first; this is the defensive backstop.
         """
-        with transaction.atomic():
-            bill = Bill(
-                condominium=draft.condominium,
-                building=draft.building,
-                category=draft.category,
-                billing_account=draft.billing_account,
-                competence_month=draft.competence_month,
-                due_date=draft.due_date,
-                description=draft.description,
-                external_identifier=draft.external_identifier,
-                behavior=draft.behavior,
-                lifecycle_state=draft.lifecycle_state,
-                notes=draft.notes,
-                created_by=user,
-                updated_by=user,
-            )
-            bill.full_clean()  # PT validation + competence_month -> day 1
-            bill.save()
-            BillService._write_lines(bill, lines, user)
-            BillService._upsert_statement(bill, draft.billing_account, statement, user)
+        try:
+            with transaction.atomic():
+                bill = Bill(
+                    condominium=draft.condominium,
+                    building=draft.building,
+                    category=draft.category,
+                    billing_account=draft.billing_account,
+                    competence_month=draft.competence_month,
+                    due_date=draft.due_date,
+                    description=draft.description,
+                    external_identifier=draft.external_identifier,
+                    behavior=draft.behavior,
+                    lifecycle_state=draft.lifecycle_state,
+                    notes=draft.notes,
+                    created_by=user,
+                    updated_by=user,
+                )
+                bill.full_clean()  # PT validation + competence_month -> day 1
+                bill.save()
+                BillService._write_lines(bill, lines, user)
+                BillService._upsert_statement(bill, draft.billing_account, statement, user)
+        except ValidationError as exc:
+            # full_clean()'s validate_constraints() reports the partial unique under its constraint
+            # name; map that one violation to the PT message and re-raise everything else verbatim.
+            if _ACCOUNT_MONTH_CONSTRAINT in str(exc):
+                raise ValidationError(_ERR_BILL_ALREADY_EXISTS) from exc
+            raise
+        except IntegrityError as exc:
+            # Defensive backstop if full_clean() is ever bypassed (race / direct save path).
+            raise ValidationError(_ERR_BILL_ALREADY_EXISTS) from exc
         return bill
+
+    @staticmethod
+    def _apply_header(bill: Bill, header: dict[str, object], user: User | None) -> None:
+        """Apply the editable header fields of a re-imported (corrected) invoice, in place.
+
+        competence_month is immutable (the (billing_account, competence_month) identity is fixed
+        once a bill exists), so it is never written here — only the _EDITABLE_HEADER_FIELDS the
+        serializer validated. full_clean() re-runs the model invariants before the save.
+        """
+        changed = [field for field in header if field in _EDITABLE_HEADER_FIELDS]
+        if not changed:
+            return
+        for field in changed:
+            setattr(bill, field, header[field])
+        bill.updated_by = user
+        bill.full_clean()
+        bill.save(update_fields=[*changed, "updated_by", "updated_at"])
 
     @staticmethod
     def update_with_lines(
         bill: Bill,
         lines: list[BillLineInput],
         statement: StatementInput | None = None,
+        header: dict[str, object] | None = None,
         user: User | None = None,
     ) -> Bill:
-        """Replace the bill's lines + upsert the statement on the SAME Bill (pk/payments kept).
+        """Replace the bill's lines + upsert the statement (+ editable header) on the SAME Bill.
 
         Allowed only while the bill is UNPAID (payment_status == 'open', read from
         with_amounts — never summed in Python) and its competence month is OPEN
-        (CondoMonthCloseService.assert_open). Old lines are soft-deleted (audit history kept);
-        with_amounts ignores soft-deleted lines. Raises (PT) when paid or month closed.
+        (CondoMonthCloseService.assert_open). When ``header`` is given (a re-imported corrected
+        invoice), its editable fields (due_date/external_identifier/issue_date/building/category/…)
+        are persisted in the SAME atomic transaction; competence_month stays immutable. Old lines
+        are soft-deleted (audit history kept); with_amounts ignores soft-deleted lines. Raises (PT)
+        when paid or month closed.
         """
         annotated = Bill.objects.with_amounts(today_sp()).get(pk=bill.pk)
         if str(getattr(annotated, "payment_status", "open")) != "open":
             raise ValidationError(_ERR_BILL_PAID)
         CondoMonthCloseService.assert_open(bill.competence_month)
         with transaction.atomic():
+            if header is not None:
+                BillService._apply_header(bill, header, user)
             for line in BillLineItem.objects.filter(bill=bill):
                 line.delete(deleted_by=user)
             BillService._write_lines(bill, lines, user)

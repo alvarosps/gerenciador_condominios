@@ -36,6 +36,7 @@ from finances.models import (
     InstallmentPlan,
     InstallmentPlanState,
 )
+from finances.services.installment_plan_service import _schedule_due_dates
 
 # Opening parcelas are pinned to the first tracked month so an overdue parcela (due 29/05) does
 # not create a pre-tracking month with a spurious negative net; the real due_date is preserved on
@@ -88,6 +89,7 @@ class Command(BaseCommand):
             "accounts_updated": 0,
             "embedded_plans_created": 0,
             "embedded_plans_updated": 0,
+            "embedded_installments_created": 0,
             "iptu_terms_created": 0,
             "iptu_terms_updated": 0,
             "opening_installments_created": 0,
@@ -192,8 +194,10 @@ class Command(BaseCommand):
             )
             description = _as_str(item["description"])
             count = _as_int(item["installment_count"])
-            total_amount = _money(item["installment_amount"]) * count
-            _plan, created = InstallmentPlan.objects.update_or_create(
+            installment_amount = _money(item["installment_amount"])
+            default_due_day = _as_int(item["default_due_day"])
+            total_amount = installment_amount * count
+            plan, created = InstallmentPlan.objects.update_or_create(
                 billing_account=account,
                 embedded=True,
                 description=description,
@@ -203,15 +207,56 @@ class Command(BaseCommand):
                     "total_amount": total_amount,
                     "installment_count": count,
                     "start_due_date": _OPENING_COMPETENCE,
-                    "default_due_day": _as_int(item["default_due_day"]),
+                    "default_due_day": default_due_day,
                     "lifecycle_state": InstallmentPlanState.ACTIVE,
                 },
             )
             self._tally("embedded_plans", created)
+            self._seed_embedded_installments(
+                plan=plan,
+                current_number=_as_int(item["current_installment"]),
+                count=count,
+                installment_amount=installment_amount,
+                default_due_day=default_due_day,
+            )
             self.stdout.write(
                 f"  [{index}/{len(items)}] + {description} "
                 f"({item['installment_count']}x, atual {item['current_installment']})"
             )
+
+    def _seed_embedded_installments(
+        self,
+        *,
+        plan: InstallmentPlan,
+        current_number: int,
+        count: int,
+        installment_amount: Decimal,
+        default_due_day: int,
+    ) -> None:
+        """Materialize the going-forward Installment rows so the embedded parcela actually lands on
+        the generated Bill (BillGenerationService._generate_embedded_lines reads Installment rows).
+
+        Without these rows the plan is an inert shell — generation materializes nothing. Mirrors the
+        IPTU-term non-backfill rule (§13): only the current parcela (due 2026-06, the opening month)
+        and the remaining future parcelas are created — paid pre-tracking parcelas (1..current-1) are
+        NOT backfilled. The current parcela is pinned to _OPENING_COMPETENCE and the rest follow
+        monthly via InstallmentPlanService._schedule_due_dates (DRY: same day-clamping as the service).
+        Idempotent: get_or_create on (plan, number).
+        """
+        remaining = count - current_number + 1
+        if remaining <= 0:
+            return
+        due_dates = _schedule_due_dates(_OPENING_COMPETENCE, remaining, default_due_day)
+        for offset, due_date in enumerate(due_dates):
+            number = current_number + offset
+            _installment, created = Installment.objects.get_or_create(
+                plan=plan,
+                number=number,
+                is_deleted=False,
+                defaults={"due_date": due_date, "amount": installment_amount},
+            )
+            if created:
+                self.stats["embedded_installments_created"] += 1
 
     def _seed_iptu_terms(self, data: dict[str, object]) -> None:
         """IPTU terms — standalone plan (embedded=False, billing_account=<IPTU>) + opening parcelas.

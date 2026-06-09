@@ -89,6 +89,19 @@ _ERR_COMPETENCE_MISSING = "Competência (MM/AAAA) não encontrada na fatura."
 _ERR_DATE_MISSING = "Data (DD/MM/AAAA) não encontrada na fatura."
 _ERR_ANCHOR_MISSING = "Rótulo esperado não encontrado na fatura."
 _ERR_TOTAL_MISSING = "Total da fatura {issuer} não encontrado."
+_WARN_CONSUMO_MISSING = "Consumo não encontrado na fatura — definido como 0; confira a leitura."
+
+
+def consumo_or_zero(value: int | None, warnings: list[str]) -> int:
+    """Required consumo reading defaulted to 0 (+ a PT warning) when the anchor is unparseable.
+
+    The statement's consumo_m3/consumo_kwh is a backend PositiveIntegerField and a required FE zod
+    field, so a ``None`` would break both. When the CONSUMO label is missing/illegible, default to 0
+    and warn the admin instead of emitting ``None`` (design §5.3 — the draft must always reconcile)."""
+    if value is None:
+        warnings.append(_WARN_CONSUMO_MISSING)
+        return 0
+    return value
 
 
 # --- Shared parse helpers (DRY — used by both parsers) ------------------------------------------

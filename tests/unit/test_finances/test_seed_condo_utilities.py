@@ -31,6 +31,7 @@ from finances.models import (
     InstallmentPlanState,
     SupplyStatus,
 )
+from finances.services.bill_generation_service import BillGenerationService
 from finances.services.condo_balance_service import CondoBalanceService
 from finances.services.installment_plan_service import InstallmentPlanService
 from finances.services.iptu_alert_service import IptuAlertService
@@ -257,6 +258,41 @@ def test_seed_embedded_plans_linked_to_consumption_accounts(tmp_path: Path) -> N
     assert plan.billing_account.account_type == BillingAccountType.WATER
     assert plan.installment_count == 46
     assert plan.lifecycle_state == InstallmentPlanState.ACTIVE
+
+
+@freeze_time(FROZEN)
+def test_seed_embedded_plan_materializes_going_forward_installments(tmp_path: Path) -> None:
+    """The embedded plan is NOT an inert shell: going-forward Installment rows are materialized
+    (current parcela 24 through 46, non-backfill of 1..23), so generation can land the parcela.
+    Current parcela (24) is due in the opening month 2026-06."""
+    _make_fixture_buildings()
+    _run(_write_fixture(tmp_path))
+
+    plan = InstallmentPlan.objects.get(embedded=True)
+    numbers = sorted(Installment.objects.filter(plan=plan).values_list("number", flat=True))
+    assert numbers == list(range(24, 47))  # current 24 .. count 46; 1..23 NOT backfilled
+    current = Installment.objects.get(plan=plan, number=24)
+    assert current.due_date == date(2026, 6, 4)  # default_due_day 4, opening month 2026-06
+    assert current.amount == Decimal("94.48")
+
+
+@freeze_time(FROZEN)
+def test_seed_embedded_parcela_lands_on_generated_bill(tmp_path: Path) -> None:
+    """Regression: after seed + ensure_month_bills(2026,6), the embedded parcela appears as a line on
+    the recurring account's generated Bill (the plan is no longer an inert shell)."""
+    _make_fixture_buildings()
+    _run(_write_fixture(tmp_path))
+
+    account = BillingAccount.objects.get(
+        account_type=BillingAccountType.WATER, external_identifier="117.111.0049.0519.00"
+    )
+    current = Installment.objects.get(plan__billing_account=account, number=24)
+    BillGenerationService.ensure_month_bills(2026, 6)
+
+    bill = Bill.objects.get(billing_account=account, competence_month=OPENING_COMPETENCE)
+    parcela_lines = BillLineItem.objects.filter(bill=bill, installment=current)
+    assert parcela_lines.count() == 1
+    assert parcela_lines.first().amount == Decimal("94.48")
 
 
 @freeze_time(FROZEN)

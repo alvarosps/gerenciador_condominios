@@ -36,6 +36,7 @@ from finances.models import (
     FundedFrom,
     IncomeEntry,
     Installment,
+    InstallmentPlanState,
     Payment,
     Reserve,
     ReserveMovement,
@@ -202,6 +203,9 @@ _ERR_STATEMENT_OBJECT = "statement deve ser um objeto."
 _ERR_LINE_OBJECT = "Cada linha deve ser um objeto."
 _ERR_NO_FILE = "Envie o arquivo da fatura no campo 'file'."
 _ERR_NOT_PDF = "O arquivo enviado não é um PDF válido."
+_ERR_INSTALLMENT_NOT_OWNED = (
+    "A parcela informada não pertence ao plano embutido ativo desta conta recorrente."
+)
 
 
 def _coerce_statement_value(field: str, raw: object) -> object:
@@ -229,25 +233,48 @@ def _parse_statement(raw: object) -> StatementInput | None:
     return cast(StatementInput, coerced)
 
 
-def _parse_lines(line_items: list[object]) -> list[BillLineInput]:
-    """Build BillLineInput list from the raw line_items payload (resolves category/installment)."""
+def _resolve_owned_installment(
+    installment_id: object, billing_account: BillingAccount | None
+) -> Installment | None:
+    """Resolve an installment_id to an Installment ONLY if it belongs to this bill's embedded ACTIVE
+    plan; otherwise reject (400 PT). Without this an attacker could bind ANY installment id to a
+    line (cross-account leakage / a parcela that is not the account's). Mirrors the embedded-plan
+    invariant the draft reconciler (InvoiceDraftService._reconcile_line) already enforces."""
+    if not installment_id:
+        return None
+    pk = int(str(installment_id))  # bad id -> ValueError -> 400 PT in the action
+    installment = Installment.objects.filter(
+        pk=pk,
+        plan__billing_account=billing_account,
+        plan__embedded=True,
+        plan__lifecycle_state=InstallmentPlanState.ACTIVE,
+        plan__is_deleted=False,
+    ).first()
+    if installment is None:
+        raise ValidationError(_ERR_INSTALLMENT_NOT_OWNED)
+    return installment
+
+
+def _parse_lines(
+    line_items: list[object], billing_account: BillingAccount | None
+) -> list[BillLineInput]:
+    """Build BillLineInput list from the raw line_items payload (resolves category/installment).
+
+    An installment_id is bound ONLY when it belongs to the bill's embedded ACTIVE plan (ownership
+    guard); a foreign/standalone/inactive installment is rejected 400 PT.
+    """
     lines: list[BillLineInput] = []
     for raw in line_items:
         if not isinstance(raw, dict):
             raise ValidationError(_ERR_LINE_OBJECT)
         category_id = raw.get("category_id")
-        installment_id = raw.get("installment_id")
         lines.append(
             BillLineInput(
                 description=str(raw["description"]),
                 amount=Decimal(str(raw["amount"])),
                 is_offset=bool(raw.get("is_offset", False)),
                 category=(Category.objects.filter(pk=category_id).first() if category_id else None),
-                installment=(
-                    Installment.objects.filter(pk=installment_id).first()
-                    if installment_id
-                    else None
-                ),
+                installment=_resolve_owned_installment(raw.get("installment_id"), billing_account),
             )
         )
     return lines
@@ -438,7 +465,7 @@ class BillViewSet(viewsets.ModelViewSet):
                 lifecycle_state=validated.get("lifecycle_state", BillLifecycleState.ACTIVE),
                 notes=validated.get("notes", ""),
             )
-            lines = _parse_lines(line_items)
+            lines = _parse_lines(line_items, validated.get("billing_account"))
             statement = _parse_statement(request.data.get("statement"))
             bill = BillService.create_with_lines(
                 draft, lines, statement=statement, user=cast(User, request.user)
@@ -450,7 +477,13 @@ class BillViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"])
     def update_with_lines(self, request: Request, pk: str | None = None) -> Response:
-        """Replace a bill's lines + upsert its statement on the SAME Bill (UNPAID + OPEN only)."""
+        """Replace a bill's lines + upsert its statement (+ corrected header) on the SAME Bill.
+
+        UNPAID + OPEN only. A re-imported (corrected) invoice carries a 'bill' header; its editable
+        fields (due_date/external_identifier/issue_date/building/category/…) are validated here via
+        the partial BillSerializer and persisted in the SAME atomic transaction as the line/statement
+        replace. competence_month stays IMMUTABLE — it is never forwarded to the service.
+        """
         bill = self.get_object()
         line_items = request.data.get("line_items", [])
         if not isinstance(line_items, list):
@@ -458,11 +491,29 @@ class BillViewSet(viewsets.ModelViewSet):
                 {"error": "Payload inválido: 'line_items' (lista) é obrigatório."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        bill_data = request.data.get("bill")
+        header: dict[str, object] | None = None
+        if bill_data is not None:
+            if not isinstance(bill_data, dict):
+                return Response(
+                    {"error": "Payload inválido: 'bill' deve ser um objeto."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            header_serializer = BillSerializer(instance=bill, data=bill_data, partial=True)
+            if not header_serializer.is_valid():
+                return Response(header_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            # competence_month is immutable; drop it (+ condominium, never reassigned) so the
+            # service only sees the editable header fields it accepts.
+            header = {
+                field: value
+                for field, value in header_serializer.validated_data.items()
+                if field not in ("competence_month", "condominium")
+            }
         try:
-            lines = _parse_lines(line_items)
+            lines = _parse_lines(line_items, bill.billing_account)
             statement = _parse_statement(request.data.get("statement"))
             BillService.update_with_lines(
-                bill, lines, statement=statement, user=cast(User, request.user)
+                bill, lines, statement=statement, header=header, user=cast(User, request.user)
             )
         except (KeyError, ValueError, InvalidOperation, ValidationError) as exc:
             message = exc.messages[0] if isinstance(exc, ValidationError) else str(exc)

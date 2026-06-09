@@ -14,7 +14,6 @@ from finances.models import (
     Bill,
     BillingAccount,
     BillingAccountType,
-    BillLifecycleState,
     Installment,
     InstallmentPlanState,
 )
@@ -67,7 +66,7 @@ class InvoiceDraftService:
             for line in parsed.line_items
         ]
 
-        existing_bill_id = InvoiceDraftService._existing_active_bill_id(parsed, account)
+        existing_bill_id = InvoiceDraftService._existing_bill_id(parsed, account)
         if existing_bill_id is not None and account is not None:
             warnings.append(
                 _WARN_REPLACEMENT.format(
@@ -151,19 +150,19 @@ class InvoiceDraftService:
         }
 
     @staticmethod
-    def _existing_active_bill_id(
-        parsed: ParsedInvoice, account: BillingAccount | None
-    ) -> int | None:
-        """The pk of an active Bill already covering (account, competence), or None.
+    def _existing_bill_id(parsed: ParsedInvoice, account: BillingAccount | None) -> int | None:
+        """The pk of ANY non-deleted Bill already covering (account, competence), or None.
 
-        A match means the modal must route to update_with_lines (S58) instead of create — this only
-        READS; it never resolves to a write. objects already excludes soft-deleted bills.
+        The Bill partial unique is ``WHERE is_deleted=False`` (NOT lifecycle-filtered): a non-deleted
+        SUSPENDED/CANCELED/DEFERRED bill for (account, competence) still occupies the slot, so a
+        create_with_lines would raise IntegrityError. Matching any non-deleted bill routes the modal
+        to update_with_lines (S58) instead. This only READS; ``objects`` already excludes soft-deleted
+        bills, mirroring the constraint's condition exactly.
         """
         if account is None:
             return None
         bill = Bill.objects.filter(
             billing_account=account,
             competence_month=parsed.competence_month,
-            lifecycle_state=BillLifecycleState.ACTIVE,
         ).first()
         return bill.pk if bill is not None else None

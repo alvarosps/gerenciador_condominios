@@ -38,9 +38,10 @@ def test_ceee_competence_from_conta_mes_not_due_or_issue(
 def test_ceee_external_identifier_uc_and_account_type(
     render_invoice_pdf: RenderFixture,
 ) -> None:
-    """CEEE: external_identifier = UC; account_type ELECTRICITY; behavior RECURRING; due_date read."""
+    """CEEE: external_identifier = Número da UC (dotted, authoritative — matches the seeded
+    electricity account); account_type ELECTRICITY; behavior RECURRING; due_date read."""
     invoice = _parse(render_invoice_pdf, "ceee_850_solar")
-    assert invoice.external_identifier == "900126780"
+    assert invoice.external_identifier == "1.273.678.010-60"
     assert invoice.account_type == BillingAccountType.ELECTRICITY
     assert invoice.behavior == BillBehavior.RECURRING
     assert invoice.due_date == date(2026, 6, 10)
@@ -123,10 +124,21 @@ def test_ceee_unknown_item_label_kept_as_generic(
     assert energia.amount == quantize_money("89.42")
 
 
+def test_ceee_missing_consumo_defaults_to_zero_with_warning(
+    render_invoice_pdf: RenderFixture,
+) -> None:
+    """CEEE without a parseable CONSUMO KWH line -> consumo_kwh defaults to 0 (NOT None — it is a
+    required PositiveIntegerField / FE zod field) and a PT warning is appended."""
+    invoice = _parse(render_invoice_pdf, "ceee_no_consumo")
+    assert invoice.statement is not None
+    assert invoice.statement["consumo_kwh"] == 0
+    assert any("consumo" in warning.lower() for warning in invoice.warnings)
+
+
 def test_ceee_arrecadada_marker_emits_warning(render_invoice_pdf: RenderFixture) -> None:
     """CEEE with 'FATURA ARRECADADA / NÃO RECEBER' -> PT warning (2nd via already paid); parsing proceeds."""
     invoice = _parse(render_invoice_pdf, "ceee_solar_credito")
     assert any("arrecadada" in warning.lower() for warning in invoice.warnings)
     # Parsing still produced a complete draft.
     assert invoice.account_type == BillingAccountType.ELECTRICITY
-    assert invoice.external_identifier == "900127980"
+    assert invoice.external_identifier == "1.273.798.010-05"
