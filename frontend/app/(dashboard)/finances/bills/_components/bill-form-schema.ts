@@ -21,6 +21,9 @@ export const billLineFormSchema = z.object({
   description: z.string().min(1, 'Descrição é obrigatória'),
   amount: z.number().min(0, 'O valor não pode ser negativo'),
   is_offset: z.boolean(),
+  // Set only by the parser-draft prefill (S63): a line reconciled to an embedded Installment.
+  // Such a line is rendered locked (read-only) — the admin does not edit the reconciliation.
+  installment_id: z.number().nullable(),
 });
 
 export const billAccountTypeValues = [

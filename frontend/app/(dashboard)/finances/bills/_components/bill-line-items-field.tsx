@@ -46,7 +46,13 @@ export function BillLineItemsField({ form }: BillLineItemsFieldProps) {
           variant="outline"
           size="sm"
           onClick={() =>
-            append({ category_id: null, description: '', amount: 0, is_offset: false })
+            append({
+              category_id: null,
+              description: '',
+              amount: 0,
+              is_offset: false,
+              installment_id: null,
+            })
           }
         >
           <Plus className="mr-1 h-4 w-4" />
@@ -60,19 +66,31 @@ export function BillLineItemsField({ form }: BillLineItemsFieldProps) {
         </p>
       ) : (
         <div className="space-y-3">
-          {fields.map((field, index) => (
+          {fields.map((field, index) => {
+            const installmentId = lines?.[index]?.installment_id ?? null;
+            const isLocked = installmentId !== null;
+            return (
             <div key={field.id} className="rounded-md border p-3">
               <div className="flex items-start justify-between gap-2">
-                <span className="text-sm font-medium">Linha {index + 1}</span>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => remove(index)}
-                  aria-label={`Remover linha ${String(index + 1)}`}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+                <span className="text-sm font-medium">
+                  Linha {index + 1}
+                  {isLocked && (
+                    <span className="ml-2 text-xs font-normal text-muted-foreground">
+                      (parcela reconciliada)
+                    </span>
+                  )}
+                </span>
+                {!isLocked && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => remove(index)}
+                    aria-label={`Remover linha ${String(index + 1)}`}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                )}
               </div>
 
               <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -83,7 +101,11 @@ export function BillLineItemsField({ form }: BillLineItemsFieldProps) {
                     <FormItem className="sm:col-span-2">
                       <FormLabel>Descrição</FormLabel>
                       <FormControl>
-                        <Input placeholder="Ex: Consumo de energia" {...lineField} />
+                        <Input
+                          placeholder="Ex: Consumo de energia"
+                          disabled={isLocked}
+                          {...lineField}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -101,6 +123,7 @@ export function BillLineItemsField({ form }: BillLineItemsFieldProps) {
                         onValueChange={(value) =>
                           lineField.onChange(value === NO_CATEGORY ? null : Number(value))
                         }
+                        disabled={isLocked}
                       >
                         <FormControl>
                           <SelectTrigger>
@@ -140,6 +163,7 @@ export function BillLineItemsField({ form }: BillLineItemsFieldProps) {
                             step="0.01"
                             placeholder="0,00"
                             className="pl-10"
+                            disabled={isLocked}
                             value={Number.isNaN(lineField.value) ? '' : lineField.value}
                             onChange={(e) => {
                               lineField.onChange(e.target.value === '' ? 0 : Number(e.target.value));
@@ -159,14 +183,19 @@ export function BillLineItemsField({ form }: BillLineItemsFieldProps) {
                     <FormItem className="flex items-center justify-between sm:col-span-2">
                       <FormLabel>Abatimento (valor subtraído do total)</FormLabel>
                       <FormControl>
-                        <Switch checked={lineField.value} onCheckedChange={lineField.onChange} />
+                        <Switch
+                          checked={lineField.value}
+                          onCheckedChange={lineField.onChange}
+                          disabled={isLocked}
+                        />
                       </FormControl>
                     </FormItem>
                   )}
                 />
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

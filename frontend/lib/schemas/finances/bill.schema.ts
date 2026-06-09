@@ -17,6 +17,30 @@ export const billLineItemSchema = z.object({
   is_offset: z.boolean().default(false),
 });
 
+// Readings-only statements (§3.2/§3.3): NO money fields — the money lives in BillLineItem
+// (single source). Mirror WaterBillStatement / ElectricityBillStatement (S58 serializer) verbatim.
+export const waterStatementSchema = z.object({
+  id: z.number().optional(),
+  consumo_m3: z.number(),
+  leitura_anterior: z.number().nullable().optional(),
+  leitura_atual: z.number().nullable().optional(),
+  leitura_dias: z.number().nullable().optional(),
+  data_leitura: z.string().nullable().optional(),
+  agua_status: z.enum(['active', 'cut']).default('active'),
+  esgoto_status: z.enum(['active', 'cut']).default('active'),
+});
+
+export const electricityStatementSchema = z.object({
+  id: z.number().optional(),
+  consumo_kwh: z.number(),
+  energia_injetada_kwh: z.number().nullable().optional(),
+  leitura_anterior: z.number().nullable().optional(),
+  leitura_atual: z.number().nullable().optional(),
+  leitura_dias: z.number().nullable().optional(),
+  classe: z.string().optional().default(''),
+  bandeira: z.string().optional().default(''),
+});
+
 export const billSchema = z.object({
   id: z.number().optional(),
   condominium: condominiumRefSchema.optional(),
@@ -36,6 +60,8 @@ export const billSchema = z.object({
   lifecycle_state: billLifecycleStateEnum,
   notes: z.string().optional().default(''),
   line_items: z.array(billLineItemSchema).default([]),
+  water_statement: waterStatementSchema.nullable().optional(),
+  electricity_statement: electricityStatementSchema.nullable().optional(),
   // Read-only annotations from Bill.objects.with_amounts(today) — never recomputed (§4.4).
   amount_total: moneyField.optional(),
   amount_paid: moneyField.optional(),
@@ -48,3 +74,5 @@ export const billSchema = z.object({
 
 export type Bill = z.infer<typeof billSchema>;
 export type BillLineItem = z.infer<typeof billLineItemSchema>;
+export type WaterStatement = z.infer<typeof waterStatementSchema>;
+export type ElectricityStatement = z.infer<typeof electricityStatementSchema>;

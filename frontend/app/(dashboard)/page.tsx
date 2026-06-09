@@ -8,6 +8,7 @@ import { RentAdjustmentAlerts } from './_components/rent-adjustment-alerts';
 import { RentCalendarSection } from './_components/rent-calendar/rent-calendar-section';
 import { CombinedCalendarSection } from './_components/finance-calendar/combined-calendar-section';
 import { FinanceKpiRow } from './_components/finance-kpis/finance-kpi-row';
+import { IptuRiskBanner } from './finances/_components/iptu-risk-banner';
 import { TenantStatisticsWidget } from './_components/tenant-statistics-widget';
 
 export default function DashboardPage() {
@@ -27,6 +28,9 @@ export default function DashboardPage() {
       <div className="space-y-6">
         {/* Condominium finance KPIs — above the condominium calendar (Phase 4) */}
         <FinanceKpiRow year={currentYear} month={currentMonth} />
+
+        {/* IPTU parcelamento-loss risk — drill-down of the Atrasados KPI (returns null when none) */}
+        <IptuRiskBanner />
 
         {/* Rent Calendar - Top */}
         <RentCalendarSection />
