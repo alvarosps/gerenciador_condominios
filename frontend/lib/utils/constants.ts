@@ -77,4 +77,5 @@ export const ROUTES = {
   FINANCES_EMPLOYEES: '/finances/employees',
   FINANCES_PROJECTION: '/finances/projection',
   FINANCES_DISTRIBUTION: '/finances/distribution',
+  FINANCES_CATEGORIES: '/finances/categories',
 };

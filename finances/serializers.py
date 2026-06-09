@@ -81,7 +81,11 @@ class CategorySimpleSerializer(serializers.ModelSerializer):
 class CategorySerializer(serializers.ModelSerializer):
     condominium = CondominiumSimpleSerializer(read_only=True)
     condominium_id = serializers.PrimaryKeyRelatedField(
-        queryset=Condominium.objects.all(), source="condominium", write_only=True
+        queryset=Condominium.objects.all(),
+        source="condominium",
+        write_only=True,
+        required=False,
+        allow_null=True,
     )
     parent = CategorySimpleSerializer(read_only=True)
     parent_id = serializers.PrimaryKeyRelatedField(
@@ -110,6 +114,13 @@ class CategorySerializer(serializers.ModelSerializer):
         # The (condominium, parent, name) uniqueness is a partial DB constraint; DRF's
         # auto UniqueTogetherValidator would wrongly force parent_id to always be present.
         validators: list[object] = []
+
+    def validate(self, attrs: dict[str, object]) -> dict[str, object]:
+        # The condominium is an invisible singleton with no client-side selector (design §15);
+        # the Categorias management UI never sends condominium_id, so default it on create exactly
+        # as Bill/Reserve/IncomeEntry do (DRY).
+        _apply_default_condominium(self.instance, attrs)
+        return attrs
 
 
 class BillingAccountSerializer(serializers.ModelSerializer):

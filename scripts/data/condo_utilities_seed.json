@@ -26,6 +26,13 @@
     "data_saldo_inicial": "2026-03-01",
     "rent_tracking_start_date": "2026-06-01"
   },
+  "categorias": [
+    { "name": "Serviços/Utilidades", "sort_order": 1 },
+    { "name": "Impostos", "sort_order": 2 },
+    { "name": "Manutenção", "sort_order": 3 },
+    { "name": "Pessoal/Folha", "sort_order": 4 },
+    { "name": "Outros", "sort_order": 5 }
+  ],
   "contas": [
     {
       "predio_street_number": 836,
