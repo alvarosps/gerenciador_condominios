@@ -14,10 +14,6 @@ vi.mock('@/lib/api/hooks/use-bills', async (importOriginal) => {
   return { ...actual, useGenerateMonthBills: vi.fn() };
 });
 
-// Stub the building filter hook so its (delayed) XHR does not leak into teardown; the bills
-// list still goes through MSW (and is awaited by each test, so it settles cleanly).
-vi.mock('@/lib/api/hooks/use-buildings', () => ({ useBuildings: () => ({ data: [] }) }));
-
 const API_BASE = 'http://localhost:8008/api';
 
 beforeAll(() => {
@@ -157,5 +153,34 @@ describe('BillsPage', () => {
     renderWithProviders(<BillsPage />, { queryClient: createTestQueryClient() });
 
     expect(await screen.findByText('Nenhuma conta cadastrada')).toBeInTheDocument();
+  });
+
+  it('groups bills into one accordion per building (+ a Condomínio bucket) and shows the Tipo column', async () => {
+    setAdmin(false);
+    setBillsResponse([
+      createMockBill({
+        id: 1,
+        description: 'Água DMAE 836',
+        account_type: 'water',
+        building: { id: 1, street_number: 836, name: 'Condomínio Steinmetz', address: 'Av. Circular 836' },
+        building_id: 1,
+      }),
+      createMockBill({
+        id: 2,
+        description: 'IPTU dívida 2026',
+        account_type: 'iptu',
+        building: null,
+        building_id: null,
+      }),
+    ]);
+
+    renderWithProviders(<BillsPage />, { queryClient: createTestQueryClient() });
+
+    // One group header per building + the Condomínio bucket for the null-building bill.
+    expect(await screen.findByText('Condomínio Steinmetz — Nº 836')).toBeInTheDocument();
+    expect(screen.getAllByText('Condomínio').length).toBeGreaterThan(0);
+    // The derived "Tipo" column renders the PT account-type labels.
+    expect(screen.getAllByText('Água').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('IPTU').length).toBeGreaterThan(0);
   });
 });

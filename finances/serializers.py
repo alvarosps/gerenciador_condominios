@@ -22,6 +22,7 @@ from finances.models import (
     _TYPED_IDENTITY_ACCOUNT_TYPES,
     Bill,
     BillingAccount,
+    BillingAccountType,
     BillLineItem,
     BillSkip,
     Category,
@@ -80,7 +81,11 @@ class CategorySimpleSerializer(serializers.ModelSerializer):
 class CategorySerializer(serializers.ModelSerializer):
     condominium = CondominiumSimpleSerializer(read_only=True)
     condominium_id = serializers.PrimaryKeyRelatedField(
-        queryset=Condominium.objects.all(), source="condominium", write_only=True
+        queryset=Condominium.objects.all(),
+        source="condominium",
+        write_only=True,
+        required=False,
+        allow_null=True,
     )
     parent = CategorySimpleSerializer(read_only=True)
     parent_id = serializers.PrimaryKeyRelatedField(
@@ -109,6 +114,13 @@ class CategorySerializer(serializers.ModelSerializer):
         # The (condominium, parent, name) uniqueness is a partial DB constraint; DRF's
         # auto UniqueTogetherValidator would wrongly force parent_id to always be present.
         validators: list[object] = []
+
+    def validate(self, attrs: dict[str, object]) -> dict[str, object]:
+        # The condominium is an invisible singleton with no client-side selector (design §15);
+        # the Categorias management UI never sends condominium_id, so default it on create exactly
+        # as Bill/Reserve/IncomeEntry do (DRY).
+        _apply_default_condominium(self.instance, attrs)
+        return attrs
 
 
 class BillingAccountSerializer(serializers.ModelSerializer):
@@ -297,6 +309,7 @@ class BillSerializer(serializers.ModelSerializer):
     amount_remaining = serializers.SerializerMethodField()
     payment_status = serializers.SerializerMethodField()
     is_overdue = serializers.SerializerMethodField()
+    account_type = serializers.SerializerMethodField()
 
     class Meta:
         model = Bill
@@ -326,6 +339,7 @@ class BillSerializer(serializers.ModelSerializer):
             "amount_remaining",
             "payment_status",
             "is_overdue",
+            "account_type",
             "created_at",
             "updated_at",
         ]
@@ -380,6 +394,16 @@ class BillSerializer(serializers.ModelSerializer):
 
     def get_is_overdue(self, obj: Bill) -> bool:
         return bool(getattr(obj, "is_overdue", False))
+
+    def get_account_type(self, obj: Bill) -> str:
+        # Structural type for the "Tipo" column. A recurring água/luz Bill links the account
+        # directly; a standalone IPTU parcela Bill has billing_account=None and reaches the IPTU
+        # account via installment→plan; an avulsa one_time Bill has neither → generic.
+        if obj.billing_account is not None:
+            return obj.billing_account.account_type
+        if obj.installment is not None and obj.installment.plan.billing_account is not None:
+            return obj.installment.plan.billing_account.account_type
+        return BillingAccountType.GENERIC.value
 
 
 class BillSkipSerializer(serializers.ModelSerializer):

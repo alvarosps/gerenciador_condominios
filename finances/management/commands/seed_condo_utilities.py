@@ -25,16 +25,26 @@ from pathlib import Path
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
-from core.models import Building, FinancialSettings
+from core.models import Building, Condominium, FinancialSettings
 from finances.models import (
     Bill,
     BillBehavior,
     BillingAccount,
+    BillingAccountType,
     BillLifecycleState,
     BillLineItem,
+    Category,
     Installment,
     InstallmentPlan,
     InstallmentPlanState,
+)
+from finances.services.bill_service import (
+    BillDraft,
+    BillLineInput,
+    BillService,
+    ElectricityStatementInput,
+    StatementInput,
+    WaterStatementInput,
 )
 from finances.services.installment_plan_service import _schedule_due_dates
 
@@ -96,16 +106,22 @@ class Command(BaseCommand):
             "opening_bills_created": 0,
             "deferred_debts_created": 0,
             "deferred_debts_updated": 0,
+            "categories_created": 0,
+            "categories_updated": 0,
+            "monthly_bills_created": 0,
+            "monthly_bills_skipped": 0,
         }
 
         prefix = "[DRY RUN] " if dry_run else ""
         self.stdout.write(f"{prefix}Semeando contas de serviço (prédios 836/850)...")
         with transaction.atomic():
             self._seed_settings(data)
+            self._seed_categories(data)
             self._seed_billing_accounts(data)
             self._seed_embedded_plans(data)
             self._seed_iptu_terms(data)
             self._seed_deferred_2026_debts(data)
+            self._seed_monthly_utility_bills(data)
             if dry_run:
                 transaction.set_rollback(True)
 
@@ -153,6 +169,34 @@ class Command(BaseCommand):
         )
         self.stats["settings"] = 1
         self.stdout.write("  + FinancialSettings (saldo 0 / 2026-03-01 / tracking 2026-06-01)")
+
+    def _seed_categories(self, data: dict[str, object]) -> None:
+        """Starter finance Categories (condo-wide root tags) — key (condominium, parent=None, name).
+
+        Category is the optional, data-driven classification (distinct from the structural
+        account_type "Tipo"). The dropdown is empty until rows exist; this seeds a sensible root
+        set scoped to the singleton condominium. update_or_create keeps reruns idempotent.
+        """
+        items = self._section(data, "categorias")
+        if not items:
+            return
+        condominium = Condominium.get_default()
+        if condominium is None:
+            return
+        self.stdout.write(f"  Categorias ({len(items)})...")
+        for index, item in enumerate(items, start=1):
+            name = _as_str(item["name"])
+            _category, created = Category.objects.update_or_create(
+                condominium=condominium,
+                parent=None,
+                name=name,
+                defaults={
+                    "color": _as_str(item.get("color", "")),
+                    "sort_order": _as_int(item.get("sort_order", 0)),
+                },
+            )
+            self._tally("categories", created)
+            self.stdout.write(f"  [{index}/{len(items)}] + {name}")
 
     def _seed_billing_accounts(self, data: dict[str, object]) -> None:
         """Typed BillingAccounts — key (building, account_type, external_identifier)."""
@@ -394,6 +438,114 @@ class Command(BaseCommand):
             )
             self._tally("deferred_debts", created)
             self.stdout.write(f"  [{index}/{len(items)}] + {description} (R$ {amount})")
+
+    def _seed_monthly_utility_bills(self, data: dict[str, object]) -> None:
+        """Seed the real monthly água/luz faturas (RECURRING Bill + statement + itemized lines).
+
+        Each fatura is built via BillService.create_with_lines with the full line breakdown
+        (consumo/esgoto/multa/juros/descontos…) + the reading statement; the parcela line is bound
+        to the embedded plan's Installment (``installment_number``) so a future generate_month dedups
+        on (bill, installment) instead of adding a second parcela line. NOT idempotent on its own
+        (create_with_lines raises if a bill already occupies (billing_account, competence_month)), so
+        an existing bill for the month is detected and skipped (mirrors _seed_opening_parcela).
+        """
+        items = self._section(data, "faturas_mensais")
+        if not items:
+            return
+        self.stdout.write(f"  Faturas mensais ({len(items)})...")
+        for index, item in enumerate(items, start=1):
+            account_type = _as_str(item["account_type"])
+            account = self._get_account(account_type, _as_str(item["account_external_identifier"]))
+            building = account.building
+            if building is None:
+                continue
+            competence = _as_date(item["competence_month"])
+            description = _as_str(item["description"])
+            if Bill.all_objects.filter(
+                billing_account=account, competence_month=competence, is_deleted=False
+            ).exists():
+                self.stats["monthly_bills_skipped"] += 1
+                self.stdout.write(f"  [{index}/{len(items)}] = {description} (já existe)")
+                continue
+            embedded_plan = InstallmentPlan.objects.filter(
+                billing_account=account, embedded=True
+            ).first()
+            draft = BillDraft(
+                condominium=building.condominium,
+                building=building,
+                billing_account=account,
+                competence_month=competence,
+                due_date=_as_date(item["due_date"]),
+                description=description,
+                behavior=BillBehavior.RECURRING,
+            )
+            BillService.create_with_lines(
+                draft,
+                self._build_fatura_lines(item, embedded_plan),
+                self._build_statement(account_type, item.get("statement")),
+            )
+            self.stats["monthly_bills_created"] += 1
+            self.stdout.write(f"  [{index}/{len(items)}] + {description}")
+
+    def _build_fatura_lines(
+        self, item: dict[str, object], embedded_plan: InstallmentPlan | None
+    ) -> list[BillLineInput]:
+        """BillLineInput list from the JSON lines; a line with installment_number binds to the
+        embedded plan's Installment (so the parcela line reconciles + is not double-generated)."""
+        raw_lines = item.get("lines", [])
+        lines: list[BillLineInput] = []
+        if not isinstance(raw_lines, list):
+            return lines
+        for raw in raw_lines:
+            if not isinstance(raw, dict):
+                continue
+            line: BillLineInput = {
+                "description": _as_str(raw["description"]),
+                "amount": _money(raw["amount"]),
+                "is_offset": bool(raw.get("is_offset", False)),
+            }
+            number = raw.get("installment_number")
+            if number is not None and embedded_plan is not None:
+                installment = Installment.objects.filter(
+                    plan=embedded_plan, number=_as_int(number)
+                ).first()
+                if installment is not None:
+                    line["installment"] = installment
+            lines.append(line)
+        return lines
+
+    def _build_statement(self, account_type: str, raw: object) -> StatementInput | None:
+        """Build the typed reading statement (water/electricity) from the JSON, or None."""
+        if not isinstance(raw, dict):
+            return None
+        if account_type == BillingAccountType.WATER.value:
+            return self._water_statement(raw)
+        return self._electricity_statement(raw)
+
+    @staticmethod
+    def _opt_int(raw: dict[str, object], key: str) -> int | None:
+        return _as_int(raw[key]) if key in raw else None
+
+    def _water_statement(self, raw: dict[str, object]) -> WaterStatementInput:
+        return {
+            "consumo_m3": _as_int(raw["consumo_m3"]),
+            "leitura_anterior": self._opt_int(raw, "leitura_anterior"),
+            "leitura_atual": self._opt_int(raw, "leitura_atual"),
+            "leitura_dias": self._opt_int(raw, "leitura_dias"),
+            "agua_status": _as_str(raw.get("agua_status", "active")),
+            "esgoto_status": _as_str(raw.get("esgoto_status", "active")),
+        }
+
+    def _electricity_statement(self, raw: dict[str, object]) -> ElectricityStatementInput:
+        return {
+            "consumo_kwh": _as_int(raw["consumo_kwh"]),
+            "energia_injetada_kwh": self._opt_int(raw, "energia_injetada_kwh"),
+            "leitura_anterior": self._opt_int(raw, "leitura_anterior"),
+            "leitura_atual": self._opt_int(raw, "leitura_atual"),
+            "leitura_dias": self._opt_int(raw, "leitura_dias"),
+            "classe": _as_str(raw.get("classe", "")),
+            "bandeira": _as_str(raw.get("bandeira", "")),
+        }
 
     # ------------------------------------------------------------------ helpers
 

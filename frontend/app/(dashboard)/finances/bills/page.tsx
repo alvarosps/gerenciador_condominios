@@ -1,9 +1,16 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { CalendarPlus, FileUp, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
+import { Badge } from '@/components/ui/badge';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,7 +35,6 @@ import {
   useGenerateMonthBills,
   useParseInvoice,
 } from '@/lib/api/hooks/use-bills';
-import { useBuildings } from '@/lib/api/hooks/use-buildings';
 import { useAuthStore } from '@/store/auth-store';
 import { handleError } from '@/lib/utils/error-handler';
 import { useCrudPage } from '@/lib/hooks/use-crud-page';
@@ -55,20 +61,40 @@ export default function BillsPage() {
 
   const now = new Date();
   const [period] = useState({ year: now.getFullYear(), month: now.getMonth() + 1 });
-  const [buildingFilter, setBuildingFilter] = useState<string>(ALL);
   const [lifecycleFilter, setLifecycleFilter] = useState<string>(ALL);
   const [payingBill, setPayingBill] = useState<Bill | null>(null);
   const [importDraft, setImportDraft] = useState<ParsedInvoice | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const parseInvoice = useParseInvoice();
 
+  // Building is rendered as one table per building (accordion), not a filter; only the situação
+  // (lifecycle) filter stays — applied server-side across all buildings.
   const filters: BillFilters = {
-    ...(buildingFilter === ALL ? {} : { building_id: Number(buildingFilter) }),
     ...(lifecycleFilter === ALL ? {} : { lifecycle_state: lifecycleFilter }),
   };
 
   const { data: bills, isLoading } = useBills(filters);
-  const { data: buildings } = useBuildings();
+
+  // One table per building (accordion), derived from each bill's own nested building so it never
+  // depends on a separate buildings list being complete. Bills with building=null go under a
+  // "Condomínio" bucket (the extra group leases/apartments lack). Sorted by street_number, condo
+  // bucket last.
+  const groups = useMemo(() => {
+    const byKey = new Map<string, { key: string; label: string; order: number; bills: Bill[] }>();
+    (bills ?? []).forEach((bill) => {
+      const building = bill.building;
+      const key = building?.id !== undefined ? String(building.id) : 'condominio';
+      const group = byKey.get(key) ?? {
+        key,
+        label: building ? `${building.name} — Nº ${building.street_number}` : 'Condomínio',
+        order: building?.street_number ?? Number.MAX_SAFE_INTEGER,
+        bills: [],
+      };
+      group.bills.push(bill);
+      byKey.set(key, group);
+    });
+    return [...byKey.values()].sort((a, b) => a.order - b.order);
+  }, [bills]);
   const deleteMutation = useDeleteBill();
   const generateMonth = useGenerateMonthBills();
 
@@ -165,22 +191,6 @@ export default function BillsPage() {
       )}
 
       <div className="mb-4 flex flex-wrap items-center gap-3">
-        <Select value={buildingFilter} onValueChange={setBuildingFilter}>
-          <SelectTrigger className="w-48">
-            <SelectValue placeholder="Prédio" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ALL}>Todos os prédios</SelectItem>
-            {buildings?.map((building) =>
-              building.id === undefined ? null : (
-                <SelectItem key={building.id} value={String(building.id)}>
-                  {building.name}
-                </SelectItem>
-              ),
-            )}
-          </SelectContent>
-        </Select>
-
         <Select value={lifecycleFilter} onValueChange={setLifecycleFilter}>
           <SelectTrigger className="w-40">
             <SelectValue placeholder="Situação" />
@@ -196,17 +206,38 @@ export default function BillsPage() {
         </Select>
       </div>
 
-      {!isLoading && (bills?.length ?? 0) === 0 ? (
+      {!isLoading && groups.length === 0 ? (
         <p className="rounded-md border-2 border-dashed py-12 text-center text-sm text-muted-foreground">
           Nenhuma conta cadastrada
         </p>
       ) : (
-        <DataTable<Bill>
-          columns={columns}
-          dataSource={bills}
-          loading={isLoading}
-          rowKey="id"
-        />
+        <Accordion
+          // Re-key on the group set so the default-open state re-applies once bills load.
+          key={groups.map((group) => group.key).join(',')}
+          type="multiple"
+          defaultValue={groups.map((group) => group.key)}
+          className="space-y-4"
+        >
+          {groups.map((group) => (
+            <AccordionItem key={group.key} value={group.key}>
+              <AccordionTrigger className="px-4">
+                <div className="flex items-center gap-2">
+                  <span>{group.label}</span>
+                  <Badge variant="secondary">{group.bills.length} contas</Badge>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="px-4 pb-4">
+                <DataTable<Bill>
+                  columns={columns}
+                  dataSource={group.bills}
+                  loading={isLoading}
+                  rowKey="id"
+                  pagination={false}
+                />
+              </AccordionContent>
+            </AccordionItem>
+          ))}
+        </Accordion>
       )}
 
       <BillFormModal open={crud.isModalOpen} bill={crud.editingItem} onClose={crud.closeModal} />
