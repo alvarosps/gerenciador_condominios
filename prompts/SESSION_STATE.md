@@ -13,7 +13,7 @@
 **Roadmap**: `prompts/ROADMAP.md` (seção "Contas de serviço / parser / IPTU")
 **Total de Sessões**: 9 (56–64)
 **Branch**: `feat/condo-utility-bills` (a partir de `master`)
-**Status**: **em execução** — Sessões **56–58 concluídas** (gate verde no branch da feature). Próxima: 59.
+**Status**: **em execução** — Sessões **56–59 concluídas** (gate verde no branch da feature). Próxima: 60.
 **Decisões de produto** (design §2): contas tipadas (`account_type` water/electricity/iptu/internet/generic) + identidade (inscrição/UC/medidor/titular/endereço cadastrado); **statements 1:1 só leituras** (dinheiro = `BillLineItem`, fonte única); **parser DMAE+CEEE em memória, SEM anexar o PDF** (upload→lê→insere); refactor `InstallmentPlan.linked_billing_account → billing_account`; IPTU = conta-registro (não auto-gera) + planos avulsos + dívida diferida; **alerta IPTU = banner load-bearing + push best-effort agregado SP-aware**; seed das parcelas de abertura com `competence_month=2026-06`; "Atrasados" inclui IPTU (banner = drill-down). Prod = última alteração (após deploy).
 
 | # | Sessão | Camada | Status | Arquivo |
@@ -21,7 +21,7 @@
 | 56 | Tipo + identidade da conta (`account_type`/`SupplyStatus`/identidade/unique) + `recurring_for_generation()` (exclui IPTU) | BE | **concluída** | `prompts/56-finances-account-type-identity.md` |
 | 57 | Refactor `InstallmentPlan.billing_account` (rename + clean cross-model + serializer.validate + todos consumidores + convert_deferred herda IPTU) | BE+FE | **concluída** | `prompts/57-finances-installmentplan-billing-account-refactor.md` |
 | 58 | `WaterBillStatement`/`ElectricityBillStatement` (readings-only, RLS) + `create_with_lines`/`update_with_lines` (statement + `installment_id`) | BE | **concluída** | `prompts/58-finances-bill-statements.md` |
-| 59 | Parser core `invoice_parsing/` (DMAE+CEEE posicional, registry, deps/mypy, fixtures sanitizadas) | BE | pendente | `prompts/59-finances-invoice-parser-core.md` |
+| 59 | Parser core `invoice_parsing/` (DMAE+CEEE posicional, registry, deps/mypy, fixtures sanitizadas) | BE | **concluída** | `prompts/59-finances-invoice-parser-core.md` |
 | 60 | Endpoint `POST bills/parse_invoice` (MultiPartParser) + reconciliação parcela + idempotência/replace | BE | pendente | `prompts/60-finances-parse-invoice-endpoint.md` |
 | 61 | `IptuAlertService` + `iptu_alerts` (uncached) + `Notification` types + `send_finance_alerts` (agregado, SP-aware) | BE | pendente | `prompts/61-finances-iptu-alert.md` |
 | 62 | `DialogBody` + modal responsivo (header/footer fixos) + campos novos + bloco statement (água/luz) + alinhar modais irmãos | FE | pendente | `prompts/62-finances-modal-responsive.md` |
@@ -61,6 +61,13 @@
 - **Modificados**: `finances/models.py` (`WaterBillStatement`/`ElectricityBillStatement` — `OneToOne(Bill, CASCADE)`, readings-only, `agua/esgoto_status ∈ SupplyStatus`, dual managers); `finances/services/bill_service.py` (TypedDicts `*StatementInput` + `installment` em `BillLineInput`; `create_with_lines(…, statement=None)`; novo `update_with_lines` replace+upsert com guard UNPAID+OPEN; `delete` cascade soft-delete; helpers `_statement_model_for`/`_write_lines`/`_upsert_statement`); `finances/serializers.py` (serializers read-only + `BillSerializer` aninha via `SerializerMethodField` que filtra `is_deleted`); `finances/viewsets/crud_views.py` (helpers `_parse_statement`/`_parse_lines` 400 PT; `create_with_lines` estendido; `@action update_with_lines`; `destroy` → `BillService.delete`; `select_related` das statements); `finances/signals.py` (2 models em `_FINANCE_MODELS`); `tests/factories.py` (`make_water_statement`/`make_electricity_statement`).
 - **Bug real corrigido (não workaround)**: o unique do `bill_id` (OneToOne) é hard por-tabela e **não** exclui soft-deletados → soft-delete+recriar violava. O upsert agora **reusa a linha in-place**; swap de tipo (água↔luz, tabelas distintas) soft-deleta a antiga e cria a nova. Reverse OneToOne usa `_base_manager` (vê soft-deletado) → serializer filtra `is_deleted`.
 - **Gate (in-place)**: `ruff`/`mypy`/`pyright` limpos; **42 novos** ✓ (100% nas linhas tocadas); `makemigrations --check` "No changes"; migração 0006 fwd/back + RLS ✓; regressão (bill_service 7, integration -k bill 63, signals 54, finances amplo 96) verde. Zero suppressions.
+
+### Sessão 59 — concluída
+- **Pacote `finances/services/invoice_parsing/`** (sem ORM): `base.py` (`ParsedLine`/`ParsedInvoice` dataclasses + protocolo `InvoiceParser` + helpers posicionais `extract_words`/`crop`/bbox, `parse_brl` estrito, `parse_competence`/`parse_installment_marker`); `dmae.py` (`DmaeWaterParser` total-conservador — toda linha vira `ParsedLine`, `TAXA COBRANCA`→genérica, `DESCONTO`→offset, `PARCELA X/N`→`installment_number`; invariante Σ−offsets==total com linha de ajuste+warning; statement água/cortado); `ceee.py` (`CeeeElectricityParser` — energia líquida=total−Σitens, negativo→offset positivo; statement kWh/injeção/classe/bandeira; "FATURA ARRECADADA"→warning; 3 layouts); `registry.py` (`detect_and_parse(bytes)` por CNPJ, em memória, não-PDF/emissor-desconhecido→`ValueError` PT).
+- **Fixtures sanitizadas** (11 `.txt`, sem CPF/código de barras; `conftest.py` renderiza `.txt`→PDF posicional via reportlab). **`.pdf` gerado é gitignored** (regenerado do `.txt`; reportlab não-determinístico).
+- **Deps** (três lugares + override mypy): `pdfplumber`/`pdfminer.six` em `requirements.txt` + `pyproject.toml` `[project.dependencies]` + `[[tool.mypy.overrides]] ignore_missing_imports` + `uv.lock`.
+- **Gate (in-place)**: `ruff`/`mypy`/`pyright` limpos; **39 testes** ✓ (100% nas 5 módulos do parser); `makemigrations --check` "No changes" (sem model/migração); regressão **370 unit + 187 integration** verde. Zero suppressions (sem `assert` — via `line_entries`; `_coord` converte coords untyped sem `cast`).
+- **Contratos p/ S60**: `detect_and_parse(bytes)->ParsedInvoice`; `matched_account=None` aqui (match no banco + idempotência + vínculo `installment` são da S60); `statement` dict usa as chaves dos models da S58.
 
 ---
 

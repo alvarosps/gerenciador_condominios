@@ -1,0 +1,10 @@
+# Sanitized invoice from an UNRECOGNIZED issuer (neither DMAE nor CEEE CNPJ).
+# detect_and_parse must raise ValueError (PT) for this one.
+# Format: "<x> <y> <text>" (positional reportlab drawString; PDF points, origin bottom-left).
+
+50  800  COMPANHIA QUALQUER DE SERVICOS
+50  788  CNPJ 11.222.333/0001-44
+50  776  FATURA 05/2026
+50  764  VENCIMENTO 10/06/2026
+50  752  TOTAL A PAGAR
+360 752  123,45
