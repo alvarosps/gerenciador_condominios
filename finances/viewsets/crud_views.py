@@ -24,7 +24,7 @@ from rest_framework.parsers import MultiPartParser
 from rest_framework.request import Request
 from rest_framework.response import Response
 
-from core.pagination import CustomPageNumberPagination
+from core.pagination import CustomPageNumberPagination, LargePageNumberPagination
 from core.permissions import FinancialReadOnly
 from finances.models import (
     Bill,
@@ -283,10 +283,11 @@ def _parse_lines(
 class BillViewSet(viewsets.ModelViewSet):
     serializer_class = BillSerializer
     permission_classes = [FinancialReadOnly]
-    # No pagination: the Contas UI groups ALL bills per building (no page slicing). Returns a bare
-    # list; the frontend's extractResults handles both shapes. (CustomPageNumberPagination capped
-    # page_size at 500, silently dropping bills beyond it.)
-    pagination_class = None
+    # The Contas UI groups ALL bills per building (no page slicing). Keep the paginated
+    # {results, count} envelope (consumers/tests rely on it) but lift the cap so page_size=10000
+    # returns every bill in one page (CustomPageNumberPagination's max_page_size=500 would silently
+    # drop bills beyond 500).
+    pagination_class = LargePageNumberPagination
 
     def get_queryset(self) -> QuerySet[Bill]:
         queryset = (
