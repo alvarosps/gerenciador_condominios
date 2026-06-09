@@ -13,7 +13,7 @@
 **Roadmap**: `prompts/ROADMAP.md` (seção "Contas de serviço / parser / IPTU")
 **Total de Sessões**: 9 (56–64)
 **Branch**: `feat/condo-utility-bills` (a partir de `master`)
-**Status**: **em execução** — Sessões **56–62 concluídas** (gate verde no branch da feature). Próxima: 63.
+**Status**: **em execução** — Sessões **56–63 concluídas** (gate verde no branch da feature). Próxima: 64 (última — seed).
 **Decisões de produto** (design §2): contas tipadas (`account_type` water/electricity/iptu/internet/generic) + identidade (inscrição/UC/medidor/titular/endereço cadastrado); **statements 1:1 só leituras** (dinheiro = `BillLineItem`, fonte única); **parser DMAE+CEEE em memória, SEM anexar o PDF** (upload→lê→insere); refactor `InstallmentPlan.linked_billing_account → billing_account`; IPTU = conta-registro (não auto-gera) + planos avulsos + dívida diferida; **alerta IPTU = banner load-bearing + push best-effort agregado SP-aware**; seed das parcelas de abertura com `competence_month=2026-06`; "Atrasados" inclui IPTU (banner = drill-down). Prod = última alteração (após deploy).
 
 | # | Sessão | Camada | Status | Arquivo |
@@ -25,7 +25,7 @@
 | 60 | Endpoint `POST bills/parse_invoice` (MultiPartParser) + reconciliação parcela + idempotência/replace | BE | **concluída** | `prompts/60-finances-parse-invoice-endpoint.md` |
 | 61 | `IptuAlertService` + `iptu_alerts` (uncached) + `Notification` types + `send_finance_alerts` (agregado, SP-aware) | BE | **concluída** | `prompts/61-finances-iptu-alert.md` |
 | 62 | `DialogBody` + modal responsivo (header/footer fixos) + campos novos + bloco statement (água/luz) + alinhar modais irmãos | FE | **concluída** | `prompts/62-finances-modal-responsive.md` |
-| 63 | `useParseInvoice` + "Importar fatura (PDF)" + prefill do parser + `useUpdateBillWithLines` + `IptuRiskBanner`/`use-iptu-alerts` | FE | pendente | `prompts/63-finances-import-fatura-banner.md` |
+| 63 | `useParseInvoice` + "Importar fatura (PDF)" + prefill do parser + `useUpdateBillWithLines` + `IptuRiskBanner`/`use-iptu-alerts` | FE | **concluída** | `prompts/63-finances-import-fatura-banner.md` |
 | 64 | Seed real `scripts/data/condo_utilities_seed.json` + comando `seed_condo_utilities` (local → prod após deploy) | BE/data | pendente | `prompts/64-finances-seed-real-data.md` |
 
 **Ordem/dependências**: `56 → 57 → 58 → (59 → 60)`; `61` depende de **56+57**; `62` depende de **56+58**; `63` depende de **60+61+62**; `64` depende de **tudo**. Gate por sessão: ≥90% em `finances`, `ruff && mypy core/ finances/ && pyright && pytest` (BE) / `lint && type-check && test:unit` (FE), zero warnings, sem suppressions.
@@ -87,6 +87,12 @@
 - **Modificados**: `frontend/components/ui/dialog.tsx` (`DialogBody = flex-1 overflow-y-auto`); `bill-form-modal.tsx` (`DialogContent max-h-[90vh] flex flex-col`; header fixo, `DialogBody` rolável, `DialogFooter` fixo; "Tipo de conta" select + Inscrição/UC + Emissão; `<BillStatementFields>`; alerta "Fase 3" → **link Planos de Parcelamento**); `bill-form-schema.ts` (campos UI-only `account_type`/`*_statement` — **NÃO** no payload; `bill.schema.ts` API intacto); `bill-form-modal.test.tsx` (reescreve teste do link + 3 novos); `employee-form-modal.tsx`/`installment-plan-form-modal.tsx`/`income-entry-form-modal.tsx` (migração de layout p/ `DialogBody`, sem mudar campos/hooks).
 - **Gate (in-place FE)**: vitest **25 escopados** ✓; `type-check`/`eslint` limpos; **suite completa 861/861** ✓ (`test:unit`). Zero suppressions (sem `as Tipo`/`!` em produção). *(8 "errors" = teardown MSW/happy-dom pré-existente em `bills-page.test.tsx` — não tocado; 7/7 isolado.)*
 - **Decisão**: `account_type`/`water_statement`/`electricity_statement` adicionados ao **bill-form-schema (form state UI-only)** p/ renderizar selector/inputs sob TS estrito; **fora** do payload create/update; `bill.schema.ts` (contrato API) intacto. **S63** liga o prefill do parser + persistência da statement nesses mesmos nomes de campo.
+
+### Sessão 63 — concluída (FE)
+- **Criados**: `lib/api/hooks/use-iptu-alerts.ts` (GET `finance-dashboard/iptu_alerts/`, shape plano, `staleTime:0`/`refetchOnWindowFocus`); `lib/schemas/finances/invoice-parse.schema.ts` (`parsedLineSchema` com `category_id`+`installment_id`, `bill.description`, `existing_bill_id` nullable, statements nullable); `app/(dashboard)/finances/_components/iptu-risk-banner.tsx` (agrupa por `(building_label, external_identifier)`, warning/critical com texto+ícone, sem total R$); + 4 arquivos de teste (19).
+- **Modificados**: `use-bills.ts` (`BillLineInput.installment_id`, `CreateBillWithLines.statement`, `UpdateBillWithLines`, `useParseInvoice` FormData `Content-Type: undefined` sem invalidação, `useUpdateBillWithLines` POST `{id}/update_with_lines/`); `bill.schema.ts` (aninha `water_statement`/`electricity_statement`); `billing-account.schema.ts` (**fix**: adiciona `account_type`/`secondary_identifier`/`holder_name`/`registered_address`/`supply_status` que o schema zod estava descartando + `ACCOUNT_TYPE_LABELS`/`accountLabel`); `query-keys.ts` (`iptuAlerts`); `bill-form-modal.tsx` (`draft?` prop, `draftToDefaults`, prefill statement, **save roteia por `existing_bill_id`**, select desambiguado, Alert de warnings, `createWithLines` único — DRY); `bill-form-schema.ts`/`bill-line-items-field.tsx` (`installment_id` + linha de parcela **travada**); `bills/page.tsx` + `(dashboard)/page.tsx` ("Importar fatura (PDF)" no bloco `{isAdmin}` + `<IptuRiskBanner/>`); mocks (`handlers.ts` 3 rotas, `finances.ts` factories).
+- **Gate (in-place FE)**: vitest **19 escopados + 52 regressão** ✓; `lint`/`type-check` limpos; **suite completa 880/880** ✓. Zero suppressions/`as`/`!` em produção; sem barrel; DRY (1 `createWithLines`).
+- **Decisão/fix**: `billing-account.schema.ts` estava removendo os campos novos que o backend serializa (S56) → adicionados (necessário p/ `accountLabel`/desambiguação). *(Warning a11y benigno "DialogContent missing Description" é estrutura pré-existente dos modais, não introduzido aqui; nenhum teste falha.)*
 
 ---
 
