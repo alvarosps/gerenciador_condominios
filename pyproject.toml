@@ -44,6 +44,8 @@ dependencies = [
     "playwright>=1.50.0,<2.0",
     "reportlab>=4.1.0,<5.0",
     "Pillow>=11.0.0,<13.0",
+    "pdfplumber>=0.11.0,<1.0",
+    "pdfminer.six>=20240706",
     # Utilities
     "num2words>=0.5.14,<0.6",
     "python-dateutil>=2.8.0,<3.0",
@@ -340,6 +342,8 @@ module = [
     "faker.*",
     "decouple.*",
     "reportlab.*",
+    "pdfplumber.*",
+    "pdfminer.*",
     "model_bakery.*",
     "responses.*",
     "freezegun.*",

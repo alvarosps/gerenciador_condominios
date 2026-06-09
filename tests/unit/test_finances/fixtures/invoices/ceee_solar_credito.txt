@@ -1,0 +1,31 @@
+# Sanitized CEEE (electricity) invoice — high solar-credit month: net energy NEGATIVE.
+# Also a 2nd-via already collected ("FATURA ARRECADADA / NAO RECEBER").
+# SANITIZED: synthetic values only, NO real CPF / NO barcode. CNPJ is public.
+# Format: "<x> <y> <text>" (positional reportlab drawString; PDF points, origin bottom-left).
+#
+# Energia liquida = total - sum(itens) = 12,34 - 35,00 = -22,66 (NEGATIVE -> offset, magnitude 22,66)
+
+50  800  CEEE EQUATORIAL ENERGIA
+50  788  CNPJ 08.467.115/0001-00
+50  776  FATURA ARRECADADA / NAO RECEBER
+50  764  EMISSAO 22/06/2026
+50  752  CONTA MES 06/2026
+50  740  VENCIMENTO 10/07/2026
+50  728  UC 900127980
+50  716  MEDIDOR MD50721985
+50  704  TITULAR TITULAR TESTE
+50  692  CLASSE Residencial Pleno
+50  680  BANDEIRA Verde
+
+50  656  LEITURA ANTERIOR 12000
+50  644  LEITURA ATUAL 12010
+50  632  CONSUMO KWH 10
+50  620  ENERGIA INJETADA KWH 480
+50  608  LEITURA DIAS 30
+
+50  576  DESCRICAO DOS VALORES FATURADOS
+50  560  CIP
+360 560  35,00
+
+50  528  TOTAL A PAGAR
+360 528  12,34
