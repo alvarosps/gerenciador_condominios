@@ -135,7 +135,7 @@
       "account_external_identifier": "117.111.0049.0519.00",
       "description": "Parcelamento DMAE água 836",
       "installment_count": 46,
-      "current_installment": 24,
+      "current_installment": 23,
       "installment_amount": 94.48,
       "default_due_day": 4
     },
@@ -145,7 +145,7 @@
       "account_external_identifier": "117.111.0049.0508.00",
       "description": "Parcelamento DMAE água 850",
       "installment_count": 59,
-      "current_installment": 3,
+      "current_installment": 2,
       "installment_amount": 530.24,
       "default_due_day": 4
     },
@@ -300,6 +300,194 @@
       "lancamento": "202600179990",
       "amount": 6741.33,
       "due_date": "2026-06-30"
+    }
+  ],
+  "faturas_mensais": [
+    {
+      "account_type": "electricity",
+      "account_external_identifier": "1.273.798.010-05",
+      "competence_month": "2026-05-01",
+      "due_date": "2026-06-16",
+      "description": "Luz principal 840 (solar) 836 — 05/2026",
+      "statement": {
+        "consumo_kwh": 1752,
+        "energia_injetada_kwh": 1172,
+        "leitura_anterior": 80789,
+        "leitura_atual": 82541,
+        "leitura_dias": 31,
+        "classe": "B1_RESID"
+      },
+      "lines": [
+        { "description": "Consumo TE", "amount": 250.23 },
+        { "description": "Consumo TU", "amount": 348.80 },
+        { "description": "Consumo Comp. TE", "amount": 81.52 },
+        { "description": "Consumo Comp. TU", "amount": 704.82 },
+        { "description": "Energia Ativa Injetada TE", "amount": 81.52, "is_offset": true },
+        { "description": "Energia Ativa Injetada TU", "amount": 585.00, "is_offset": true },
+        { "description": "Par.S/Des.GD2 TU", "amount": 137.35 },
+        { "description": "Benefício Tarifário Bruto SCEE TUSD", "amount": 447.65 },
+        { "description": "Benefício Tarifário Bruto SCEE TE", "amount": 67.66 },
+        { "description": "Adicional Bandeira", "amount": 11.07 },
+        { "description": "Cip-Ilum Pública", "amount": 10.97 },
+        { "description": "Benefício Tarifário Líquido SCEE", "amount": 494.12, "is_offset": true },
+        { "description": "Multa", "amount": 9.67 },
+        { "description": "Correção Monetária", "amount": 5.78 },
+        { "description": "Juros", "amount": 6.61 }
+      ]
+    },
+    {
+      "account_type": "electricity",
+      "account_external_identifier": "650.847.010-16",
+      "competence_month": "2026-05-01",
+      "due_date": "2026-06-01",
+      "description": "Luz 2º relógio 836 (tarifa social) — 05/2026",
+      "statement": {
+        "consumo_kwh": 189,
+        "leitura_anterior": 66861,
+        "leitura_atual": 67050,
+        "leitura_dias": 31,
+        "classe": "RESID. BAIXA RENDA"
+      },
+      "lines": [
+        { "description": "Consumo TE", "amount": 42.03 },
+        { "description": "Consumo TUSD", "amount": 45.97 },
+        { "description": "Benefício Tarifário Bruto TE", "amount": 25.77 },
+        { "description": "Benefício Tarifário Bruto TUSD", "amount": 26.86 },
+        { "description": "Adicional Bandeira", "amount": 2.07 },
+        { "description": "Benefício Tarifário Líquido", "amount": 52.63, "is_offset": true },
+        { "description": "Multa", "amount": 3.31 },
+        { "description": "Correção Monetária", "amount": 1.98 },
+        { "description": "Juros", "amount": 2.26 }
+      ]
+    },
+    {
+      "account_type": "electricity",
+      "account_external_identifier": "1.273.678.010-60",
+      "competence_month": "2026-05-01",
+      "due_date": "2026-06-16",
+      "description": "Luz 850 (solar) — 05/2026",
+      "statement": {
+        "consumo_kwh": 1726,
+        "energia_injetada_kwh": 1405,
+        "leitura_anterior": 53308,
+        "leitura_atual": 55034,
+        "leitura_dias": 31,
+        "classe": "B1_RESID"
+      },
+      "lines": [
+        { "description": "Consumo TE", "amount": 43.13 },
+        { "description": "Consumo TU", "amount": 60.13 },
+        { "description": "Consumo Comp. TE", "amount": 113.09 },
+        { "description": "Consumo Comp. TU", "amount": 977.84 },
+        { "description": "Energia Ativa Injetada TE", "amount": 97.73, "is_offset": true },
+        { "description": "Inj. mUC PT TE", "amount": 15.36, "is_offset": true },
+        { "description": "Energia Ativa Injetada TU", "amount": 701.31, "is_offset": true },
+        { "description": "Inj. mUC PT TU", "amount": 110.30, "is_offset": true },
+        { "description": "Adicional Bandeira", "amount": 1.90 },
+        { "description": "Cip-Ilum Pública", "amount": 10.97 },
+        { "description": "Parcelamento de débitos 19/24", "amount": 629.35, "installment_number": 19 },
+        { "description": "Multa", "amount": 34.92 },
+        { "description": "Correção Monetária", "amount": 11.95 },
+        { "description": "Rel. Normal DJ", "amount": 14.09 },
+        { "description": "Juros", "amount": 18.13 }
+      ]
+    },
+    {
+      "account_type": "water",
+      "account_external_identifier": "117.111.0049.0519.00",
+      "competence_month": "2026-05-01",
+      "due_date": "2026-06-04",
+      "description": "Água DMAE 836 — 05/2026",
+      "statement": {
+        "consumo_m3": 51,
+        "leitura_anterior": 619,
+        "leitura_atual": 670,
+        "leitura_dias": 29,
+        "agua_status": "active",
+        "esgoto_status": "active"
+      },
+      "lines": [
+        { "description": "Água", "amount": 660.00 },
+        { "description": "Esgoto", "amount": 528.00 },
+        { "description": "Parcelamento de débitos 23/46", "amount": 94.48, "installment_number": 23 },
+        { "description": "Multa", "amount": 2.31 },
+        { "description": "Juros de mora", "amount": 1.88 },
+        { "description": "Atualização monetária", "amount": 0.28 }
+      ]
+    },
+    {
+      "account_type": "water",
+      "account_external_identifier": "117.111.0049.0519.00",
+      "competence_month": "2026-06-01",
+      "due_date": "2026-07-04",
+      "description": "Água DMAE 836 — 06/2026",
+      "statement": {
+        "consumo_m3": 13,
+        "leitura_anterior": 670,
+        "leitura_atual": 683,
+        "leitura_dias": 29,
+        "agua_status": "cut",
+        "esgoto_status": "active"
+      },
+      "lines": [
+        { "description": "Água", "amount": 660.00 },
+        { "description": "Esgoto", "amount": 528.00 },
+        { "description": "Parcelamento de débitos 24/46", "amount": 94.48, "installment_number": 24 },
+        { "description": "Taxa de cobrança", "amount": 6.50 },
+        { "description": "Multa", "amount": 27.99 },
+        { "description": "Juros de mora", "amount": 1.88 },
+        { "description": "Atualização monetária", "amount": 0.28 }
+      ]
+    },
+    {
+      "account_type": "water",
+      "account_external_identifier": "117.111.0049.0508.00",
+      "competence_month": "2026-05-01",
+      "due_date": "2026-06-04",
+      "description": "Água DMAE 850 — 05/2026",
+      "statement": {
+        "consumo_m3": 158,
+        "leitura_anterior": 2731,
+        "leitura_atual": 2889,
+        "leitura_dias": 29,
+        "agua_status": "active",
+        "esgoto_status": "active"
+      },
+      "lines": [
+        { "description": "Água", "amount": 1800.07 },
+        { "description": "Esgoto", "amount": 791.26 },
+        { "description": "Parcelamento de débitos 2/59", "amount": 530.24, "installment_number": 2 },
+        { "description": "Multa", "amount": 10.60 },
+        { "description": "Juros de mora", "amount": 27.39 },
+        { "description": "Atualização monetária", "amount": 7.52 },
+        { "description": "Desconto acréscimo impontualidade", "amount": 9.61, "is_offset": true },
+        { "description": "Desconto débito tipo", "amount": 0.42, "is_offset": true }
+      ]
+    },
+    {
+      "account_type": "water",
+      "account_external_identifier": "117.111.0049.0508.00",
+      "competence_month": "2026-06-01",
+      "due_date": "2026-07-04",
+      "description": "Água DMAE 850 — 06/2026",
+      "statement": {
+        "consumo_m3": 177,
+        "leitura_anterior": 2889,
+        "leitura_atual": 3066,
+        "leitura_dias": 29,
+        "agua_status": "active",
+        "esgoto_status": "active"
+      },
+      "lines": [
+        { "description": "Água", "amount": 2118.83 },
+        { "description": "Esgoto", "amount": 886.41 },
+        { "description": "Parcelamento de débitos 3/59", "amount": 530.24, "installment_number": 3 },
+        { "description": "Multa", "amount": 10.60 },
+        { "description": "Juros de mora", "amount": 27.39 },
+        { "description": "Atualização monetária", "amount": 7.52 },
+        { "description": "Desconto acréscimo impontualidade", "amount": 9.61, "is_offset": true },
+        { "description": "Desconto débito tipo", "amount": 0.42, "is_offset": true }
+      ]
     }
   ]
 }
