@@ -25,13 +25,14 @@ from pathlib import Path
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
-from core.models import Building, FinancialSettings
+from core.models import Building, Condominium, FinancialSettings
 from finances.models import (
     Bill,
     BillBehavior,
     BillingAccount,
     BillLifecycleState,
     BillLineItem,
+    Category,
     Installment,
     InstallmentPlan,
     InstallmentPlanState,
@@ -96,12 +97,15 @@ class Command(BaseCommand):
             "opening_bills_created": 0,
             "deferred_debts_created": 0,
             "deferred_debts_updated": 0,
+            "categories_created": 0,
+            "categories_updated": 0,
         }
 
         prefix = "[DRY RUN] " if dry_run else ""
         self.stdout.write(f"{prefix}Semeando contas de serviço (prédios 836/850)...")
         with transaction.atomic():
             self._seed_settings(data)
+            self._seed_categories(data)
             self._seed_billing_accounts(data)
             self._seed_embedded_plans(data)
             self._seed_iptu_terms(data)
@@ -153,6 +157,34 @@ class Command(BaseCommand):
         )
         self.stats["settings"] = 1
         self.stdout.write("  + FinancialSettings (saldo 0 / 2026-03-01 / tracking 2026-06-01)")
+
+    def _seed_categories(self, data: dict[str, object]) -> None:
+        """Starter finance Categories (condo-wide root tags) — key (condominium, parent=None, name).
+
+        Category is the optional, data-driven classification (distinct from the structural
+        account_type "Tipo"). The dropdown is empty until rows exist; this seeds a sensible root
+        set scoped to the singleton condominium. update_or_create keeps reruns idempotent.
+        """
+        items = self._section(data, "categorias")
+        if not items:
+            return
+        condominium = Condominium.get_default()
+        if condominium is None:
+            return
+        self.stdout.write(f"  Categorias ({len(items)})...")
+        for index, item in enumerate(items, start=1):
+            name = _as_str(item["name"])
+            _category, created = Category.objects.update_or_create(
+                condominium=condominium,
+                parent=None,
+                name=name,
+                defaults={
+                    "color": _as_str(item.get("color", "")),
+                    "sort_order": _as_int(item.get("sort_order", 0)),
+                },
+            )
+            self._tally("categories", created)
+            self.stdout.write(f"  [{index}/{len(items)}] + {name}")
 
     def _seed_billing_accounts(self, data: dict[str, object]) -> None:
         """Typed BillingAccounts — key (building, account_type, external_identifier)."""
