@@ -110,12 +110,12 @@ _FIXTURE_DATA: dict[str, object] = {
             "account_external_identifier": "516449",
             "termo": "992988",
             "installment_count": 10,
-            "total_amount": 27181.69,
+            "total_amount": 1045.44,
             "current_number": 9,
-            "current_amount": 2718.16,
+            "current_amount": 522.72,
             "current_due_date": "2026-05-29",
             "next_number": 10,
-            "next_amount": 2718.25,
+            "next_amount": 522.72,
             "next_due_date": "2026-06-30",
         },
         {
@@ -125,10 +125,10 @@ _FIXTURE_DATA: dict[str, object] = {
             "installment_count": 10,
             "total_amount": 98.37,
             "current_number": 9,
-            "current_amount": 9.83,
+            "current_amount": 49.15,
             "current_due_date": "2026-05-29",
             "next_number": 10,
-            "next_amount": 9.90,
+            "next_amount": 49.22,
             "next_due_date": "2026-06-30",
         },
     ],
@@ -365,8 +365,8 @@ def test_opening_overdue_installment_appears_in_overdue_not_pre_tracking(tmp_pat
 
     assert not Bill.objects.filter(competence_month__lt=OPENING_COMPETENCE).exists()
     overdue_total = CondoBalanceService.overdue_bills_total()
-    # The overdue opening parcela of term 992988 (R$2718,16) is part of 'Atrasados'.
-    assert overdue_total >= Decimal("2718.16")
+    # The overdue opening parcela of term 992988 (R$522,72, valor atualizado) is part of 'Atrasados'.
+    assert overdue_total >= Decimal("522.72")
 
 
 @freeze_time(FROZEN)
