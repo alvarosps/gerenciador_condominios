@@ -27,6 +27,7 @@ import {
 } from '@/lib/api/hooks/use-installment-plans';
 import { useAuthStore } from '@/store/auth-store';
 import { useCrudPage } from '@/lib/hooks/use-crud-page';
+import { getErrorMessage } from '@/lib/utils/error-handler';
 import type { InstallmentPlan } from '@/lib/schemas/finances/installment-plan.schema';
 import { buildInstallmentPlanColumns } from './_components/installment-plan-columns';
 import { InstallmentPlanFormModal } from './_components/installment-plan-form-modal';
@@ -40,7 +41,7 @@ export default function InstallmentPlansPage() {
   const [convertingPlan, setConvertingPlan] = useState<InstallmentPlan | null>(null);
   const [schedulePlan, setSchedulePlan] = useState<InstallmentPlan | null>(null);
 
-  const { data: plans, isLoading } = useInstallmentPlans();
+  const { data: plans, isLoading, isError, error } = useInstallmentPlans();
   const deleteMutation = useDeleteInstallmentPlan();
 
   const crud = useCrudPage<InstallmentPlan>({
@@ -82,7 +83,11 @@ export default function InstallmentPlansPage() {
         )}
       </div>
 
-      {!isLoading && (plans?.length ?? 0) === 0 ? (
+      {isError ? (
+        <p className="rounded-md border-2 border-dashed border-destructive/40 py-12 text-center text-sm text-destructive">
+          Erro ao carregar planos de parcelas: {getErrorMessage(error)}
+        </p>
+      ) : !isLoading && (plans?.length ?? 0) === 0 ? (
         <p className="rounded-md border-2 border-dashed py-12 text-center text-sm text-muted-foreground">
           Nenhum plano de parcelas cadastrado
         </p>

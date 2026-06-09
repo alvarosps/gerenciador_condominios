@@ -12,7 +12,11 @@ import {
 } from '../use-installment-plans';
 import { createTestQueryClient, createWrapper } from '@/tests/test-utils';
 import { server } from '@/tests/mocks/server';
-import { createMockInstallment, createMockInstallmentPlan } from '@/tests/mocks/data/finances';
+import {
+  createMockBillingAccount,
+  createMockInstallment,
+  createMockInstallmentPlan,
+} from '@/tests/mocks/data/finances';
 
 const API_BASE = 'http://localhost:8008/api';
 
@@ -32,6 +36,34 @@ describe('useInstallmentPlans', () => {
     expect(typeof plan?.total_amount).toBe('number');
     expect(plan?.total_amount).toBe(1500);
     expect(typeof plan?.installments?.[0]?.amount).toBe('number');
+  });
+
+  it('parses an embedded plan from a READ payload (nested billing_account, no billing_account_id)', async () => {
+    // Real prod read shape: the serializer emits the nested `billing_account` object but NOT the
+    // write_only `billing_account_id`. The embedded superRefine must accept the nested account;
+    // otherwise installmentPlanSchema.parse throws inside .map and rejects the WHOLE query,
+    // emptying the entire Parcelas list (the bug this guards against).
+    const embeddedReadPayload = {
+      ...createMockInstallmentPlan({
+        id: 13,
+        embedded: true,
+        description: 'Parcelamento DMAE água 836',
+        billing_account: createMockBillingAccount({ id: 9, account_type: 'water', supply_status: 'cut' }),
+      }),
+      billing_account_id: undefined, // write_only — absent on read (dropped by JSON serialization)
+    };
+    server.use(
+      http.get(`${API_BASE}/finances/installment-plans/`, () =>
+        HttpResponse.json([embeddedReadPayload]),
+      ),
+    );
+
+    const { result } = renderHook(() => useInstallmentPlans(), { wrapper: createWrapper() });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true), { timeout: 5000 });
+
+    expect(result.current.data).toHaveLength(1);
+    expect(result.current.data?.[0]?.embedded).toBe(true);
+    expect(result.current.data?.[0]?.billing_account?.account_type).toBe('water');
   });
 
   it('forwards building_id / lifecycle_state / embedded as query params', async () => {

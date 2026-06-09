@@ -43,10 +43,15 @@ export const installmentPlanSchema = z
     updated_at: z.string().optional(),
   })
   .superRefine((data, ctx) => {
-    if (
-      data.embedded &&
-      (data.billing_account_id === null || data.billing_account_id === undefined)
-    ) {
+    // An embedded plan must be linked to a recurring account. On WRITE the form supplies
+    // `billing_account_id`; on READ the API returns the nested `billing_account` object only
+    // (`billing_account_id` is write_only on the serializer). Require that at least one is
+    // present — checking only the id would wrongly reject every embedded plan parsed from a
+    // read response, throwing inside .map(parse) and emptying the whole list.
+    const hasLinkedAccount =
+      (data.billing_account_id !== null && data.billing_account_id !== undefined) ||
+      (data.billing_account !== null && data.billing_account !== undefined);
+    if (data.embedded && !hasLinkedAccount) {
       ctx.addIssue({
         code: 'custom',
         path: ['billing_account_id'],
