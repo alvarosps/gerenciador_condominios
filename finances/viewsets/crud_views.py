@@ -5,18 +5,22 @@ the with_amounts(today) annotation (TZ-SP today). Actions are thin: they parse/v
 request data (400 PT) and delegate to the S37/S38 services.
 """
 
+import io
 from collections.abc import Callable
 from datetime import date
 from decimal import Decimal, InvalidOperation
 from typing import cast
 
+import pdfplumber
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import QuerySet
 from django.http import QueryDict
+from pdfplumber.utils.exceptions import PdfminerException
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
+from rest_framework.parsers import MultiPartParser
 from rest_framework.request import Request
 from rest_framework.response import Response
 
@@ -57,6 +61,8 @@ from finances.services.bill_service import (
     StatementInput,
 )
 from finances.services.condo_month_close_service import CondoMonthCloseService
+from finances.services.invoice_draft_service import InvoiceDraftService
+from finances.services.invoice_parsing.registry import detect_and_parse
 from finances.services.reserve_service import ReserveService
 from finances.services.timezone import today_sp
 from finances.viewsets.query_params import int_param
@@ -194,6 +200,8 @@ _DATE_STATEMENT_FIELDS = frozenset({"data_leitura"})
 
 _ERR_STATEMENT_OBJECT = "statement deve ser um objeto."
 _ERR_LINE_OBJECT = "Cada linha deve ser um objeto."
+_ERR_NO_FILE = "Envie o arquivo da fatura no campo 'file'."
+_ERR_NOT_PDF = "O arquivo enviado não é um PDF válido."
 
 
 def _coerce_statement_value(field: str, raw: object) -> object:
@@ -460,6 +468,34 @@ class BillViewSet(viewsets.ModelViewSet):
             message = exc.messages[0] if isinstance(exc, ValidationError) else str(exc)
             return Response({"error": message}, status=status.HTTP_400_BAD_REQUEST)
         return Response(self._serialized_bill(bill), status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["post"], parser_classes=[MultiPartParser])
+    def parse_invoice(self, request: Request) -> Response:
+        """Receive a utility invoice PDF (multipart), parse it in MEMORY and return a DRAFT.
+
+        Writes NOTHING (past-immutable, design §6): the draft is persisted later via
+        create_with_lines/update_with_lines (S58), from the modal (S63). is_staff is enforced by
+        FinancialReadOnly (POST write gate). The PDF is validated and discarded — never stored
+        (decisão #4). The only external I/O boundary is pdfplumber.open; the positional parsing
+        lives in the S59 registry.
+        """
+        uploaded = request.FILES.get("file")
+        if uploaded is None:
+            return Response({"error": _ERR_NO_FILE}, status=status.HTTP_400_BAD_REQUEST)
+        pdf_bytes = uploaded.read()
+        try:
+            with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+                has_pages = bool(pdf.pages)
+        except (PdfminerException, ValueError, OSError):
+            return Response({"error": _ERR_NOT_PDF}, status=status.HTTP_400_BAD_REQUEST)
+        if not has_pages:
+            return Response({"error": _ERR_NOT_PDF}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            parsed = detect_and_parse(pdf_bytes)
+        except ValueError as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+        draft = InvoiceDraftService.build_draft(parsed)
+        return Response(draft, status=status.HTTP_200_OK)
 
     def destroy(self, request: Request, *args: object, **kwargs: object) -> Response:
         """Soft-delete the bill through BillService.delete, which cascades to its statement.

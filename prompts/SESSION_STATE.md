@@ -13,7 +13,7 @@
 **Roadmap**: `prompts/ROADMAP.md` (seção "Contas de serviço / parser / IPTU")
 **Total de Sessões**: 9 (56–64)
 **Branch**: `feat/condo-utility-bills` (a partir de `master`)
-**Status**: **em execução** — Sessões **56–59 concluídas** (gate verde no branch da feature). Próxima: 60.
+**Status**: **em execução** — Sessões **56–60 concluídas** (gate verde no branch da feature). Próxima: 61.
 **Decisões de produto** (design §2): contas tipadas (`account_type` water/electricity/iptu/internet/generic) + identidade (inscrição/UC/medidor/titular/endereço cadastrado); **statements 1:1 só leituras** (dinheiro = `BillLineItem`, fonte única); **parser DMAE+CEEE em memória, SEM anexar o PDF** (upload→lê→insere); refactor `InstallmentPlan.linked_billing_account → billing_account`; IPTU = conta-registro (não auto-gera) + planos avulsos + dívida diferida; **alerta IPTU = banner load-bearing + push best-effort agregado SP-aware**; seed das parcelas de abertura com `competence_month=2026-06`; "Atrasados" inclui IPTU (banner = drill-down). Prod = última alteração (após deploy).
 
 | # | Sessão | Camada | Status | Arquivo |
@@ -22,7 +22,7 @@
 | 57 | Refactor `InstallmentPlan.billing_account` (rename + clean cross-model + serializer.validate + todos consumidores + convert_deferred herda IPTU) | BE+FE | **concluída** | `prompts/57-finances-installmentplan-billing-account-refactor.md` |
 | 58 | `WaterBillStatement`/`ElectricityBillStatement` (readings-only, RLS) + `create_with_lines`/`update_with_lines` (statement + `installment_id`) | BE | **concluída** | `prompts/58-finances-bill-statements.md` |
 | 59 | Parser core `invoice_parsing/` (DMAE+CEEE posicional, registry, deps/mypy, fixtures sanitizadas) | BE | **concluída** | `prompts/59-finances-invoice-parser-core.md` |
-| 60 | Endpoint `POST bills/parse_invoice` (MultiPartParser) + reconciliação parcela + idempotência/replace | BE | pendente | `prompts/60-finances-parse-invoice-endpoint.md` |
+| 60 | Endpoint `POST bills/parse_invoice` (MultiPartParser) + reconciliação parcela + idempotência/replace | BE | **concluída** | `prompts/60-finances-parse-invoice-endpoint.md` |
 | 61 | `IptuAlertService` + `iptu_alerts` (uncached) + `Notification` types + `send_finance_alerts` (agregado, SP-aware) | BE | pendente | `prompts/61-finances-iptu-alert.md` |
 | 62 | `DialogBody` + modal responsivo (header/footer fixos) + campos novos + bloco statement (água/luz) + alinhar modais irmãos | FE | pendente | `prompts/62-finances-modal-responsive.md` |
 | 63 | `useParseInvoice` + "Importar fatura (PDF)" + prefill do parser + `useUpdateBillWithLines` + `IptuRiskBanner`/`use-iptu-alerts` | FE | pendente | `prompts/63-finances-import-fatura-banner.md` |
@@ -68,6 +68,13 @@
 - **Deps** (três lugares + override mypy): `pdfplumber`/`pdfminer.six` em `requirements.txt` + `pyproject.toml` `[project.dependencies]` + `[[tool.mypy.overrides]] ignore_missing_imports` + `uv.lock`.
 - **Gate (in-place)**: `ruff`/`mypy`/`pyright` limpos; **39 testes** ✓ (100% nas 5 módulos do parser); `makemigrations --check` "No changes" (sem model/migração); regressão **370 unit + 187 integration** verde. Zero suppressions (sem `assert` — via `line_entries`; `_coord` converte coords untyped sem `cast`).
 - **Contratos p/ S60**: `detect_and_parse(bytes)->ParsedInvoice`; `matched_account=None` aqui (match no banco + idempotência + vínculo `installment` são da S60); `statement` dict usa as chaves dos models da S58.
+
+### Sessão 60 — concluída
+- **Criados**: `finances/services/invoice_draft_service.py` (`build_draft(ParsedInvoice)->dict` — match de conta por `account_type`+`external_identifier`, reconciliação `installment_id` do plano embutido `ACTIVE`/não-deletado (parcela sem plano → linha genérica + warning, **nunca** auto-cria), idempotência `existing_bill_id` (Bill ativo na competência), serialização do draft; **0 writes** — reads-only); `tests/unit/test_finances/test_invoice_draft_service.py` (18), `tests/integration/test_parse_invoice_api.py` (12).
+- **Modificados**: `finances/viewsets/crud_views.py` (`@action parse_invoice`, `parser_classes=[MultiPartParser]`, lê `request.FILES["file"]`, valida PDF via `pdfplumber.open` → 400 PT; emissor desconhecido → 422 PT; delega ao service; `urls.py` intacto — rota auto-exposta).
+- **Draft (canônico)**: `{bill{…,description,building_id,category_id}, line_items[{…,category_id,installment_id}], statement, matched_account, existing_bill_id, warnings}` — objeto plano (não `{results,count}`). Save roteia por **`existing_bill_id`** (truthy → `update_with_lines`; senão `create_with_lines`); `installment_id` resolvido aqui (`installment_number` fica interno ao S59).
+- **Gate (in-place)**: `ruff`/`mypy`/`pyright` limpos; **30 novos** ✓ (100% nas linhas tocadas); `makemigrations --check` "No changes" (sem migração); regressão (bill actions/statements/crud/parser/bill_service) verde. Zero suppressions. **Imutável quanto ao passado** (parse não grava nada).
+- **Decisão**: labels PT como `dict[str,str]` literal (conflito ruff×pyright em `TextChoices.label` `_StrOrPromise`) — sem suppression.
 
 ---
 
