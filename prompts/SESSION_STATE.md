@@ -13,7 +13,7 @@
 **Roadmap**: `prompts/ROADMAP.md` (seção "Contas de serviço / parser / IPTU")
 **Total de Sessões**: 9 (56–64)
 **Branch**: `feat/condo-utility-bills` (a partir de `master`)
-**Status**: **em execução** — Sessões **56–60 concluídas** (gate verde no branch da feature). Próxima: 61.
+**Status**: **em execução** — Sessões **56–61 concluídas** (gate verde no branch da feature). Próxima: 62.
 **Decisões de produto** (design §2): contas tipadas (`account_type` water/electricity/iptu/internet/generic) + identidade (inscrição/UC/medidor/titular/endereço cadastrado); **statements 1:1 só leituras** (dinheiro = `BillLineItem`, fonte única); **parser DMAE+CEEE em memória, SEM anexar o PDF** (upload→lê→insere); refactor `InstallmentPlan.linked_billing_account → billing_account`; IPTU = conta-registro (não auto-gera) + planos avulsos + dívida diferida; **alerta IPTU = banner load-bearing + push best-effort agregado SP-aware**; seed das parcelas de abertura com `competence_month=2026-06`; "Atrasados" inclui IPTU (banner = drill-down). Prod = última alteração (após deploy).
 
 | # | Sessão | Camada | Status | Arquivo |
@@ -23,7 +23,7 @@
 | 58 | `WaterBillStatement`/`ElectricityBillStatement` (readings-only, RLS) + `create_with_lines`/`update_with_lines` (statement + `installment_id`) | BE | **concluída** | `prompts/58-finances-bill-statements.md` |
 | 59 | Parser core `invoice_parsing/` (DMAE+CEEE posicional, registry, deps/mypy, fixtures sanitizadas) | BE | **concluída** | `prompts/59-finances-invoice-parser-core.md` |
 | 60 | Endpoint `POST bills/parse_invoice` (MultiPartParser) + reconciliação parcela + idempotência/replace | BE | **concluída** | `prompts/60-finances-parse-invoice-endpoint.md` |
-| 61 | `IptuAlertService` + `iptu_alerts` (uncached) + `Notification` types + `send_finance_alerts` (agregado, SP-aware) | BE | pendente | `prompts/61-finances-iptu-alert.md` |
+| 61 | `IptuAlertService` + `iptu_alerts` (uncached) + `Notification` types + `send_finance_alerts` (agregado, SP-aware) | BE | **concluída** | `prompts/61-finances-iptu-alert.md` |
 | 62 | `DialogBody` + modal responsivo (header/footer fixos) + campos novos + bloco statement (água/luz) + alinhar modais irmãos | FE | pendente | `prompts/62-finances-modal-responsive.md` |
 | 63 | `useParseInvoice` + "Importar fatura (PDF)" + prefill do parser + `useUpdateBillWithLines` + `IptuRiskBanner`/`use-iptu-alerts` | FE | pendente | `prompts/63-finances-import-fatura-banner.md` |
 | 64 | Seed real `scripts/data/condo_utilities_seed.json` + comando `seed_condo_utilities` (local → prod após deploy) | BE/data | pendente | `prompts/64-finances-seed-real-data.md` |
@@ -75,6 +75,12 @@
 - **Draft (canônico)**: `{bill{…,description,building_id,category_id}, line_items[{…,category_id,installment_id}], statement, matched_account, existing_bill_id, warnings}` — objeto plano (não `{results,count}`). Save roteia por **`existing_bill_id`** (truthy → `update_with_lines`; senão `create_with_lines`); `installment_id` resolvido aqui (`installment_number` fica interno ao S59).
 - **Gate (in-place)**: `ruff`/`mypy`/`pyright` limpos; **30 novos** ✓ (100% nas linhas tocadas); `makemigrations --check` "No changes" (sem migração); regressão (bill actions/statements/crud/parser/bill_service) verde. Zero suppressions. **Imutável quanto ao passado** (parse não grava nada).
 - **Decisão**: labels PT como `dict[str,str]` literal (conflito ruff×pyright em `TextChoices.label` `_StrOrPromise`) — sem suppression.
+
+### Sessão 61 — concluída
+- **Criados**: `finances/services/iptu_alert_service.py` (`IptuRiskRow` frozen + `IptuAlertService.evaluate(today)` — query `InstallmentPlan` ACTIVE/`embedded=False`/`billing_account__account_type=IPTU`, conta vencidas via `with_amounts.is_overdue`; 1→WARNING, ≥2→CRITICAL; deadline=1ª parcela não-vencida; mensagens PT; ordem CRITICAL→WARNING; **sem efeitos**); `core/management/commands/send_finance_alerts.py` (cron: `today_sp()`; **1 resumo agregado/admin/tipo/dia** p/ `is_staff` ativos, idempotente via `is_notification_sent_on`; push best-effort); `core/migrations/0049_alter_notification_type.py` (AlterField, reversível); 4 arquivos de teste (18+5+9+5 = **37**).
+- **Modificados**: `core/models.py` (`Notification.TYPE_IPTU_OVERDUE_RISK`/`TYPE_IPTU_PARCELAMENTO_LOST` constantes + TYPE_CHOICES); `core/services/notification_service.py` (`is_notification_sent_on(user,type,day)` SP-aware; legado UTC intacto); `finances/viewsets/dashboard_views.py` (`@action iptu_alerts` **UNCACHED**, `FinancialReadOnly`, shape plano `{alerts, warning_count, critical_count}` — não `{results,count}`).
+- **Gate (in-place)**: `ruff`/`mypy core/ finances/`/`pyright` limpos; **37 novos** ✓ (100% nos módulos tocados); `makemigrations --check` "No changes"; 0049 fwd/back ✓; regressão (notification_service/send_scheduled 11, dashboard/calendar/overdue 14) verde. Zero suppressions.
+- **Nota**: flake pré-existente `psycopg [BAD]` no modo single-process com coverage (afeta um teste irmão JÁ mergeado de forma idêntica) — verde sob o runner xdist padrão (5+ runs). Não é defeito de lógica (consistente com a memória de flakiness xdist/coverage do projeto).
 
 ---
 

@@ -30,6 +30,7 @@ from finances.services.condo_balance_service import CondoBalanceService, _next_m
 from finances.services.condo_calendar_service import CondoCalendarService
 from finances.services.condo_projection_service import CondoProjectionService
 from finances.services.condo_simulation_service import CondoSimulationService
+from finances.services.iptu_alert_service import IptuAlertService
 from finances.services.owner_distribution_service import OwnerDistributionService
 from finances.services.timezone import current_month_sp, today_sp
 
@@ -256,6 +257,34 @@ class FinanceDashboardViewSet(viewsets.ViewSet):
                     "count": rent_stats["overdue_count"],
                     "total_fee": rent_stats["overdue_total_fee"],
                 },
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    @action(detail=False, methods=["get"])
+    def iptu_alerts(self, request: Request) -> Response:
+        # NO cache (design §11): depends on today_sp() + payment state; midnight rollover is not a
+        # write, so cache would never be invalidated — same rationale as combined_calendar/overdue.
+        rows = IptuAlertService.evaluate(today_sp())
+        return Response(
+            {
+                "alerts": [
+                    {
+                        "plan_id": r.plan_id,
+                        "external_identifier": r.external_identifier,
+                        "building_label": r.building_label,
+                        "level": r.level,
+                        "overdue_count": r.overdue_count,
+                        "deadline": r.deadline,
+                        "overdue_due_dates": r.overdue_due_dates,
+                        "message": r.message,
+                    }
+                    for r in rows
+                ],
+                "warning_count": sum(1 for r in rows if r.level == IptuAlertService.LEVEL_WARNING),
+                "critical_count": sum(
+                    1 for r in rows if r.level == IptuAlertService.LEVEL_CRITICAL
+                ),
             },
             status=status.HTTP_200_OK,
         )
