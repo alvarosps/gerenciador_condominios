@@ -145,7 +145,11 @@ export function useGenerateContract() {
       const { data } = await apiClient.post<{
         pdf_path: string;
         message: string;
-      }>(`/leases/${leaseId}/generate_contract/`);
+      }>(`/leases/${leaseId}/generate_contract/`, undefined, {
+        // PDF generation launches headless Chromium on the backend — far slower
+        // than the default 30s, especially on the small production instance.
+        timeout: 180_000,
+      });
       return data;
     },
     onSuccess: (_, leaseId) => {

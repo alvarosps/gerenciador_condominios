@@ -160,6 +160,26 @@ class TestPlaywrightPDFGenerator:
         call_kwargs = mock_context.chromium.launch.call_args[1]
         assert call_kwargs.get("executable_path") == "/usr/bin/chromium"
 
+    def test_generate_pdf_launches_with_container_hardening_flags(self, tmp_path, mocker):
+        """Launch args must include flags for constrained containers (small /dev/shm, no GPU)."""
+        mock_playwright = mocker.patch("core.infrastructure.pdf_generator.sync_playwright")
+        mock_context = mocker.MagicMock()
+        mock_playwright.return_value.__enter__ = mocker.MagicMock(return_value=mock_context)
+        mock_playwright.return_value.__exit__ = mocker.MagicMock(return_value=False)
+
+        mock_browser = mocker.MagicMock()
+        mock_page = mocker.MagicMock()
+        mock_context.chromium.launch.return_value = mock_browser
+        mock_browser.new_page.return_value = mock_page
+
+        generator = PlaywrightPDFGenerator()
+        generator.generate_pdf("<html></html>", tmp_path / "out.pdf")
+
+        launch_args = mock_context.chromium.launch.call_args[1]["args"]
+        assert "--no-sandbox" in launch_args
+        assert "--disable-dev-shm-usage" in launch_args
+        assert "--disable-gpu" in launch_args
+
     def test_generate_pdf_raises_pdf_generation_error_on_failure(self, tmp_path, mocker):
         """Any exception during generation should be wrapped as PDFGenerationError."""
         mocker.patch(

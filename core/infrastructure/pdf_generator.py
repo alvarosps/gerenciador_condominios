@@ -87,7 +87,15 @@ class PlaywrightPDFGenerator(IPDFGenerator):
                 with sync_playwright() as p:
                     launch_args: dict = {
                         "headless": True,
-                        "args": ["--no-sandbox", "--disable-setuid-sandbox"],
+                        "args": [
+                            "--no-sandbox",
+                            "--disable-setuid-sandbox",
+                            # Containers (Render) have a small /dev/shm; without this
+                            # flag Chromium crashes the hosting process under memory
+                            # pressure instead of falling back to /tmp.
+                            "--disable-dev-shm-usage",
+                            "--disable-gpu",
+                        ],
                     }
                     if chrome_executable:
                         launch_args["executable_path"] = chrome_executable

@@ -1,5 +1,9 @@
 import type { NextRequest } from 'next/server';
 
+// PDF generation (generate_contract) holds the request while headless Chromium
+// runs on the backend — keep the proxy alive longer than the Vercel default.
+export const maxDuration = 180;
+
 async function handleProxy(req: NextRequest) {
   const backendUrl = process.env.BACKEND_API_URL ?? 'http://localhost:8008/api';
   
@@ -51,8 +55,10 @@ async function handleProxy(req: NextRequest) {
   } catch (error: unknown) {
     console.error('API Proxy Error:', error);
     const errorMessage = error instanceof Error ? error.message : String(error);
-    return new Response(JSON.stringify({ error: 'Proxy Error', details: errorMessage }), {
-      status: 500,
+    // The backend closed the connection without responding (crash, OOM, timeout)
+    // — that's a gateway failure, not an application error.
+    return new Response(JSON.stringify({ error: 'Bad Gateway', details: errorMessage }), {
+      status: 502,
       headers: {
         'Content-Type': 'application/json',
       },

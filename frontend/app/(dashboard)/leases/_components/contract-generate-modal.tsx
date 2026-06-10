@@ -159,7 +159,7 @@ export function ContractGenerateModal({ open, lease, onClose }: Props) {
                 <div className="flex flex-col items-center justify-center py-6 space-y-3">
                   <Loader2 className="h-8 w-8 animate-spin text-primary" />
                   <p className="text-sm text-muted-foreground">
-                    Gerando contrato PDF... Isso pode levar alguns segundos.
+                    Gerando contrato PDF... Isso pode levar até 1 minuto.
                   </p>
                 </div>
               )}
