@@ -23,6 +23,31 @@ describe('API proxy route', () => {
     expect(body).toEqual({ error: 'Bad Gateway', details: 'fetch failed' });
   });
 
+  it('does not forward hop-by-hop headers to the backend', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response('{}', { status: 200 }));
+
+    const request = new NextRequest('http://localhost:4000/api/leases/65/generate_contract/', {
+      method: 'POST',
+      headers: {
+        'transfer-encoding': 'chunked',
+        connection: 'keep-alive',
+        'keep-alive': 'timeout=5',
+        authorization: 'Bearer token-123',
+      },
+    });
+
+    await POST(request);
+
+    const init = fetchSpy.mock.calls[0]?.[1];
+    const forwardedHeaders = new Headers(init?.headers);
+    expect(forwardedHeaders.has('transfer-encoding')).toBe(false);
+    expect(forwardedHeaders.has('connection')).toBe(false);
+    expect(forwardedHeaders.has('keep-alive')).toBe(false);
+    expect(forwardedHeaders.get('authorization')).toBe('Bearer token-123');
+  });
+
   it('forwards backend responses with their original status', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
       new Response(JSON.stringify({ detail: 'Não encontrado.' }), {

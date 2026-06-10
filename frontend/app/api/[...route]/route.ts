@@ -4,6 +4,19 @@ import type { NextRequest } from 'next/server';
 // runs on the backend — keep the proxy alive longer than the Vercel default.
 export const maxDuration = 180;
 
+// Hop-by-hop headers (RFC 7230 §6.1) apply to a single connection and must not
+// be forwarded; undici rejects outbound requests carrying transfer-encoding.
+const HOP_BY_HOP_HEADERS = [
+  'connection',
+  'keep-alive',
+  'proxy-authenticate',
+  'proxy-authorization',
+  'te',
+  'trailer',
+  'transfer-encoding',
+  'upgrade',
+];
+
 async function handleProxy(req: NextRequest) {
   const backendUrl = process.env.BACKEND_API_URL ?? 'http://localhost:8008/api';
   
@@ -26,8 +39,10 @@ async function handleProxy(req: NextRequest) {
   
   // Prepare headers
   const headers = new Headers(req.headers);
+  for (const header of HOP_BY_HOP_HEADERS) {
+    headers.delete(header);
+  }
   headers.delete('host'); // Let fetch set the correct host for Render
-  headers.delete('connection');
   headers.delete('content-length'); // We will set it precisely
   
   if (body) {
