@@ -8,6 +8,7 @@ and approving or rejecting them.
 from typing import cast
 
 from django.contrib.auth.models import User
+from django.http import HttpResponseBase
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.decorators import action
@@ -19,6 +20,7 @@ from core.models import PaymentProof
 from core.pagination import CustomPageNumberPagination
 from core.permissions import IsAdminUser
 from core.serializers import PaymentProofSerializer
+from core.services.file_response_service import proof_file_response
 from core.services.notification_service import notify_proof_reviewed
 
 _VALID_REVIEW_ACTIONS = ("approve", "reject")
@@ -98,3 +100,31 @@ class AdminProofViewSet(ViewSet):
         proof.save(update_fields=["status", "reviewed_by", "reviewed_at", "rejection_reason"])
         notify_proof_reviewed(proof)
         return Response(PaymentProofSerializer(proof).data)
+
+    @action(detail=True, methods=["get"], url_path="file")
+    def file(self, request: Request, pk: str | None = None) -> HttpResponseBase:
+        """
+        GET /api/admin/proofs/{pk}/file/
+
+        Stream the proof's uploaded file for admin review.
+        """
+        if not pk:
+            return Response(
+                {"detail": "Comprovante não encontrado."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        try:
+            proof = PaymentProof.objects.select_related("lease").get(pk=pk)
+        except PaymentProof.DoesNotExist:
+            return Response(
+                {"detail": "Comprovante não encontrado."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if not proof.file:
+            return Response(
+                {"detail": "Arquivo não encontrado."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        return proof_file_response(proof)

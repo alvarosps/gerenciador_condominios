@@ -104,23 +104,6 @@ class IsTenantOrAdmin(permissions.BasePermission):
         )
 
 
-class FinancialReadOnly(permissions.BasePermission):
-    """
-    Financial module permission.
-    Read access for any authenticated user.
-    Write (POST, PUT, PATCH, DELETE) only for admin (is_staff).
-    """
-
-    def has_permission(self, request: Request, view: APIView) -> bool:
-        if not (request.user and request.user.is_authenticated):
-            return False
-
-        if request.method in permissions.SAFE_METHODS:
-            return True
-
-        return bool(request.user.is_staff)
-
-
 class ReadOnlyForNonAdmin(permissions.BasePermission):
     """
     Allow read-only access to authenticated users.
@@ -245,7 +228,6 @@ PERMISSION_CLASSES: dict[str, list[type[permissions.BasePermission]]] = {
     "owner_or_admin": [IsAuthenticatedAndActive, IsOwnerOrAdmin],
     "tenant_or_admin": [IsAuthenticatedAndActive, IsTenantOrAdmin],
     "read_only_for_non_admin": [ReadOnlyForNonAdmin],
-    "financial_read_only": [FinancialReadOnly],
     "can_generate_contract": [IsAuthenticatedAndActive, CanGenerateContract],
     "can_modify_lease": [CanModifyLease],
     "authenticated": [IsAuthenticatedAndActive],

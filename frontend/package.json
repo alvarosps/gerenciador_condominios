@@ -15,8 +15,7 @@
     "test:unit": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "generate-types": "node scripts/generate-types.js",
-    "prepare": "husky"
+    "generate-types": "node scripts/generate-types.js"
   },
   "lint-staged": {
     "*.{ts,tsx}": [
@@ -107,7 +106,6 @@
     "eslint-config-next": "14.2.14",
     "eslint-config-prettier": "^10.1.8",
     "happy-dom": "^16.6.0",
-    "husky": "^9.1.7",
     "jsdom": "^27.0.1",
     "lint-staged": "^16.2.4",
     "msw": "^2.11.5",

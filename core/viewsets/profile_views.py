@@ -10,6 +10,8 @@ import logging
 from typing import cast
 
 from django.contrib.auth.models import User
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -17,8 +19,6 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 
 logger = logging.getLogger(__name__)
-
-_MIN_PASSWORD_LENGTH = 8
 
 
 @api_view(["PATCH"])
@@ -83,11 +83,11 @@ def change_password(request: Request) -> Response:
 
     Body:
         old_password (str): Current password for verification.
-        new_password (str): New password (minimum 8 characters).
+        new_password (str): New password — validated against AUTH_PASSWORD_VALIDATORS.
 
     Returns:
         200 on success.
-        400 if old_password is wrong or new_password is too short.
+        400 if old_password is wrong or new_password fails Django's password validators.
     """
     user = cast(User, request.user)
 
@@ -106,9 +106,11 @@ def change_password(request: Request) -> Response:
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    if len(new_password) < _MIN_PASSWORD_LENGTH:
+    try:
+        validate_password(new_password, user)
+    except DjangoValidationError as exc:
         return Response(
-            {"error": "A nova senha deve ter no mínimo 8 caracteres."},
+            {"error": " ".join(exc.messages)},
             status=status.HTTP_400_BAD_REQUEST,
         )
 

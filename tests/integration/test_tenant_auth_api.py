@@ -25,6 +25,10 @@ VERIFY_URL = "/api/auth/whatsapp/verify/"
 _CPF = "529.982.247-25"
 _PHONE = "(11) 98765-4321"
 
+# Generic, identical responses that must not reveal whether a CPF/CNPJ is a tenant.
+_GENERIC_REQUEST_DETAIL = "Se o CPF/CNPJ estiver cadastrado, um código foi enviado via WhatsApp."
+_GENERIC_VERIFY_ERROR = "Código inválido."
+
 
 def _make_tenant(admin_user, cpf_cnpj=_CPF, phone=_PHONE):
     building = Building.objects.create(
@@ -71,8 +75,8 @@ def _make_tenant(admin_user, cpf_cnpj=_CPF, phone=_PHONE):
 class TestRequestCode:
     """Tests for POST /api/auth/whatsapp/request/"""
 
-    def test_request_code_success(self, admin_user):
-        """Successful code request creates a WhatsAppVerification and returns 200."""
+    def test_request_code_known_cpf_returns_generic_200(self, admin_user):
+        """Known CPF creates a WhatsAppVerification, sends the code and returns a generic 200."""
         _make_tenant(admin_user)
         client = APIClient()
 
@@ -80,15 +84,21 @@ class TestRequestCode:
             response = client.post(REQUEST_URL, {"cpf_cnpj": _CPF}, format="json")
 
         assert response.status_code == status.HTTP_200_OK
-        assert "Código enviado" in response.data["detail"]
+        assert response.data["detail"] == _GENERIC_REQUEST_DETAIL
         mock_send.assert_called_once()
         assert WhatsAppVerification.objects.filter(cpf_cnpj=_CPF).count() == 1
 
-    def test_request_code_unknown_cpf(self):
-        """Unknown CPF returns 404."""
+    def test_request_code_unknown_cpf_returns_same_generic_200(self):
+        """Unknown CPF must NOT enumerate: same generic 200, no verification, no send."""
         client = APIClient()
-        response = client.post(REQUEST_URL, {"cpf_cnpj": "000.000.000-00"}, format="json")
-        assert response.status_code == status.HTTP_404_NOT_FOUND
+
+        with patch("core.viewsets.auth_views.send_verification_code") as mock_send:
+            response = client.post(REQUEST_URL, {"cpf_cnpj": "000.000.000-00"}, format="json")
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["detail"] == _GENERIC_REQUEST_DETAIL
+        mock_send.assert_not_called()
+        assert WhatsAppVerification.objects.filter(cpf_cnpj="000.000.000-00").count() == 0
 
     def test_request_code_missing_cpf(self):
         """Missing cpf_cnpj returns 400."""
@@ -175,18 +185,19 @@ class TestVerifyCode:
         )
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
-    def test_verify_unknown_cpf(self):
-        """Unknown CPF returns 404."""
+    def test_verify_unknown_cpf_returns_400_generic(self):
+        """Unknown CPF must NOT enumerate: same generic 400 as a wrong code (never 404)."""
         client = APIClient()
         response = client.post(
             VERIFY_URL,
             {"cpf_cnpj": "000.000.000-00", "code": "123456"},
             format="json",
         )
-        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.data["error"] == _GENERIC_VERIFY_ERROR
 
-    def test_verify_no_pending_verification(self, admin_user):
-        """No pending verification returns 404."""
+    def test_verify_no_pending_verification_returns_400_generic(self, admin_user):
+        """Known CPF without a pending verification returns the same generic 400 (never 404)."""
         _make_tenant(admin_user)
         client = APIClient()
         response = client.post(
@@ -194,7 +205,8 @@ class TestVerifyCode:
             {"cpf_cnpj": _CPF, "code": "123456"},
             format="json",
         )
-        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.data["error"] == _GENERIC_VERIFY_ERROR
 
     def test_verify_missing_fields(self):
         """Missing required fields returns 400."""

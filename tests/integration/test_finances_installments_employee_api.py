@@ -311,13 +311,12 @@ def test_list_employees_filtered_and_soft_delete(authenticated_api_client) -> No
     assert Employee.all_objects.get(pk=active.id).is_deleted is True
 
 
-# --- FinancialReadOnly permission matrix ---
+# --- IsAdminUser permission matrix (admin-only after P1.2) ---
 
 
-def test_non_admin_can_read_but_not_write(regular_authenticated_api_client) -> None:
-    make_installment_plan()
-    assert regular_authenticated_api_client.get(PLANS_URL).status_code == 200
-    assert regular_authenticated_api_client.get(EMPLOYEES_URL).status_code == 200
+def test_non_admin_blocked_from_read_and_write(regular_authenticated_api_client) -> None:
+    assert regular_authenticated_api_client.get(PLANS_URL).status_code == 403
+    assert regular_authenticated_api_client.get(EMPLOYEES_URL).status_code == 403
     write = regular_authenticated_api_client.post(
         EMPLOYEES_URL,
         {"condominium_id": 1, "name": "X", "payment_type": "variable", "default_due_day": 5},
@@ -326,6 +325,12 @@ def test_non_admin_can_read_but_not_write(regular_authenticated_api_client) -> N
     assert write.status_code == 403
     convert = regular_authenticated_api_client.post(CONVERT_URL, {}, format="json")
     assert convert.status_code == 403
+
+
+def test_admin_can_read(authenticated_api_client) -> None:
+    make_installment_plan()
+    assert authenticated_api_client.get(PLANS_URL).status_code == 200
+    assert authenticated_api_client.get(EMPLOYEES_URL).status_code == 200
 
 
 def test_anonymous_is_unauthorized(api_client) -> None:

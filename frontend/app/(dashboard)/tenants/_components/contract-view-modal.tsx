@@ -1,15 +1,14 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { useContractTemplate, usePreviewContractTemplate } from '@/lib/api/hooks/use-contract-template';
+import {
+  useContractTemplate,
+  usePreviewContractTemplate,
+} from '@/lib/api/hooks/use-contract-template';
+import { useContractPdf } from '@/lib/api/hooks/use-leases';
 import { type Lease } from '@/lib/schemas/lease.schema';
 
 interface ContractViewModalProps {
@@ -18,39 +17,48 @@ interface ContractViewModalProps {
   onClose: () => void;
 }
 
-function getContractPdfUrl(lease: Lease): string | null {
-  if (!lease.contract_generated) return null;
-  const buildingNumber = lease.apartment?.building?.street_number;
-  const aptNumber = lease.apartment?.number;
-  const leaseId = lease.id;
-  if (!buildingNumber || !aptNumber || !leaseId) return null;
-
-  // Contract PDFs are served from the backend root (/contracts/), outside the /api
-  // proxy namespace, so build an absolute URL from the backend origin.
-  const backendOrigin = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:8008';
-  return `${backendOrigin}/contracts/${String(buildingNumber)}/contract_apto_${String(aptNumber)}_${String(leaseId)}.pdf`;
-}
-
 export function ContractViewModal({ open, lease, onClose }: ContractViewModalProps) {
   const [previewHtml, setPreviewHtml] = useState('');
+  const [pdfObjectUrl, setPdfObjectUrl] = useState<string | null>(null);
   const { data: template } = useContractTemplate();
   const previewMutation = usePreviewContractTemplate();
   const lastLeaseIdRef = useRef<number | null>(null);
 
-  const pdfUrl = lease ? getContractPdfUrl(lease) : null;
-  const showPdf = lease?.contract_generated && pdfUrl;
-
-  const loadPreview = useCallback(async (templateContent: string, leaseId: number) => {
-    try {
-      const result = await previewMutation.mutateAsync({ content: templateContent, lease_id: leaseId });
-      setPreviewHtml(result.html);
-    } catch {
-      toast.error('Erro ao gerar preview do contrato');
-    }
-  }, [previewMutation]);
+  const wantsPdf = Boolean(open && lease?.contract_generated);
+  // Fetch the PDF via the same-origin API proxy (carries HttpOnly auth cookies) instead of
+  // building an anonymous /contracts/ URL; the iframe shows the resulting object URL.
+  const { data: pdfBlob } = useContractPdf(lease?.id ?? null, wantsPdf);
+  const showPdf = wantsPdf && Boolean(pdfObjectUrl);
 
   useEffect(() => {
-    if (!open || !lease?.id || showPdf) {
+    if (!pdfBlob) {
+      return;
+    }
+    const objectUrl = URL.createObjectURL(pdfBlob);
+    setPdfObjectUrl(objectUrl);
+    return () => {
+      URL.revokeObjectURL(objectUrl);
+      setPdfObjectUrl(null);
+    };
+  }, [pdfBlob]);
+
+  const loadPreview = useCallback(
+    async (templateContent: string, leaseId: number) => {
+      try {
+        const result = await previewMutation.mutateAsync({
+          content: templateContent,
+          lease_id: leaseId,
+        });
+        setPreviewHtml(result.html);
+      } catch {
+        toast.error('Erro ao gerar preview do contrato');
+      }
+    },
+    [previewMutation]
+  );
+
+  useEffect(() => {
+    if (!open || !lease?.id || wantsPdf) {
       setPreviewHtml('');
       lastLeaseIdRef.current = null;
       return;
@@ -60,12 +68,10 @@ export function ContractViewModal({ open, lease, onClose }: ContractViewModalPro
       lastLeaseIdRef.current = lease.id;
       void loadPreview(template.content, lease.id);
     }
-  }, [open, lease?.id, showPdf, template?.content, loadPreview]);
+  }, [open, lease?.id, wantsPdf, template?.content, loadPreview]);
 
   const tenantName = lease?.responsible_tenant?.name ?? 'Inquilino';
-  const aptInfo = lease?.apartment
-    ? `Apto ${String(lease.apartment.number)}`
-    : '';
+  const aptInfo = lease?.apartment ? `Apto ${String(lease.apartment.number)}` : '';
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -77,9 +83,9 @@ export function ContractViewModal({ open, lease, onClose }: ContractViewModalPro
         </DialogHeader>
 
         <div className="flex-1 min-h-[60vh] rounded-md border overflow-hidden">
-          {showPdf ? (
+          {showPdf && pdfObjectUrl ? (
             <iframe
-              src={pdfUrl}
+              src={pdfObjectUrl}
               className="w-full h-full min-h-[60vh]"
               title="Contrato PDF"
             />

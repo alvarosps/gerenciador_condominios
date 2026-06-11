@@ -38,7 +38,33 @@ def _cookie_samesite() -> Literal["Lax", "Strict", "None"]:
     raise ImproperlyConfigured(msg)
 
 
-def _set_auth_cookies(response: Response, access: str, refresh: str | None = None) -> None:
+def role_for_user(user: User) -> str:
+    """Map a user to the non-HttpOnly ``role`` claim read by the Next.js middleware.
+
+    "staff" mirrors core.permissions.IsAdminUser (is_staff OR is_superuser); everyone
+    else is "tenant". This is a role hint for UX routing, not an authorization decision —
+    the backend (queryset scope + IsAdminUser) remains the real barrier.
+    """
+    return "staff" if (user.is_staff or user.is_superuser) else "tenant"
+
+
+def _role_from_access(access: str) -> str:
+    """Resolve the role cookie value from an access-token string (refresh flow).
+
+    The refresh endpoint has no authenticated user object yet, so it decodes the freshly
+    minted access token to recover the user and recompute the role. Falls back to "tenant"
+    (the non-admin default) if the user cannot be resolved — fail-safe, never elevate.
+    """
+    try:
+        user = User.objects.get(pk=AccessToken(cast(Token, access))["user_id"])
+    except (TokenError, User.DoesNotExist, KeyError):
+        return "tenant"
+    return role_for_user(user)
+
+
+def _set_auth_cookies(
+    response: Response, access: str, refresh: str | None = None, role: str = "tenant"
+) -> None:
     is_secure = not settings.DEBUG
     samesite = _cookie_samesite()
     response.set_cookie(
@@ -69,11 +95,22 @@ def _set_auth_cookies(response: Response, access: str, refresh: str | None = Non
         max_age=ACCESS_TOKEN_MAX_AGE,
         path="/",
     )
+    # Non-HttpOnly role hint: the Edge middleware cannot read the HttpOnly JWT, so it relies
+    # on this cookie to keep tenants out of the admin dashboard.
+    response.set_cookie(
+        key="role",
+        value=role,
+        httponly=False,
+        secure=is_secure,
+        samesite=samesite,
+        max_age=ACCESS_TOKEN_MAX_AGE,
+        path="/",
+    )
 
 
 def _clear_auth_cookies(response: Response) -> None:
     samesite = _cookie_samesite()
-    for name in ("access_token", "refresh_token", "is_authenticated"):
+    for name in ("access_token", "refresh_token", "is_authenticated", "role"):
         response.delete_cookie(name, path="/", samesite=samesite)
 
 
@@ -82,9 +119,11 @@ class CookieTokenObtainPairView(TokenObtainPairView):
         response = super().post(request, *args, **kwargs)
         if response.status_code == status.HTTP_200_OK:
             access_token_str = response.data["access"]
-            _set_auth_cookies(response, access_token_str, response.data["refresh"])
             token = AccessToken(access_token_str)
             user = User.objects.get(pk=token["user_id"])
+            _set_auth_cookies(
+                response, access_token_str, response.data["refresh"], role=role_for_user(user)
+            )
             response.data = {
                 "user": {
                     "id": user.pk,
@@ -113,7 +152,7 @@ class CookieTokenRefreshView(TokenRefreshView):
             access = serializer.validated_data.get("access", "")
             new_refresh = serializer.validated_data.get("refresh")
             response = Response(status=status.HTTP_200_OK)
-            _set_auth_cookies(response, access, new_refresh)
+            _set_auth_cookies(response, access, new_refresh, role=_role_from_access(access))
             response.data = {}
             return response
 
@@ -121,7 +160,7 @@ class CookieTokenRefreshView(TokenRefreshView):
         if response.status_code == status.HTTP_200_OK:
             access = response.data.get("access", "")
             new_refresh = response.data.get("refresh")
-            _set_auth_cookies(response, access, new_refresh)
+            _set_auth_cookies(response, access, new_refresh, role=_role_from_access(access))
             response.data = {}
         return response
 

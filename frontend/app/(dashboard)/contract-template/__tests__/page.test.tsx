@@ -98,7 +98,9 @@ function Wrapper({ children }: { children: ReactNode }) {
 }
 
 // Helper functions to create complete mock objects
-function createMockQueryResult(overrides: Partial<ReturnType<typeof hooks.useTemplateBackups>> = {}): ReturnType<typeof hooks.useTemplateBackups> {
+function createMockQueryResult(
+  overrides: Partial<ReturnType<typeof hooks.useTemplateBackups>> = {}
+): ReturnType<typeof hooks.useTemplateBackups> {
   return {
     data: undefined,
     refetch: vi.fn(),
@@ -126,7 +128,9 @@ function createMockQueryResult(overrides: Partial<ReturnType<typeof hooks.useTem
   } as ReturnType<typeof hooks.useTemplateBackups>;
 }
 
-function createMockMutationResult<T = ReturnType<typeof hooks.useSaveContractTemplate>>(overrides: Record<string, unknown> = {}): T {
+function createMockMutationResult<T = ReturnType<typeof hooks.useSaveContractTemplate>>(
+  overrides: Record<string, unknown> = {}
+): T {
   return {
     mutateAsync: vi.fn(),
     isPending: false,
@@ -167,13 +171,9 @@ describe('ContractTemplatePage', () => {
         error: null,
       } as ReturnType<typeof hooks.useContractTemplate>);
 
-      vi.spyOn(hooks, 'useTemplateBackups').mockReturnValue(
-        createMockQueryResult()
-      );
+      vi.spyOn(hooks, 'useTemplateBackups').mockReturnValue(createMockQueryResult());
 
-      vi.spyOn(hooks, 'useSaveContractTemplate').mockReturnValue(
-        createMockMutationResult()
-      );
+      vi.spyOn(hooks, 'useSaveContractTemplate').mockReturnValue(createMockMutationResult());
 
       vi.spyOn(hooks, 'usePreviewContractTemplate').mockReturnValue(
         createMockMutationResult<ReturnType<typeof hooks.usePreviewContractTemplate>>()
@@ -199,13 +199,9 @@ describe('ContractTemplatePage', () => {
         error: null,
       } as ReturnType<typeof hooks.useContractTemplate>);
 
-      vi.spyOn(hooks, 'useTemplateBackups').mockReturnValue(
-        createMockQueryResult({ data: [] })
-      );
+      vi.spyOn(hooks, 'useTemplateBackups').mockReturnValue(createMockQueryResult({ data: [] }));
 
-      vi.spyOn(hooks, 'useSaveContractTemplate').mockReturnValue(
-        createMockMutationResult()
-      );
+      vi.spyOn(hooks, 'useSaveContractTemplate').mockReturnValue(createMockMutationResult());
 
       vi.spyOn(hooks, 'usePreviewContractTemplate').mockReturnValue(
         createMockMutationResult<ReturnType<typeof hooks.usePreviewContractTemplate>>()
@@ -237,13 +233,9 @@ describe('ContractTemplatePage', () => {
         error: null,
       } as ReturnType<typeof hooks.useContractTemplate>);
 
-      vi.spyOn(hooks, 'useTemplateBackups').mockReturnValue(
-        createMockQueryResult({ data: [] })
-      );
+      vi.spyOn(hooks, 'useTemplateBackups').mockReturnValue(createMockQueryResult({ data: [] }));
 
-      vi.spyOn(hooks, 'useSaveContractTemplate').mockReturnValue(
-        createMockMutationResult()
-      );
+      vi.spyOn(hooks, 'useSaveContractTemplate').mockReturnValue(createMockMutationResult());
 
       vi.spyOn(hooks, 'usePreviewContractTemplate').mockReturnValue(
         createMockMutationResult<ReturnType<typeof hooks.usePreviewContractTemplate>>()
@@ -281,13 +273,9 @@ describe('ContractTemplatePage', () => {
         error: null,
       } as ReturnType<typeof hooks.useContractTemplate>);
 
-      vi.spyOn(hooks, 'useTemplateBackups').mockReturnValue(
-        createMockQueryResult({ data: [] })
-      );
+      vi.spyOn(hooks, 'useTemplateBackups').mockReturnValue(createMockQueryResult({ data: [] }));
 
-      vi.spyOn(hooks, 'useSaveContractTemplate').mockReturnValue(
-        createMockMutationResult()
-      );
+      vi.spyOn(hooks, 'useSaveContractTemplate').mockReturnValue(createMockMutationResult());
 
       vi.spyOn(hooks, 'usePreviewContractTemplate').mockReturnValue(
         createMockMutationResult<ReturnType<typeof hooks.usePreviewContractTemplate>>()
@@ -317,13 +305,9 @@ describe('ContractTemplatePage', () => {
         error: null,
       } as ReturnType<typeof hooks.useContractTemplate>);
 
-      vi.spyOn(hooks, 'useTemplateBackups').mockReturnValue(
-        createMockQueryResult({ data: [] })
-      );
+      vi.spyOn(hooks, 'useTemplateBackups').mockReturnValue(createMockQueryResult({ data: [] }));
 
-      vi.spyOn(hooks, 'useSaveContractTemplate').mockReturnValue(
-        createMockMutationResult()
-      );
+      vi.spyOn(hooks, 'useSaveContractTemplate').mockReturnValue(createMockMutationResult());
 
       vi.spyOn(hooks, 'usePreviewContractTemplate').mockReturnValue(
         createMockMutationResult<ReturnType<typeof hooks.usePreviewContractTemplate>>()
@@ -354,8 +338,8 @@ describe('ContractTemplatePage', () => {
       const mockContent = '<html><body>Original</body></html>';
       const mockSave = vi.fn().mockResolvedValue({
         message: 'Template salvo com sucesso!',
-        backup_path: '/path/backup.html',
-        backup_filename: 'backup.html',
+        version_id: 2,
+        label: '05/04/2026 12:00:00',
       });
 
       vi.spyOn(hooks, 'useContractTemplate').mockReturnValue({
@@ -366,9 +350,7 @@ describe('ContractTemplatePage', () => {
         error: null,
       } as ReturnType<typeof hooks.useContractTemplate>);
 
-      vi.spyOn(hooks, 'useTemplateBackups').mockReturnValue(
-        createMockQueryResult({ data: [] })
-      );
+      vi.spyOn(hooks, 'useTemplateBackups').mockReturnValue(createMockQueryResult({ data: [] }));
 
       vi.spyOn(hooks, 'useSaveContractTemplate').mockReturnValue(
         createMockMutationResult({ mutateAsync: mockSave })
@@ -416,9 +398,7 @@ describe('ContractTemplatePage', () => {
         error: null,
       } as ReturnType<typeof hooks.useContractTemplate>);
 
-      vi.spyOn(hooks, 'useTemplateBackups').mockReturnValue(
-        createMockQueryResult({ data: [] })
-      );
+      vi.spyOn(hooks, 'useTemplateBackups').mockReturnValue(createMockQueryResult({ data: [] }));
 
       vi.spyOn(hooks, 'useSaveContractTemplate').mockReturnValue(
         createMockMutationResult({ mutateAsync: mockSave })
@@ -469,9 +449,7 @@ describe('ContractTemplatePage', () => {
         error: null,
       } as ReturnType<typeof hooks.useContractTemplate>);
 
-      vi.spyOn(hooks, 'useTemplateBackups').mockReturnValue(
-        createMockQueryResult({ data: [] })
-      );
+      vi.spyOn(hooks, 'useTemplateBackups').mockReturnValue(createMockQueryResult({ data: [] }));
 
       vi.spyOn(hooks, 'useSaveContractTemplate').mockReturnValue(
         createMockMutationResult({ mutateAsync: mockSave })
@@ -521,16 +499,14 @@ describe('ContractTemplatePage', () => {
         error: null,
       } as ReturnType<typeof hooks.useContractTemplate>);
 
-      vi.spyOn(hooks, 'useTemplateBackups').mockReturnValue(
-        createMockQueryResult({ data: [] })
-      );
+      vi.spyOn(hooks, 'useTemplateBackups').mockReturnValue(createMockQueryResult({ data: [] }));
 
-      vi.spyOn(hooks, 'useSaveContractTemplate').mockReturnValue(
-        createMockMutationResult()
-      );
+      vi.spyOn(hooks, 'useSaveContractTemplate').mockReturnValue(createMockMutationResult());
 
       vi.spyOn(hooks, 'usePreviewContractTemplate').mockReturnValue(
-        createMockMutationResult<ReturnType<typeof hooks.usePreviewContractTemplate>>({ mutateAsync: mockPreview })
+        createMockMutationResult<ReturnType<typeof hooks.usePreviewContractTemplate>>({
+          mutateAsync: mockPreview,
+        })
       );
 
       vi.spyOn(hooks, 'useRestoreTemplateBackup').mockReturnValue(
@@ -568,16 +544,14 @@ describe('ContractTemplatePage', () => {
         error: null,
       } as ReturnType<typeof hooks.useContractTemplate>);
 
-      vi.spyOn(hooks, 'useTemplateBackups').mockReturnValue(
-        createMockQueryResult({ data: [] })
-      );
+      vi.spyOn(hooks, 'useTemplateBackups').mockReturnValue(createMockQueryResult({ data: [] }));
 
-      vi.spyOn(hooks, 'useSaveContractTemplate').mockReturnValue(
-        createMockMutationResult()
-      );
+      vi.spyOn(hooks, 'useSaveContractTemplate').mockReturnValue(createMockMutationResult());
 
       vi.spyOn(hooks, 'usePreviewContractTemplate').mockReturnValue(
-        createMockMutationResult<ReturnType<typeof hooks.usePreviewContractTemplate>>({ mutateAsync: mockPreview })
+        createMockMutationResult<ReturnType<typeof hooks.usePreviewContractTemplate>>({
+          mutateAsync: mockPreview,
+        })
       );
 
       vi.spyOn(hooks, 'useRestoreTemplateBackup').mockReturnValue(
@@ -612,16 +586,14 @@ describe('ContractTemplatePage', () => {
         error: null,
       } as ReturnType<typeof hooks.useContractTemplate>);
 
-      vi.spyOn(hooks, 'useTemplateBackups').mockReturnValue(
-        createMockQueryResult({ data: [] })
-      );
+      vi.spyOn(hooks, 'useTemplateBackups').mockReturnValue(createMockQueryResult({ data: [] }));
 
-      vi.spyOn(hooks, 'useSaveContractTemplate').mockReturnValue(
-        createMockMutationResult()
-      );
+      vi.spyOn(hooks, 'useSaveContractTemplate').mockReturnValue(createMockMutationResult());
 
       vi.spyOn(hooks, 'usePreviewContractTemplate').mockReturnValue(
-        createMockMutationResult<ReturnType<typeof hooks.usePreviewContractTemplate>>({ mutateAsync: mockPreview })
+        createMockMutationResult<ReturnType<typeof hooks.usePreviewContractTemplate>>({
+          mutateAsync: mockPreview,
+        })
       );
 
       vi.spyOn(hooks, 'useRestoreTemplateBackup').mockReturnValue(
@@ -661,13 +633,9 @@ describe('ContractTemplatePage', () => {
         error: null,
       } as ReturnType<typeof hooks.useContractTemplate>);
 
-      vi.spyOn(hooks, 'useTemplateBackups').mockReturnValue(
-        createMockQueryResult({ data: [] })
-      );
+      vi.spyOn(hooks, 'useTemplateBackups').mockReturnValue(createMockQueryResult({ data: [] }));
 
-      vi.spyOn(hooks, 'useSaveContractTemplate').mockReturnValue(
-        createMockMutationResult()
-      );
+      vi.spyOn(hooks, 'useSaveContractTemplate').mockReturnValue(createMockMutationResult());
 
       vi.spyOn(hooks, 'usePreviewContractTemplate').mockReturnValue(
         createMockMutationResult<ReturnType<typeof hooks.usePreviewContractTemplate>>()
@@ -708,13 +676,9 @@ describe('ContractTemplatePage', () => {
         error: null,
       } as ReturnType<typeof hooks.useContractTemplate>);
 
-      vi.spyOn(hooks, 'useTemplateBackups').mockReturnValue(
-        createMockQueryResult({ data: [] })
-      );
+      vi.spyOn(hooks, 'useTemplateBackups').mockReturnValue(createMockQueryResult({ data: [] }));
 
-      vi.spyOn(hooks, 'useSaveContractTemplate').mockReturnValue(
-        createMockMutationResult()
-      );
+      vi.spyOn(hooks, 'useSaveContractTemplate').mockReturnValue(createMockMutationResult());
 
       vi.spyOn(hooks, 'usePreviewContractTemplate').mockReturnValue(
         createMockMutationResult<ReturnType<typeof hooks.usePreviewContractTemplate>>()
@@ -743,13 +707,9 @@ describe('ContractTemplatePage', () => {
         error: null,
       } as ReturnType<typeof hooks.useContractTemplate>);
 
-      vi.spyOn(hooks, 'useTemplateBackups').mockReturnValue(
-        createMockQueryResult({ data: [] })
-      );
+      vi.spyOn(hooks, 'useTemplateBackups').mockReturnValue(createMockQueryResult({ data: [] }));
 
-      vi.spyOn(hooks, 'useSaveContractTemplate').mockReturnValue(
-        createMockMutationResult()
-      );
+      vi.spyOn(hooks, 'useSaveContractTemplate').mockReturnValue(createMockMutationResult());
 
       vi.spyOn(hooks, 'usePreviewContractTemplate').mockReturnValue(
         createMockMutationResult<ReturnType<typeof hooks.usePreviewContractTemplate>>()
@@ -765,6 +725,116 @@ describe('ContractTemplatePage', () => {
       const backupsButton = screen.getByRole('button', { name: /backups/i });
       expect(backupsButton).toBeInTheDocument();
     });
+
+    it('should list template versions by id in the backups modal', async () => {
+      const user = userEvent.setup();
+
+      vi.spyOn(hooks, 'useContractTemplate').mockReturnValue({
+        data: { content: '<html>Test</html>' },
+        isLoading: false,
+        isSuccess: true,
+        isError: false,
+        error: null,
+      } as ReturnType<typeof hooks.useContractTemplate>);
+
+      vi.spyOn(hooks, 'useTemplateBackups').mockReturnValue(
+        createMockQueryResult({
+          data: [
+            {
+              id: 1,
+              label: 'Padrão',
+              created_at: '2026-04-05T12:00:00',
+              is_default: true,
+              is_active: false,
+            },
+            {
+              id: 2,
+              label: '05/04/2026 12:00:00',
+              created_at: '2026-04-05T12:00:00',
+              is_default: false,
+              is_active: true,
+            },
+          ],
+        })
+      );
+
+      vi.spyOn(hooks, 'useSaveContractTemplate').mockReturnValue(createMockMutationResult());
+      vi.spyOn(hooks, 'usePreviewContractTemplate').mockReturnValue(
+        createMockMutationResult<ReturnType<typeof hooks.usePreviewContractTemplate>>()
+      );
+      vi.spyOn(hooks, 'useRestoreTemplateBackup').mockReturnValue(
+        createMockMutationResult<ReturnType<typeof hooks.useRestoreTemplateBackup>>()
+      );
+
+      render(<ContractTemplatePage />, { wrapper: Wrapper });
+
+      await user.click(screen.getByRole('button', { name: /backups/i }));
+
+      expect(screen.getByText('Padrão')).toBeInTheDocument();
+      expect(screen.getByText('05/04/2026 12:00:00')).toBeInTheDocument();
+      // The active version is marked and not restorable.
+      expect(screen.getByText(/em uso/i)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /^ativo$/i })).toBeDisabled();
+    });
+
+    it('should restore a version by id', async () => {
+      const user = userEvent.setup();
+      const mockRestore = vi.fn().mockResolvedValue({
+        message: "Template restaurado com sucesso para a versão 'Padrão'.",
+        version_id: 1,
+        label: 'Padrão',
+      });
+
+      vi.spyOn(hooks, 'useContractTemplate').mockReturnValue({
+        data: { content: '<html>Test</html>' },
+        isLoading: false,
+        isSuccess: true,
+        isError: false,
+        error: null,
+      } as ReturnType<typeof hooks.useContractTemplate>);
+
+      vi.spyOn(hooks, 'useTemplateBackups').mockReturnValue(
+        createMockQueryResult({
+          data: [
+            {
+              id: 1,
+              label: 'Padrão',
+              created_at: '2026-04-05T12:00:00',
+              is_default: true,
+              is_active: false,
+            },
+          ],
+        })
+      );
+
+      vi.spyOn(hooks, 'useSaveContractTemplate').mockReturnValue(createMockMutationResult());
+      vi.spyOn(hooks, 'usePreviewContractTemplate').mockReturnValue(
+        createMockMutationResult<ReturnType<typeof hooks.usePreviewContractTemplate>>()
+      );
+      vi.spyOn(hooks, 'useRestoreTemplateBackup').mockReturnValue(
+        createMockMutationResult<ReturnType<typeof hooks.useRestoreTemplateBackup>>({
+          mutateAsync: mockRestore,
+        })
+      );
+
+      const { toast } = await import('sonner');
+
+      render(<ContractTemplatePage />, { wrapper: Wrapper });
+
+      await user.click(screen.getByRole('button', { name: /backups/i }));
+      await user.click(screen.getByRole('button', { name: /restaurar/i }));
+
+      // Confirm in the alert dialog.
+      await user.click(screen.getByRole('button', { name: /sim, restaurar/i }));
+
+      await waitFor(() => {
+        // The restore is invoked with the integer version id, never a filename.
+        expect(mockRestore).toHaveBeenCalledWith(1);
+        expect(toast.success).toHaveBeenCalledWith(
+          "Template restaurado com sucesso para a versão 'Padrão'."
+        );
+      });
+    });
   });
 
   describe('Tab Navigation', () => {
@@ -777,13 +847,9 @@ describe('ContractTemplatePage', () => {
         error: null,
       } as ReturnType<typeof hooks.useContractTemplate>);
 
-      vi.spyOn(hooks, 'useTemplateBackups').mockReturnValue(
-        createMockQueryResult({ data: [] })
-      );
+      vi.spyOn(hooks, 'useTemplateBackups').mockReturnValue(createMockQueryResult({ data: [] }));
 
-      vi.spyOn(hooks, 'useSaveContractTemplate').mockReturnValue(
-        createMockMutationResult()
-      );
+      vi.spyOn(hooks, 'useSaveContractTemplate').mockReturnValue(createMockMutationResult());
 
       vi.spyOn(hooks, 'usePreviewContractTemplate').mockReturnValue(
         createMockMutationResult<ReturnType<typeof hooks.usePreviewContractTemplate>>()

@@ -19,9 +19,13 @@ from typing import Any
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
-from django.db import models
+from django.db import models, transaction
 from django.db.models import QuerySet
 from django.utils import timezone
+from jinja2 import BaseLoader
+from jinja2.exceptions import TemplateSyntaxError
+
+from core.jinja_environment import build_contract_jinja_env
 
 # Import validators (note: we don't enforce these on existing data)
 from core.validators import (
@@ -979,6 +983,175 @@ class ContractRule(AuditMixin, SoftDeleteMixin, models.Model):
         )
 
 
+class ContractTemplate(AuditMixin, models.Model):
+    """
+    Versioned, DB-backed contract template (HTML) used for PDF generation.
+
+    Each row is an immutable version (history); editing the template creates a NEW
+    active row rather than mutating an existing one — so it inherits ``AuditMixin``
+    (created/updated audit trail) but NOT ``SoftDeleteMixin``: old versions that fall
+    out of the retention window are hard-deleted (they are backups, not domain records).
+
+    Persisting in the database — instead of ``core/templates/backups/`` on disk — makes
+    the template editor durable on ephemeral container filesystems (Render) and removes
+    the path-traversal restore vector entirely (restore takes an integer id).
+
+    Invariants:
+        - Exactly one row has ``is_active=True`` (the version currently used to render).
+        - Exactly one row has ``is_default=True`` (the original seed; "restore default").
+    """
+
+    # Keep DEFAULT + active + this many most-recent non-default versions; older ones are
+    # hard-deleted on each save (they are rotating backups).
+    MAX_RETAINED_VERSIONS = 10
+
+    EMPTY_CONTENT_ERROR = "O conteúdo do template não pode estar vazio."
+
+    content = models.TextField(help_text="Conteúdo HTML do template de contrato")
+    label = models.CharField(
+        max_length=100,
+        help_text="Rótulo legível da versão (ex.: 'Padrão' ou um timestamp)",
+    )
+    is_active = models.BooleanField(
+        default=False,
+        db_index=True,
+        help_text="Versão atualmente em uso para gerar contratos (exatamente uma)",
+    )
+    is_default = models.BooleanField(
+        default=False,
+        db_index=True,
+        help_text="Versão original/seed do template (para restaurar o padrão)",
+    )
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Template de Contrato"
+        verbose_name_plural = "Templates de Contrato"
+
+    def __str__(self) -> str:
+        """Return a short identifier for the template version."""
+        flags = []
+        if self.is_default:
+            flags.append("padrão")
+        if self.is_active:
+            flags.append("ativa")
+        suffix = f" ({', '.join(flags)})" if flags else ""
+        return f"{self.label}{suffix}"
+
+    @staticmethod
+    def _validate_syntax(content: str) -> None:
+        """Compile ``content`` in the sandboxed Jinja env to validate its syntax.
+
+        ``from_string`` compiles without rendering, so no lease/context is needed — it
+        only checks that the template parses. A broken template must never become the
+        active version (that would make ALL contract PDF generation fail), so callers
+        run this before persisting.
+
+        Raises:
+            ValueError: PT message (with line number) when the Jinja syntax is invalid.
+        """
+        env = build_contract_jinja_env(BaseLoader())
+        try:
+            env.from_string(content)
+        except TemplateSyntaxError as exc:
+            msg = f"Template inválido: erro de sintaxe Jinja na linha {exc.lineno}: {exc.message}"
+            raise ValueError(msg) from exc
+
+    @classmethod
+    def get_active_content(cls) -> str:
+        """Return the HTML content of the active template version.
+
+        Raises:
+            ContractTemplate.DoesNotExist: When no active version exists.
+        """
+        return cls.objects.only("content").get(is_active=True).content
+
+    @classmethod
+    def list_versions(cls) -> "list[ContractTemplate]":
+        """Return all versions: the DEFAULT first, then the rest newest-first."""
+        default: list[ContractTemplate] = list(cls.objects.filter(is_default=True))
+        others: list[ContractTemplate] = list(
+            cls.objects.filter(is_default=False).order_by("-created_at")
+        )
+        return default + others
+
+    @classmethod
+    def save_version(cls, content: str, user: Any = None) -> "ContractTemplate":
+        """Validate ``content``, persist it as the new active version, and rotate backups.
+
+        Atomic: deactivates every other version, creates the new active row, then
+        hard-deletes the oldest non-default/non-active versions beyond the retention
+        window. Validation runs first so an invalid template never replaces the working
+        active version.
+
+        Args:
+            content: New template HTML.
+            user: User performing the change (audit).
+
+        Returns:
+            The newly created active ``ContractTemplate``.
+
+        Raises:
+            ValueError: When ``content`` is empty or has invalid Jinja syntax.
+        """
+        if not content or not content.strip():
+            raise ValueError(cls.EMPTY_CONTENT_ERROR)
+
+        cls._validate_syntax(content)
+
+        label = timezone.now().strftime("%d/%m/%Y %H:%M:%S")
+
+        with transaction.atomic():
+            cls.objects.filter(is_active=True).update(is_active=False)
+            version = cls.objects.create(
+                content=content,
+                label=label,
+                is_active=True,
+                is_default=False,
+                created_by=user,
+                updated_by=user,
+            )
+            cls._rotate()
+        return version
+
+    @classmethod
+    def _rotate(cls) -> None:
+        """Hard-delete the oldest non-default versions beyond the retention window.
+
+        The DEFAULT and the active version are always kept; among the remaining
+        non-default versions only the ``MAX_RETAINED_VERSIONS`` newest are retained.
+        """
+        retained_ids = set(
+            cls.objects.filter(is_default=False)
+            .order_by("-created_at")
+            .values_list("pk", flat=True)[: cls.MAX_RETAINED_VERSIONS]
+        )
+        cls.objects.filter(is_default=False, is_active=False).exclude(pk__in=retained_ids).delete()
+
+    @classmethod
+    def restore_version(cls, version_id: int, user: Any = None) -> "ContractTemplate":
+        """Make the version with ``version_id`` the active one (deactivate the others).
+
+        Args:
+            version_id: Primary key of the version to activate.
+            user: User performing the restore (audit).
+
+        Returns:
+            The now-active ``ContractTemplate``.
+
+        Raises:
+            ContractTemplate.DoesNotExist: When ``version_id`` does not exist.
+        """
+        with transaction.atomic():
+            target = cls.objects.get(pk=version_id)
+            cls.objects.filter(is_active=True).exclude(pk=target.pk).update(is_active=False)
+            if not target.is_active:
+                target.is_active = True
+                target.updated_by = user
+                target.save(update_fields=["is_active", "updated_by", "updated_at"])
+        return target
+
+
 # =============================================================================
 # FINANCIAL MODULE MODELS
 # =============================================================================
@@ -1794,3 +1967,13 @@ class OAuthExchangeCode(models.Model):
             return False
         elapsed = (timezone.now() - self.created_at).total_seconds()
         return elapsed <= self.TTL_SECONDS
+
+    @classmethod
+    def purge_expired(cls) -> int:
+        """Hard-delete codes older than the TTL so abandoned tokens never accumulate.
+
+        Returns the number of rows deleted.
+        """
+        cutoff = timezone.now() - timedelta(seconds=cls.TTL_SECONDS)
+        deleted, _ = cls.objects.filter(created_at__lt=cutoff).delete()
+        return deleted

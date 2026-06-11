@@ -1,4 +1,4 @@
-"""Session 38 — FinancialReadOnly matrix for /api/finances/ endpoints."""
+"""IsAdminUser matrix for /api/finances/ endpoints (admin-only after P1.2)."""
 
 import pytest
 from rest_framework import status
@@ -42,8 +42,13 @@ def test_admin_write_passes_permission(authenticated_api_client, method, url):
 
 
 @pytest.mark.parametrize("url", READ_ENDPOINTS)
-def test_non_admin_can_read(regular_authenticated_api_client, url):
-    assert regular_authenticated_api_client.get(url).status_code == status.HTTP_200_OK
+def test_non_admin_cannot_read(regular_authenticated_api_client, url):
+    assert regular_authenticated_api_client.get(url).status_code == status.HTTP_403_FORBIDDEN
+
+
+@pytest.mark.parametrize("url", READ_ENDPOINTS)
+def test_admin_can_read(authenticated_api_client, url):
+    assert authenticated_api_client.get(url).status_code == status.HTTP_200_OK
 
 
 def test_unauthenticated_cannot_read(api_client):

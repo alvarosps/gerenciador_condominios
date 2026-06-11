@@ -10,8 +10,7 @@
  */
 
 const JINJA_VARIABLE_REGEX = /\{\{\s*([^}|]+)(?:\s*\|\s*([^}]+))?\s*\}\}/g;
-const JINJA_BLOCK_REGEX =
-  /\{%\s*(if|for|endif|endfor|else|elif)\s*([^%]*)\s*%\}/g;
+const JINJA_BLOCK_REGEX = /\{%\s*(if|for|endif|endfor|else|elif)\s*([^%]*)\s*%\}/g;
 
 // Regex to extract body content from full HTML document
 const BODY_CONTENT_REGEX = /<body[^>]*>([\s\S]*)<\/body>/i;
@@ -28,7 +27,8 @@ const TABLE_WITH_JINJA_REGEX = /<table[^>]*>[\s\S]*?\{%[\s\S]*?<\/table>/gi;
 const LIST_WITH_JINJA_REGEX = /<(ul|ol)[^>]*>\s*\{%[\s\S]*?<\/\1>/gi;
 
 // Regex to match signature section with custom CSS classes
-const SIGNATURE_SECTION_REGEX = /<div\s+class="signature-section"[^>]*>[\s\S]*?<\/div>\s*(?=<\/body>|$)/gi;
+const SIGNATURE_SECTION_REGEX =
+  /<div\s+class="signature-section"[^>]*>[\s\S]*?<\/div>\s*(?=<\/body>|$)/gi;
 
 function escapeHtml(text: string): string {
   const map: Record<string, string> = {
@@ -49,10 +49,7 @@ function unescapeHtml(text: string): string {
     '&quot;': '"',
     '&#039;': "'",
   };
-  return text.replace(
-    /&(amp|lt|gt|quot|#039);/g,
-    (entity) => map[entity] ?? entity
-  );
+  return text.replace(/&(amp|lt|gt|quot|#039);/g, (entity) => map[entity] ?? entity);
 }
 
 /**
@@ -82,16 +79,18 @@ export function extractBodyContent(html: string): string {
 /**
  * Reconstructs a full HTML document by injecting body content back
  * into the original document structure.
+ *
+ * Uses a replacement *function* (not a replacement string). A replacement string would
+ * interpret `$1`, `$&`, `$$` etc. — and the contract body contains literals like
+ * `R$100,00`/`R$50,00`, so any `$1`..`$9`/`$&` in the body would inject fragments of the
+ * matched text and corrupt the saved template. A function returns its result verbatim.
  */
-export function reconstructFullDocument(
-  originalDocument: string,
-  bodyContent: string
-): string {
+export function reconstructFullDocument(originalDocument: string, bodyContent: string): string {
   if (!isFullHtmlDocument(originalDocument)) {
     return bodyContent;
   }
 
-  return originalDocument.replace(BODY_CONTENT_REGEX, `<body>\n${bodyContent}\n  </body>`);
+  return originalDocument.replace(BODY_CONTENT_REGEX, () => `<body>\n${bodyContent}\n  </body>`);
 }
 
 /**
@@ -108,10 +107,7 @@ export function jinjaToWysiwyg(html: string): string {
   let result = html;
 
   // Normalize self-closing page breaks to proper div tags (for Tiptap parsing)
-  result = result.replace(
-    SELF_CLOSING_PAGE_BREAK_REGEX,
-    '<div class="page-break"></div>'
-  );
+  result = result.replace(SELF_CLOSING_PAGE_BREAK_REGEX, '<div class="page-break"></div>');
 
   // CRITICAL: Extract tables with Jinja blocks and wrap them as atomic content
   // This prevents invalid HTML (spans can't be direct children of tables)
@@ -140,26 +136,18 @@ export function jinjaToWysiwyg(html: string): string {
   });
 
   // Convert {{ variable }} to span nodes (outside of protected blocks)
-  result = result.replace(
-    JINJA_VARIABLE_REGEX,
-    (match, variable: string, filter?: string) => {
-      const trimmedVariable = variable.trim();
-      const trimmedFilter = filter?.trim();
-      const filterAttr = trimmedFilter
-        ? ` data-filter="${escapeHtml(trimmedFilter)}"`
-        : '';
-      return `<span data-template-variable="${escapeHtml(trimmedVariable)}"${filterAttr} contenteditable="false">${escapeHtml(match)}</span>`;
-    }
-  );
+  result = result.replace(JINJA_VARIABLE_REGEX, (match, variable: string, filter?: string) => {
+    const trimmedVariable = variable.trim();
+    const trimmedFilter = filter?.trim();
+    const filterAttr = trimmedFilter ? ` data-filter="${escapeHtml(trimmedFilter)}"` : '';
+    return `<span data-template-variable="${escapeHtml(trimmedVariable)}"${filterAttr} contenteditable="false">${escapeHtml(match)}</span>`;
+  });
 
   // Convert {% block %} to span nodes (outside of tables with Jinja)
-  result = result.replace(
-    JINJA_BLOCK_REGEX,
-    (match, blockType: string, content: string) => {
-      const trimmedContent = content.trim();
-      return `<span data-template-block="${blockType}" data-content="${escapeHtml(trimmedContent)}" contenteditable="false">${escapeHtml(match)}</span>`;
-    }
-  );
+  result = result.replace(JINJA_BLOCK_REGEX, (match, blockType: string, content: string) => {
+    const trimmedContent = content.trim();
+    return `<span data-template-block="${blockType}" data-content="${escapeHtml(trimmedContent)}" contenteditable="false">${escapeHtml(match)}</span>`;
+  });
 
   // Restore tables with Jinja as atomic non-editable blocks
   // These tables are wrapped in a div that Tiptap treats as a single unit
@@ -208,9 +196,7 @@ export function wysiwygToJinja(html: string): string {
   templateTables.forEach((el) => {
     // Get table content from data attribute (URL-encoded) to avoid escaping issues
     const encodedContent = el.getAttribute('data-table-content');
-    const tableContent = encodedContent
-      ? decodeURIComponent(encodedContent)
-      : el.innerHTML; // Fallback to innerHTML if attribute missing
+    const tableContent = encodedContent ? decodeURIComponent(encodedContent) : el.innerHTML; // Fallback to innerHTML if attribute missing
     const fragment = doc.createRange().createContextualFragment(tableContent);
     el.parentNode?.replaceChild(fragment, el);
   });
@@ -219,9 +205,7 @@ export function wysiwygToJinja(html: string): string {
   const templateLists = doc.querySelectorAll('[data-template-list]');
   templateLists.forEach((el) => {
     const encodedContent = el.getAttribute('data-list-content');
-    const listContent = encodedContent
-      ? decodeURIComponent(encodedContent)
-      : el.innerHTML;
+    const listContent = encodedContent ? decodeURIComponent(encodedContent) : el.innerHTML;
     const fragment = doc.createRange().createContextualFragment(listContent);
     el.parentNode?.replaceChild(fragment, el);
   });
@@ -230,9 +214,7 @@ export function wysiwygToJinja(html: string): string {
   const templateSignatures = doc.querySelectorAll('[data-template-signature]');
   templateSignatures.forEach((el) => {
     const encodedContent = el.getAttribute('data-signature-content');
-    const signatureContent = encodedContent
-      ? decodeURIComponent(encodedContent)
-      : el.innerHTML;
+    const signatureContent = encodedContent ? decodeURIComponent(encodedContent) : el.innerHTML;
     const fragment = doc.createRange().createContextualFragment(signatureContent);
     el.parentNode?.replaceChild(fragment, el);
   });

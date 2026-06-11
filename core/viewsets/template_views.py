@@ -3,22 +3,28 @@
 Contract template management views.
 
 This module handles all contract template CRUD operations:
-- Get current template
-- Save template with backup
-- Preview template with sample data
-- List and restore backups
+- Get the active template
+- Save a new active version (with backup rotation)
+- Preview a template with sample data
+- List versions and restore one by id
+
+Persistence is database-backed (``ContractTemplate``); restore takes an integer version
+id, so there is no filesystem path traversal surface.
 
 Separated from LeaseViewSet to follow Single Responsibility Principle.
 """
 
 import logging
+from typing import cast
 
+from django.contrib.auth.models import User
 from django.core.exceptions import ObjectDoesNotExist
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.request import Request
 from rest_framework.response import Response
 
+from ..models import ContractTemplate
 from ..permissions import IsAdminUser
 from ..services import TemplateManagementService
 
@@ -31,8 +37,8 @@ class ContractTemplateViewSet(viewsets.ViewSet):
 
     Permissions: Admin only
 
-    Provides endpoints for managing the contract template used for
-    PDF generation. All changes are backed up automatically.
+    Provides endpoints for managing the contract template used for PDF generation.
+    Every save creates a new versioned backup in the database.
     """
 
     permission_classes = [IsAdminUser]
@@ -40,12 +46,9 @@ class ContractTemplateViewSet(viewsets.ViewSet):
     @action(detail=False, methods=["get"], url_path="current")
     def get_template(self, request: Request) -> Response:
         """
-        Get current contract template HTML.
+        Get the active contract template HTML.
 
         GET /api/templates/current/
-
-        Returns the HTML content of the current contract template used for
-        PDF generation. Used by the template editor frontend.
 
         Returns:
             Response: {"content": "<html>...</html>"}
@@ -53,17 +56,11 @@ class ContractTemplateViewSet(viewsets.ViewSet):
         try:
             content = TemplateManagementService.get_template()
             return Response({"content": content}, status=status.HTTP_200_OK)
-        except FileNotFoundError as e:
-            logger.warning(f"Template file not found: {e}")
+        except ContractTemplate.DoesNotExist:
+            logger.warning("No active contract template configured")
             return Response(
                 {"error": "Template de contrato não encontrado"},
                 status=status.HTTP_404_NOT_FOUND,
-            )
-        except PermissionError:
-            logger.exception("Permission denied reading template")
-            return Response(
-                {"error": "Sem permissão para ler o template"},
-                status=status.HTTP_403_FORBIDDEN,
             )
         except Exception:
             logger.exception("Unexpected error getting template")
@@ -75,24 +72,18 @@ class ContractTemplateViewSet(viewsets.ViewSet):
     @action(detail=False, methods=["post"], url_path="save")
     def save_template(self, request: Request) -> Response:
         """
-        Save contract template HTML with automatic backup.
+        Save the contract template as a new active version.
 
         POST /api/templates/save/
 
-        Creates a timestamped backup of the current template before saving
-        the new content. Backups are stored in core/templates/backups/
+        Validates the Jinja syntax, deactivates the previous version, creates the new
+        active version, and rotates old backups.
 
         Request Body:
-            {
-                "content": "<html>...</html>"
-            }
+            {"content": "<html>...</html>"}
 
         Returns:
-            Response: {
-                "message": "Template salvo com sucesso!",
-                "backup_path": "path/to/backup",
-                "backup_filename": "backup_filename.html"
-            }
+            Response: {"message", "version_id", "label"}
         """
         content = request.data.get("content")
 
@@ -103,22 +94,10 @@ class ContractTemplateViewSet(viewsets.ViewSet):
             )
 
         try:
-            result = TemplateManagementService.save_template(content)
+            result = TemplateManagementService.save_template(content, user=cast(User, request.user))
             return Response(result, status=status.HTTP_200_OK)
         except ValueError as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        except PermissionError:
-            logger.exception("Permission denied saving template")
-            return Response(
-                {"error": "Sem permissão para salvar o template"},
-                status=status.HTTP_403_FORBIDDEN,
-            )
-        except OSError:
-            logger.exception("OS error saving template")
-            return Response(
-                {"error": "Erro ao salvar arquivo do template"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
         except Exception:
             logger.exception("Unexpected error saving template")
             return Response(
@@ -129,19 +108,12 @@ class ContractTemplateViewSet(viewsets.ViewSet):
     @action(detail=False, methods=["post"], url_path="preview")
     def preview_template(self, request: Request) -> Response:
         """
-        Render template with sample data for preview.
+        Render a template with sample data for preview.
 
         POST /api/templates/preview/
 
-        Renders the provided template content with sample lease data to
-        generate a preview. Uses the first available lease or a specific
-        lease if lease_id is provided.
-
         Request Body:
-            {
-                "content": "<html>...</html>",
-                "lease_id": 123  // Optional
-            }
+            {"content": "<html>...</html>", "lease_id": 123}  # lease_id optional
 
         Returns:
             Response: {"html": "<rendered html>"}
@@ -175,36 +147,20 @@ class ContractTemplateViewSet(viewsets.ViewSet):
     @action(detail=False, methods=["get"], url_path="backups")
     def list_backups(self, request: Request) -> Response:
         """
-        List all template backups.
+        List all template versions.
 
         GET /api/templates/backups/
 
-        Returns a list of all template backups with metadata including
-        filename, size, and creation timestamp.
-
         Returns:
             Response: [
-                {
-                    "filename": "backup_filename.html",
-                    "path": "absolute/path",
-                    "size": 12345,
-                    "created_at": "2025-01-19T14:30:00"
-                },
+                {"id": 1, "label": "Padrão", "created_at": "...",
+                 "is_default": true, "is_active": true},
                 ...
             ]
         """
         try:
             backups = TemplateManagementService.list_backups()
             return Response(backups, status=status.HTTP_200_OK)
-        except FileNotFoundError as e:
-            logger.warning(f"Backup directory not found: {e}")
-            return Response([], status=status.HTTP_200_OK)  # Return empty list if no backups
-        except PermissionError:
-            logger.exception("Permission denied listing backups")
-            return Response(
-                {"error": "Sem permissão para listar backups"},
-                status=status.HTTP_403_FORBIDDEN,
-            )
         except Exception:
             logger.exception("Unexpected error listing backups")
             return Response(
@@ -215,52 +171,42 @@ class ContractTemplateViewSet(viewsets.ViewSet):
     @action(detail=False, methods=["post"], url_path="restore")
     def restore_backup(self, request: Request) -> Response:
         """
-        Restore a template from backup.
+        Restore (activate) a specific template version by id.
 
         POST /api/templates/restore/
 
-        Restores a specific backup file. Creates a safety backup of the
-        current template before restoring.
-
         Request Body:
-            {
-                "backup_filename": "contract_template_backup_20250119_143000.html"
-            }
+            {"version_id": 12}
 
         Returns:
-            Response: {
-                "message": "Template restaurado com sucesso",
-                "safety_backup": "safety_backup_filename.html"
-            }
+            Response: {"message", "version_id", "label"}
         """
-        backup_filename = request.data.get("backup_filename")
+        version_id = request.data.get("version_id")
 
-        if not backup_filename:
+        if version_id is None:
             return Response(
-                {"error": "O campo 'backup_filename' é obrigatório."},
+                {"error": "O campo 'version_id' é obrigatório."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         try:
-            result = TemplateManagementService.restore_backup(backup_filename)
+            version_id = int(version_id)
+        except (TypeError, ValueError):
+            return Response(
+                {"error": "O campo 'version_id' deve ser um número inteiro."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            result = TemplateManagementService.restore_backup(
+                version_id, user=cast(User, request.user)
+            )
             return Response(result, status=status.HTTP_200_OK)
-        except FileNotFoundError as e:
-            logger.warning(f"Backup file not found: {e}")
+        except ContractTemplate.DoesNotExist:
+            logger.warning("Template version not found: %s", version_id)
             return Response(
-                {"error": "Arquivo de backup não encontrado"},
+                {"error": "Versão de template não encontrada"},
                 status=status.HTTP_404_NOT_FOUND,
-            )
-        except PermissionError:
-            logger.exception("Permission denied restoring backup")
-            return Response(
-                {"error": "Sem permissão para restaurar backup"},
-                status=status.HTTP_403_FORBIDDEN,
-            )
-        except OSError:
-            logger.exception("OS error restoring backup")
-            return Response(
-                {"error": "Erro ao restaurar arquivo de backup"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
         except Exception:
             logger.exception("Unexpected error restoring backup")

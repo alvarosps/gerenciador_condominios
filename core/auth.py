@@ -9,17 +9,19 @@ import logging
 from typing import Any
 
 from django.conf import settings
+from django.db import transaction
 from django.http import JsonResponse
 from django.shortcuts import redirect
 from rest_framework.authentication import SessionAuthentication
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
-from rest_framework.permissions import AllowAny, IsAdminUser, IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from core.models import OAuthExchangeCode
-from core.viewsets.auth_views_cookie import _set_auth_cookies
+from core.permissions import IsAdminUser
+from core.viewsets.auth_views_cookie import _set_auth_cookies, role_for_user
 
 logger = logging.getLogger(__name__)
 
@@ -142,18 +144,24 @@ def exchange_oauth_code(request: Request) -> Response:
     if not code:
         return Response({"error": "Code is required"}, status=400)
 
-    try:
-        exchange = OAuthExchangeCode.objects.get(code=code)
-    except (OAuthExchangeCode.DoesNotExist, ValueError):
-        return Response({"error": "Invalid or expired code"}, status=400)
+    # Serialize concurrent exchanges of the same code and consume it exactly once.
+    with transaction.atomic():
+        try:
+            exchange = OAuthExchangeCode.objects.select_for_update().get(code=code)
+        except (OAuthExchangeCode.DoesNotExist, ValueError):
+            return Response({"error": "Invalid or expired code"}, status=400)
 
-    if not exchange.is_valid():
-        return Response({"error": "Invalid or expired code"}, status=400)
+        if not exchange.is_valid():
+            return Response({"error": "Invalid or expired code"}, status=400)
 
-    exchange.is_used = True
-    exchange.save(update_fields=["is_used"])
+        user = exchange.user
+        access_token = exchange.access_token
+        refresh_token = exchange.refresh_token
 
-    user = exchange.user
+        # Delete the row regardless of outcome so plaintext tokens never linger in the DB.
+        exchange.delete()
+        # Opportunistically purge abandoned (never-exchanged) expired codes too.
+        OAuthExchangeCode.purge_expired()
 
     if not user.is_staff:
         # Require admin access for this endpoint (Google OAuth login is only for admins)
@@ -177,7 +185,7 @@ def exchange_oauth_code(request: Request) -> Response:
             },
         }
     )
-    _set_auth_cookies(response, exchange.access_token, exchange.refresh_token)
+    _set_auth_cookies(response, access_token, refresh_token, role=role_for_user(user))
     return response
 
 

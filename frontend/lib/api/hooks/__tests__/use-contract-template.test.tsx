@@ -46,7 +46,7 @@ describe('useContractTemplate', () => {
     server.use(
       http.get(`${API_BASE}/templates/current/`, () => {
         return new HttpResponse(null, { status: 500 });
-      }),
+      })
     );
 
     const { result } = renderHook(() => useContractTemplate(), {
@@ -91,14 +91,14 @@ describe('useSaveContractTemplate', () => {
     });
 
     expect(result.current.data?.message).toBeDefined();
-    expect(result.current.data?.backup_filename).toBeDefined();
+    expect(result.current.data?.version_id).toBeDefined();
   });
 
   it('should handle save error', async () => {
     server.use(
       http.post(`${API_BASE}/templates/save/`, () => {
         return new HttpResponse(null, { status: 400 });
-      }),
+      })
     );
 
     const { result } = renderHook(() => useSaveContractTemplate(), {
@@ -123,7 +123,7 @@ describe('useSaveContractTemplate', () => {
         return HttpResponse.json({
           content: fetchCount === 1 ? '<html>Old</html>' : '<html>New</html>',
         });
-      }),
+      })
     );
 
     const wrapper = createWrapper();
@@ -185,9 +185,9 @@ describe('usePreviewContractTemplate', () => {
       http.post(`${API_BASE}/templates/preview/`, () => {
         return HttpResponse.json(
           { error: 'Nenhuma locação encontrada no sistema.' },
-          { status: 404 },
+          { status: 404 }
         );
-      }),
+      })
     );
 
     const { result } = renderHook(() => usePreviewContractTemplate(), {
@@ -208,9 +208,9 @@ describe('usePreviewContractTemplate', () => {
       http.post(`${API_BASE}/templates/preview/`, () => {
         return HttpResponse.json(
           { error: 'Template syntax error: unexpected token' },
-          { status: 400 },
+          { status: 400 }
         );
-      }),
+      })
     );
 
     const { result } = renderHook(() => usePreviewContractTemplate(), {
@@ -237,16 +237,18 @@ describe('useTemplateBackups', () => {
 
     expect(Array.isArray(result.current.data)).toBe(true);
     const first = result.current.data?.[0];
-    expect(first?.filename).toBeDefined();
-    expect(first?.size).toBeDefined();
+    expect(first?.id).toBeDefined();
+    expect(first?.label).toBeDefined();
     expect(first?.created_at).toBeDefined();
+    expect(first?.is_default).toBeDefined();
+    expect(first?.is_active).toBeDefined();
   });
 
   it('should return empty array when no backups exist', async () => {
     server.use(
       http.get(`${API_BASE}/templates/backups/`, () => {
         return HttpResponse.json([]);
-      }),
+      })
     );
 
     const { result } = renderHook(() => useTemplateBackups(), {
@@ -264,7 +266,7 @@ describe('useTemplateBackups', () => {
     server.use(
       http.get(`${API_BASE}/templates/backups/`, () => {
         return new HttpResponse(null, { status: 500 });
-      }),
+      })
     );
 
     const { result } = renderHook(() => useTemplateBackups(), {
@@ -285,28 +287,28 @@ describe('useRestoreTemplateBackup', () => {
       wrapper: createWrapper(),
     });
 
-    result.current.mutate('contract_template_backup_20260405_120000.html');
+    result.current.mutate(1);
 
     await waitFor(() => {
       expect(result.current.isSuccess).toBe(true);
     });
 
     expect(result.current.data?.message).toBeDefined();
-    expect(result.current.data?.safety_backup).toBeDefined();
+    expect(result.current.data?.version_id).toBeDefined();
   });
 
-  it('should handle restore error when backup not found', async () => {
+  it('should handle restore error when version not found', async () => {
     server.use(
       http.post(`${API_BASE}/templates/restore/`, () => {
-        return HttpResponse.json({ error: 'Backup file not found' }, { status: 404 });
-      }),
+        return HttpResponse.json({ error: 'Versão de template não encontrada' }, { status: 404 });
+      })
     );
 
     const { result } = renderHook(() => useRestoreTemplateBackup(), {
       wrapper: createWrapper(),
     });
 
-    result.current.mutate('nonexistent.html');
+    result.current.mutate(999999);
 
     await waitFor(() => {
       expect(result.current.isError).toBe(true);
@@ -327,7 +329,7 @@ describe('useRestoreTemplateBackup', () => {
       http.get(`${API_BASE}/templates/backups/`, () => {
         backupsFetchCount += 1;
         return HttpResponse.json([]);
-      }),
+      })
     );
 
     const wrapper = createWrapper();
@@ -345,7 +347,7 @@ describe('useRestoreTemplateBackup', () => {
 
     const { result: restoreResult } = renderHook(() => useRestoreTemplateBackup(), { wrapper });
 
-    restoreResult.current.mutate('backup.html');
+    restoreResult.current.mutate(1);
 
     await waitFor(() => {
       expect(restoreResult.current.isSuccess).toBe(true);
@@ -361,22 +363,23 @@ describe('useRestoreTemplateBackup', () => {
 
 describe('Hooks Integration', () => {
   beforeEach(() => {
-    // Override handlers to simulate a fresh state with no backups initially
+    // Override handlers to simulate a single saved version available to restore
     server.use(
       http.get(`${API_BASE}/templates/backups/`, () => {
         return HttpResponse.json([
           {
-            filename: 'backup_new.html',
-            path: '/path/backup_new.html',
-            size: 1000,
+            id: 7,
+            label: '05/04/2026 12:00:00',
             created_at: '2026-04-05T12:00:00',
+            is_default: false,
+            is_active: false,
           },
         ]);
-      }),
+      })
     );
   });
 
-  it('should work together: save template → see new backup → restore backup', async () => {
+  it('should work together: save template → see new version → restore version', async () => {
     const wrapper = createWrapper();
 
     // 1. Save template
@@ -388,9 +391,9 @@ describe('Hooks Integration', () => {
       expect(saveResult.current.isSuccess).toBe(true);
     });
 
-    expect(saveResult.current.data?.backup_filename).toBeDefined();
+    expect(saveResult.current.data?.version_id).toBeDefined();
 
-    // 2. List backups (the handler returns one backup)
+    // 2. List versions (the handler returns one version)
     const { result: backupsResult } = renderHook(() => useTemplateBackups(), { wrapper });
 
     await waitFor(() => {
@@ -398,12 +401,12 @@ describe('Hooks Integration', () => {
     });
 
     expect(backupsResult.current.data?.length).toBeGreaterThan(0);
-    expect(backupsResult.current.data?.[0]?.filename).toBe('backup_new.html');
+    expect(backupsResult.current.data?.[0]?.id).toBe(7);
 
-    // 3. Restore backup
+    // 3. Restore version
     const { result: restoreResult } = renderHook(() => useRestoreTemplateBackup(), { wrapper });
 
-    restoreResult.current.mutate('backup_new.html');
+    restoreResult.current.mutate(7);
 
     await waitFor(() => {
       expect(restoreResult.current.isSuccess).toBe(true);

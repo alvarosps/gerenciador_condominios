@@ -93,8 +93,8 @@ npm run lint && npm run type-check            # ESLint + TypeScript
 
 ## Convenções
 
-- Backend: Ruff (100 chars, replaces black+isort+flake8+pylint) + mypy strict (django-stubs) — enforced via pre-commit
-- Frontend: ESLint strict-type-checked + Prettier + TypeScript strict (noUncheckedIndexedAccess) — husky + lint-staged
+- Backend: Ruff (100 chars, replaces black+isort+flake8+pylint) + mypy strict (django-stubs) — enforced via pre-commit (run `pre-commit install` once after cloning)
+- Frontend: ESLint strict-type-checked + Prettier + TypeScript strict (noUncheckedIndexedAccess) — lint-staged, run by the root pre-commit hook (`frontend-lint-staged`), not husky
 - CRITICAL: Never use `# noqa`, `# type: ignore`, or `eslint-disable` comments — always fix the actual code
 - Validação brasileira: CPF (11 dígitos), CNPJ (14 dígitos), moeda R$ 1.500,00, data DD/MM/YYYY
 - Estado civil: Solteiro(a), Casado(a), Divorciado(a), Viúvo(a), União Estável

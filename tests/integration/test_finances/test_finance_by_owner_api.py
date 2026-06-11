@@ -109,9 +109,9 @@ def test_by_owner_does_not_share_cache_with_overview(authenticated_api_client):
 
 
 @freeze_time("2026-07-15 12:00:00")
-def test_by_owner_readable_by_non_admin(regular_authenticated_api_client):
+def test_by_owner_blocked_for_non_admin(regular_authenticated_api_client):
     resp = regular_authenticated_api_client.get(f"{BY_OWNER_URL}?year=2026&month=7")
-    assert resp.status_code == status.HTTP_200_OK
+    assert resp.status_code == status.HTTP_403_FORBIDDEN
 
 
 def test_by_owner_requires_authentication(api_client):

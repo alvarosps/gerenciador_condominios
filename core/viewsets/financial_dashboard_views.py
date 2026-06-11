@@ -11,7 +11,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 
 from core.models import Person, PersonPayment
-from core.permissions import FinancialReadOnly, IsAdminUser
+from core.permissions import IsAdminUser
 from core.services.cash_flow_service import MONTHS_IN_YEAR, CashFlowService
 from core.services.daily_control_service import DailyControlService
 from core.services.financial_dashboard_service import FinancialDashboardService
@@ -22,9 +22,9 @@ _DEFAULT_PROJECTION_MONTHS = 12
 
 
 class FinancialDashboardViewSet(viewsets.ViewSet):
-    """Read-only ViewSet exposing FinancialDashboardService aggregations."""
+    """Admin-only ViewSet exposing FinancialDashboardService aggregations."""
 
-    permission_classes = [FinancialReadOnly]
+    permission_classes = [IsAdminUser]
 
     @action(detail=False, methods=["get"])
     def overview(self, request: Request) -> Response:

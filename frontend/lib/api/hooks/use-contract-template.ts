@@ -8,25 +8,26 @@ interface TemplateResponse {
 
 interface SaveTemplateResponse {
   message: string;
-  backup_path: string;
-  backup_filename: string;
+  version_id: number;
+  label: string;
 }
 
 interface PreviewResponse {
   html: string;
 }
 
-interface Backup {
-  filename: string;
-  path: string;
-  size: number;
+interface TemplateVersion {
+  id: number;
+  label: string;
   created_at: string;
-  is_default?: boolean;
+  is_default: boolean;
+  is_active: boolean;
 }
 
 interface RestoreResponse {
   message: string;
-  safety_backup: string;
+  version_id: number;
+  label: string;
 }
 
 /**
@@ -36,9 +37,7 @@ export function useContractTemplate() {
   return useQuery({
     queryKey: queryKeys.contractTemplate.all,
     queryFn: async () => {
-      const { data } = await apiClient.get<TemplateResponse>(
-        '/templates/current/'
-      );
+      const { data } = await apiClient.get<TemplateResponse>('/templates/current/');
       return data;
     },
     staleTime: 1000 * 60 * 5, // Cache for 5 minutes
@@ -53,10 +52,7 @@ export function useSaveContractTemplate() {
 
   return useMutation({
     mutationFn: async (content: string) => {
-      const { data } = await apiClient.post<SaveTemplateResponse>(
-        '/templates/save/',
-        { content }
-      );
+      const { data } = await apiClient.post<SaveTemplateResponse>('/templates/save/', { content });
       return data;
     },
     onSuccess: () => {
@@ -72,25 +68,20 @@ export function useSaveContractTemplate() {
 export function usePreviewContractTemplate() {
   return useMutation({
     mutationFn: async (params: { content: string; lease_id?: number }) => {
-      const { data } = await apiClient.post<PreviewResponse>(
-        '/templates/preview/',
-        params
-      );
+      const { data } = await apiClient.post<PreviewResponse>('/templates/preview/', params);
       return data;
     },
   });
 }
 
 /**
- * List all template backups
+ * List all template versions (backups)
  */
 export function useTemplateBackups() {
   return useQuery({
     queryKey: queryKeys.templateBackups.all,
     queryFn: async () => {
-      const { data } = await apiClient.get<Backup[]>(
-        '/templates/backups/'
-      );
+      const { data } = await apiClient.get<TemplateVersion[]>('/templates/backups/');
       return data;
     },
     staleTime: 1000 * 60 * 2, // Cache for 2 minutes
@@ -98,17 +89,14 @@ export function useTemplateBackups() {
 }
 
 /**
- * Restore a template backup
+ * Restore a template version by id
  */
 export function useRestoreTemplateBackup() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (backup_filename: string) => {
-      const { data } = await apiClient.post<RestoreResponse>(
-        '/templates/restore/',
-        { backup_filename }
-      );
+    mutationFn: async (version_id: number) => {
+      const { data } = await apiClient.post<RestoreResponse>('/templates/restore/', { version_id });
       return data;
     },
     onSuccess: () => {

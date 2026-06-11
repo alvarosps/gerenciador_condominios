@@ -7,7 +7,7 @@ import pytest
 from django.conf import settings
 from django.core.exceptions import ValidationError
 
-from core.models import Landlord
+from core.models import ContractRule, Landlord
 from core.services.contract_service import ContractService
 from core.utils import format_currency
 from tests.factories import (
@@ -198,6 +198,158 @@ class TestPrepareContractContext:
     def test_landlord_is_active_landlord(self, lease, landlord):
         context = ContractService.prepare_contract_context(lease)
         assert context["landlord"] == landlord
+
+    def test_contract_rules_are_sanitized_in_context(self, lease, landlord, admin_user):
+        """Admin-entered rule HTML is sanitized before reaching the template (anti stored-XSS)."""
+        ContractRule.objects.create(
+            content="Silêncio após 22h <script>fetch('//evil')</script>",
+            order=1,
+            created_by=admin_user,
+        )
+        ContractRule.objects.create(
+            content='<b onclick="x()">Não fumar</b>', order=2, created_by=admin_user
+        )
+
+        context = ContractService.prepare_contract_context(lease)
+        joined = " ".join(context["rules"])
+
+        assert "<script>" not in joined
+        assert "fetch" not in joined
+        assert "onclick" not in joined
+        # legitimate text and inline formatting survive
+        assert "Silêncio após 22h" in joined
+        assert "<b>Não fumar</b>" in joined
+
+
+@pytest.mark.unit
+class TestPrepareContractContextFurnitureNames:
+    def test_context_includes_furniture_names(self, lease, apartment, landlord, admin_user):
+        chair = make_furniture(name="Cadeira FN", user=admin_user)
+        table = make_furniture(name="Mesa FN", user=admin_user)
+        apartment.furnitures.add(chair, table)
+
+        context = ContractService.prepare_contract_context(lease)
+
+        assert "furniture_names" in context
+        assert isinstance(context["furniture_names"], list)
+        assert all(isinstance(name, str) for name in context["furniture_names"])
+        assert set(context["furniture_names"]) == {"Cadeira FN", "Mesa FN"}
+
+    def test_furniture_names_empty_when_no_furniture(self, lease, landlord):
+        context = ContractService.prepare_contract_context(lease)
+        assert context["furniture_names"] == []
+
+    def test_furniture_names_mirror_furniture_objects(self, lease, apartment, landlord, admin_user):
+        sofa = make_furniture(name="Sofá FN", user=admin_user)
+        apartment.furnitures.add(sofa)
+
+        context = ContractService.prepare_contract_context(lease)
+
+        object_names = sorted(f.name for f in context["furnitures"])
+        assert sorted(context["furniture_names"]) == object_names
+
+
+@pytest.mark.unit
+class TestDepositClauseRendering:
+    """Deposit clause uses lease.deposit_amount (regression: it used tenant.deposit_amount,
+    a field that does not exist on Tenant, so the clause was always omitted)."""
+
+    def test_deposit_clause_rendered_when_lease_has_deposit(self, lease, landlord):
+        lease.deposit_amount = Decimal("500.00")
+        lease.save(update_fields=["deposit_amount"])
+
+        context = ContractService.prepare_contract_context(lease)
+        html = ContractService.render_contract_template(context)
+
+        assert "caução adicional" in html
+        assert format_currency(Decimal("500.00")) in html
+
+    def test_deposit_clause_omitted_when_no_deposit(self, lease, landlord):
+        assert lease.deposit_amount is None
+
+        context = ContractService.prepare_contract_context(lease)
+        html = ContractService.render_contract_template(context)
+
+        # Omitted, and StrictUndefined does not blow up on the None deposit branch
+        assert "caução adicional" not in html
+
+    def test_deposit_clause_omitted_when_zero(self, lease, landlord):
+        lease.deposit_amount = Decimal("0.00")
+        lease.save(update_fields=["deposit_amount"])
+
+        context = ContractService.prepare_contract_context(lease)
+        html = ContractService.render_contract_template(context)
+
+        assert "caução adicional" not in html
+
+
+@pytest.mark.unit
+class TestBotijaoClauseRendering:
+    """Botijão clause matches against furniture_names (regression: `in furnitures` compared a
+    string against a list of Furniture objects, so it was always False)."""
+
+    def test_botijao_clause_rendered_when_furniture_present(
+        self, lease, apartment, landlord, admin_user
+    ):
+        botijao = make_furniture(name="Botijão de gás", user=admin_user)
+        apartment.furnitures.add(botijao)
+
+        context = ContractService.prepare_contract_context(lease)
+        html = ContractService.render_contract_template(context)
+
+        assert "BOTIJÃO DE GÁS" in html
+        assert "casco" in html
+
+    def test_botijao_clause_omitted_when_absent(self, lease, apartment, landlord, admin_user):
+        chair = make_furniture(name="Cadeira sem botijão", user=admin_user)
+        apartment.furnitures.add(chair)
+
+        context = ContractService.prepare_contract_context(lease)
+        html = ContractService.render_contract_template(context)
+
+        assert "BOTIJÃO DE GÁS" not in html
+
+
+@pytest.mark.unit
+class TestRenderContractTemplateSandbox:
+    def test_full_embedded_template_renders_without_undefined_error(
+        self, lease, apartment, landlord, admin_user
+    ):
+        """The embedded contract template must render fully under StrictUndefined — every
+        variable it references must exist in prepare_contract_context."""
+        botijao = make_furniture(name="Botijão de gás", user=admin_user)
+        apartment.furnitures.add(botijao)
+        lease.deposit_amount = Decimal("750.00")
+        lease.save(update_fields=["deposit_amount"])
+
+        context = ContractService.prepare_contract_context(lease)
+        html = ContractService.render_contract_template(context)
+
+        assert "<html" in html
+        assert landlord.name in html
+
+    def test_render_uses_sandboxed_env_blocks_ssti_in_active_template(
+        self, lease, landlord, admin_user
+    ):
+        """Defense in depth: an SSTI payload stored as the active DB template is blocked by
+        the sandbox at render time (it never executes)."""
+        from jinja2.exceptions import SecurityError
+
+        from core.models import ContractTemplate
+
+        ContractTemplate.objects.update(is_active=False)
+        ContractTemplate.objects.create(
+            content="<html>{{ ''.__class__.__mro__ }}</html>",
+            label="ssti",
+            is_active=True,
+            is_default=False,
+            created_by=admin_user,
+            updated_by=admin_user,
+        )
+
+        context = ContractService.prepare_contract_context(lease)
+        with pytest.raises(SecurityError):
+            ContractService.render_contract_template(context)
 
 
 @pytest.mark.unit

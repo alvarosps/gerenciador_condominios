@@ -1,6 +1,6 @@
 """CRUD viewsets + convert_deferred action for installments/payroll (Session 42).
 
-ModelViewSet + FinancialReadOnly + CustomPageNumberPagination. Thin actions: they
+ModelViewSet + IsAdminUser + CustomPageNumberPagination. Thin actions: they
 parse/validate request data (400 PT) and delegate to the Session 41 services
 (InstallmentPlanService.convert_deferred). No business logic here.
 """
@@ -18,7 +18,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 
 from core.pagination import CustomPageNumberPagination
-from core.permissions import FinancialReadOnly
+from core.permissions import IsAdminUser
 from finances.models import Bill, Category, Employee, Installment, InstallmentPlan
 from finances.serializers import (
     EmployeeSerializer,
@@ -31,7 +31,7 @@ from finances.viewsets.query_params import date_param, int_param
 
 class InstallmentPlanViewSet(viewsets.ModelViewSet):
     serializer_class = InstallmentPlanSerializer
-    permission_classes = [FinancialReadOnly]
+    permission_classes = [IsAdminUser]
     pagination_class = CustomPageNumberPagination
 
     def get_queryset(self) -> QuerySet[InstallmentPlan]:
@@ -115,7 +115,7 @@ class InstallmentViewSet(viewsets.ModelViewSet):
     plan/generation (S41), so create/destroy are not exposed (only GET/PATCH)."""
 
     serializer_class = InstallmentSerializer
-    permission_classes = [FinancialReadOnly]
+    permission_classes = [IsAdminUser]
     pagination_class = CustomPageNumberPagination
     http_method_names = ["get", "patch", "head", "options"]
 
@@ -136,7 +136,7 @@ class InstallmentViewSet(viewsets.ModelViewSet):
 
 class EmployeeViewSet(viewsets.ModelViewSet):
     serializer_class = EmployeeSerializer
-    permission_classes = [FinancialReadOnly]
+    permission_classes = [IsAdminUser]
     pagination_class = CustomPageNumberPagination
 
     def get_queryset(self) -> QuerySet[Employee]:

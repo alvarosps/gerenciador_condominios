@@ -47,7 +47,9 @@ As you review, update your agent memory with patterns, conventions, and recurrin
 - [ ] Input validation at serializer level
 - [ ] Auth required on all non-public endpoints
 - [ ] No CORS_ALLOW_ALL_ORIGINS
-- [ ] Financial endpoints use FinancialReadOnly permission
+- [ ] Financial endpoints (legacy core + finances/ app) use IsAdminUser (admin-only read+write)
+- [ ] IsAdminUser imported from core.permissions, never from rest_framework.permissions
+- [ ] Tenant/Lease querysets scoped to the requesting tenant when non-staff
 
 ### Testing
 - [ ] Tests exist for new functionality

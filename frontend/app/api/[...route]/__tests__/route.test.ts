@@ -41,7 +41,15 @@ describe('API proxy route', () => {
     await POST(request);
 
     const init = fetchSpy.mock.calls[0]?.[1];
-    const forwardedHeaders = new Headers(init?.headers);
+    // The route forwards a Headers instance; assert against it directly.
+    // Do NOT re-wrap with `new Headers(init.headers)` — happy-dom's Headers
+    // copy-constructor drops headers that were themselves copied in, which
+    // would spuriously strip `authorization` here.
+    const forwardedHeaders = init?.headers;
+    expect(forwardedHeaders).toBeInstanceOf(Headers);
+    if (!(forwardedHeaders instanceof Headers)) {
+      throw new Error('expected forwarded headers to be a Headers instance');
+    }
     expect(forwardedHeaders.has('transfer-encoding')).toBe(false);
     expect(forwardedHeaders.has('connection')).toBe(false);
     expect(forwardedHeaders.has('keep-alive')).toBe(false);
@@ -53,7 +61,7 @@ describe('API proxy route', () => {
       new Response(JSON.stringify({ detail: 'Não encontrado.' }), {
         status: 404,
         headers: { 'Content-Type': 'application/json' },
-      }),
+      })
     );
 
     const request = new NextRequest('http://localhost:4000/api/leases/999/', {

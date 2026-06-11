@@ -2,8 +2,8 @@
 
 Exercises the real path View -> IptuAlertService -> Model against the test DB (no
 internal mocking). Asserts the non-paginated shape {alerts, warning_count, critical_count},
-that it reflects payment without stale cache (uncached), and the FinancialReadOnly access
-policy. Only freezegun (today) and DRF throttling (infra) are neutralized.
+that it reflects payment without stale cache (uncached), and the IsAdminUser access
+policy (admin-only after P1.2). Only freezegun (today) and DRF throttling (infra) are neutralized.
 """
 
 from datetime import date
@@ -160,8 +160,8 @@ def test_iptu_alerts_requires_authentication(api_client) -> None:
 
 
 @freeze_time(FROZEN)
-def test_iptu_alerts_readonly_allows_authenticated_non_staff() -> None:
-    """Usuário autenticado não-staff lê (FinancialReadOnly: read liberado) → 200."""
+def test_iptu_alerts_blocked_for_authenticated_non_staff() -> None:
+    """Usuário autenticado não-staff → 403 (financeiro é admin-only após P1.2)."""
     non_staff = User.objects.create_user(
         username="reader", email="reader@test.com", password=TEST_PASSWORD, is_staff=False
     )
@@ -169,4 +169,4 @@ def test_iptu_alerts_readonly_allows_authenticated_non_staff() -> None:
     client.force_authenticate(user=non_staff)
 
     resp = client.get(IPTU_ALERTS_URL)
-    assert resp.status_code == status.HTTP_200_OK
+    assert resp.status_code == status.HTTP_403_FORBIDDEN

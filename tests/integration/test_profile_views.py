@@ -82,13 +82,15 @@ class TestChangePassword:
         assert "Senha atual incorreta" in response.data["error"]
 
     def test_short_new_password_returns_400(self, authenticated_api_client):
+        # Now enforced by Django's AUTH_PASSWORD_VALIDATORS (MinimumLengthValidator), whose
+        # message is in English ("...at least 8 characters.").
         response = authenticated_api_client.post(
             CHANGE_PASSWORD_URL,
             {"old_password": TEST_PASSWORD, "new_password": "abc"},
             format="json",
         )
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "8 caracteres" in response.data["error"]
+        assert "at least 8 characters" in response.data["error"]
 
     def test_missing_old_password_returns_400(self, authenticated_api_client):
         response = authenticated_api_client.post(

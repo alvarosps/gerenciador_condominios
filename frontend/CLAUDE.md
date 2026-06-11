@@ -20,7 +20,7 @@ store/auth-store.ts           # Zustand auth state
 
 ## Git Hooks
 
-- `husky` + `lint-staged`: ESLint --fix + Prettier --write rodam automaticamente em `*.{ts,tsx}` no pre-commit
+- `lint-staged` (ESLint --fix + Prettier --write em `*.{ts,tsx}`) roda via o hook `frontend-lint-staged` do **pre-commit da raiz** (não mais husky). Enforcement exige `pre-commit install` após clonar.
 
 ## Padrões Obrigatórios
 

@@ -19,7 +19,7 @@ from typing import Any
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from jinja2 import Environment, FileSystemLoader, select_autoescape
+from jinja2 import BaseLoader
 
 from core.contract_rules import regras_condominio
 from core.infrastructure import (
@@ -28,11 +28,12 @@ from core.infrastructure import (
     IPDFGenerator,
     PlaywrightPDFGenerator,
 )
-from core.models import ContractRule, Furniture, Landlord, Lease
-from core.utils import format_currency, number_to_words
+from core.jinja_environment import build_contract_jinja_env
+from core.models import ContractRule, ContractTemplate, Furniture, Landlord, Lease
 
 from .date_calculator import DateCalculatorService
 from .fee_calculator import FeeCalculatorService
+from .html_sanitizer import sanitize_contract_html
 
 logger = logging.getLogger(__name__)
 
@@ -195,9 +196,11 @@ class ContractService:
         if landlord is None:
             raise ValidationError(NO_ACTIVE_LANDLORD_ERROR)
 
-        # Get rules from database, fallback to hardcoded rules if none exist
+        # Get rules from database, fallback to hardcoded rules if none exist.
+        # Sanitize here (single source) so the admin-authored HTML reaching the
+        # template's `| safe` is a safe formatting-only subset (anti stored-XSS).
         db_rules = ContractRule.get_active_rules()
-        rules = db_rules or regras_condominio
+        rules = [sanitize_contract_html(rule) for rule in (db_rules or regras_condominio)]
 
         context = {
             "landlord": landlord,
@@ -205,6 +208,7 @@ class ContractService:
             "building_number": lease.apartment.building.street_number,
             "apartment_number": lease.apartment.number,
             "furnitures": lease_furnitures,
+            "furniture_names": [furniture.name for furniture in lease_furnitures],
             "validity": validity,
             "start_date": formatted_dates["start_date_formatted"],
             "final_date": final_date,
@@ -248,12 +252,31 @@ class ContractService:
         return relative_path
 
     @staticmethod
+    def get_contract_absolute_path(lease: Lease) -> Path:
+        """
+        Resolve the absolute on-disk path for a lease contract PDF.
+
+        Single source of truth for "where the contract PDF lives": joins the
+        configured output directory under BASE_DIR with the canonical relative path.
+
+        Args:
+            lease: The lease object
+
+        Returns:
+            Absolute path to the PDF file (may or may not exist on disk yet)
+        """
+        relative_path = ContractService.get_contract_relative_path(lease)
+        output_dir = str(settings.PDF_OUTPUT_DIR)
+        return Path(settings.BASE_DIR) / output_dir / relative_path
+
+    @staticmethod
     def render_contract_template(context: dict[str, Any]) -> str:
         """
-        Render the contract HTML template with the given context.
+        Render the active contract HTML template with the given context.
 
-        Uses Jinja2 template engine with custom filters for currency formatting
-        and number-to-words conversion.
+        Loads the active ``ContractTemplate`` content from the database (durable on
+        ephemeral container filesystems) and renders it inside the shared sandboxed
+        Jinja environment with the currency/number-to-words filters.
 
         Args:
             context: Template context dictionary
@@ -266,15 +289,10 @@ class ContractService:
             >>> html = ContractService.render_contract_template(context)
             >>> assert "<html>" in html
         """
-        template_path = str(Path(settings.BASE_DIR) / "core" / "templates")
-        env = Environment(
-            loader=FileSystemLoader(template_path),
-            autoescape=select_autoescape(["html"]),
-        )
-        env.filters["currency"] = format_currency
-        env.filters["extenso"] = number_to_words
+        content = ContractTemplate.get_active_content()
+        env = build_contract_jinja_env(BaseLoader())
 
-        template = env.get_template("contract_template.html")
+        template = env.from_string(content)
         html_content = template.render(context)
 
         logger.debug("Contract template rendered successfully")

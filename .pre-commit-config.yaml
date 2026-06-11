@@ -18,9 +18,10 @@ repos:
       - id: check-merge-conflict
       - id: check-case-conflict
       - id: detect-private-key
-      - id: mixed-line-ending
-        args: ['--fix=lf']
-        exclude: '\.sql$'
+      # NOTE: no mixed-line-ending hook. The repo normalizes line endings via
+      # .gitattributes (`* text=auto` → LF in the repository), and forcing
+      # `--fix=lf` in the working tree fights git's core.autocrlf=true on
+      # Windows, breaking lint-staged's stash/restore.
 
   # Ruff — replaces black, isort, flake8, pylint
   - repo: https://github.com/astral-sh/ruff-pre-commit
@@ -30,16 +31,20 @@ repos:
         args: [--fix, --exit-non-zero-on-fix]
       - id: ruff-format
 
-  # Type checking
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.15.0
+  # NOTE: type-checking (mypy + pyright) is NOT a pre-commit hook. It needs the
+  # full runtime deps (celery, etc.) which an isolated hook env lacks, and it is
+  # too slow for every commit. Run it via the canonical gate / CI instead:
+  #   mypy core/ condominios_manager/ finances/ && pyright
+
+  # Frontend gate (ESLint --fix + Prettier) via lint-staged — single hook
+  # manager: pre-commit (root) is authoritative; husky was removed.
+  - repo: local
     hooks:
-      - id: mypy
-        additional_dependencies:
-          - django-stubs[compatible-mypy]
-          - djangorestframework-stubs[compatible-mypy]
-          - types-python-dateutil
-        args: [--config-file=pyproject.toml]
+      - id: frontend-lint-staged
+        name: frontend lint-staged
+        entry: bash -c 'cd frontend && npx lint-staged'
+        language: system
+        files: ^frontend/.*\.(ts|tsx)$
         pass_filenames: false
 
 default_stages: [pre-commit]

@@ -1,6 +1,6 @@
 """CRUD viewsets + Bill actions for the finances API (Session 38).
 
-ModelViewSet + FinancialReadOnly + CustomPageNumberPagination. Bill amount_* read from
+ModelViewSet + IsAdminUser + CustomPageNumberPagination. Bill amount_* read from
 the with_amounts(today) annotation (TZ-SP today). Actions are thin: they parse/validate
 request data (400 PT) and delegate to the S37/S38 services.
 """
@@ -25,7 +25,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 
 from core.pagination import CustomPageNumberPagination, LargePageNumberPagination
-from core.permissions import FinancialReadOnly
+from core.permissions import IsAdminUser
 from finances.models import (
     Bill,
     BillingAccount,
@@ -95,7 +95,7 @@ def _validated_funded_from(raw: object) -> str:
 
 class CategoryViewSet(viewsets.ModelViewSet):
     serializer_class = CategorySerializer
-    permission_classes = [FinancialReadOnly]
+    permission_classes = [IsAdminUser]
     pagination_class = CustomPageNumberPagination
 
     def get_queryset(self) -> QuerySet[Category]:
@@ -112,7 +112,7 @@ class CategoryViewSet(viewsets.ModelViewSet):
 
 class BillingAccountViewSet(viewsets.ModelViewSet):
     serializer_class = BillingAccountSerializer
-    permission_classes = [FinancialReadOnly]
+    permission_classes = [IsAdminUser]
     pagination_class = CustomPageNumberPagination
 
     def get_queryset(self) -> QuerySet[BillingAccount]:
@@ -135,7 +135,7 @@ class BillingAccountViewSet(viewsets.ModelViewSet):
 
 class BillSkipViewSet(viewsets.ModelViewSet):
     serializer_class = BillSkipSerializer
-    permission_classes = [FinancialReadOnly]
+    permission_classes = [IsAdminUser]
     pagination_class = CustomPageNumberPagination
 
     def get_queryset(self) -> QuerySet[BillSkip]:
@@ -152,7 +152,7 @@ class BillSkipViewSet(viewsets.ModelViewSet):
 
 class PaymentViewSet(viewsets.ModelViewSet):
     serializer_class = PaymentSerializer
-    permission_classes = [FinancialReadOnly]
+    permission_classes = [IsAdminUser]
     pagination_class = CustomPageNumberPagination
 
     def get_queryset(self) -> QuerySet[Payment]:
@@ -282,7 +282,7 @@ def _parse_lines(
 
 class BillViewSet(viewsets.ModelViewSet):
     serializer_class = BillSerializer
-    permission_classes = [FinancialReadOnly]
+    permission_classes = [IsAdminUser]
     # The Contas UI groups ALL bills per building (no page slicing). Keep the paginated
     # {results, count} envelope (consumers/tests rely on it) but lift the cap so page_size=10000
     # returns every bill in one page (CustomPageNumberPagination's max_page_size=500 would silently
@@ -531,7 +531,7 @@ class BillViewSet(viewsets.ModelViewSet):
 
         Writes NOTHING (past-immutable, design §6): the draft is persisted later via
         create_with_lines/update_with_lines (S58), from the modal (S63). is_staff is enforced by
-        FinancialReadOnly (POST write gate). The PDF is validated and discarded — never stored
+        IsAdminUser (admin-only viewset). The PDF is validated and discarded — never stored
         (decisão #4). The only external I/O boundary is pdfplumber.open; the positional parsing
         lives in the S59 registry.
         """
@@ -567,7 +567,7 @@ class BillViewSet(viewsets.ModelViewSet):
 
 class ReserveViewSet(viewsets.ModelViewSet):
     serializer_class = ReserveSerializer
-    permission_classes = [FinancialReadOnly]
+    permission_classes = [IsAdminUser]
     pagination_class = CustomPageNumberPagination
 
     def get_queryset(self) -> QuerySet[Reserve]:
@@ -624,7 +624,7 @@ class ReserveMovementViewSet(viewsets.ReadOnlyModelViewSet):
     here would bypass that guard and could drive the reserve negative, so writes are not exposed."""
 
     serializer_class = ReserveMovementSerializer
-    permission_classes = [FinancialReadOnly]
+    permission_classes = [IsAdminUser]
     pagination_class = CustomPageNumberPagination
 
     def get_queryset(self) -> QuerySet[ReserveMovement]:
@@ -647,7 +647,7 @@ class ReserveMovementViewSet(viewsets.ReadOnlyModelViewSet):
 
 class IncomeEntryViewSet(viewsets.ModelViewSet):
     serializer_class = IncomeEntrySerializer
-    permission_classes = [FinancialReadOnly]
+    permission_classes = [IsAdminUser]
     pagination_class = CustomPageNumberPagination
 
     def get_queryset(self) -> QuerySet[IncomeEntry]:
@@ -673,7 +673,7 @@ class IncomeEntryViewSet(viewsets.ModelViewSet):
 
 class CondoMonthCloseViewSet(viewsets.ModelViewSet):
     serializer_class = CondoMonthCloseSerializer
-    permission_classes = [FinancialReadOnly]
+    permission_classes = [IsAdminUser]
     pagination_class = CustomPageNumberPagination
 
     def get_queryset(self) -> QuerySet[CondoMonthClose]:

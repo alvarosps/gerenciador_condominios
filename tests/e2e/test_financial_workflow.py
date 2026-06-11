@@ -322,8 +322,8 @@ class TestFinancialWorkflowE2E:
         cf_resp = client.get("/api/cash-flow/monthly/", {"year": 2026, "month": 3})
         assert cf_resp.status_code == status.HTTP_200_OK
 
-    def test_permissions_non_admin_read_only(self, admin_user, regular_user):
-        """Non-admin users should get 403 on write operations but 200 on reads."""
+    def test_permissions_non_admin_locked_out(self, admin_user, regular_user):
+        """After P1.2 the whole financial module is admin-only: non-admin gets 403 on read AND write."""
         from rest_framework.test import APIClient
 
         admin_client = APIClient()
@@ -337,12 +337,12 @@ class TestFinancialWorkflowE2E:
         assert resp.status_code == status.HTTP_201_CREATED
         person_id = resp.data["id"]
 
-        # Non-admin can READ
+        # Non-admin CANNOT read (financeiro é admin-only)
         read_resp = non_admin.get("/api/persons/")
-        assert read_resp.status_code == status.HTTP_200_OK
+        assert read_resp.status_code == status.HTTP_403_FORBIDDEN
 
         read_detail = non_admin.get(f"/api/persons/{person_id}/")
-        assert read_detail.status_code == status.HTTP_200_OK
+        assert read_detail.status_code == status.HTTP_403_FORBIDDEN
 
         # Non-admin CANNOT write
         create_resp = non_admin.post("/api/persons/", {"name": "Blocked", "relationship": "teste"})
@@ -359,9 +359,9 @@ class TestFinancialWorkflowE2E:
         delete_resp = non_admin.delete(f"/api/persons/{person_id}/")
         assert delete_resp.status_code == status.HTTP_403_FORBIDDEN
 
-        # Non-admin CAN read dashboard (IsAuthenticated)
+        # Non-admin CANNOT read dashboard (admin-only)
         dash_resp = non_admin.get("/api/financial-dashboard/overview/")
-        assert dash_resp.status_code == status.HTTP_200_OK
+        assert dash_resp.status_code == status.HTTP_403_FORBIDDEN
 
         # Non-admin CANNOT read cash flow (CashFlowViewSet is admin-only — IsAdminUser)
         cf_resp = non_admin.get("/api/cash-flow/monthly/", {"year": 2026, "month": 3})
@@ -375,11 +375,11 @@ class TestFinancialWorkflowE2E:
         )
         assert sim_resp.status_code == status.HTTP_403_FORBIDDEN
 
-        # Non-admin CAN read financial settings (FinancialReadOnly — read OK)
+        # Non-admin CANNOT read financial settings (admin-only)
         settings_resp = non_admin.get("/api/financial-settings/current/")
-        assert settings_resp.status_code == status.HTTP_200_OK
+        assert settings_resp.status_code == status.HTTP_403_FORBIDDEN
 
-        # Non-admin CANNOT update financial settings (FinancialReadOnly — write denied)
+        # Non-admin CANNOT update financial settings
         settings_update = non_admin.put(
             "/api/financial-settings/current/",
             {

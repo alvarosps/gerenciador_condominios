@@ -394,10 +394,24 @@ const leaseHandlers = [
       return new HttpResponse(null, { status: 404 });
     }
     lease.contract_generated = true;
-    lease.pdf_path = `contracts/mock/contract_${id}.pdf`;
     return HttpResponse.json({
+      lease_id: id,
       message: 'Contract generated successfully',
-      pdf_path: lease.pdf_path,
+    });
+  }),
+
+  // Download contract PDF (authenticated, same-origin via proxy)
+  http.get(`${API_BASE}/leases/:id/contract/`, async ({ params }) => {
+    await delay(20);
+    const id = Number(params.id);
+    const lease = leases.find((l) => l.id === id);
+    if (!lease?.contract_generated) {
+      return HttpResponse.json({ detail: 'Contrato ainda não foi gerado.' }, { status: 404 });
+    }
+    const pdfBytes = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x34]); // %PDF-1.4
+    return new HttpResponse(pdfBytes, {
+      status: 200,
+      headers: { 'Content-Type': 'application/pdf' },
     });
   }),
 
@@ -2004,9 +2018,9 @@ const templateHandlers = [
   http.post(`${API_BASE}/templates/save/`, async () => {
     await delay(100);
     return HttpResponse.json({
-      message: 'Template salvo com sucesso!',
-      backup_path: '/path/to/backup.html',
-      backup_filename: 'contract_template_backup_20260405_120000.html',
+      message: 'Template salvo com sucesso! Versão de backup criada.',
+      version_id: 2,
+      label: '05/04/2026 12:00:00',
     });
   }),
 
@@ -2014,10 +2028,11 @@ const templateHandlers = [
     await delay(50);
     return HttpResponse.json([
       {
-        filename: 'contract_template_backup_20260405_120000.html',
-        path: '/path/to/backup.html',
-        size: 5432,
+        id: 1,
+        label: 'Padrão',
         created_at: '2026-04-05T12:00:00',
+        is_default: true,
+        is_active: true,
       },
     ]);
   }),
@@ -2025,8 +2040,9 @@ const templateHandlers = [
   http.post(`${API_BASE}/templates/restore/`, async () => {
     await delay(100);
     return HttpResponse.json({
-      message: 'Template restaurado com sucesso de backup.html',
-      safety_backup: 'contract_template_before_restore_20260405_120000.html',
+      message: "Template restaurado com sucesso para a versão 'Padrão'.",
+      version_id: 1,
+      label: 'Padrão',
     });
   }),
 
@@ -2107,7 +2123,7 @@ const tenantPortalHandlers = [
  */
 const webPushHandlers = [
   http.get('*/web-push/vapid-public-key/', () =>
-    HttpResponse.json({ publicKey: 'BPtestVapidPublicKeyExample' }),
+    HttpResponse.json({ publicKey: 'BPtestVapidPublicKeyExample' })
   ),
   http.post('*/web-push/subscribe/', async ({ request }) => {
     const body = await request.json();
@@ -2173,7 +2189,10 @@ const financeHandlers = [
     await delay(100);
     const body = (await request.json()) as { year: number; month: number };
     const competence = `${body.year}-${String(body.month).padStart(2, '0')}-01`;
-    return HttpResponse.json({ created: 1, bills: [createMockBill({ competence_month: competence })] });
+    return HttpResponse.json({
+      created: 1,
+      bills: [createMockBill({ competence_month: competence })],
+    });
   }),
   http.post(`${API_BASE}/finances/bills/:id/pay/`, async ({ params }) => {
     await delay(100);
@@ -2199,15 +2218,21 @@ const financeHandlers = [
   }),
   http.post(`${API_BASE}/finances/bills/:id/suspend/`, async ({ params }) => {
     await delay(50);
-    return HttpResponse.json(createMockBill({ id: Number(params.id), lifecycle_state: 'suspended' }));
+    return HttpResponse.json(
+      createMockBill({ id: Number(params.id), lifecycle_state: 'suspended' })
+    );
   }),
   http.post(`${API_BASE}/finances/bills/:id/defer/`, async ({ params }) => {
     await delay(50);
-    return HttpResponse.json(createMockBill({ id: Number(params.id), lifecycle_state: 'deferred' }));
+    return HttpResponse.json(
+      createMockBill({ id: Number(params.id), lifecycle_state: 'deferred' })
+    );
   }),
   http.post(`${API_BASE}/finances/bills/:id/cancel/`, async ({ params }) => {
     await delay(50);
-    return HttpResponse.json(createMockBill({ id: Number(params.id), lifecycle_state: 'canceled' }));
+    return HttpResponse.json(
+      createMockBill({ id: Number(params.id), lifecycle_state: 'canceled' })
+    );
   }),
   http.post(`${API_BASE}/finances/bills/:id/reactivate/`, async ({ params }) => {
     await delay(50);
@@ -2604,7 +2629,7 @@ const financesCondoMonthCloseHandlers = [
         reference_month: `${data.year}-${String(data.month).padStart(2, '0')}-01`,
         status: 'closed',
         closed_at: '2026-06-07T00:00:00Z',
-      }),
+      })
     );
   }),
 
@@ -2616,7 +2641,7 @@ const financesCondoMonthCloseHandlers = [
         reference_month: `${data.year}-${String(data.month).padStart(2, '0')}-01`,
         status: 'open',
         closed_at: null,
-      }),
+      })
     );
   }),
 ];
@@ -2643,7 +2668,7 @@ const financesDashboardHandlers = [
       createMockOwnerDistribution({
         ...(year ? { year: Number(year) } : {}),
         ...(month ? { month: Number(month) } : {}),
-      }),
+      })
     );
   }),
 

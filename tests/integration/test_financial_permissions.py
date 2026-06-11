@@ -1,8 +1,7 @@
-"""Integration tests for FinancialReadOnly permission on financial API endpoints.
+"""Integration tests for IsAdminUser on the legacy core financial API endpoints.
 
-Verifies that the FinancialReadOnly permission class is wired correctly on all
-financial viewsets — non-admin authenticated users can read but not write,
-and admin users can write.
+After P1.2 the entire financial module is admin-only: a non-staff authenticated user
+gets 403 on both read and write; only staff/superusers can read or write.
 
 Unit-level permission logic is tested in tests/unit/test_permissions.py.
 These tests cover the HTTP layer (view → permission → response).
@@ -35,7 +34,7 @@ FINANCIAL_READ_ENDPOINTS = [
 
 
 class TestFinancialWritePermissions:
-    """Non-admin authenticated users cannot write to financial endpoints."""
+    """Non-admin authenticated users cannot read or write financial endpoints."""
 
     @pytest.mark.parametrize(("method", "url"), FINANCIAL_WRITE_ENDPOINTS)
     def test_non_admin_cannot_write(self, regular_authenticated_api_client, method, url):
@@ -49,8 +48,13 @@ class TestFinancialWritePermissions:
         assert response.status_code != status.HTTP_403_FORBIDDEN
 
     @pytest.mark.parametrize("url", FINANCIAL_READ_ENDPOINTS)
-    def test_non_admin_can_read(self, regular_authenticated_api_client, url):
+    def test_non_admin_cannot_read(self, regular_authenticated_api_client, url):
         response = regular_authenticated_api_client.get(url)
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    @pytest.mark.parametrize("url", FINANCIAL_READ_ENDPOINTS)
+    def test_admin_can_read(self, authenticated_api_client, url):
+        response = authenticated_api_client.get(url)
         assert response.status_code == status.HTTP_200_OK
 
     def test_unauthenticated_cannot_read_financial(self, api_client):

@@ -13,9 +13,10 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent } from '@/components/ui/card';
 import { FilePlus, Download, CheckCircle, Info, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { useGenerateContract } from '@/lib/api/hooks/use-leases';
+import { useGenerateContract, fetchContractPdfBlob } from '@/lib/api/hooks/use-leases';
 import { type Lease } from '@/lib/schemas/lease.schema';
 import { formatCurrency } from '@/lib/utils/formatters';
+import { downloadBlob } from '@/lib/utils/download';
 import { format, parseISO } from 'date-fns';
 import { handleError } from '@/lib/utils/error-handler';
 
@@ -27,14 +28,15 @@ interface Props {
 
 export function ContractGenerateModal({ open, lease, onClose }: Props) {
   const generateMutation = useGenerateContract();
-  const [pdfPath, setPdfPath] = useState<string | null>(null);
+  const [generated, setGenerated] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   const handleGenerate = async () => {
     if (!lease?.id) return;
 
     try {
       const result = await generateMutation.mutateAsync(lease.id);
-      setPdfPath(result.pdf_path);
+      setGenerated(true);
       toast.success(result.message || 'Contrato gerado com sucesso!');
     } catch (error) {
       toast.error('Erro ao gerar contrato');
@@ -42,18 +44,24 @@ export function ContractGenerateModal({ open, lease, onClose }: Props) {
     }
   };
 
-  const handleDownload = () => {
-    if (pdfPath) {
-      // Extract relative path from full Windows/Linux path (e.g., "C:\...\contracts\836\file.pdf" -> "contracts/836/file.pdf")
-      // In production, the path might be "/opt/render/.../media/file.pdf", so we match either contracts/ or media/
-      const relativePath = pdfPath.replace(/\\/g, '/').replace(/^.*?(contracts\/|media\/)/, '$1');
-      const downloadUrl = `/download?path=${encodeURIComponent(relativePath)}`;
-      window.open(downloadUrl, '_blank');
+  const handleDownload = async () => {
+    if (!lease?.id) return;
+    setIsDownloading(true);
+    try {
+      // Same-origin proxy request: carries the HttpOnly auth cookies so the backend can
+      // verify ownership before streaming the PDF.
+      const blob = await fetchContractPdfBlob(lease.id);
+      downloadBlob(blob, `contrato_apto_${String(lease.apartment?.number ?? lease.id)}.pdf`);
+    } catch (error) {
+      toast.error('Erro ao baixar contrato');
+      handleError(error, 'ContractGenerateModal.handleDownload');
+    } finally {
+      setIsDownloading(false);
     }
   };
 
   const handleClose = () => {
-    setPdfPath(null);
+    setGenerated(false);
     onClose();
   };
 
@@ -67,15 +75,13 @@ export function ContractGenerateModal({ open, lease, onClose }: Props) {
         </DialogHeader>
 
         <div className="space-y-4">
-          {pdfPath ? (
+          {generated ? (
             <div className="border border-success/20 bg-success/10 rounded-lg p-4">
               <div className="flex items-start gap-3">
                 <CheckCircle className="h-5 w-5 text-success flex-shrink-0 mt-0.5" />
                 <div className="space-y-2 flex-1 min-w-0">
                   <p className="font-medium text-success">Contrato Gerado com Sucesso!</p>
-                  <p className="text-sm text-success">
-                    O contrato foi gerado e salvo no servidor.
-                  </p>
+                  <p className="text-sm text-success">O contrato foi gerado e salvo no servidor.</p>
                   <p className="text-sm text-success">
                     Clique em &quot;Baixar Contrato&quot; para visualizar o PDF.
                   </p>
@@ -104,13 +110,15 @@ export function ContractGenerateModal({ open, lease, onClose }: Props) {
                       </dd>
                     </div>
                     <div className="flex justify-between py-2 border-b">
-                      <dt className="font-medium text-sm text-muted-foreground">Inquilino Responsável</dt>
-                      <dd className="text-sm text-foreground">
-                        {lease.responsible_tenant?.name}
-                      </dd>
+                      <dt className="font-medium text-sm text-muted-foreground">
+                        Inquilino Responsável
+                      </dt>
+                      <dd className="text-sm text-foreground">{lease.responsible_tenant?.name}</dd>
                     </div>
                     <div className="flex justify-between py-2 border-b">
-                      <dt className="font-medium text-sm text-muted-foreground">Total de Inquilinos</dt>
+                      <dt className="font-medium text-sm text-muted-foreground">
+                        Total de Inquilinos
+                      </dt>
                       <dd className="text-sm text-foreground">
                         {lease.number_of_tenants ?? lease.tenants?.length ?? 0}
                       </dd>
@@ -123,12 +131,12 @@ export function ContractGenerateModal({ open, lease, onClose }: Props) {
                     </div>
                     <div className="flex justify-between py-2 border-b">
                       <dt className="font-medium text-sm text-muted-foreground">Validade</dt>
-                      <dd className="text-sm text-foreground">
-                        {lease.validity_months} meses
-                      </dd>
+                      <dd className="text-sm text-foreground">{lease.validity_months} meses</dd>
                     </div>
                     <div className="flex justify-between py-2 border-b">
-                      <dt className="font-medium text-sm text-muted-foreground">Valor do Aluguel</dt>
+                      <dt className="font-medium text-sm text-muted-foreground">
+                        Valor do Aluguel
+                      </dt>
                       <dd className="text-sm text-foreground">
                         {formatCurrency(lease.rental_value ?? lease.apartment?.rental_value ?? 0)}
                       </dd>
@@ -141,12 +149,12 @@ export function ContractGenerateModal({ open, lease, onClose }: Props) {
                     </div>
                     <div className="flex justify-between py-2 border-b">
                       <dt className="font-medium text-sm text-muted-foreground">Taxa de Tag</dt>
-                      <dd className="text-sm text-foreground">
-                        {formatCurrency(lease.tag_fee)}
-                      </dd>
+                      <dd className="text-sm text-foreground">{formatCurrency(lease.tag_fee)}</dd>
                     </div>
                     <div className="flex justify-between py-2">
-                      <dt className="font-medium text-sm text-muted-foreground">Dia de Vencimento</dt>
+                      <dt className="font-medium text-sm text-muted-foreground">
+                        Dia de Vencimento
+                      </dt>
                       <dd className="text-sm text-foreground">
                         Dia {lease.responsible_tenant?.due_day ?? '-'} de cada mês
                       </dd>
@@ -171,16 +179,17 @@ export function ContractGenerateModal({ open, lease, onClose }: Props) {
           <Button variant="outline" onClick={handleClose}>
             Fechar
           </Button>
-          {pdfPath ? (
-            <Button onClick={handleDownload}>
-              <Download className="h-4 w-4 mr-2" />
+          {generated ? (
+            <Button onClick={() => void handleDownload()} disabled={isDownloading}>
+              {isDownloading ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4 mr-2" />
+              )}
               Baixar Contrato
             </Button>
           ) : (
-            <Button
-              onClick={handleGenerate}
-              disabled={generateMutation.isPending}
-            >
+            <Button onClick={handleGenerate} disabled={generateMutation.isPending}>
               {generateMutation.isPending ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               ) : (

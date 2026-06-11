@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Menu } from 'lucide-react';
 import { Sidebar } from './sidebar';
 import { Header } from './header';
@@ -20,6 +21,7 @@ interface MainLayoutProps {
 export function MainLayout({ children }: MainLayoutProps) {
   const { user, isAuthenticated, setUser } = useAuthStore();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const router = useRouter();
 
   // Fetch user profile if authenticated but no user data (e.g., cookie session restored)
   useEffect(() => {
@@ -29,6 +31,20 @@ export function MainLayout({ children }: MainLayoutProps) {
       });
     }
   }, [isAuthenticated, user, setUser]);
+
+  // Role guard (defense in depth alongside the Edge middleware): a non-staff tenant who
+  // reaches the admin dashboard is sent to their portal. The backend is the real barrier.
+  const isNonStaff = user?.is_staff === false;
+  useEffect(() => {
+    if (isNonStaff) {
+      router.replace('/tenant');
+    }
+  }, [isNonStaff, router]);
+
+  // Avoid flashing the admin shell while the redirect is in flight.
+  if (isNonStaff) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen">

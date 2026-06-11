@@ -8,6 +8,9 @@ This package contains business logic services separated from the HTTP layer:
 - DashboardService: Financial metrics and operational statistics (Phase 7)
 - TemplateManagementService: Contract template CRUD operations (Phase 6)
 - MonthAdvanceService: Month advancement orchestration (validate, snapshot, prepare next month)
+
+The shared sandboxed Jinja environment factory lives at ``core.jinja_environment`` (peer of
+``models``/``utils``), not here, because both the model and service layers consume it.
 """
 
 from .base import BaseService

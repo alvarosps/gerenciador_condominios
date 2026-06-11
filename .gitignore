@@ -52,7 +52,6 @@ venv/
 .venv/
 ENV/
 env/
-.env
 
 # Django
 *.log
@@ -61,14 +60,25 @@ db.sqlite3
 db.sqlite3-journal
 /static/
 /media/
-# Uploaded media (MEDIA_ROOT = contracts/) — user-uploaded payment proofs, not source
+# Generated contract PDFs + uploaded payment proofs (PII) — never commit.
+# contracts/ is MEDIA_ROOT (runtime output dir); keep the dir, ignore the PII files.
+/contracts/**/*.pdf
 /contracts/payment_proofs/
+/Notificacao_*.pdf
 *.pot
 
-# Database backups
+# Database backups & dumps (PII) — never commit. Root-only patterns so we
+# don't catch core/migrations SQL, scripts/data seeds, or package.json/.mcp.json.
 /backups/
+/backup_json/
+*.dump
+/*.sql
+/backup_*.json
+/*.json.gz
+/local_backup.*
 
-# Template backups
+# Legacy on-disk contract-template backups (now persisted in the DB —
+# ContractTemplate). Keep any pre-migration files local but never commit them.
 core/templates/backups/
 
 # Documentation (allow docs/ but ignore generated docs)
@@ -103,3 +113,6 @@ nul
 
 # Invoice-parser test fixtures: generated PDFs (regenerated from sanitized .txt by conftest; non-deterministic reportlab output). The .txt source is versioned.
 tests/unit/test_finances/fixtures/invoices/*.pdf
+
+# Incident artifact (history purge input) — never commit
+/incident-purge-paths.txt

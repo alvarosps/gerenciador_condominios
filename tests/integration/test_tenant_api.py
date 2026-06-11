@@ -1,5 +1,6 @@
 """Integration tests for tenant portal API endpoints (/api/tenant/*)."""
 
+import io
 from datetime import date
 from decimal import Decimal
 from pathlib import Path
@@ -9,6 +10,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.utils import timezone
+from PIL import Image
 from rest_framework.test import APIClient
 
 from core.models import (
@@ -299,8 +301,11 @@ class TestTenantPix:
 @pytest.mark.django_db
 class TestTenantProof:
     def test_upload_proof_succeeds(self, tenant_client):
+        # A real PNG is required now that uploads are validated by magic bytes, not content_type.
+        buffer = io.BytesIO()
+        Image.new("RGB", (4, 4), color=(20, 120, 200)).save(buffer, format="PNG")
         proof_file = SimpleUploadedFile(
-            "comprovante.png", b"\x89PNG\r\n\x1a\nfake", content_type="image/png"
+            "comprovante.png", buffer.getvalue(), content_type="image/png"
         )
         response = tenant_client.post(
             "/api/tenant/payments/proof/",

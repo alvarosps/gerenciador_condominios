@@ -51,6 +51,8 @@ dependencies = [
     "python-dateutil>=2.8.0,<3.0",
     "requests>=2.31.0,<3.0",
     "Jinja2>=3.1.0,<4.0",
+    # HTML Sanitization (admin-entered ContractRule HTML rendered into contracts)
+    "nh3>=0.2.18,<0.4",
     # Logging
     "python-json-logger>=3.0.0,<4.0",
     # Task Queue
@@ -248,8 +250,6 @@ max-complexity = 12
     "PLR2004",
     "C901",
 ]
-# generate_notice_pdf.py shells out to a trusted system PDF tool (not user-controlled input)
-"generate_notice_pdf.py" = ["S603"]
 # __init__.py re-exports symbols for clean public API
 "__init__.py" = ["F401"]
 # S3DocumentStorage must catch broad exceptions because boto3/botocore exceptions do not inherit
