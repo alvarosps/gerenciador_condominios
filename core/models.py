@@ -479,19 +479,14 @@ class Tenant(AuditMixin, SoftDeleteMixin, models.Model):
         help_text="Conta de usuário associada para acesso ao portal do inquilino",
     )
 
-    # Brazilian marital status choices (includes legacy values without "(a)" for backward compatibility)
+    # Brazilian marital status choices — canonical "(a)" forms only; legacy/feminine
+    # variants are normalized by the marital_status data migration (HF-1)
     MARITAL_STATUS_CHOICES = [
         ("Solteiro(a)", "Solteiro(a)"),
         ("Casado(a)", "Casado(a)"),
         ("Divorciado(a)", "Divorciado(a)"),
         ("Viúvo(a)", "Viúvo(a)"),
         ("União Estável", "União Estável"),
-        # Legacy values (backward compatibility)
-        ("Solteiro", "Solteiro"),
-        ("Casado", "Casado"),
-        ("Divorciado", "Divorciado"),
-        ("Viúvo", "Viúvo"),
-        ("Separado", "Separado"),
     ]
 
     # Dados básicos
