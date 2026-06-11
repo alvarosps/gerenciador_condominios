@@ -1,6 +1,6 @@
 # Plano HF-1 — 500 no PATCH /api/tenants (edição de dia de vencimento) + dados legados inválidos
 
-> **Estado:** PLANEJADO — nao executado
+> **Estado:** IMPLEMENTADO no branch `fix/tenant-update-500-validation` (2026-06-11) — pendente: merge/deploy + runbook de dados em prod (passo 4 da Task 5). Desvios documentados: Landlord também normalizado (compartilha as choices); `_base_manager` na migration (historical models não serializam managers custom); `Separado`/`Separada` removidos do mapa e das choices (zero linhas em prod, nenhum consumidor); mocks de teste do frontend atualizados para valores canônicos.
 > **Prioridade:** HOTFIX (bloqueia operação em produção) · **Branch sugerida:** `fix/tenant-update-500-validation` (a partir de `master`) · **Depende de:** nenhum (independente do roadmap P0–P8; pode rodar antes/em paralelo a tudo)
 >
 > **For agentic workers:** REQUIRED SUB-SKILL: usar `superpowers:subagent-driven-development` ou `superpowers:executing-plans` + `/prompt-session` (TDD + audit). Passos usam checkbox (`- [ ]`).
