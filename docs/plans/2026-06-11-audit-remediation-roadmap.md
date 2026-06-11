@@ -21,6 +21,7 @@ Segurança e correção de dinheiro/dados primeiro (P0–P2); depois mobile (con
 
 | Fase | Plano | Título | Branch | Depende de | Paralelo com |
 |---|---|---|---|---|---|
+| **HF — Hotfix prod** | HF-1 | 500 no PATCH /api/tenants (full_clean × dado legado) + handler global 400 + normalização marital_status | `fix/tenant-update-500-validation` | — | qualquer (bloqueia operação em prod — fazer já) |
 | **P0 — Incidente** | P0.1 | Purga de PII/segredos do git + rotação + hooks + higiene | `chore/security-incident-git-purge` | — | — (fazer 1º, isolado) |
 | **P1 — Segurança** | P1.1 | Servir contratos/comprovantes só autenticado | `fix/authenticated-file-serving` | P0.1 | P1.2, P1.3, P1.4 |
 | | P1.2 | Segregação inquilino×admin + endpoints financeiros a `is_staff` | `fix/permission-segregation` | P0.1 | P1.1, P1.3, P1.4 |
