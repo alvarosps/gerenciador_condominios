@@ -16,6 +16,7 @@ from jinja2 import BaseLoader, StrictUndefined
 from jinja2.exceptions import SecurityError, UndefinedError
 from jinja2.sandbox import SandboxedEnvironment
 
+from core.services.html_sanitizer import sanitize_contract_html
 from core.services.jinja_environment import build_contract_jinja_env
 from core.utils import format_currency, number_to_words
 
@@ -71,3 +72,46 @@ class TestBuildContractJinjaEnv:
         env = build_contract_jinja_env(BaseLoader())
         rendered = env.from_string("{{ value }}").render(value="<script>")
         assert "&lt;script&gt;" in rendered
+
+
+@pytest.mark.unit
+class TestSanitizeContractHtml:
+    """sanitize_contract_html reduces admin-entered ContractRule HTML to a safe
+    formatting-only subset (anti stored-XSS), preserving inline formatting."""
+
+    def test_strips_script_tag_and_content(self):
+        cleaned = sanitize_contract_html("Regra <script>alert('x')</script> importante")
+        assert "<script>" not in cleaned
+        assert "alert" not in cleaned
+        assert "Regra" in cleaned
+        assert "importante" in cleaned
+
+    def test_strips_event_handler_attributes(self):
+        cleaned = sanitize_contract_html('<b onclick="steal()">Texto</b>')
+        assert "onclick" not in cleaned
+        assert "steal" not in cleaned
+        assert "<b>Texto</b>" in cleaned
+
+    def test_strips_href_and_style_attributes(self):
+        cleaned = sanitize_contract_html(
+            '<span style="x:expression()">a</span><a href="javascript:b()">link</a>'
+        )
+        assert "style=" not in cleaned
+        assert "href=" not in cleaned
+        assert "javascript:" not in cleaned
+
+    def test_preserves_inline_formatting_tags(self):
+        cleaned = sanitize_contract_html("<b>Negrito</b> e <i>itálico</i> e <u>sublinhado</u>")
+        assert "<b>Negrito</b>" in cleaned
+        assert "<i>itálico</i>" in cleaned
+        assert "<u>sublinhado</u>" in cleaned
+
+    def test_preserves_lists(self):
+        cleaned = sanitize_contract_html("<ul><li>um</li><li>dois</li></ul>")
+        assert "<ul>" in cleaned
+        assert "<li>um</li>" in cleaned
+
+    def test_disallowed_tag_stripped_but_text_kept(self):
+        cleaned = sanitize_contract_html("<iframe src='evil'></iframe>ok")
+        assert "<iframe" not in cleaned
+        assert "ok" in cleaned

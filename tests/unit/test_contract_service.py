@@ -7,7 +7,7 @@ import pytest
 from django.conf import settings
 from django.core.exceptions import ValidationError
 
-from core.models import Landlord
+from core.models import ContractRule, Landlord
 from core.services.contract_service import ContractService
 from core.utils import format_currency
 from tests.factories import (
@@ -198,6 +198,27 @@ class TestPrepareContractContext:
     def test_landlord_is_active_landlord(self, lease, landlord):
         context = ContractService.prepare_contract_context(lease)
         assert context["landlord"] == landlord
+
+    def test_contract_rules_are_sanitized_in_context(self, lease, landlord, admin_user):
+        """Admin-entered rule HTML is sanitized before reaching the template (anti stored-XSS)."""
+        ContractRule.objects.create(
+            content="Silêncio após 22h <script>fetch('//evil')</script>",
+            order=1,
+            created_by=admin_user,
+        )
+        ContractRule.objects.create(
+            content='<b onclick="x()">Não fumar</b>', order=2, created_by=admin_user
+        )
+
+        context = ContractService.prepare_contract_context(lease)
+        joined = " ".join(context["rules"])
+
+        assert "<script>" not in joined
+        assert "fetch" not in joined
+        assert "onclick" not in joined
+        # legitimate text and inline formatting survive
+        assert "Silêncio após 22h" in joined
+        assert "<b>Não fumar</b>" in joined
 
 
 @pytest.mark.unit

@@ -32,6 +32,7 @@ from core.models import ContractRule, Furniture, Landlord, Lease
 
 from .date_calculator import DateCalculatorService
 from .fee_calculator import FeeCalculatorService
+from .html_sanitizer import sanitize_contract_html
 from .jinja_environment import build_contract_jinja_env
 
 logger = logging.getLogger(__name__)
@@ -195,9 +196,11 @@ class ContractService:
         if landlord is None:
             raise ValidationError(NO_ACTIVE_LANDLORD_ERROR)
 
-        # Get rules from database, fallback to hardcoded rules if none exist
+        # Get rules from database, fallback to hardcoded rules if none exist.
+        # Sanitize here (single source) so the admin-authored HTML reaching the
+        # template's `| safe` is a safe formatting-only subset (anti stored-XSS).
         db_rules = ContractRule.get_active_rules()
-        rules = db_rules or regras_condominio
+        rules = [sanitize_contract_html(rule) for rule in (db_rules or regras_condominio)]
 
         context = {
             "landlord": landlord,
