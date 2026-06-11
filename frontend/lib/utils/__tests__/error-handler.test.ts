@@ -164,6 +164,33 @@ describe('getErrorMessage', () => {
     expect(getErrorMessage(err)).toBe('Erro A, Erro B');
   });
 
+  it('returns the first DRF field-level error as "field: message"', () => {
+    const err = makeAxiosError(400, {
+      marital_status: ["Value 'Solteira' is not a valid choice."],
+    });
+    expect(getErrorMessage(err)).toBe("marital_status: Value 'Solteira' is not a valid choice.");
+  });
+
+  it('joins multiple messages of the same field', () => {
+    const err = makeAxiosError(400, {
+      phone: ['Telefone inválido.', 'DDD obrigatório.'],
+    });
+    expect(getErrorMessage(err)).toBe('phone: Telefone inválido., DDD obrigatório.');
+  });
+
+  it('still prefers detail over field-level errors', () => {
+    const err = makeAxiosError(400, {
+      detail: 'Não encontrado.',
+      campo: ['x'],
+    });
+    expect(getErrorMessage(err)).toBe('Não encontrado.');
+  });
+
+  it('ignores non-string-array fields and falls back to the generic 400 message', () => {
+    const err = makeAxiosError(400, { meta: [42], empty: [] });
+    expect(getErrorMessage(err)).toBe('Dados inválidos. Verifique os campos.');
+  });
+
   it('returns network error message for AxiosError without response', () => {
     const err = makeAxiosError();
     expect(getErrorMessage(err)).toBe('Erro de conexão. Verifique sua internet.');
@@ -219,17 +246,13 @@ describe('handleError', () => {
   it('logs the error with context prefix', () => {
     const error = new Error('Test error');
     handleError(error, 'TestContext');
-    expect(console.error).toHaveBeenCalledWith(
-      '[TestContext] Test error',
-      error
-    );
+    expect(console.error).toHaveBeenCalledWith('[TestContext] Test error', error);
   });
 
   it('logs default message for unknown error', () => {
     handleError({ weird: true }, 'SomeContext');
-    expect(console.error).toHaveBeenCalledWith(
-      '[SomeContext] Ocorreu um erro inesperado',
-      { weird: true }
-    );
+    expect(console.error).toHaveBeenCalledWith('[SomeContext] Ocorreu um erro inesperado', {
+      weird: true,
+    });
   });
 });
