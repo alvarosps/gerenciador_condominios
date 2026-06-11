@@ -18,7 +18,6 @@
       "Bash(pyright:*)",
       "Bash(npx pyright:*)",
       "Bash(python scripts/backup_db.py:*)",
-      "Bash(python scripts/generate_metrics.py:*)",
       "Bash(npm run dev:*)",
       "Bash(npm run build:*)",
       "Bash(npm run lint:*)",

@@ -248,8 +248,6 @@ max-complexity = 12
     "PLR2004",
     "C901",
 ]
-# generate_notice_pdf.py shells out to a trusted system PDF tool (not user-controlled input)
-"generate_notice_pdf.py" = ["S603"]
 # __init__.py re-exports symbols for clean public API
 "__init__.py" = ["F401"]
 # S3DocumentStorage must catch broad exceptions because boto3/botocore exceptions do not inherit
