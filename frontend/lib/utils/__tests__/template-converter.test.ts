@@ -61,6 +61,20 @@ describe('reconstructFullDocument', () => {
     const result = reconstructFullDocument('<p>fragment</p>', '<p>body</p>');
     expect(result).toBe('<p>body</p>');
   });
+
+  it('preserves R$100,00 and R$50,00 literals in the body (no $1 corruption)', () => {
+    const newBody = '<p>multa de R$100,00 (cem reais) e R$50,00 (cinquenta)</p>';
+    const result = reconstructFullDocument(FULL_HTML, newBody);
+    expect(result).toContain('multa de R$100,00 (cem reais) e R$50,00 (cinquenta)');
+    // The old body ("Hello") must NOT leak in via $1 interpretation
+    expect(result).not.toContain('Hello');
+  });
+
+  it('preserves literal $& and $$ replacement-pattern sequences in the body', () => {
+    const newBody = '<p>edge $& and $$ and $1 literally</p>';
+    const result = reconstructFullDocument(FULL_HTML, newBody);
+    expect(result).toContain('edge $& and $$ and $1 literally');
+  });
 });
 
 describe('jinjaToWysiwyg', () => {
@@ -172,5 +186,33 @@ describe('wysiwygToJinja', () => {
     const restored = wysiwygToJinja(wysiwyg);
     // The body content after round-trip should contain the original variable
     expect(restored).toContain('{{ tenant_name }}');
+  });
+
+  it('round-trips {{ lease.deposit_amount | currency }} intact', () => {
+    const original = '<p>{{ lease.deposit_amount | currency }}</p>';
+    const wysiwyg = jinjaToWysiwyg(original);
+    const restored = wysiwygToJinja(wysiwyg);
+    expect(restored).toContain('{{ lease.deposit_amount | currency }}');
+  });
+});
+
+describe('full pipeline round-trip with R$ literals', () => {
+  it('jinjaToWysiwyg -> wysiwygToJinja -> reconstructFullDocument keeps R$100,00 body intact', () => {
+    const doc = `<!DOCTYPE html>
+<html>
+<head><title>Contract</title></head>
+<body>
+  <p>multa de R$100,00 (cem reais)</p>
+  <p>{{ lease.deposit_amount | currency }}</p>
+</body>
+</html>`;
+    const body = extractBodyContent(doc);
+    const wysiwyg = jinjaToWysiwyg(body);
+    const back = wysiwygToJinja(wysiwyg);
+    const rebuilt = reconstructFullDocument(doc, back);
+
+    expect(rebuilt).toContain('R$100,00');
+    expect(rebuilt).toContain('{{ lease.deposit_amount | currency }}');
+    expect(rebuilt).toContain('<!DOCTYPE html>');
   });
 });

@@ -5,12 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,15 +17,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  Save,
-  Eye,
-  Undo,
-  History,
-  Info,
-  Code,
-  FileText,
-} from 'lucide-react';
+import { Save, Eye, Undo, History, Info, Code, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 import Editor from '@monaco-editor/react';
 import {
@@ -76,12 +63,19 @@ export default function ContractTemplatePage() {
       const result = await saveMutation.mutateAsync(content);
       toast.success(result.message);
     } catch (error: unknown) {
-      const errorMessage = error && typeof error === 'object' && 'response' in error
-        && error.response && typeof error.response === 'object' && 'data' in error.response
-        && error.response.data && typeof error.response.data === 'object' && 'error' in error.response.data
-        && typeof error.response.data.error === 'string'
-        ? error.response.data.error
-        : 'Erro ao salvar template';
+      const errorMessage =
+        error &&
+        typeof error === 'object' &&
+        'response' in error &&
+        error.response &&
+        typeof error.response === 'object' &&
+        'data' in error.response &&
+        error.response.data &&
+        typeof error.response.data === 'object' &&
+        'error' in error.response.data &&
+        typeof error.response.data.error === 'string'
+          ? error.response.data.error
+          : 'Erro ao salvar template';
       toast.error(errorMessage);
     }
   };
@@ -98,12 +92,19 @@ export default function ContractTemplatePage() {
       setActiveTab('preview');
       toast.success('Preview gerado com sucesso!');
     } catch (error: unknown) {
-      const errorMessage = error && typeof error === 'object' && 'response' in error
-        && error.response && typeof error.response === 'object' && 'data' in error.response
-        && error.response.data && typeof error.response.data === 'object' && 'error' in error.response.data
-        && typeof error.response.data.error === 'string'
-        ? error.response.data.error
-        : 'Erro ao gerar preview. Verifique se há locações cadastradas.';
+      const errorMessage =
+        error &&
+        typeof error === 'object' &&
+        'response' in error &&
+        error.response &&
+        typeof error.response === 'object' &&
+        'data' in error.response &&
+        error.response.data &&
+        typeof error.response.data === 'object' &&
+        'error' in error.response.data &&
+        typeof error.response.data.error === 'string'
+          ? error.response.data.error
+          : 'Erro ao gerar preview. Verifique se há locações cadastradas.';
       toast.error(errorMessage);
     }
   };
@@ -125,12 +126,19 @@ export default function ContractTemplatePage() {
       setRestoreBackupFilename(null);
       void refetchBackups();
     } catch (error: unknown) {
-      const errorMessage = error && typeof error === 'object' && 'response' in error
-        && error.response && typeof error.response === 'object' && 'data' in error.response
-        && error.response.data && typeof error.response.data === 'object' && 'error' in error.response.data
-        && typeof error.response.data.error === 'string'
-        ? error.response.data.error
-        : 'Erro ao restaurar backup';
+      const errorMessage =
+        error &&
+        typeof error === 'object' &&
+        'response' in error &&
+        error.response &&
+        typeof error.response === 'object' &&
+        'data' in error.response &&
+        error.response.data &&
+        typeof error.response.data === 'object' &&
+        'error' in error.response.data &&
+        typeof error.response.data.error === 'string'
+          ? error.response.data.error
+          : 'Erro ao restaurar backup';
       toast.error(errorMessage);
     }
   };
@@ -153,7 +161,10 @@ export default function ContractTemplatePage() {
             <CardTitle className="flex flex-wrap items-center gap-2">
               <span>Editor de Template de Contrato</span>
               {hasChanges && (
-                <Badge variant="secondary" className="bg-warning/10 text-warning hover:bg-warning/20 whitespace-nowrap">
+                <Badge
+                  variant="secondary"
+                  className="bg-warning/10 text-warning hover:bg-warning/20 whitespace-nowrap"
+                >
                   Alterações não salvas
                 </Badge>
               )}
@@ -176,11 +187,7 @@ export default function ContractTemplatePage() {
                   </>
                 )}
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setIsBackupModalOpen(true)}
-              >
+              <Button variant="outline" size="sm" onClick={() => setIsBackupModalOpen(true)}>
                 <History className="h-4 w-4 mr-2" />
                 Backups
               </Button>
@@ -193,12 +200,7 @@ export default function ContractTemplatePage() {
                 <Eye className="h-4 w-4 mr-2" />
                 Preview
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleRevert}
-                disabled={!hasChanges}
-              >
+              <Button variant="outline" size="sm" onClick={handleRevert} disabled={!hasChanges}>
                 <Undo className="h-4 w-4 mr-2" />
                 Reverter
               </Button>
@@ -220,19 +222,28 @@ export default function ContractTemplatePage() {
               <p className="font-medium mb-2">Variáveis Disponíveis</p>
               <div className="grid grid-cols-2 gap-2 text-sm">
                 <div>
-                  <code className="bg-muted px-1 py-0.5 rounded">{'{{ tenant.name }}'}</code> - Nome do inquilino
+                  <code className="bg-muted px-1 py-0.5 rounded">{'{{ tenant.name }}'}</code> - Nome
+                  do inquilino
                 </div>
                 <div>
-                  <code className="bg-muted px-1 py-0.5 rounded">{'{{ building_number }}'}</code> - Número do prédio
+                  <code className="bg-muted px-1 py-0.5 rounded">{'{{ building_number }}'}</code> -
+                  Número do prédio
                 </div>
                 <div>
-                  <code className="bg-muted px-1 py-0.5 rounded">{'{{ apartment_number }}'}</code> - Número do apartamento
+                  <code className="bg-muted px-1 py-0.5 rounded">{'{{ apartment_number }}'}</code> -
+                  Número do apartamento
                 </div>
                 <div>
-                  <code className="bg-muted px-1 py-0.5 rounded">{'{{ rental_value | currency }}'}</code> - Valor em moeda
+                  <code className="bg-muted px-1 py-0.5 rounded">
+                    {'{{ rental_value | currency }}'}
+                  </code>{' '}
+                  - Valor em moeda
                 </div>
                 <div>
-                  <code className="bg-muted px-1 py-0.5 rounded">{'{{ rental_value | extenso }}'}</code> - Valor por extenso
+                  <code className="bg-muted px-1 py-0.5 rounded">
+                    {'{{ rental_value | extenso }}'}
+                  </code>{' '}
+                  - Valor por extenso
                 </div>
                 <div>
                   <Button
@@ -264,11 +275,7 @@ export default function ContractTemplatePage() {
                     <p className="text-muted-foreground">Carregando template...</p>
                   </div>
                 ) : editorMode === 'wysiwyg' ? (
-                  <WysiwygEditor
-                    value={content}
-                    onChange={setContent}
-                    className="h-full"
-                  />
+                  <WysiwygEditor value={content} onChange={setContent} className="h-full" />
                 ) : (
                   <Editor
                     height="100%"
@@ -322,72 +329,286 @@ export default function ContractTemplatePage() {
               <div style={{ height: '65vh', overflow: 'auto' }} className="p-4">
                 <h3 className="text-lg font-semibold mb-3">Variáveis do Locador</h3>
                 <ul className="list-disc pl-6 mb-6 space-y-1">
-                  <li><code className="bg-muted px-1 py-0.5 rounded text-sm">{'{{ landlord.name }}'}</code> - Nome do locador</li>
-                  <li><code className="bg-muted px-1 py-0.5 rounded text-sm">{'{{ landlord.cpf_cnpj }}'}</code> - CPF ou CNPJ</li>
-                  <li><code className="bg-muted px-1 py-0.5 rounded text-sm">{'{{ landlord.rg }}'}</code> - RG</li>
-                  <li><code className="bg-muted px-1 py-0.5 rounded text-sm">{'{{ landlord.nationality }}'}</code> - Nacionalidade</li>
-                  <li><code className="bg-muted px-1 py-0.5 rounded text-sm">{'{{ landlord.marital_status }}'}</code> - Estado civil</li>
-                  <li><code className="bg-muted px-1 py-0.5 rounded text-sm">{'{{ landlord.phone }}'}</code> - Telefone</li>
-                  <li><code className="bg-muted px-1 py-0.5 rounded text-sm">{'{{ landlord.email }}'}</code> - Email</li>
-                  <li><code className="bg-muted px-1 py-0.5 rounded text-sm">{'{{ landlord.street }}'}</code> - Rua</li>
-                  <li><code className="bg-muted px-1 py-0.5 rounded text-sm">{'{{ landlord.street_number }}'}</code> - Número</li>
-                  <li><code className="bg-muted px-1 py-0.5 rounded text-sm">{'{{ landlord.neighborhood }}'}</code> - Bairro</li>
-                  <li><code className="bg-muted px-1 py-0.5 rounded text-sm">{'{{ landlord.city }}'}</code> - Cidade</li>
-                  <li><code className="bg-muted px-1 py-0.5 rounded text-sm">{'{{ landlord.state }}'}</code> - Estado</li>
-                  <li><code className="bg-muted px-1 py-0.5 rounded text-sm">{'{{ landlord.zip_code }}'}</code> - CEP</li>
-                  <li><code className="bg-muted px-1 py-0.5 rounded text-sm">{'{{ landlord.country }}'}</code> - País</li>
-                  <li><code className="bg-muted px-1 py-0.5 rounded text-sm">{'{{ landlord.full_address }}'}</code> - Endereço completo</li>
+                  <li>
+                    <code className="bg-muted px-1 py-0.5 rounded text-sm">
+                      {'{{ landlord.name }}'}
+                    </code>{' '}
+                    - Nome do locador
+                  </li>
+                  <li>
+                    <code className="bg-muted px-1 py-0.5 rounded text-sm">
+                      {'{{ landlord.cpf_cnpj }}'}
+                    </code>{' '}
+                    - CPF ou CNPJ
+                  </li>
+                  <li>
+                    <code className="bg-muted px-1 py-0.5 rounded text-sm">
+                      {'{{ landlord.rg }}'}
+                    </code>{' '}
+                    - RG
+                  </li>
+                  <li>
+                    <code className="bg-muted px-1 py-0.5 rounded text-sm">
+                      {'{{ landlord.nationality }}'}
+                    </code>{' '}
+                    - Nacionalidade
+                  </li>
+                  <li>
+                    <code className="bg-muted px-1 py-0.5 rounded text-sm">
+                      {'{{ landlord.marital_status }}'}
+                    </code>{' '}
+                    - Estado civil
+                  </li>
+                  <li>
+                    <code className="bg-muted px-1 py-0.5 rounded text-sm">
+                      {'{{ landlord.phone }}'}
+                    </code>{' '}
+                    - Telefone
+                  </li>
+                  <li>
+                    <code className="bg-muted px-1 py-0.5 rounded text-sm">
+                      {'{{ landlord.email }}'}
+                    </code>{' '}
+                    - Email
+                  </li>
+                  <li>
+                    <code className="bg-muted px-1 py-0.5 rounded text-sm">
+                      {'{{ landlord.street }}'}
+                    </code>{' '}
+                    - Rua
+                  </li>
+                  <li>
+                    <code className="bg-muted px-1 py-0.5 rounded text-sm">
+                      {'{{ landlord.street_number }}'}
+                    </code>{' '}
+                    - Número
+                  </li>
+                  <li>
+                    <code className="bg-muted px-1 py-0.5 rounded text-sm">
+                      {'{{ landlord.neighborhood }}'}
+                    </code>{' '}
+                    - Bairro
+                  </li>
+                  <li>
+                    <code className="bg-muted px-1 py-0.5 rounded text-sm">
+                      {'{{ landlord.city }}'}
+                    </code>{' '}
+                    - Cidade
+                  </li>
+                  <li>
+                    <code className="bg-muted px-1 py-0.5 rounded text-sm">
+                      {'{{ landlord.state }}'}
+                    </code>{' '}
+                    - Estado
+                  </li>
+                  <li>
+                    <code className="bg-muted px-1 py-0.5 rounded text-sm">
+                      {'{{ landlord.zip_code }}'}
+                    </code>{' '}
+                    - CEP
+                  </li>
+                  <li>
+                    <code className="bg-muted px-1 py-0.5 rounded text-sm">
+                      {'{{ landlord.country }}'}
+                    </code>{' '}
+                    - País
+                  </li>
+                  <li>
+                    <code className="bg-muted px-1 py-0.5 rounded text-sm">
+                      {'{{ landlord.full_address }}'}
+                    </code>{' '}
+                    - Endereço completo
+                  </li>
                 </ul>
 
                 <h3 className="text-lg font-semibold mb-3">Variáveis de Inquilino</h3>
                 <ul className="list-disc pl-6 mb-6 space-y-1">
-                  <li><code className="bg-muted px-1 py-0.5 rounded text-sm">{'{{ tenant.name }}'}</code> - Nome completo</li>
-                  <li><code className="bg-muted px-1 py-0.5 rounded text-sm">{'{{ tenant.cpf_cnpj }}'}</code> - CPF ou CNPJ</li>
-                  <li><code className="bg-muted px-1 py-0.5 rounded text-sm">{'{{ tenant.rg }}'}</code> - RG</li>
-                  <li><code className="bg-muted px-1 py-0.5 rounded text-sm">{'{{ tenant.phone }}'}</code> - Telefone</li>
-                  <li><code className="bg-muted px-1 py-0.5 rounded text-sm">{'{{ tenant.marital_status }}'}</code> - Estado civil</li>
-                  <li><code className="bg-muted px-1 py-0.5 rounded text-sm">{'{{ tenant.profession }}'}</code> - Profissão</li>
-                  <li><code className="bg-muted px-1 py-0.5 rounded text-sm">{'{{ tenant.email }}'}</code> - Email</li>
+                  <li>
+                    <code className="bg-muted px-1 py-0.5 rounded text-sm">
+                      {'{{ tenant.name }}'}
+                    </code>{' '}
+                    - Nome completo
+                  </li>
+                  <li>
+                    <code className="bg-muted px-1 py-0.5 rounded text-sm">
+                      {'{{ tenant.cpf_cnpj }}'}
+                    </code>{' '}
+                    - CPF ou CNPJ
+                  </li>
+                  <li>
+                    <code className="bg-muted px-1 py-0.5 rounded text-sm">
+                      {'{{ tenant.rg }}'}
+                    </code>{' '}
+                    - RG
+                  </li>
+                  <li>
+                    <code className="bg-muted px-1 py-0.5 rounded text-sm">
+                      {'{{ tenant.phone }}'}
+                    </code>{' '}
+                    - Telefone
+                  </li>
+                  <li>
+                    <code className="bg-muted px-1 py-0.5 rounded text-sm">
+                      {'{{ tenant.marital_status }}'}
+                    </code>{' '}
+                    - Estado civil
+                  </li>
+                  <li>
+                    <code className="bg-muted px-1 py-0.5 rounded text-sm">
+                      {'{{ tenant.profession }}'}
+                    </code>{' '}
+                    - Profissão
+                  </li>
                 </ul>
 
                 <h3 className="text-lg font-semibold mb-3">Variáveis de Apartamento</h3>
                 <ul className="list-disc pl-6 mb-6 space-y-1">
-                  <li><code className="bg-muted px-1 py-0.5 rounded text-sm">{'{{ building_number }}'}</code> - Número do prédio</li>
-                  <li><code className="bg-muted px-1 py-0.5 rounded text-sm">{'{{ apartment_number }}'}</code> - Número do apartamento</li>
-                  <li><code className="bg-muted px-1 py-0.5 rounded text-sm">{'{{ building_address }}'}</code> - Endereço do prédio</li>
+                  <li>
+                    <code className="bg-muted px-1 py-0.5 rounded text-sm">
+                      {'{{ building_number }}'}
+                    </code>{' '}
+                    - Número do prédio
+                  </li>
+                  <li>
+                    <code className="bg-muted px-1 py-0.5 rounded text-sm">
+                      {'{{ apartment_number }}'}
+                    </code>{' '}
+                    - Número do apartamento
+                  </li>
                 </ul>
 
                 <h3 className="text-lg font-semibold mb-3">Variáveis de Locação</h3>
                 <ul className="list-disc pl-6 mb-6 space-y-1">
-                  <li><code className="bg-muted px-1 py-0.5 rounded text-sm">{'{{ validity }}'}</code> - Validade em meses</li>
-                  <li><code className="bg-muted px-1 py-0.5 rounded text-sm">{'{{ start_date }}'}</code> - Data de início</li>
-                  <li><code className="bg-muted px-1 py-0.5 rounded text-sm">{'{{ final_date }}'}</code> - Data final</li>
-                  <li><code className="bg-muted px-1 py-0.5 rounded text-sm">{'{{ next_month_date }}'}</code> - Data do próximo mês</li>
-                  <li><code className="bg-muted px-1 py-0.5 rounded text-sm">{'{{ rental_value }}'}</code> - Valor do aluguel (número)</li>
-                  <li><code className="bg-muted px-1 py-0.5 rounded text-sm">{'{{ cleaning_fee }}'}</code> - Taxa de limpeza</li>
-                  <li><code className="bg-muted px-1 py-0.5 rounded text-sm">{'{{ valor_tags }}'}</code> - Valor das tags (20 ou 40)</li>
-                  <li><code className="bg-muted px-1 py-0.5 rounded text-sm">{'{{ tag_unit_price }}'}</code> - Valor de reposição de 1 tag</li>
-                  <li><code className="bg-muted px-1 py-0.5 rounded text-sm">{'{{ tenant.due_day }}'}</code> - Dia de vencimento</li>
-                  <li><code className="bg-muted px-1 py-0.5 rounded text-sm">{'{{ lease.number_of_tenants }}'}</code> - Número de inquilinos</li>
+                  <li>
+                    <code className="bg-muted px-1 py-0.5 rounded text-sm">{'{{ validity }}'}</code>{' '}
+                    - Validade em meses
+                  </li>
+                  <li>
+                    <code className="bg-muted px-1 py-0.5 rounded text-sm">
+                      {'{{ start_date }}'}
+                    </code>{' '}
+                    - Data de início
+                  </li>
+                  <li>
+                    <code className="bg-muted px-1 py-0.5 rounded text-sm">
+                      {'{{ final_date }}'}
+                    </code>{' '}
+                    - Data final
+                  </li>
+                  <li>
+                    <code className="bg-muted px-1 py-0.5 rounded text-sm">
+                      {'{{ next_month_date }}'}
+                    </code>{' '}
+                    - Data do próximo mês
+                  </li>
+                  <li>
+                    <code className="bg-muted px-1 py-0.5 rounded text-sm">
+                      {'{{ rental_value }}'}
+                    </code>{' '}
+                    - Valor do aluguel (número)
+                  </li>
+                  <li>
+                    <code className="bg-muted px-1 py-0.5 rounded text-sm">
+                      {'{{ cleaning_fee }}'}
+                    </code>{' '}
+                    - Taxa de limpeza
+                  </li>
+                  <li>
+                    <code className="bg-muted px-1 py-0.5 rounded text-sm">
+                      {'{{ valor_tags }}'}
+                    </code>{' '}
+                    - Valor das tags (20 ou 40)
+                  </li>
+                  <li>
+                    <code className="bg-muted px-1 py-0.5 rounded text-sm">
+                      {'{{ valor_total }}'}
+                    </code>{' '}
+                    - Valor total do pagamento inicial
+                  </li>
+                  <li>
+                    <code className="bg-muted px-1 py-0.5 rounded text-sm">
+                      {'{{ tag_unit_price }}'}
+                    </code>{' '}
+                    - Valor de reposição de 1 tag
+                  </li>
+                  <li>
+                    <code className="bg-muted px-1 py-0.5 rounded text-sm">
+                      {'{{ tenant.due_day }}'}
+                    </code>{' '}
+                    - Dia de vencimento
+                  </li>
+                  <li>
+                    <code className="bg-muted px-1 py-0.5 rounded text-sm">
+                      {'{{ lease.number_of_tenants }}'}
+                    </code>{' '}
+                    - Número de inquilinos
+                  </li>
+                  <li>
+                    <code className="bg-muted px-1 py-0.5 rounded text-sm">
+                      {'{{ lease.deposit_amount }}'}
+                    </code>{' '}
+                    - Valor da caução (pode ser nulo)
+                  </li>
+                </ul>
+
+                <h3 className="text-lg font-semibold mb-3">Variáveis de Móveis</h3>
+                <ul className="list-disc pl-6 mb-6 space-y-1">
+                  <li>
+                    <code className="bg-muted px-1 py-0.5 rounded text-sm">
+                      {'{{ furnitures }}'}
+                    </code>{' '}
+                    - Lista de objetos Furniture (para a tabela de mobílias)
+                  </li>
+                  <li>
+                    <code className="bg-muted px-1 py-0.5 rounded text-sm">
+                      {'{{ furniture_names }}'}
+                    </code>{' '}
+                    - Lista de nomes (strings) — use em condicionais, ex.: botijão
+                  </li>
+                </ul>
+
+                <h3 className="text-lg font-semibold mb-3">Variáveis de Regras</h3>
+                <ul className="list-disc pl-6 mb-6 space-y-1">
+                  <li>
+                    <code className="bg-muted px-1 py-0.5 rounded text-sm">{'{{ rules }}'}</code> -
+                    Lista de regras de convivência do condomínio
+                  </li>
                 </ul>
 
                 <h3 className="text-lg font-semibold mb-3">Filtros Jinja2</h3>
                 <ul className="list-disc pl-6 mb-6 space-y-1">
-                  <li><code className="bg-muted px-1 py-0.5 rounded text-sm">{'{{ rental_value | currency }}'}</code> - Formata como moeda (R$ 1.500,00)</li>
-                  <li><code className="bg-muted px-1 py-0.5 rounded text-sm">{'{{ rental_value | extenso }}'}</code> - Escreve por extenso (mil e quinhentos reais)</li>
+                  <li>
+                    <code className="bg-muted px-1 py-0.5 rounded text-sm">
+                      {'{{ rental_value | currency }}'}
+                    </code>{' '}
+                    - Formata como moeda (R$ 1.500,00)
+                  </li>
+                  <li>
+                    <code className="bg-muted px-1 py-0.5 rounded text-sm">
+                      {'{{ rental_value | extenso }}'}
+                    </code>{' '}
+                    - Escreve por extenso (mil e quinhentos reais)
+                  </li>
                 </ul>
 
                 <h3 className="text-lg font-semibold mb-3">Loops (Móveis)</h3>
                 <pre className="bg-muted p-4 rounded mb-6 text-sm overflow-x-auto">
-{`{% for furniture in furnitures %}
+                  {`{% for furniture in furnitures %}
   <li>{{ furniture.name }}</li>
 {% endfor %}`}
                 </pre>
 
                 <h3 className="text-lg font-semibold mb-3">Condicionais</h3>
-                <pre className="bg-muted p-4 rounded text-sm overflow-x-auto">
-{`{% if lease.deposit_amount and lease.deposit_amount > 0 %}
+                <pre className="bg-muted p-4 rounded mb-6 text-sm overflow-x-auto">
+                  {`{% if lease.deposit_amount and lease.deposit_amount > 0 %}
   <p>Caução: {{ lease.deposit_amount | currency }}</p>
+{% endif %}`}
+                </pre>
+
+                <h3 className="text-lg font-semibold mb-3">Condicional com lista de nomes</h3>
+                <pre className="bg-muted p-4 rounded text-sm overflow-x-auto">
+                  {`{% if "Botijão de gás" in furniture_names %}
+  <p>Botijão de gás disponível.</p>
 {% endif %}`}
                 </pre>
               </div>
@@ -418,9 +639,7 @@ export default function ContractTemplatePage() {
                           <Badge variant="default" className="bg-info">
                             Template Original
                           </Badge>
-                          <span className="text-muted-foreground">
-                            {backup.filename}
-                          </span>
+                          <span className="text-muted-foreground">{backup.filename}</span>
                         </>
                       ) : (
                         backup.filename
@@ -443,9 +662,7 @@ export default function ContractTemplatePage() {
                 </div>
               ))
             ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                Nenhum backup encontrado
-              </div>
+              <div className="text-center py-8 text-muted-foreground">Nenhum backup encontrado</div>
             )}
           </div>
         </DialogContent>
@@ -460,7 +677,8 @@ export default function ContractTemplatePage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Restaurar Backup</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja restaurar o backup &quot;{restoreBackupFilename}&quot;? O template atual será substituído.
+              Tem certeza que deseja restaurar o backup &quot;{restoreBackupFilename}&quot;? O
+              template atual será substituído.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

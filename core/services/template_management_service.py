@@ -13,12 +13,13 @@ import shutil
 from pathlib import Path
 
 from django.conf import settings
-from jinja2 import BaseLoader, Environment, select_autoescape
+from jinja2 import BaseLoader
+from jinja2.exceptions import TemplateSyntaxError
 
 from core.models import Lease
-from core.utils import format_currency, number_to_words
 
 from .contract_service import ContractService
+from .jinja_environment import build_contract_jinja_env
 
 logger = logging.getLogger(__name__)
 
@@ -122,6 +123,29 @@ class TemplateManagementService:
         logger.info("Template content retrieved successfully")
         return content
 
+    @staticmethod
+    def _validate_template_syntax(content: str) -> None:
+        """
+        Compile the template in the sandboxed environment to validate Jinja syntax.
+
+        ``from_string`` compiles without rendering, so no lease/context is needed — it
+        only checks that the template parses. A broken save must never overwrite the
+        working template (which would make ALL contract PDF generation unavailable), so
+        this runs BEFORE any backup/write in ``save_template``.
+
+        Args:
+            content: Template HTML content to validate
+
+        Raises:
+            ValueError: If the content has invalid Jinja syntax (PT message + line number)
+        """
+        env = build_contract_jinja_env(BaseLoader())
+        try:
+            env.from_string(content)
+        except TemplateSyntaxError as exc:
+            msg = f"Template inválido: erro de sintaxe Jinja na linha {exc.lineno}: {exc.message}"
+            raise ValueError(msg) from exc
+
     @classmethod
     def save_template(cls, content: str) -> dict[str, str]:
         """
@@ -140,12 +164,14 @@ class TemplateManagementService:
             }
 
         Raises:
-            ValueError: If content is empty
+            ValueError: If content is empty or has invalid Jinja syntax
             IOError: If file operations fail
         """
         if not content or not content.strip():
             msg = "Template content cannot be empty"
             raise ValueError(msg)
+
+        cls._validate_template_syntax(content)
 
         template_path = cls.get_template_path()
         backup_dir = cls.get_backup_directory()
@@ -215,13 +241,8 @@ class TemplateManagementService:
         # Prepare context using the same logic as contract generation
         context = ContractService.prepare_contract_context(sample_lease)
 
-        # Render template with Jinja2
-        env = Environment(
-            loader=BaseLoader(),
-            autoescape=select_autoescape(["html"]),
-        )
-        env.filters["currency"] = format_currency
-        env.filters["extenso"] = number_to_words
+        # Render template with the shared sandboxed Jinja environment
+        env = build_contract_jinja_env(BaseLoader())
 
         template = env.from_string(content)
         html_content = template.render(context)
@@ -284,11 +305,20 @@ class TemplateManagementService:
             dict: {"message": Success message}
 
         Raises:
+            ValueError: If backup_filename escapes the backups directory or is not .html
             FileNotFoundError: If backup file doesn't exist
             IOError: If file operations fail
         """
-        backup_dir = cls.get_backup_directory()
-        backup_path = backup_dir / backup_filename
+        backup_dir = cls.get_backup_directory().resolve()
+        candidate = (backup_dir / backup_filename).resolve()
+
+        # Reject path traversal (../../.env), absolute paths and escaping symlinks; the
+        # .html suffix prevents overwriting the template with an arbitrary file type.
+        if candidate.suffix != ".html" or not candidate.is_relative_to(backup_dir):
+            msg = "Nome de backup inválido"
+            raise ValueError(msg)
+
+        backup_path = candidate
 
         if not backup_path.exists():
             msg = f"Backup file not found: {backup_filename}"

@@ -19,7 +19,7 @@ from typing import Any
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from jinja2 import Environment, FileSystemLoader, select_autoescape
+from jinja2 import FileSystemLoader
 
 from core.contract_rules import regras_condominio
 from core.infrastructure import (
@@ -29,10 +29,10 @@ from core.infrastructure import (
     PlaywrightPDFGenerator,
 )
 from core.models import ContractRule, Furniture, Landlord, Lease
-from core.utils import format_currency, number_to_words
 
 from .date_calculator import DateCalculatorService
 from .fee_calculator import FeeCalculatorService
+from .jinja_environment import build_contract_jinja_env
 
 logger = logging.getLogger(__name__)
 
@@ -205,6 +205,7 @@ class ContractService:
             "building_number": lease.apartment.building.street_number,
             "apartment_number": lease.apartment.number,
             "furnitures": lease_furnitures,
+            "furniture_names": [furniture.name for furniture in lease_furnitures],
             "validity": validity,
             "start_date": formatted_dates["start_date_formatted"],
             "final_date": final_date,
@@ -285,12 +286,7 @@ class ContractService:
             >>> assert "<html>" in html
         """
         template_path = str(Path(settings.BASE_DIR) / "core" / "templates")
-        env = Environment(
-            loader=FileSystemLoader(template_path),
-            autoescape=select_autoescape(["html"]),
-        )
-        env.filters["currency"] = format_currency
-        env.filters["extenso"] = number_to_words
+        env = build_contract_jinja_env(FileSystemLoader(template_path))
 
         template = env.get_template("contract_template.html")
         html_content = template.render(context)

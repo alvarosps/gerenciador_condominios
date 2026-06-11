@@ -447,3 +447,83 @@ class TestRestoreBackupErrorBranches:
         )
         assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
         assert "restaurar" in response.data["error"]
+
+
+# =============================================================================
+# Security regressions — SSTI sandbox, save validation, restore path traversal
+# =============================================================================
+
+
+@pytest.mark.integration
+class TestRestorePathTraversal:
+    url = "/api/templates/restore/"
+
+    def test_restore_invalid_filename_returns_400(
+        self, authenticated_api_client, template_dir, tmp_path
+    ):
+        """POST /restore/ with a traversal filename returns 400 and does not overwrite the
+        template (regression for the path-traversal finding)."""
+        template_file = template_dir / "contract_template.html"
+        original = template_file.read_text(encoding="utf-8")
+
+        secret = tmp_path / ".env"
+        secret.write_text("SECRET=top-secret", encoding="utf-8")
+
+        response = authenticated_api_client.post(
+            self.url, {"backup_filename": "../../.env"}, format="json"
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "error" in response.data
+        assert template_file.read_text(encoding="utf-8") == original
+
+    def test_restore_non_html_returns_400(self, authenticated_api_client, template_dir, tmp_path):
+        backup_dir = tmp_path / "core" / "templates" / "backups"
+        backup_dir.mkdir(parents=True, exist_ok=True)
+        (backup_dir / "evil.txt").write_text("nope", encoding="utf-8")
+
+        response = authenticated_api_client.post(
+            self.url, {"backup_filename": "evil.txt"}, format="json"
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+
+@pytest.mark.integration
+class TestSaveInvalidTemplate:
+    url = "/api/templates/save/"
+
+    def test_save_invalid_template_returns_400_and_keeps_current(
+        self, authenticated_api_client, template_dir
+    ):
+        """Invalid Jinja returns 400 and leaves the on-disk template intact (so PDF
+        generation stays available)."""
+        template_file = template_dir / "contract_template.html"
+        original = template_file.read_text(encoding="utf-8")
+
+        response = authenticated_api_client.post(
+            self.url, {"content": "<html>{% if %}</html>"}, format="json"
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "error" in response.data
+        assert template_file.read_text(encoding="utf-8") == original
+
+
+@pytest.mark.integration
+class TestPreviewSSTI:
+    url = "/api/templates/preview/"
+
+    def test_preview_ssti_payload_does_not_execute(
+        self, authenticated_api_client, template_dir, lease, active_landlord
+    ):
+        """An SSTI payload is blocked by the sandbox: the view returns a 5xx error envelope
+        without leaking subclass internals (the gadget never executes)."""
+        payload = "{{ ''.__class__.__mro__[1].__subclasses__() }}"
+        response = authenticated_api_client.post(
+            self.url, {"content": payload, "lease_id": lease.id}, format="json"
+        )
+
+        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+        assert "html" not in response.data
+        assert "subclasses" not in str(response.data)

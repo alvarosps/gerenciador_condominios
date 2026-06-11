@@ -433,11 +433,11 @@
       | extenso }}).
     </p>
 
-    {% if tenant.deposit_amount and tenant.deposit_amount > 0 %}
+    {% if lease.deposit_amount and lease.deposit_amount > 0 %}
     <p>
       O LOCATÁRIO possui caução adicional no valor de
-      <strong>{{ tenant.deposit_amount | currency }}</strong>
-      ({{ tenant.deposit_amount | extenso }} reais), que será devolvido ao
+      <strong>{{ lease.deposit_amount | currency }}</strong>
+      ({{ lease.deposit_amount | extenso }} reais), que será devolvido ao
       término do contrato, podendo ser utilizado exclusivamente para: pagamento
       de multa por quebra de contrato ou cobertura de danos ao imóvel/mobiliário
       verificados na vistoria de saída.
@@ -499,7 +499,7 @@
       segue a Lei 13.709/2018 (LGPD).
     </p>
 
-    {% if "Botijão de gás" in furnitures %}
+    {% if "Botijão de gás" in furniture_names %}
     <p>
       <strong>BOTIJÃO DE GÁS:</strong> Um botijão (casco) é disponibilizado na
       entrada e deve ser deixado na saída. Se o LOCATÁRIO desejar levar um

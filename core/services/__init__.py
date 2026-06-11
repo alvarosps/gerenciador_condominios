@@ -8,6 +8,7 @@ This package contains business logic services separated from the HTTP layer:
 - DashboardService: Financial metrics and operational statistics (Phase 7)
 - TemplateManagementService: Contract template CRUD operations (Phase 6)
 - MonthAdvanceService: Month advancement orchestration (validate, snapshot, prepare next month)
+- build_contract_jinja_env: Shared sandboxed Jinja environment for contract templates
 """
 
 from .base import BaseService
@@ -15,6 +16,7 @@ from .contract_service import ContractService
 from .dashboard_service import DashboardService
 from .date_calculator import DateCalculatorService
 from .fee_calculator import FeeCalculatorService
+from .jinja_environment import build_contract_jinja_env
 from .month_advance_service import MonthAdvanceService
 from .template_management_service import TemplateManagementService
 
@@ -26,4 +28,5 @@ __all__ = [
     "FeeCalculatorService",
     "MonthAdvanceService",
     "TemplateManagementService",
+    "build_contract_jinja_env",
 ]

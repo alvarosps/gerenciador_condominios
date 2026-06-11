@@ -270,3 +270,122 @@ class TestPreviewTemplate:
             lease_id=lease.id,
         )
         assert str(lease.id) in html_content
+
+
+@pytest.mark.unit
+class TestPreviewTemplateSecurity:
+    """preview_template runs inside the SandboxedEnvironment with StrictUndefined."""
+
+    def test_preview_rejects_ssti_payload(self, template_file, lease, active_landlord):
+        """The classic SSTI/RCE gadget must be blocked by the sandbox (not executed)."""
+        from jinja2.exceptions import SecurityError
+
+        payload = "{{ ''.__class__.__mro__[1].__subclasses__() }}"
+        with pytest.raises(SecurityError):
+            TemplateManagementService.preview_template(payload, lease_id=lease.id)
+
+    def test_preview_rejects_dunder_access(self, template_file, lease, active_landlord):
+        from jinja2.exceptions import SecurityError
+
+        with pytest.raises(SecurityError):
+            TemplateManagementService.preview_template("{{ ''.__class__ }}", lease_id=lease.id)
+
+    def test_preview_renders_valid_template(self, template_file, lease, active_landlord):
+        html_content = TemplateManagementService.preview_template(
+            "<html>{{ tenant.name }}</html>", lease_id=lease.id
+        )
+        assert lease.responsible_tenant.name in html_content
+
+    def test_preview_strict_undefined_raises_on_unknown_var(
+        self, template_file, lease, active_landlord
+    ):
+        from jinja2.exceptions import UndefinedError
+
+        with pytest.raises(UndefinedError):
+            TemplateManagementService.preview_template(
+                "<html>{{ variavel_que_nao_existe }}</html>", lease_id=lease.id
+            )
+
+
+@pytest.mark.unit
+class TestSaveTemplateValidation:
+    """save_template validates Jinja syntax before persisting so a broken save never makes
+    contract PDF generation unavailable."""
+
+    def test_save_rejects_invalid_jinja_without_overwriting(self, template_file):
+        original = template_file.read_text(encoding="utf-8")
+
+        with pytest.raises(ValueError, match="Template inválido"):
+            TemplateManagementService.save_template("<html>{% if %}</html>")
+
+        # The on-disk template must be untouched
+        assert template_file.read_text(encoding="utf-8") == original
+
+    def test_save_invalid_jinja_creates_no_backup(self, template_file, tmp_path):
+        backup_dir = tmp_path / "core" / "templates" / "backups"
+
+        with pytest.raises(ValueError, match="Template inválido"):
+            TemplateManagementService.save_template("<html>{% for x %}</html>")
+
+        if backup_dir.exists():
+            new_backups = list(backup_dir.glob("contract_template_backup_*.html"))
+            assert new_backups == []
+
+    def test_save_error_message_includes_line_number(self, template_file):
+        with pytest.raises(ValueError, match="linha"):
+            TemplateManagementService.save_template("<html>{% endfor %}</html>")
+
+    def test_save_valid_template_persists_and_backs_up(self, template_file, tmp_path):
+        new_content = "<html><body>{{ tenant.name }} valid</body></html>"
+        result = TemplateManagementService.save_template(new_content)
+
+        assert template_file.read_text(encoding="utf-8") == new_content
+        backup_dir = tmp_path / "core" / "templates" / "backups"
+        assert list(backup_dir.glob("contract_template_backup_*.html"))
+        assert "backup_filename" in result
+
+
+@pytest.mark.unit
+class TestRestoreBackupPathTraversal:
+    """restore_backup validates backup_filename to prevent path traversal."""
+
+    def test_restore_rejects_path_traversal(self, template_file, tmp_path):
+        original = template_file.read_text(encoding="utf-8")
+
+        # Place a sentinel '.env' two levels up to mimic a real secrets file
+        evil = tmp_path / ".env"
+        evil.write_text("SECRET=should-not-be-restored", encoding="utf-8")
+
+        with pytest.raises(ValueError, match="inválido"):
+            TemplateManagementService.restore_backup("../../.env")
+
+        # The template must NOT have been overwritten with the .env contents
+        assert template_file.read_text(encoding="utf-8") == original
+
+    def test_restore_rejects_absolute_path(self, template_file, tmp_path):
+        outside = tmp_path / "evil.html"
+        outside.write_text("<html>evil</html>", encoding="utf-8")
+
+        with pytest.raises(ValueError, match="inválido"):
+            TemplateManagementService.restore_backup(str(outside))
+
+    def test_restore_rejects_non_html_suffix(self, template_file, tmp_path):
+        backup_dir = tmp_path / "core" / "templates" / "backups"
+        backup_dir.mkdir(parents=True, exist_ok=True)
+        (backup_dir / "contract_template_backup_x.txt").write_text("nope", encoding="utf-8")
+
+        with pytest.raises(ValueError, match="inválido"):
+            TemplateManagementService.restore_backup("contract_template_backup_x.txt")
+
+    def test_restore_valid_backup_succeeds(self, template_file, tmp_path):
+        backup_dir = tmp_path / "core" / "templates" / "backups"
+        backup_dir.mkdir(parents=True, exist_ok=True)
+        legit = backup_dir / "contract_template_backup_20240101_000000.html"
+        legit.write_text("<html>restored content</html>", encoding="utf-8")
+
+        result = TemplateManagementService.restore_backup(
+            "contract_template_backup_20240101_000000.html"
+        )
+
+        assert template_file.read_text(encoding="utf-8") == "<html>restored content</html>"
+        assert "safety_backup" in result

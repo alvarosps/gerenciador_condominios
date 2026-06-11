@@ -244,6 +244,8 @@ class ContractTemplateViewSet(viewsets.ViewSet):
         try:
             result = TemplateManagementService.restore_backup(backup_filename)
             return Response(result, status=status.HTTP_200_OK)
+        except ValueError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         except FileNotFoundError as e:
             logger.warning(f"Backup file not found: {e}")
             return Response(
