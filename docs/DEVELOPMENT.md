@@ -31,11 +31,6 @@ npm install
 npm run dev  # http://localhost:4000
 ```
 
-### Docker (alternativa)
-```bash
-docker-compose up -d  # Dev: PostgreSQL + Django + Frontend
-```
-
 ## Rodando Testes
 
 ```bash

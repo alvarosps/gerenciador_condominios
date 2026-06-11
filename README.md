@@ -192,27 +192,9 @@ createdb condominio
 python manage.py migrate
 ```
 
-## Docker Setup
+## Deployment
 
-### Development
-
-```bash
-# Start all services (PostgreSQL, Redis, Backend, Frontend)
-docker-compose up -d
-
-# View logs
-docker-compose logs -f
-
-# Stop services
-docker-compose down
-```
-
-### Production
-
-```bash
-# Start with production config
-docker-compose -f docker-compose.prod.yml up -d
-```
+Production runs on **Vercel** (frontend) + **Render** (backend, see `render_build.sh`) + **Supabase** (PostgreSQL). There is no Docker/nginx stack — deploys happen by pushing to the repo; the Render build runs migrations and `playwright install chromium`.
 
 ## Running Tests
 
@@ -373,9 +355,9 @@ condominios_manager/
 ├── scripts/                    # Utility scripts
 │   ├── backup_db.py           # Database backup
 │   └── restore_db.py          # Database restore
-├── backups/                    # Database backups
-├── contracts/                  # Generated PDFs
-├── docker-compose.yml          # Docker config
+├── backups/                    # Database backups (gitignored)
+├── contracts/                  # Generated PDFs (gitignored)
+├── render_build.sh             # Render (backend) build script
 ├── requirements.txt            # Python dependencies
 └── CLAUDE.md                   # AI assistant instructions
 ```
