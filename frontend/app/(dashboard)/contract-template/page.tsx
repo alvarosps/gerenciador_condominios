@@ -5,7 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -38,7 +44,7 @@ export default function ContractTemplatePage() {
   const [activeTab, setActiveTab] = useState('editor');
   const [editorMode, setEditorMode] = useState<EditorMode>('wysiwyg');
   const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
-  const [restoreBackupFilename, setRestoreBackupFilename] = useState<string | null>(null);
+  const [restoreVersionId, setRestoreVersionId] = useState<number | null>(null);
 
   const { data: templateData, isLoading } = useContractTemplate();
   const { data: backups, refetch: refetchBackups } = useTemplateBackups();
@@ -117,13 +123,13 @@ export default function ContractTemplatePage() {
   };
 
   const handleRestoreBackup = async () => {
-    if (!restoreBackupFilename) return;
+    if (restoreVersionId === null) return;
 
     try {
-      const result = await restoreMutation.mutateAsync(restoreBackupFilename);
+      const result = await restoreMutation.mutateAsync(restoreVersionId);
       toast.success(result.message);
       setIsBackupModalOpen(false);
-      setRestoreBackupFilename(null);
+      setRestoreVersionId(null);
       void refetchBackups();
     } catch (error: unknown) {
       const errorMessage =
@@ -141,14 +147,6 @@ export default function ContractTemplatePage() {
           : 'Erro ao restaurar backup';
       toast.error(errorMessage);
     }
-  };
-
-  const formatBytes = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return `${String(Math.round((bytes / Math.pow(k, i)) * 100) / 100)} ${sizes[i] ?? ''}`;
   };
 
   const hasChanges = content !== templateData?.content;
@@ -622,31 +620,34 @@ export default function ContractTemplatePage() {
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Backups do Template</DialogTitle>
+            <DialogDescription>
+              Versões salvas do template. Restaure qualquer versão para torná-la a ativa.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-2 max-h-96 overflow-y-auto">
             {backups && backups.length > 0 ? (
               backups.map((backup) => (
                 <div
-                  key={backup.filename}
+                  key={backup.id}
                   className={`flex items-center justify-between p-3 border rounded hover:bg-muted ${
                     backup.is_default ? 'border-info/30 bg-info/10' : ''
                   }`}
                 >
                   <div className="flex-1">
                     <div className="font-medium text-sm flex items-center gap-2">
-                      {backup.is_default ? (
-                        <>
-                          <Badge variant="default" className="bg-info">
-                            Template Original
-                          </Badge>
-                          <span className="text-muted-foreground">{backup.filename}</span>
-                        </>
-                      ) : (
-                        backup.filename
+                      {backup.is_default && (
+                        <Badge variant="default" className="bg-info">
+                          Template Original
+                        </Badge>
                       )}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      Tamanho: {formatBytes(backup.size)}
+                      <span className={backup.is_default ? 'text-muted-foreground' : ''}>
+                        {backup.label}
+                      </span>
+                      {backup.is_active && (
+                        <Badge variant="secondary" className="bg-success/10 text-success">
+                          Em uso
+                        </Badge>
+                      )}
                     </div>
                     <div className="text-xs text-muted-foreground">
                       Criado em: {new Date(backup.created_at).toLocaleString('pt-BR')}
@@ -654,10 +655,10 @@ export default function ContractTemplatePage() {
                   </div>
                   <Button
                     variant={backup.is_default ? 'default' : 'link'}
-                    onClick={() => setRestoreBackupFilename(backup.filename)}
-                    disabled={restoreMutation.isPending}
+                    onClick={() => setRestoreVersionId(backup.id)}
+                    disabled={restoreMutation.isPending || backup.is_active}
                   >
-                    Restaurar
+                    {backup.is_active ? 'Ativo' : 'Restaurar'}
                   </Button>
                 </div>
               ))
@@ -670,15 +671,16 @@ export default function ContractTemplatePage() {
 
       {/* Restore Confirmation Dialog */}
       <AlertDialog
-        open={Boolean(restoreBackupFilename)}
-        onOpenChange={(open) => !open && setRestoreBackupFilename(null)}
+        open={restoreVersionId !== null}
+        onOpenChange={(open) => !open && setRestoreVersionId(null)}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Restaurar Backup</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja restaurar o backup &quot;{restoreBackupFilename}&quot;? O
-              template atual será substituído.
+              Tem certeza que deseja restaurar a versão &quot;
+              {backups?.find((b) => b.id === restoreVersionId)?.label ?? ''}&quot;? O template atual
+              será substituído.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

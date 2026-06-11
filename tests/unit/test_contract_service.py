@@ -328,19 +328,24 @@ class TestRenderContractTemplateSandbox:
         assert "<html" in html
         assert landlord.name in html
 
-    def test_render_uses_sandboxed_env_blocks_ssti_in_disk_template(
-        self, lease, landlord, monkeypatch, tmp_path
+    def test_render_uses_sandboxed_env_blocks_ssti_in_active_template(
+        self, lease, landlord, admin_user
     ):
-        """Defense in depth: an SSTI payload placed in the on-disk template is blocked by the
-        sandbox at render time (it never executes)."""
+        """Defense in depth: an SSTI payload stored as the active DB template is blocked by
+        the sandbox at render time (it never executes)."""
         from jinja2.exceptions import SecurityError
 
-        template_dir = tmp_path / "core" / "templates"
-        template_dir.mkdir(parents=True)
-        (template_dir / "contract_template.html").write_text(
-            "<html>{{ ''.__class__.__mro__ }}</html>", encoding="utf-8"
+        from core.models import ContractTemplate
+
+        ContractTemplate.objects.update(is_active=False)
+        ContractTemplate.objects.create(
+            content="<html>{{ ''.__class__.__mro__ }}</html>",
+            label="ssti",
+            is_active=True,
+            is_default=False,
+            created_by=admin_user,
+            updated_by=admin_user,
         )
-        monkeypatch.setattr(settings, "BASE_DIR", str(tmp_path))
 
         context = ContractService.prepare_contract_context(lease)
         with pytest.raises(SecurityError):

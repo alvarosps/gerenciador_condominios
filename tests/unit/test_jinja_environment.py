@@ -1,4 +1,4 @@
-"""Unit tests for core/services/jinja_environment.build_contract_jinja_env.
+"""Unit tests for core/jinja_environment.build_contract_jinja_env.
 
 The shared Jinja environment is a SandboxedEnvironment with StrictUndefined and the
 contract filters (currency/extenso). It is used by both ContractService.render_contract_template
@@ -16,8 +16,8 @@ from jinja2 import BaseLoader, StrictUndefined
 from jinja2.exceptions import SecurityError, UndefinedError
 from jinja2.sandbox import SandboxedEnvironment
 
+from core.jinja_environment import build_contract_jinja_env
 from core.services.html_sanitizer import sanitize_contract_html
-from core.services.jinja_environment import build_contract_jinja_env
 from core.utils import format_currency, number_to_words
 
 

@@ -2018,9 +2018,9 @@ const templateHandlers = [
   http.post(`${API_BASE}/templates/save/`, async () => {
     await delay(100);
     return HttpResponse.json({
-      message: 'Template salvo com sucesso!',
-      backup_path: '/path/to/backup.html',
-      backup_filename: 'contract_template_backup_20260405_120000.html',
+      message: 'Template salvo com sucesso! Versão de backup criada.',
+      version_id: 2,
+      label: '05/04/2026 12:00:00',
     });
   }),
 
@@ -2028,10 +2028,11 @@ const templateHandlers = [
     await delay(50);
     return HttpResponse.json([
       {
-        filename: 'contract_template_backup_20260405_120000.html',
-        path: '/path/to/backup.html',
-        size: 5432,
+        id: 1,
+        label: 'Padrão',
         created_at: '2026-04-05T12:00:00',
+        is_default: true,
+        is_active: true,
       },
     ]);
   }),
@@ -2039,8 +2040,9 @@ const templateHandlers = [
   http.post(`${API_BASE}/templates/restore/`, async () => {
     await delay(100);
     return HttpResponse.json({
-      message: 'Template restaurado com sucesso de backup.html',
-      safety_backup: 'contract_template_before_restore_20260405_120000.html',
+      message: "Template restaurado com sucesso para a versão 'Padrão'.",
+      version_id: 1,
+      label: 'Padrão',
     });
   }),
 

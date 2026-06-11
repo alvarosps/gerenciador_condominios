@@ -1,25 +1,26 @@
 """
 Template management service for contract template CRUD operations.
 
+Persistence lives in the database (``ContractTemplate``), not on the container
+filesystem — the editor and its version history survive deploys/restarts on ephemeral
+filesystems (Render), and restore takes an integer version id (no path traversal).
+
 Handles all business logic related to contract template management including:
-- Reading current template from filesystem
-- Saving template with automatic backup
-- Rendering template preview with sample data
+- Reading the active template
+- Saving a new active version (with syntax validation + backup rotation)
+- Rendering a template preview with sample data
+- Listing template versions and restoring one by id
 """
 
-import datetime as dt
 import logging
-import shutil
-from pathlib import Path
 
-from django.conf import settings
+from django.contrib.auth.models import User
 from jinja2 import BaseLoader
-from jinja2.exceptions import TemplateSyntaxError
 
-from core.models import Lease
+from core.jinja_environment import build_contract_jinja_env
+from core.models import ContractTemplate, Lease
 
 from .contract_service import ContractService
-from .jinja_environment import build_contract_jinja_env
 
 logger = logging.getLogger(__name__)
 
@@ -28,172 +29,56 @@ class TemplateManagementService:
     """
     Service for contract template management.
 
-    Provides enterprise-level template CRUD operations with backup functionality
+    Provides template CRUD operations with versioned backups stored in the database
     and preview rendering using sample lease data.
 
     Methods:
-        get_template: Read current template content from filesystem
-        save_template: Save template with automatic versioned backup
+        get_template: Read the active template content
+        save_template: Persist a new active version (validates syntax, rotates backups)
         preview_template: Render template with sample data for preview
-        list_backups: List all template backups
-        restore_backup: Restore a specific backup
+        list_backups: List all template versions (DEFAULT first, then newest-first)
+        restore_backup: Activate a specific version by id
     """
-
-    @staticmethod
-    def get_template_path() -> Path:
-        """
-        Get the absolute path to the contract template file.
-
-        Returns:
-            Path to contract_template.html
-
-        Raises:
-            FileNotFoundError: If template file doesn't exist
-        """
-        template_path = Path(settings.BASE_DIR) / "core" / "templates" / "contract_template.html"
-
-        if not template_path.exists():
-            msg = f"Template file not found at {template_path}"
-            raise FileNotFoundError(msg)
-
-        return template_path
-
-    @staticmethod
-    def get_backup_directory() -> Path:
-        """
-        Get the directory for template backups.
-
-        Returns:
-            Path to backups directory
-
-        Creates the directory if it doesn't exist.
-        """
-        backup_dir = Path(settings.BASE_DIR) / "core" / "templates" / "backups"
-        backup_dir.mkdir(parents=True, exist_ok=True)
-        return backup_dir
-
-    @classmethod
-    def ensure_default_backup(cls) -> str | None:
-        """
-        Ensure a default backup exists.
-
-        Creates a backup named 'contract_template_DEFAULT.html' from the current
-        template if it doesn't already exist. This serves as the original template
-        that can always be restored.
-
-        Returns:
-            str: Path to default backup file, or None if already exists
-        """
-        try:
-            backup_dir = cls.get_backup_directory()
-            default_backup_path = backup_dir / "contract_template_DEFAULT.html"
-
-            if not default_backup_path.exists():
-                template_path = cls.get_template_path()
-                shutil.copy2(template_path, default_backup_path)
-                logger.info(f"Default backup created: {default_backup_path}")
-                return str(default_backup_path)
-
-        except OSError:
-            logger.exception("Error creating default backup")
-            return None
-        else:
-            return None
 
     @classmethod
     def get_template(cls) -> str:
         """
-        Read current contract template content.
-
-        Ensures a default backup exists before returning the template.
+        Read the active contract template content.
 
         Returns:
             str: Template HTML content
 
         Raises:
-            FileNotFoundError: If template file doesn't exist
-            IOError: If file cannot be read
+            ContractTemplate.DoesNotExist: If no active template exists
         """
-        template_path = cls.get_template_path()
-
-        # Ensure default backup exists on first access
-        cls.ensure_default_backup()
-
-        content = template_path.read_text(encoding="utf-8")
-        logger.info("Template content retrieved successfully")
+        content = ContractTemplate.get_active_content()
+        logger.info("Active contract template retrieved successfully")
         return content
 
-    @staticmethod
-    def _validate_template_syntax(content: str) -> None:
-        """
-        Compile the template in the sandboxed environment to validate Jinja syntax.
-
-        ``from_string`` compiles without rendering, so no lease/context is needed — it
-        only checks that the template parses. A broken save must never overwrite the
-        working template (which would make ALL contract PDF generation unavailable), so
-        this runs BEFORE any backup/write in ``save_template``.
-
-        Args:
-            content: Template HTML content to validate
-
-        Raises:
-            ValueError: If the content has invalid Jinja syntax (PT message + line number)
-        """
-        env = build_contract_jinja_env(BaseLoader())
-        try:
-            env.from_string(content)
-        except TemplateSyntaxError as exc:
-            msg = f"Template inválido: erro de sintaxe Jinja na linha {exc.lineno}: {exc.message}"
-            raise ValueError(msg) from exc
-
     @classmethod
-    def save_template(cls, content: str) -> dict[str, str]:
+    def save_template(cls, content: str, user: User | None = None) -> dict[str, object]:
         """
-        Save contract template with automatic backup.
+        Persist a new active template version with backup rotation.
 
-        Creates a timestamped backup of the current template before saving
-        the new content. Backups are stored in core/templates/backups/
+        Validates the Jinja syntax before persisting so a broken save never replaces the
+        working active version (which would make ALL contract PDF generation fail).
 
         Args:
             content: New template HTML content
+            user: User performing the change (audit)
 
         Returns:
-            dict: {
-                "message": Success message,
-                "backup_path": Path to backup file
-            }
+            dict: {"message", "version_id", "label"}
 
         Raises:
             ValueError: If content is empty or has invalid Jinja syntax
-            IOError: If file operations fail
         """
-        if not content or not content.strip():
-            msg = "Template content cannot be empty"
-            raise ValueError(msg)
-
-        cls._validate_template_syntax(content)
-
-        template_path = cls.get_template_path()
-        backup_dir = cls.get_backup_directory()
-
-        # Generate timestamped backup filename
-        timestamp = dt.datetime.now(tz=dt.UTC).strftime("%Y%m%d_%H%M%S")
-        backup_filename = f"contract_template_backup_{timestamp}.html"
-        backup_path = backup_dir / backup_filename
-
-        # Create backup of current template
-        if template_path.exists():
-            shutil.copy2(template_path, backup_path)
-            logger.info(f"Backup created: {backup_path}")
-
-        # Save new template
-        template_path.write_text(content, encoding="utf-8")
-        logger.info("Template saved successfully")
-
+        version = ContractTemplate.save_version(content, user=user)
+        logger.info("Contract template version %s saved successfully", version.pk)
         return {
-            "message": "Template salvo com sucesso! Backup criado.",
-            "backup_path": str(backup_path),
-            "backup_filename": backup_filename,
+            "message": "Template salvo com sucesso! Versão de backup criada.",
+            "version_id": version.pk,
+            "label": version.label,
         }
 
     @classmethod
@@ -202,7 +87,7 @@ class TemplateManagementService:
         Render template with sample data for preview.
 
         Uses either a specific lease or the first available lease as sample data.
-        Renders the template using Jinja2 with the same context as contract generation.
+        Renders the template using the shared sandboxed Jinja environment.
 
         Args:
             content: Template HTML content to render
@@ -243,7 +128,6 @@ class TemplateManagementService:
 
         # Render template with the shared sandboxed Jinja environment
         env = build_contract_jinja_env(BaseLoader())
-
         template = env.from_string(content)
         html_content = template.render(context)
 
@@ -253,91 +137,44 @@ class TemplateManagementService:
     @classmethod
     def list_backups(cls) -> list[dict[str, object]]:
         """
-        List all template backups.
+        List all template versions.
 
-        Returns the DEFAULT backup first (if exists), followed by timestamped
-        backups sorted by creation date (newest first).
+        Returns the DEFAULT version first, followed by the remaining versions sorted by
+        creation date (newest first).
 
         Returns:
-            list: List of backup info dicts with filename, path, timestamp, and is_default flag
+            list: Version info dicts with id, label, created_at, is_default, is_active
         """
-        backup_dir = cls.get_backup_directory()
-        backups = []
-        default_backup = None
-
-        for filename in sorted(backup_dir.iterdir(), key=lambda p: p.name, reverse=True):
-            if filename.suffix != ".html":
-                continue
-
-            stat_info = filename.stat()
-
-            backup_info = {
-                "filename": filename.name,
-                "path": str(filename),
-                "size": stat_info.st_size,
-                "created_at": dt.datetime.fromtimestamp(stat_info.st_ctime, tz=dt.UTC).isoformat(),
-                "is_default": filename.name == "contract_template_DEFAULT.html",
+        return [
+            {
+                "id": version.pk,
+                "label": version.label,
+                "created_at": version.created_at.isoformat(),
+                "is_default": version.is_default,
+                "is_active": version.is_active,
             }
-
-            # Separate default backup to show first
-            if filename.name == "contract_template_DEFAULT.html":
-                default_backup = backup_info
-            elif filename.name.startswith(
-                ("contract_template_backup_", "contract_template_before_restore_")
-            ):
-                backups.append(backup_info)
-
-        # Put default backup at the beginning if it exists
-        if default_backup:
-            backups.insert(0, default_backup)
-
-        return backups
+            for version in ContractTemplate.list_versions()
+        ]
 
     @classmethod
-    def restore_backup(cls, backup_filename: str) -> dict[str, str]:
+    def restore_backup(cls, version_id: int, user: User | None = None) -> dict[str, object]:
         """
-        Restore a template from backup.
+        Activate a specific template version by id.
 
         Args:
-            backup_filename: Name of the backup file to restore
+            version_id: Primary key of the version to activate
+            user: User performing the restore (audit)
 
         Returns:
-            dict: {"message": Success message}
+            dict: {"message", "version_id", "label"}
 
         Raises:
-            ValueError: If backup_filename escapes the backups directory or is not .html
-            FileNotFoundError: If backup file doesn't exist
-            IOError: If file operations fail
+            ContractTemplate.DoesNotExist: If the version id does not exist
         """
-        backup_dir = cls.get_backup_directory().resolve()
-        candidate = (backup_dir / backup_filename).resolve()
-
-        # Reject path traversal (../../.env), absolute paths and escaping symlinks; the
-        # .html suffix prevents overwriting the template with an arbitrary file type.
-        if candidate.suffix != ".html" or not candidate.is_relative_to(backup_dir):
-            msg = "Nome de backup inválido"
-            raise ValueError(msg)
-
-        backup_path = candidate
-
-        if not backup_path.exists():
-            msg = f"Backup file not found: {backup_filename}"
-            raise FileNotFoundError(msg)
-
-        template_path = cls.get_template_path()
-
-        # Create a backup of current template before restoring
-        timestamp = dt.datetime.now(tz=dt.UTC).strftime("%Y%m%d_%H%M%S")
-        safety_backup = f"contract_template_before_restore_{timestamp}.html"
-        safety_backup_path = backup_dir / safety_backup
-        shutil.copy2(template_path, safety_backup_path)
-
-        # Restore the backup
-        shutil.copy2(backup_path, template_path)
-
-        logger.info(f"Template restored from backup: {backup_filename}")
-
+        version = ContractTemplate.restore_version(version_id, user=user)
+        logger.info("Contract template restored to version %s", version.pk)
         return {
-            "message": f"Template restaurado com sucesso de {backup_filename}",
-            "safety_backup": safety_backup,
+            "message": f"Template restaurado com sucesso para a versão '{version.label}'.",
+            "version_id": version.pk,
+            "label": version.label,
         }

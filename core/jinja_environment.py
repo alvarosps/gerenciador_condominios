@@ -1,9 +1,14 @@
 """Shared, sandboxed Jinja2 environment factory for contract templates.
 
-Single source of truth for how contract templates are compiled and rendered.
-Both ContractService.render_contract_template (PDF generation) and
-TemplateManagementService.preview_template (template editor preview) must use this
-factory so that:
+Single source of truth for how contract templates are compiled and rendered. It lives at
+the ``core`` top level (peer of ``models``/``utils``), not under ``core/services``, because
+it is shared infrastructure consumed by BOTH the model layer (``ContractTemplate`` syntax
+validation) and the service layer (PDF rendering / preview) — importing it from a service
+package would create a models→services import cycle.
+
+Both ``ContractService.render_contract_template`` (PDF generation) and
+``TemplateManagementService.preview_template`` (template editor preview), as well as
+``ContractTemplate.save_version`` (syntax validation), use this factory so that:
 
 - Templates run inside a ``SandboxedEnvironment``, which blocks access to dangerous
   attributes/methods (``__class__``, ``__globals__``, ``__subclasses__``, ...). This
@@ -24,8 +29,9 @@ def build_contract_jinja_env(loader: BaseLoader) -> SandboxedEnvironment:
     """Build the sandboxed Jinja environment used for contract templates.
 
     Args:
-        loader: The Jinja loader (``BaseLoader`` for inline preview content,
-            ``FileSystemLoader`` for the on-disk contract template).
+        loader: The Jinja loader (``BaseLoader`` for inline content rendered via
+            ``from_string`` — preview, the DB-backed active template, and syntax
+            validation).
 
     Returns:
         A ``SandboxedEnvironment`` with HTML autoescape, ``StrictUndefined`` and the

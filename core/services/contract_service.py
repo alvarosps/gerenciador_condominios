@@ -19,7 +19,7 @@ from typing import Any
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from jinja2 import FileSystemLoader
+from jinja2 import BaseLoader
 
 from core.contract_rules import regras_condominio
 from core.infrastructure import (
@@ -28,12 +28,12 @@ from core.infrastructure import (
     IPDFGenerator,
     PlaywrightPDFGenerator,
 )
-from core.models import ContractRule, Furniture, Landlord, Lease
+from core.jinja_environment import build_contract_jinja_env
+from core.models import ContractRule, ContractTemplate, Furniture, Landlord, Lease
 
 from .date_calculator import DateCalculatorService
 from .fee_calculator import FeeCalculatorService
 from .html_sanitizer import sanitize_contract_html
-from .jinja_environment import build_contract_jinja_env
 
 logger = logging.getLogger(__name__)
 
@@ -272,10 +272,11 @@ class ContractService:
     @staticmethod
     def render_contract_template(context: dict[str, Any]) -> str:
         """
-        Render the contract HTML template with the given context.
+        Render the active contract HTML template with the given context.
 
-        Uses Jinja2 template engine with custom filters for currency formatting
-        and number-to-words conversion.
+        Loads the active ``ContractTemplate`` content from the database (durable on
+        ephemeral container filesystems) and renders it inside the shared sandboxed
+        Jinja environment with the currency/number-to-words filters.
 
         Args:
             context: Template context dictionary
@@ -288,10 +289,10 @@ class ContractService:
             >>> html = ContractService.render_contract_template(context)
             >>> assert "<html>" in html
         """
-        template_path = str(Path(settings.BASE_DIR) / "core" / "templates")
-        env = build_contract_jinja_env(FileSystemLoader(template_path))
+        content = ContractTemplate.get_active_content()
+        env = build_contract_jinja_env(BaseLoader())
 
-        template = env.get_template("contract_template.html")
+        template = env.from_string(content)
         html_content = template.render(context)
 
         logger.debug("Contract template rendered successfully")

@@ -77,7 +77,8 @@ db.sqlite3-journal
 /*.json.gz
 /local_backup.*
 
-# Template backups
+# Legacy on-disk contract-template backups (now persisted in the DB —
+# ContractTemplate). Keep any pre-migration files local but never commit them.
 core/templates/backups/
 
 # Documentation (allow docs/ but ignore generated docs)
