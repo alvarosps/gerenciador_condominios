@@ -18,9 +18,10 @@ repos:
       - id: check-merge-conflict
       - id: check-case-conflict
       - id: detect-private-key
-      - id: mixed-line-ending
-        args: ['--fix=lf']
-        exclude: '\.sql$'
+      # NOTE: no mixed-line-ending hook. The repo normalizes line endings via
+      # .gitattributes (`* text=auto` → LF in the repository), and forcing
+      # `--fix=lf` in the working tree fights git's core.autocrlf=true on
+      # Windows, breaking lint-staged's stash/restore.
 
   # Ruff — replaces black, isort, flake8, pylint
   - repo: https://github.com/astral-sh/ruff-pre-commit
