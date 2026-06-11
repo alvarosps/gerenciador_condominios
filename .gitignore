@@ -67,13 +67,15 @@ db.sqlite3-journal
 /Notificacao_*.pdf
 *.pot
 
-# Database backups & dumps (PII) — never commit. Root-only *.sql/*.json so we
-# don't catch core/migrations SQL or scripts/data seeds.
+# Database backups & dumps (PII) — never commit. Root-only patterns so we
+# don't catch core/migrations SQL, scripts/data seeds, or package.json/.mcp.json.
 /backups/
 /backup_json/
 *.dump
 /*.sql
+/backup_*.json
 /*.json.gz
+/local_backup.*
 
 # Template backups
 core/templates/backups/
