@@ -2,11 +2,11 @@
 
 from rest_framework import serializers, status, viewsets
 from rest_framework.decorators import action
-from rest_framework.permissions import IsAdminUser
 from rest_framework.request import Request
 from rest_framework.response import Response
 
 from core.models import MonthSnapshot
+from core.permissions import IsAdminUser
 from core.services.month_advance_service import MonthAdvanceService
 
 

@@ -210,7 +210,7 @@ def test_income_entry_received_date_validation(authenticated_api_client):
     assert resp.status_code == status.HTTP_400_BAD_REQUEST
 
 
-# --- FinancialReadOnly matrix (mirror test_financial_permissions.py) ---
+# --- IsAdminUser matrix (admin-only after P1.2) ---
 
 _READ_ENDPOINTS = [
     "/api/finances/reserves/",
@@ -220,9 +220,14 @@ _READ_ENDPOINTS = [
 ]
 
 
-def test_non_admin_can_read(regular_authenticated_api_client):
+def test_non_admin_cannot_read(regular_authenticated_api_client):
     for url in _READ_ENDPOINTS:
-        assert regular_authenticated_api_client.get(url).status_code == status.HTTP_200_OK
+        assert regular_authenticated_api_client.get(url).status_code == status.HTTP_403_FORBIDDEN
+
+
+def test_admin_can_read(authenticated_api_client):
+    for url in _READ_ENDPOINTS:
+        assert authenticated_api_client.get(url).status_code == status.HTTP_200_OK
 
 
 def test_non_admin_cannot_write(regular_authenticated_api_client):

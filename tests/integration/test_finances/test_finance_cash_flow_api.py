@@ -146,9 +146,9 @@ def test_simulate_is_never_cached(authenticated_api_client):
 
 
 @freeze_time("2026-07-15 12:00:00")
-def test_projection_readable_by_non_admin(regular_authenticated_api_client):
+def test_projection_blocked_for_non_admin(regular_authenticated_api_client):
     resp = regular_authenticated_api_client.get(f"{PROJECTION_URL}?months=3")
-    assert resp.status_code == status.HTTP_200_OK
+    assert resp.status_code == status.HTTP_403_FORBIDDEN
 
 
 @freeze_time("2026-07-15 12:00:00")

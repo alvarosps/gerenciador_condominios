@@ -14,7 +14,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 
 from core.cache import cache_result
-from core.permissions import FinancialReadOnly
+from core.permissions import IsAdminUser
 from core.services.rent_schedule_service import RentScheduleService
 from finances.cache import FINANCE_DASHBOARD_PREFIX, FINANCE_PROJECTION_PREFIX
 from finances.models import (
@@ -196,7 +196,7 @@ def _by_category(year: int, month: int, building_id: int | None) -> list[dict[st
 class FinanceDashboardViewSet(viewsets.ViewSet):
     """Read-only dashboard for the condominium-finance calendar and overdue list."""
 
-    permission_classes = [FinancialReadOnly]
+    permission_classes = [IsAdminUser]
 
     @action(detail=False, methods=["get"])
     def combined_calendar(self, request: Request) -> Response:
@@ -344,11 +344,11 @@ class FinanceCashFlowViewSet(viewsets.ViewSet):
     """Read-only cash-flow projection + ephemeral what-if simulation (Session 47).
 
     GET projection is cached (finance-projection, invalidated by any finances write); POST simulate
-    is never cached (depends on the body and is ephemeral). FinancialReadOnly: any authenticated
-    user reads the projection; only is_staff may POST a simulation.
+    is never cached (depends on the body and is ephemeral). IsAdminUser: the whole finance module
+    is admin-only — non-staff users get 403 on both read and write.
     """
 
-    permission_classes = [FinancialReadOnly]
+    permission_classes = [IsAdminUser]
 
     @action(detail=False, methods=["get"])
     def projection(self, request: Request) -> Response:

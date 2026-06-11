@@ -13,13 +13,14 @@ from django.http import JsonResponse
 from django.shortcuts import redirect
 from rest_framework.authentication import SessionAuthentication
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
-from rest_framework.permissions import AllowAny, IsAdminUser, IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from core.models import OAuthExchangeCode
-from core.viewsets.auth_views_cookie import _set_auth_cookies
+from core.permissions import IsAdminUser
+from core.viewsets.auth_views_cookie import _set_auth_cookies, role_for_user
 
 logger = logging.getLogger(__name__)
 
@@ -177,7 +178,9 @@ def exchange_oauth_code(request: Request) -> Response:
             },
         }
     )
-    _set_auth_cookies(response, exchange.access_token, exchange.refresh_token)
+    _set_auth_cookies(
+        response, exchange.access_token, exchange.refresh_token, role=role_for_user(user)
+    )
     return response
 
 

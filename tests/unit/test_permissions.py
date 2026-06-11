@@ -15,7 +15,6 @@ from core.models import Apartment, Building, Lease, Tenant
 from core.permissions import (
     CanGenerateContract,
     CanModifyLease,
-    FinancialReadOnly,
     HasActiveLease,
     IsAdminUser,
     IsAuthenticatedAndActive,
@@ -165,36 +164,6 @@ class TestIsTenantOrAdmin:
         obj = _Obj(tenants=type("M2M", (), {"all": lambda self: []})())
         obj.responsible_tenant = _Obj()  # no user attr
         assert self.perm.has_object_permission(request, None, obj) is False
-
-
-# ---------------------------------------------------------------------------
-# FinancialReadOnly
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.unit
-class TestFinancialReadOnly:
-    perm = FinancialReadOnly()
-
-    def test_authenticated_user_can_read(self, regular_user):
-        request = make_request("GET")
-        request.user = regular_user
-        assert self.perm.has_permission(request, None) is True
-
-    def test_unauthenticated_denied(self):
-        request = make_request("GET")
-        request.user = type("U", (), {"is_authenticated": False})()
-        assert self.perm.has_permission(request, None) is False
-
-    def test_regular_user_cannot_write(self, regular_user):
-        request = make_request("POST")
-        request.user = regular_user
-        assert self.perm.has_permission(request, None) is False
-
-    def test_admin_user_can_write(self, admin_user):
-        request = make_request("POST")
-        request.user = admin_user
-        assert self.perm.has_permission(request, None) is True
 
 
 # ---------------------------------------------------------------------------
@@ -367,10 +336,6 @@ class TestGetPermissionClasses:
         classes = get_permission_classes("nonexistent_key")
         assert isinstance(classes, list)
         assert len(classes) > 0
-
-    def test_financial_read_only_type(self):
-        classes = get_permission_classes("financial_read_only")
-        assert FinancialReadOnly in classes
 
 
 # ---------------------------------------------------------------------------

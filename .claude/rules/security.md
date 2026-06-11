@@ -6,10 +6,12 @@
 - Never log tokens, passwords, or secrets
 
 ## Authorization
-- Financial module: `FinancialReadOnly` permission — authenticated users can read, only is_staff can write
-- Existing CRUD: `IsAuthenticatedOrReadOnly`, `IsAdminUser`, `IsOwnerOrAdmin`, `IsTenantOrAdmin`
+- Financial module (legacy core `persons`/`expenses`/… AND the `finances/` app): `IsAdminUser` — admin-only for both read and write. A non-staff tenant gets 403; the whole module is hidden from tenants (P1.2). `FinancialReadOnly` was removed.
+- Tenant×admin segregation: `TenantViewSet`/`LeaseViewSet` querysets are scoped to the requesting tenant when non-staff (own record / own leases only); staff see everything. The tenant portal stays isolated under `/api/tenant/*` (`IsTenantUser`).
+- Existing CRUD: `IsAuthenticatedOrReadOnly`, `IsAdminUser`, `IsOwnerOrAdmin`, `IsTenantOrAdmin`, `ReadOnlyForNonAdmin`
+- `IsAdminUser` has a single canonical definition in `core.permissions` (is_staff OR is_superuser). Never import `IsAdminUser` from `rest_framework.permissions` (it covers only is_staff).
 - Permission classes defined in `core/permissions.py` — always use these, never inline permission checks
-- Frontend must hide create/edit/delete UI for non-admin users (conditional rendering based on user.is_staff)
+- Frontend: a non-HttpOnly `role` cookie (staff|tenant) is set on login so the Next.js middleware + `MainLayout` keep tenants out of the admin dashboard. Hide create/edit/delete UI for non-admin users (conditional rendering based on user.is_staff). The backend is the real barrier; the cookie is a UX hint.
 
 ## Data Validation
 - CPF/CNPJ validation is mandatory — use validators from `core/validators/`

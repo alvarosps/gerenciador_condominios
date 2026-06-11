@@ -1,8 +1,9 @@
 """Integration tests for the authenticated lease contract download endpoint.
 
 GET /api/leases/{id}/contract/ — serves the contract PDF only to admins or the
-responsible tenant (owner). Anonymous → 401, other tenant → 403 (IDOR regression),
-not generated / missing file → 404.
+responsible tenant (owner). Anonymous → 401, other tenant → 404 (IDOR regression:
+the lease is outside the requesting tenant's scoped queryset), not generated /
+missing file → 404.
 """
 
 from datetime import date
@@ -147,10 +148,12 @@ class TestLeaseContractDownload:
         finally:
             response.close()
 
-    def test_inquilino_de_outro_lease_recebe_403(self, contract_pdf_on_disk, other_tenant_client):
+    def test_inquilino_de_outro_lease_recebe_404(self, contract_pdf_on_disk, other_tenant_client):
+        # After P1.2 the LeaseViewSet queryset is scoped to the requesting tenant, so another
+        # tenant's lease is invisible: get_object() 404s before CanGenerateContract runs.
         lease, _ = contract_pdf_on_disk
         response = other_tenant_client.get(_url(lease.pk))
-        assert response.status_code == 403
+        assert response.status_code == 404
 
     def test_anonimo_recebe_401(self, api_client, contract_pdf_on_disk):
         lease, _ = contract_pdf_on_disk

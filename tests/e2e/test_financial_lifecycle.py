@@ -1056,7 +1056,7 @@ class TestFinancialSettingsWorkflow:
         # initial_balance_date should remain unchanged
         assert patch_resp.data["initial_balance_date"] == "2026-01-01"
 
-    def test_settings_non_admin_cannot_write(self, admin_user, regular_user):
+    def test_settings_non_admin_cannot_read_or_write(self, admin_user, regular_user):
         admin_client = APIClient()
         admin_client.force_authenticate(user=admin_user)
 
@@ -1066,9 +1066,9 @@ class TestFinancialSettingsWorkflow:
         # Ensure singleton exists
         admin_client.get("/api/financial-settings/current/")
 
-        # Non-admin can read
+        # Non-admin cannot read (financeiro é admin-only após P1.2)
         read_resp = non_admin.get("/api/financial-settings/current/")
-        assert read_resp.status_code == status.HTTP_200_OK
+        assert read_resp.status_code == status.HTTP_403_FORBIDDEN
 
         # Non-admin cannot update
         write_resp = non_admin.put(

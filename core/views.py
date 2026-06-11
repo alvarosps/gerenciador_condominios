@@ -207,6 +207,12 @@ class TenantViewSet(viewsets.ModelViewSet):
 
         queryset = super().get_queryset()
 
+        # Scope to the requesting tenant when non-staff: a tenant may only see their own
+        # record, never the PII of other tenants. Staff/superusers see everyone.
+        user = self.request.user
+        if user.is_authenticated and not (user.is_staff or user.is_superuser):
+            queryset = queryset.filter(user=user)
+
         if self.action in ["list", "retrieve"]:
             queryset = queryset.prefetch_related(
                 "dependents",  # Reverse FK: Tenant -> Dependents
@@ -332,6 +338,14 @@ class LeaseViewSet(viewsets.ModelViewSet):
             "responsible_tenant",  # ForeignKey: Lease -> Tenant (responsible)
             "resident_dependent",  # ForeignKey: Lease -> Dependent (second occupant)
         )
+
+        # Scope to the requesting tenant when non-staff: a tenant only sees leases where
+        # they are the responsible tenant. Staff/superusers see every lease. This also
+        # makes get_object() 404 for another tenant's lease (defense in depth alongside
+        # CanModifyLease / CanGenerateContract object permissions).
+        user = self.request.user
+        if user.is_authenticated and not (user.is_staff or user.is_superuser):
+            queryset = queryset.filter(responsible_tenant__user=user)
 
         if self.action in ["list", "retrieve"]:
             queryset = queryset.prefetch_related(
