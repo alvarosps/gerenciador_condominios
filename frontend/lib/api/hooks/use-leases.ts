@@ -55,7 +55,18 @@ export function useCreateLease() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: Omit<Lease, 'id' | 'apartment' | 'responsible_tenant' | 'tenants' | 'final_date' | 'rental_value' | 'resident_dependent'>) => {
+    mutationFn: async (
+      data: Omit<
+        Lease,
+        | 'id'
+        | 'apartment'
+        | 'responsible_tenant'
+        | 'tenants'
+        | 'final_date'
+        | 'rental_value'
+        | 'resident_dependent'
+      >
+    ) => {
       const response = await apiClient.post<Lease>('/leases/', data);
       return response.data;
     },
@@ -78,12 +89,14 @@ export function useUpdateLease() {
       if (!data.id) throw new Error('Lease ID is required for update');
 
       // Remove nested objects for API call
-      const { apartment: _apartment, responsible_tenant: _responsible_tenant, tenants: _tenants, ...updateData } = data;
+      const {
+        apartment: _apartment,
+        responsible_tenant: _responsible_tenant,
+        tenants: _tenants,
+        ...updateData
+      } = data;
 
-      const response = await apiClient.put<Lease>(
-        `/leases/${data.id}/`,
-        updateData
-      );
+      const response = await apiClient.put<Lease>(`/leases/${data.id}/`, updateData);
       return response.data;
     },
     onSuccess: (data) => {
@@ -135,7 +148,9 @@ export function usePatchLease() {
 
 /**
  * Hook to generate a contract PDF for a lease
- * This calls the backend to generate the PDF using Playwright (headless Chromium)
+ * This calls the backend to generate the PDF using Playwright (headless Chromium).
+ * The response identifies the lease only — the PDF is downloaded separately via the
+ * authenticated GET /leases/{id}/contract/ endpoint (never a filesystem path).
  */
 export function useGenerateContract() {
   const queryClient = useQueryClient();
@@ -143,7 +158,7 @@ export function useGenerateContract() {
   return useMutation({
     mutationFn: async (leaseId: number) => {
       const { data } = await apiClient.post<{
-        pdf_path: string;
+        lease_id: number;
         message: string;
       }>(`/leases/${leaseId}/generate_contract/`, undefined, {
         // PDF generation launches headless Chromium on the backend — far slower
@@ -157,6 +172,35 @@ export function useGenerateContract() {
       void queryClient.invalidateQueries({ queryKey: queryKeys.leases.all });
       void queryClient.invalidateQueries({ queryKey: queryKeys.apartments.all });
     },
+  });
+}
+
+/**
+ * Fetch a lease contract PDF as a Blob through the same-origin API proxy.
+ * The request carries the HttpOnly auth cookies, so the backend can verify ownership.
+ */
+export async function fetchContractPdfBlob(leaseId: number): Promise<Blob> {
+  const { data } = await apiClient.get<Blob>(`/leases/${leaseId}/contract/`, {
+    responseType: 'blob',
+    timeout: 60_000,
+  });
+  return data;
+}
+
+/**
+ * Hook to fetch a lease contract PDF Blob (for inline viewing in an iframe).
+ * Disabled until a leaseId is provided and the contract has been generated.
+ */
+export function useContractPdf(leaseId: number | null, enabled: boolean) {
+  return useQuery({
+    queryKey: [...queryKeys.leases.detail(leaseId ?? 0), 'contract-pdf'],
+    queryFn: () => {
+      if (!leaseId) throw new Error('Lease ID is required');
+      return fetchContractPdfBlob(leaseId);
+    },
+    enabled: Boolean(leaseId) && enabled,
+    staleTime: 0,
+    gcTime: 0,
   });
 }
 
@@ -281,7 +325,9 @@ export function useTerminateLease() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (leaseId: number) => {
-      const response = await apiClient.post<{ detail: string }>(`/leases/${String(leaseId)}/terminate/`);
+      const response = await apiClient.post<{ detail: string }>(
+        `/leases/${String(leaseId)}/terminate/`
+      );
       return response.data;
     },
     onSuccess: () => {

@@ -85,13 +85,16 @@ if settings.DEBUG:
     ]
 
 
-# Serve media files (contracts) in both development and production
-# (Since we generate files dynamically, we need this to serve the PDFs)
-urlpatterns += [
-    re_path(
-        r"^contracts/(?P<path>.*)$",
-        serve,
-        {"document_root": str(Path(settings.BASE_DIR) / settings.PDF_OUTPUT_DIR)},
-    ),
-    re_path(r"^media/(?P<path>.*)$", serve, {"document_root": settings.MEDIA_ROOT}),
-]
+# Serve contracts/media files directly ONLY in development. In production these are served
+# exclusively through authenticated DRF endpoints (GET /api/leases/{id}/contract/,
+# /api/admin/proofs/{id}/file/, /api/tenant/payments/proof/{id}/file/) so PII is never exposed
+# to anonymous/enumerating clients.
+if settings.DEBUG:
+    urlpatterns += [
+        re_path(
+            r"^contracts/(?P<path>.*)$",
+            serve,
+            {"document_root": str(Path(settings.BASE_DIR) / settings.PDF_OUTPUT_DIR)},
+        ),
+        re_path(r"^media/(?P<path>.*)$", serve, {"document_root": settings.MEDIA_ROOT}),
+    ]

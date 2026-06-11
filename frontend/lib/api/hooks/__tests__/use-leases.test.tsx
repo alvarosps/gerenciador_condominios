@@ -170,7 +170,8 @@ describe('useLeases', () => {
       await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
       expect(result.current.data).toHaveProperty('message');
-      expect(result.current.data).toHaveProperty('pdf_path');
+      expect(result.current.data).toHaveProperty('lease_id', 3);
+      expect(result.current.data).not.toHaveProperty('pdf_path');
     });
 
     it('should invalidate lease query after contract generation', async () => {

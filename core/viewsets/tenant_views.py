@@ -13,9 +13,7 @@ Provides all endpoints for the tenant mobile experience:
 """
 
 import logging
-from pathlib import Path
 
-from django.conf import settings
 from django.http import FileResponse, HttpResponseBase
 from django.utils import timezone
 from rest_framework import status, viewsets
@@ -42,7 +40,9 @@ from core.serializers import (
     RentAdjustmentSerializer,
     RentPaymentSerializer,
 )
+from core.services.contract_service import ContractService
 from core.services.fee_calculator import FeeCalculatorService
+from core.services.file_response_service import proof_file_response
 from core.services.notification_service import notify_new_proof
 from core.services.pix_service import generate_pix_payload
 
@@ -156,14 +156,7 @@ class TenantViewSet(viewsets.ViewSet):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        apt = lease.apartment
-        pdf_path = (
-            Path(settings.BASE_DIR)
-            / "contracts"
-            / str(apt.building.street_number)
-            / f"contract_apto_{apt.number}_{lease.pk}.pdf"
-        )
-
+        pdf_path = ContractService.get_contract_absolute_path(lease)
         if not pdf_path.is_file():
             return Response(
                 {"detail": "Arquivo do contrato não encontrado."},
@@ -174,7 +167,7 @@ class TenantViewSet(viewsets.ViewSet):
             pdf_path.open("rb"),
             content_type="application/pdf",
             as_attachment=False,
-            filename=f"contrato_apto_{apt.number}.pdf",
+            filename=f"contrato_apto_{lease.apartment.number}.pdf",
         )
 
     @action(detail=False, methods=["get"], url_path="payments")
@@ -379,6 +372,55 @@ class TenantViewSet(viewsets.ViewSet):
             )
 
         return Response(PaymentProofSerializer(proof).data, status=status.HTTP_200_OK)
+
+    @action(
+        detail=False,
+        methods=["get"],
+        url_path=r"payments/proof/(?P<proof_id>\d+)/file",
+    )
+    def payments_proof_file(
+        self, request: Request, proof_id: str | None = None
+    ) -> HttpResponseBase:
+        """
+        GET /api/tenant/payments/proof/<id>/file/
+
+        Streams the file of a payment proof belonging to the tenant's active lease.
+        The ``lease`` filter enforces ownership (a proof of another lease yields 404).
+        """
+        tenant = _get_tenant(request)
+        if tenant is None:
+            return Response(
+                {"detail": "Perfil de inquilino não encontrado."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        lease = _get_active_lease(tenant)
+        if lease is None:
+            return Response(
+                {"detail": "Nenhuma locação ativa encontrada."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if proof_id is None:
+            return Response(
+                {"detail": "Comprovante não encontrado."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        try:
+            proof = PaymentProof.objects.get(pk=int(proof_id), lease=lease)
+        except PaymentProof.DoesNotExist:
+            return Response(
+                {"detail": "Comprovante não encontrado."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if not proof.file:
+            return Response(
+                {"detail": "Arquivo não encontrado."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        return proof_file_response(proof)
 
     @action(
         detail=False,

@@ -21,7 +21,7 @@ export const leaseSchema = z.object({
   last_rent_increase_date: z.string().optional().nullable(),
   pending_rental_value: z.preprocess(
     (val) => (val !== null && val !== undefined ? Number(val) : null),
-    z.number().nullable().optional(),
+    z.number().nullable().optional()
   ),
   pending_rental_value_date: z.string().nullable().optional(),
   start_date: z.string().min(1, 'Data de início é obrigatória'),
@@ -44,7 +44,6 @@ export const leaseSchema = z.object({
   contract_signed: z.boolean().optional(),
   interfone_configured: z.boolean().optional(),
   number_of_tenants: z.number().optional(),
-  pdf_path: z.string().optional().nullable(),
   status: z.string().optional(),
   prepaid_until: z.string().nullable().optional(),
   is_salary_offset: z.boolean().optional(),

@@ -9,6 +9,7 @@ from django.core.exceptions import ValidationError
 from django.db import DatabaseError, IntegrityError, OperationalError, connection
 from django.db.models import Count, DateField, Q, QuerySet
 from django.db.models.expressions import RawSQL
+from django.http import FileResponse, HttpResponseBase
 from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
@@ -21,6 +22,7 @@ from .permissions import (
     CanGenerateContract,
     CanModifyLease,
     IsAdminUser,
+    IsAuthenticatedAndActive,
     IsTenantOrAdmin,
     ReadOnlyForNonAdmin,
 )
@@ -33,6 +35,7 @@ from .serializers import (
     TenantSerializer,
 )
 from .services import DashboardService, FeeCalculatorService
+from .services.contract_service import ContractService
 from .services.lease_service import change_tenant_due_day, terminate_lease, transfer_lease
 from .services.rent_adjustment_service import RentAdjustmentService
 from .services.rent_schedule_service import RentScheduleService
@@ -389,8 +392,10 @@ class LeaseViewSet(viewsets.ModelViewSet):
             )
 
         if task.successful():
+            # Never expose the on-disk filesystem path. The client downloads the PDF via the
+            # authenticated GET /api/leases/{id}/contract/ endpoint.
             return Response(
-                {"pdf_path": task.result, "message": "Contrato gerado com sucesso!"},
+                {"lease_id": lease.id, "message": "Contrato gerado com sucesso!"},
                 status=status.HTTP_200_OK,
             )
 
@@ -402,6 +407,43 @@ class LeaseViewSet(viewsets.ModelViewSet):
         return Response(
             {"error": "Falha na geração do contrato (task failed)."},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+    # Endpoint autenticado para baixar o PDF do contrato (admin OU dono)
+    @action(
+        detail=True,
+        methods=["get"],
+        permission_classes=[IsAuthenticatedAndActive, CanGenerateContract],
+    )
+    def contract(self, request: Request, pk: int | None = None) -> HttpResponseBase:
+        """
+        Stream the lease contract PDF.
+
+        Permissions: Admin or responsible tenant (enforced by CanGenerateContract).
+
+        Returns 404 (Portuguese ``detail``) when the contract has not been generated
+        or the PDF is missing from disk.
+        """
+        lease = self.get_object()
+
+        if not lease.contract_generated:
+            return Response(
+                {"detail": "Contrato ainda não foi gerado."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        pdf_path = ContractService.get_contract_absolute_path(lease)
+        if not pdf_path.is_file():
+            return Response(
+                {"detail": "Arquivo do contrato não encontrado."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        return FileResponse(
+            pdf_path.open("rb"),
+            content_type="application/pdf",
+            as_attachment=False,
+            filename=f"contrato_apto_{lease.apartment.number}.pdf",
         )
 
     # Endpoint para cálculo de multa de atraso
@@ -872,9 +914,8 @@ def task_status(request: Request, task_id: str) -> Response:
 
     result = AsyncResult(task_id)
     data: dict[str, Any] = {"task_id": task_id, "status": result.status}
-    if result.ready():
-        if result.successful():
-            data["result"] = result.result
-        else:
-            data["error"] = str(result.result)
+    if result.ready() and not result.successful():
+        # Never surface the task return value (the contract task returns the on-disk PDF path).
+        # The client only needs the status; success is conveyed by ``status`` alone.
+        data["error"] = str(result.result)
     return Response(data)

@@ -2,14 +2,23 @@ import type { Lease } from '@/lib/schemas/lease.schema';
 import { mockApartments } from './apartments';
 import { mockTenants } from './tenants';
 
+/** Safe indexed access for mock arrays under noUncheckedIndexedAccess (no non-null assertions). */
+function nth<T>(arr: readonly T[], index: number): T {
+  const value = arr[index];
+  if (value === undefined) {
+    throw new Error(`Mock array missing index ${index}`);
+  }
+  return value;
+}
+
 export const mockLeases: Lease[] = [
   {
     id: 1,
     apartment_id: 1,
-    apartment: mockApartments[0]!,
+    apartment: nth(mockApartments, 0),
     responsible_tenant_id: 1,
-    responsible_tenant: mockTenants[0]!,
-    tenants: [mockTenants[0]!],
+    responsible_tenant: nth(mockTenants, 0),
+    tenants: [nth(mockTenants, 0)],
     tenant_ids: [1],
     rental_value: 1500,
     resident_dependent: null,
@@ -28,15 +37,14 @@ export const mockLeases: Lease[] = [
     number_of_tenants: 1,
     pending_rental_value: null,
     pending_rental_value_date: null,
-    pdf_path: 'contracts/836/contract_apto_101_1.pdf',
   },
   {
     id: 2,
     apartment_id: 2,
-    apartment: mockApartments[1]!,
+    apartment: nth(mockApartments, 1),
     responsible_tenant_id: 1,
-    responsible_tenant: mockTenants[0]!,
-    tenants: [mockTenants[0]!, mockTenants[1]!],
+    responsible_tenant: nth(mockTenants, 0),
+    tenants: [nth(mockTenants, 0), nth(mockTenants, 1)],
     tenant_ids: [1, 2],
     rental_value: 1800,
     resident_dependent: null,
@@ -55,15 +63,14 @@ export const mockLeases: Lease[] = [
     number_of_tenants: 2,
     pending_rental_value: null,
     pending_rental_value_date: null,
-    pdf_path: 'contracts/836/contract_apto_102_2.pdf',
   },
   {
     id: 3,
     apartment_id: 3,
-    apartment: mockApartments[2]!,
+    apartment: nth(mockApartments, 2),
     responsible_tenant_id: 3,
-    responsible_tenant: mockTenants[2]!,
-    tenants: [mockTenants[2]!],
+    responsible_tenant: nth(mockTenants, 2),
+    tenants: [nth(mockTenants, 2)],
     tenant_ids: [3],
     rental_value: 1200,
     resident_dependent: null,
@@ -82,7 +89,6 @@ export const mockLeases: Lease[] = [
     number_of_tenants: 1,
     pending_rental_value: null,
     pending_rental_value_date: null,
-    pdf_path: null,
   },
 ];
 
@@ -90,8 +96,8 @@ export const mockLeases: Lease[] = [
  * Factory to create mock lease with custom overrides
  */
 export function createMockLease(overrides: Partial<Lease> = {}): Lease {
-  const apartment = mockApartments[0]!;
-  const tenant = mockTenants[0]!;
+  const apartment = nth(mockApartments, 0);
+  const tenant = nth(mockTenants, 0);
   return {
     id: Math.floor(Math.random() * 1000) + 100,
     apartment_id: apartment.id ?? 1,
@@ -117,7 +123,6 @@ export function createMockLease(overrides: Partial<Lease> = {}): Lease {
     number_of_tenants: 1,
     pending_rental_value: null,
     pending_rental_value_date: null,
-    pdf_path: null,
     ...overrides,
   };
 }

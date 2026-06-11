@@ -256,14 +256,16 @@ class TestGenerateContract:
     def test_generate_contract_succeeds(
         self, authenticated_api_client, lease, tenant, landlord, mock_pdf_generation
     ):
-        """generate_contract should return 200 with pdf_path when PDF mock is active."""
+        """generate_contract should return 200 with lease_id/message and no filesystem path."""
         # Add tenant to M2M so calculate_tag_fee receives num_tenants >= 1
         lease.tenants.add(tenant)
         url = self.url_template.format(pk=lease.pk)
         response = authenticated_api_client.post(url)
 
         assert response.status_code == status.HTTP_200_OK
-        assert "pdf_path" in response.data
+        assert response.data["lease_id"] == lease.pk
+        assert "message" in response.data
+        assert "pdf_path" not in response.data
 
     def test_generate_contract_marks_lease_contract_generated(
         self, authenticated_api_client, lease, tenant, landlord, mock_pdf_generation

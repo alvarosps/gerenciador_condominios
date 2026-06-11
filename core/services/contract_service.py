@@ -248,6 +248,24 @@ class ContractService:
         return relative_path
 
     @staticmethod
+    def get_contract_absolute_path(lease: Lease) -> Path:
+        """
+        Resolve the absolute on-disk path for a lease contract PDF.
+
+        Single source of truth for "where the contract PDF lives": joins the
+        configured output directory under BASE_DIR with the canonical relative path.
+
+        Args:
+            lease: The lease object
+
+        Returns:
+            Absolute path to the PDF file (may or may not exist on disk yet)
+        """
+        relative_path = ContractService.get_contract_relative_path(lease)
+        output_dir = str(settings.PDF_OUTPUT_DIR)
+        return Path(settings.BASE_DIR) / output_dir / relative_path
+
+    @staticmethod
     def render_contract_template(context: dict[str, Any]) -> str:
         """
         Render the contract HTML template with the given context.

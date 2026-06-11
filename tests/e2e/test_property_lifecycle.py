@@ -144,15 +144,13 @@ class TestPropertyLifecycleE2E:
         # Step 5: Generate contract (mocked PDF) and verify contract_generated=True
         contract_resp = client.post(f"/api/leases/{lease_id}/generate_contract/")
         assert contract_resp.status_code == status.HTTP_200_OK
-        assert "pdf_path" in contract_resp.data
+        # The response identifies the lease and never leaks the on-disk filesystem path.
+        assert contract_resp.data["lease_id"] == lease_id
+        assert "pdf_path" not in contract_resp.data
 
         lease_detail = client.get(f"/api/leases/{lease_id}/")
         assert lease_detail.status_code == status.HTTP_200_OK
         assert lease_detail.data["contract_generated"] is True
-        assert "pdf_path" in contract_resp.data
-        # PDF path should include building number and apartment number
-        pdf_path = contract_resp.data["pdf_path"]
-        assert str(100) in pdf_path or str(101) in pdf_path or str(lease_id) in pdf_path
 
         # Step 6: Calculate late fee with frozen time past due date
         # due_day=10, freeze to day 15 of the same month — 5 days late

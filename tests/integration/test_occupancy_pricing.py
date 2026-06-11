@@ -372,7 +372,8 @@ class TestLeaseOccupancyPricing:
         response = api_client.post(url)
 
         assert response.status_code == status.HTTP_200_OK
-        assert "pdf_path" in response.data
+        assert response.data["lease_id"] == lease_single.id
+        assert "pdf_path" not in response.data
 
         # Verify the lease still holds the custom rental_value (contract used it)
         lease_single.refresh_from_db()
