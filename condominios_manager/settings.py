@@ -215,6 +215,7 @@ CORS_ALLOW_CREDENTIALS = config("CORS_ALLOW_CREDENTIALS", default=True, cast=boo
 
 # REST Framework settings
 REST_FRAMEWORK = {
+    "EXCEPTION_HANDLER": "core.exceptions.custom_exception_handler",
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "core.authentication.CookieJWTAuthentication",
         "rest_framework.authentication.SessionAuthentication",
