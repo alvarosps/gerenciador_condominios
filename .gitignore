@@ -52,7 +52,6 @@ venv/
 .venv/
 ENV/
 env/
-.env
 
 # Django
 *.log
@@ -61,12 +60,20 @@ db.sqlite3
 db.sqlite3-journal
 /static/
 /media/
-# Uploaded media (MEDIA_ROOT = contracts/) — user-uploaded payment proofs, not source
+# Generated contract PDFs + uploaded payment proofs (PII) — never commit.
+# contracts/ is MEDIA_ROOT (runtime output dir); keep the dir, ignore the PII files.
+/contracts/**/*.pdf
 /contracts/payment_proofs/
+/Notificacao_*.pdf
 *.pot
 
-# Database backups
+# Database backups & dumps (PII) — never commit. Root-only *.sql/*.json so we
+# don't catch core/migrations SQL or scripts/data seeds.
 /backups/
+/backup_json/
+*.dump
+/*.sql
+/*.json.gz
 
 # Template backups
 core/templates/backups/
