@@ -1794,3 +1794,13 @@ class OAuthExchangeCode(models.Model):
             return False
         elapsed = (timezone.now() - self.created_at).total_seconds()
         return elapsed <= self.TTL_SECONDS
+
+    @classmethod
+    def purge_expired(cls) -> int:
+        """Hard-delete codes older than the TTL so abandoned tokens never accumulate.
+
+        Returns the number of rows deleted.
+        """
+        cutoff = timezone.now() - timedelta(seconds=cls.TTL_SECONDS)
+        deleted, _ = cls.objects.filter(created_at__lt=cutoff).delete()
+        return deleted

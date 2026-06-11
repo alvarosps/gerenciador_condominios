@@ -15,6 +15,7 @@ from django.test import override_settings
 from django.utils import timezone
 from freezegun import freeze_time
 from rest_framework import status
+from rest_framework.test import APIClient
 
 from core.adapters import AdminAllowlistSocialAccountAdapter
 from core.models import OAuthExchangeCode
@@ -136,7 +137,7 @@ class TestExchangeOauthCode:
             refresh_token="refresh-token-value",
         )
 
-    def test_valid_unused_code_returns_200_and_sets_cookies(self, api_client, admin_user):
+    def test_valid_unused_code_returns_200_and_deletes_row(self, api_client, admin_user):
         exchange = self._make_code(admin_user)
         response = api_client.post(self.url, {"code": str(exchange.code)}, format="json")
 
@@ -150,12 +151,22 @@ class TestExchangeOauthCode:
         assert response.cookies["refresh_token"].value == "refresh-token-value"
         assert response.cookies["is_authenticated"].value == "1"
 
-        exchange.refresh_from_db()
-        assert exchange.is_used is True
+        # The row (and its plaintext tokens) must be gone after a successful exchange.
+        assert not OAuthExchangeCode.objects.filter(pk=exchange.pk).exists()
 
     def test_missing_code_returns_400(self, api_client):
         response = api_client.post(self.url, {}, format="json")
         assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    def test_reused_code_after_success_returns_400(self, api_client, admin_user):
+        exchange = self._make_code(admin_user)
+        first = api_client.post(self.url, {"code": str(exchange.code)}, format="json")
+        assert first.status_code == status.HTTP_200_OK
+
+        # The code was deleted on success → a replay from a fresh client must fail with 400.
+        replay_client = APIClient()
+        second = replay_client.post(self.url, {"code": str(exchange.code)}, format="json")
+        assert second.status_code == status.HTTP_400_BAD_REQUEST
 
     def test_already_used_code_returns_400(self, api_client, admin_user):
         exchange = self._make_code(admin_user)
@@ -172,6 +183,47 @@ class TestExchangeOauthCode:
         with freeze_time("2026-01-01 12:02:00"):
             response = api_client.post(self.url, {"code": str(exchange.code)}, format="json")
         assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    def test_expired_unused_codes_are_purged_on_exchange(self, api_client, admin_user):
+        with freeze_time("2026-01-01 12:00:00"):
+            stale = self._make_code(admin_user)
+        with freeze_time("2026-01-01 12:02:00"):
+            fresh = self._make_code(admin_user)
+            response = api_client.post(self.url, {"code": str(fresh.code)}, format="json")
+
+        assert response.status_code == status.HTTP_200_OK
+        # The exchanged code is deleted AND the abandoned expired one is purged.
+        assert not OAuthExchangeCode.objects.filter(pk=fresh.pk).exists()
+        assert not OAuthExchangeCode.objects.filter(pk=stale.pk).exists()
+
+    def test_non_admin_code_returns_403_and_deletes_row(self, api_client, regular_user):
+        exchange = OAuthExchangeCode.objects.create(
+            user=regular_user,
+            access_token="access-token-value",
+            refresh_token="refresh-token-value",
+        )
+        response = api_client.post(self.url, {"code": str(exchange.code)}, format="json")
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+        # Even on a rejected (non-admin) exchange the plaintext tokens must not linger.
+        assert not OAuthExchangeCode.objects.filter(pk=exchange.pk).exists()
+
+
+@pytest.mark.unit
+class TestPurgeExpired:
+    def test_purge_expired_classmethod_deletes_only_old(self, admin_user):
+        with freeze_time("2026-01-01 12:00:00"):
+            stale = OAuthExchangeCode.objects.create(
+                user=admin_user, access_token="a", refresh_token="r"
+            )
+        with freeze_time("2026-01-01 12:02:00"):
+            recent = OAuthExchangeCode.objects.create(
+                user=admin_user, access_token="a", refresh_token="r"
+            )
+            OAuthExchangeCode.purge_expired()
+
+        assert not OAuthExchangeCode.objects.filter(pk=stale.pk).exists()
+        assert OAuthExchangeCode.objects.filter(pk=recent.pk).exists()
 
 
 @pytest.mark.integration

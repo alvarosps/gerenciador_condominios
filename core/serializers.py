@@ -8,6 +8,7 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from core.validators import BrazilianPhoneValidator, CNPJValidator, CPFValidator, validate_due_day
+from core.validators.upload import validate_proof_file
 
 from .models import (
     Apartment,
@@ -1271,15 +1272,7 @@ class PaymentProofSerializer(serializers.ModelSerializer):
         ]
 
     def validate_file(self, value: Any) -> Any:
-        max_size = 10 * 1024 * 1024  # 10MB
-        allowed_types = {"image/jpeg", "image/png", "application/pdf"}
-        if value.size > max_size:
-            msg = "Arquivo excede o tamanho máximo de 10MB."
-            raise serializers.ValidationError(msg)
-        if value.content_type not in allowed_types:
-            msg = "Tipo de arquivo não permitido. Use JPEG, PNG ou PDF."
-            raise serializers.ValidationError(msg)
-        return value
+        return validate_proof_file(value)
 
 
 class NotificationSerializer(serializers.ModelSerializer):

@@ -15,6 +15,8 @@ from datetime import timedelta
 from typing import cast
 
 from django.contrib.auth.models import User
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.utils import timezone
 from rest_framework import status, viewsets
@@ -39,7 +41,10 @@ _CODE_EXPIRY_MINUTES = 5
 _RATE_LIMIT_WINDOW_MINUTES = 15
 _RATE_LIMIT_MAX_REQUESTS = 3
 _MAX_VERIFY_ATTEMPTS = 3
-_MIN_PASSWORD_LENGTH = 8
+
+# Generic, identical responses that never reveal whether a CPF/CNPJ belongs to a tenant.
+_GENERIC_REQUEST_DETAIL = "Se o CPF/CNPJ estiver cadastrado, um código foi enviado via WhatsApp."
+_GENERIC_VERIFY_ERROR = "Código inválido."
 
 
 class WhatsAppAuthViewSet(viewsets.ViewSet):
@@ -64,18 +69,20 @@ class WhatsAppAuthViewSet(viewsets.ViewSet):
             cpf_cnpj (str): Tenant's CPF or CNPJ.
 
         Returns:
-            200 on success.
-            404 if no tenant matches the CPF/CNPJ.
+            200 with a generic message whether or not a tenant matches (no enumeration).
+            400 if cpf_cnpj is missing.
             429 if the rate limit has been exceeded (3 codes in 15 minutes).
         """
         cpf_cnpj: str = request.data.get("cpf_cnpj", "").strip()
         if not cpf_cnpj:
             return Response({"error": "cpf_cnpj é obrigatório"}, status=status.HTTP_400_BAD_REQUEST)
 
-        try:
-            tenant = Tenant.objects.get(cpf_cnpj=cpf_cnpj)
-        except Tenant.DoesNotExist:
-            return Response({"error": "Inquilino não encontrado"}, status=status.HTTP_404_NOT_FOUND)
+        tenant = Tenant.objects.filter(cpf_cnpj=cpf_cnpj).first()
+
+        # Always respond identically so a caller cannot tell whether the CPF/CNPJ is a tenant.
+        if tenant is None:
+            logger.info("Verification code requested for unknown cpf_cnpj=%s", cpf_cnpj)
+            return Response({"detail": _GENERIC_REQUEST_DETAIL}, status=status.HTTP_200_OK)
 
         window_start = timezone.now() - timedelta(minutes=_RATE_LIMIT_WINDOW_MINUTES)
         recent_count = WhatsAppVerification.objects.filter(
@@ -103,7 +110,7 @@ class WhatsAppAuthViewSet(viewsets.ViewSet):
         send_verification_code(phone, code)
         logger.info("Verification code requested for cpf_cnpj=%s", cpf_cnpj)
 
-        return Response({"detail": "Código enviado via WhatsApp."}, status=status.HTTP_200_OK)
+        return Response({"detail": _GENERIC_REQUEST_DETAIL}, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=["post"], url_path="verify")
     def verify_code(self, request: Request) -> Response:
@@ -118,8 +125,8 @@ class WhatsAppAuthViewSet(viewsets.ViewSet):
 
         Returns:
             200 with {access, refresh} on success.
-            400 if the code is wrong, expired, or exhausted.
-            404 if no tenant or no pending verification found.
+            400 with a generic "Código inválido." for an unknown CPF/CNPJ, a missing pending
+                verification, or a wrong code (no enumeration).
         """
         cpf_cnpj: str = request.data.get("cpf_cnpj", "").strip()
         code: str = request.data.get("code", "").strip()
@@ -130,10 +137,10 @@ class WhatsAppAuthViewSet(viewsets.ViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        try:
-            tenant = Tenant.objects.get(cpf_cnpj=cpf_cnpj)
-        except Tenant.DoesNotExist:
-            return Response({"error": "Inquilino não encontrado"}, status=status.HTTP_404_NOT_FOUND)
+        # Unknown CPF/CNPJ must be indistinguishable from a wrong code (no tenant enumeration).
+        tenant = Tenant.objects.filter(cpf_cnpj=cpf_cnpj).first()
+        if tenant is None:
+            return Response({"error": _GENERIC_VERIFY_ERROR}, status=status.HTTP_400_BAD_REQUEST)
 
         with transaction.atomic():
             verification = (
@@ -145,8 +152,8 @@ class WhatsAppAuthViewSet(viewsets.ViewSet):
 
             if verification is None:
                 return Response(
-                    {"error": "Nenhuma verificação pendente encontrada"},
-                    status=status.HTTP_404_NOT_FOUND,
+                    {"error": _GENERIC_VERIFY_ERROR},
+                    status=status.HTTP_400_BAD_REQUEST,
                 )
 
             if verification.attempts >= _MAX_VERIFY_ATTEMPTS:
@@ -164,7 +171,9 @@ class WhatsAppAuthViewSet(viewsets.ViewSet):
             if verification.code != code:
                 verification.attempts += 1
                 verification.save(update_fields=["attempts"])
-                return Response({"error": "Código inválido."}, status=status.HTTP_400_BAD_REQUEST)
+                return Response(
+                    {"error": _GENERIC_VERIFY_ERROR}, status=status.HTTP_400_BAD_REQUEST
+                )
 
             verification.is_used = True
             verification.save(update_fields=["is_used"])
@@ -208,20 +217,29 @@ class SetPasswordViewSet(viewsets.ViewSet):
         POST /api/auth/set-password/
 
         Body:
-            password (str): New password (minimum 8 characters).
+            password (str): New password — validated against AUTH_PASSWORD_VALIDATORS.
 
         Returns:
             200 on success.
-            400 if the password is too short or missing.
+            400 if the password is missing or fails Django's password validators.
         """
         password: str = request.data.get("password", "")
-        if len(password) < _MIN_PASSWORD_LENGTH:
+        user = cast(User, request.user)
+
+        if not password:
             return Response(
-                {"error": "A senha deve ter no mínimo 8 caracteres."},
+                {"error": "A senha é obrigatória."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        user = cast(User, request.user)
+        try:
+            validate_password(password, user)
+        except DjangoValidationError as exc:
+            return Response(
+                {"error": " ".join(exc.messages)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         user.set_password(password)
         user.save(update_fields=["password"])
         logger.info("Password updated for user pk=%s", user.pk)

@@ -120,6 +120,17 @@ class TestAdminProofFileDownload:
         finally:
             response.close()
 
+    def test_admin_proof_file_served_as_attachment_with_nosniff(
+        self, authenticated_api_client, proof
+    ):
+        response = authenticated_api_client.get(f"/api/admin/proofs/{proof.pk}/file/")
+        try:
+            assert response.status_code == 200
+            assert response["X-Content-Type-Options"] == "nosniff"
+            assert response["Content-Disposition"].startswith("attachment")
+        finally:
+            response.close()
+
     def test_nao_admin_recebe_403_no_admin_proof_file(self, owner_client, proof):
         response = owner_client.get(f"/api/admin/proofs/{proof.pk}/file/")
         assert response.status_code == 403
