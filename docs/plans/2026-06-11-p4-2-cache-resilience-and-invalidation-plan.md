@@ -3,6 +3,29 @@
 > **Estado:** PLANEJADO — nao executado
 > **Prioridade:** FASE P4 · **Branch sugerida:** `fix/cache-resilience` · **Depende de:** nenhum
 
+---
+
+## ⚠️ REVISÃO 2026-06-12 (pós P1/P2/HF-1) — LEIA PRIMEIRO; supera os passos abaixo onde conflitar
+
+Revisão code-grounded (master #17). O plano está amplamente correto (passos 1, 2, 5, 6 confirmados como trabalho real), mas:
+
+### JÁ FEITO — remover do escopo
+- **Passo 4 (Apartment.delete iterar lease.delete())** → FEITO no P2.4. `core/models.py:474-488` já faz `for lease in self.leases.filter(is_deleted=False): lease.delete(...)` (dispara `sync_apartment_is_rented`). **Remover o Passo 4 e o achado correspondente da tabela** (a referência `models.py:436-441` está defasada — agora aponta para outro bloco). Manter só os testes de regressão como verificação.
+
+### CONFLITO / CORREÇÃO
+- **Passo 1 (OPTIONS do django-redis)** → `SOCKET_CONNECT_TIMEOUT: 5` e `SOCKET_TIMEOUT: 5` JÁ existem em `settings.py:140-141`. **Apenas ADICIONAR `IGNORE_EXCEPTIONS: True`** (+ `DJANGO_REDIS_LOG_IGNORED_EXCEPTIONS`), não recriar o dict OPTIONS.
+
+### REESCOPOS / GAPS
+- **Passo 4 reescopado** → o follow-up REAL que sobra é **`PersonPaymentScheduleService.bulk_configure`** (`person_payment_schedule_service.py:136`): ainda usa `.update(is_deleted=True)` sem `deleted_at`/`deleted_by` e sem invalidação. **Promover de "follow-up opcional" para passo committed.**
+- **Passo 3 (invalidação após bulk)** → (a) linhas defasadas por P2.5: `_mark_credit_card_paid` agora em `daily_control_service.py:272-302`, o `.update()` em :298; (b) **o glob `daily-control*` é CÓDIGO MORTO** — nenhum `@cache_result` usa `key_prefix='daily-control'` (só `urls.py:71` basename). Remover esse glob da invalidação. (c) **Decisão arquitetural:** o passo manda importar `invalidate_legacy_financial_caches` de `core.signals` dentro de `daily_control_service.py` — uma dependência **Service→Signals que não existe hoje** (viola a direção de camadas). Resolver: mover o helper de invalidação para `core/cache.py` (CacheManager) e importar de lá, OU outra fonte neutra — NÃO `core.signals`.
+- **Passo 2 (mapeamento model→prefixo)** → `PaymentProof → dashboard-late-payment` é provavelmente incorreto: `get_late_payment_summary` (`dashboard_service.py:298-317`) deriva de RentPayment/leases, não de PaymentProof. Revisar o mapa.
+- **Passo 5 (loop `_LEGACY_FINANCIAL_MODELS`)** → confirmar a lista final incluindo `PersonPayment` (receiver hoje só com `_invalidate_financial_caches`). Nota: PersonIncome/CreditCard/ExpenseCategory ainda sem signal de invalidação — incluir (são do módulo legado, mas alimentam caches).
+
+### ESCOPO — não quebrar o `finances/`
+- O app `finances/` tem cache/signals próprios bem-feitos (`finances/cache.py`, `finances/signals.py`, loop com `dispatch_uid`). Este plano é só sobre o **core legado** — não tocar no esquema do `finances/`.
+
+---
+
 ## Objetivo
 
 Tornar a API resiliente a queda do Redis em runtime (hoje, sem degradacao graciosa, qualquer

@@ -34,9 +34,9 @@ Segurança e correção de dinheiro/dados primeiro (P0–P2); depois mobile (con
 | | P2.5 | Fronteira de timezone SP + bugs de dinheiro no legado + fix dado | `fix/timezone-and-legacy-money` | — | P2.1, P2.2, P2.3, P2.4 |
 | **P3 — Mobile** | P3.1 | Mobile: auth (token no body) + correção dos contratos de API | `fix/mobile-api-realignment` | P1.2 (ideal) | — |
 | | P3.2 | Mobile: quality gates + Zod runtime + remoção do financeiro legado | `chore/mobile-quality-gates` | P3.1 | — |
-| **P4 — Arquitetura** | P4.1 | Camadas do backend: extrair services, padronizar erros, validar input | `refactor/backend-layering` | P2.* | P4.2, P4.3 |
+| **P4 — Arquitetura** | P4.1 | Camadas do backend: extrair services, padronizar erros, validar input | `refactor/backend-layering` | P2.* (✓) | P4.2 |
 | | P4.2 | Resiliência de cache + reescrita da invalidação do core | `fix/cache-resilience` | — | P4.1, P4.3 |
-| | P4.3 | Frontend: dedup de modais + criação atômica + gotcha Zod + dead code | `refactor/frontend-quality` | — | P4.1, P4.2 |
+| | P4.3 | Frontend: dedup de modais + criação atômica + gotcha Zod + dead code | `refactor/frontend-quality` | **P4.1** (atômico+`LeaseCreationService`) | P4.2 |
 | **P5 — Performance** | P5.1 | Backend: N+1, IBGE assíncrono, memoização | `perf/backend-queries` | P4.1 (ideal) | P5.2 |
 | | P5.2 | Frontend: lazy `xlsx` + filtro de competência nas Contas | `perf/frontend-bundle` | — | P5.1 |
 | **P6 — Testes/Docs/CI** | P6.1 | Qualidade de testes: warnings, mock policy, factories, gaps | `test/quality-hardening` | P2–P5 (ideal) | P6.2, P6.3 |

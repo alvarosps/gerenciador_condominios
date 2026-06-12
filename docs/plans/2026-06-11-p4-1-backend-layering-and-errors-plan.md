@@ -3,6 +3,35 @@
 > **Estado:** PLANEJADO — nao executado
 > **Prioridade:** P4 (Arquitetura/Qualidade) · **Branch sugerida:** `refactor/backend-layering` · **Depende de:** P2 (para nao conflitar em arquivos quentes — `core/serializers.py`, `core/views.py`, `core/viewsets/*`)
 
+---
+
+## ⚠️ REVISÃO 2026-06-12 (pós P1/P2/HF-1) — LEIA PRIMEIRO; supera os passos abaixo onde conflitar
+
+Este plano foi escrito em 2026-06-11, antes de P1/P2/HF-1 serem implementados+mergeados. Revisão code-grounded (file:linha confirmados no master #17):
+
+### JÁ FEITO — remover do escopo (não recriar)
+- **Fatia B inteira (PixService.resolve_recipient + cidade configurável)** → FEITO no P2.2. A API real é função module-level `resolve_pix_recipient(lease) -> dict` em `core/services/pix_service.py:130` (NÃO um método de classe com dataclass `PixRecipient`); `tenant_views.py:252` já delega; `_DEFAULT_CITY="Porto Alegre"` em `pix_service.py:15`. **Excluir a Fatia B.**
+- **Fatia G passo 4 — "Criar `core/exceptions.py`" + "Registrar EXCEPTION_HANDLER"** → FEITO no HF-1. `core/exceptions.py:17` (`custom_exception_handler`, converte `DjangoValidationError`→400) e `settings.py:218` já existem. **NÃO recriar nem registrar** — apenas ESTENDER (ver gaps).
+- **Unificação de `IsAdminUser`** → FEITO no P1.2 (`core/permissions.py:32` única classe; ninguém importa a do DRF).
+- **Todas as referências file:linha estão defasadas.** Atuais: `LeaseSerializer.create`=534-563, `.update`=565-584; `ExpenseInstallmentSerializer`=825; `IncomeSerializer`=1038; `RentPaymentSerializer`=1088; `FinancialSettingsSerializer`=1264; `PaymentProofSerializer`=1281; `proof review`=`proof_views.py:57-102`; `generate_installments`=`financial_views.py:209-261`; `transfer`=`views.py:576-585`; `change_due_date`=`views.py:505` ({"error"} em :518); `adjust_rent` {"error"} em :609/615/623/634.
+
+### REESCOPOS
+- **Fatia G (padronização de erros)** → reescopar para: (1) **ESTENDER** `core/exceptions.py` p/ mapear `DoesNotExist`→`NotFound(404)` e `KeyError`→`ValidationError(400)` (o handler do HF-1 só cobre `DjangoValidationError`; KeyError em `lease_service.py:37`, DoesNotExist em `financial_views.py:202/348/434/525`, IntegrityError ainda dão **500**); (2) migrar as `Response({"error": ...})` manuais para `{"detail": ...}`. **⚠️ COORDENAÇÃO MOBILE:** `mobile/app/(admin)/actions/mark-paid.tsx:50` lê `error.response.data.error` do `proof_views.review` (`{"error"}` em :67/74/80/87). Migrar esse endpoint quebra o mobile (P3 não feito) → atualizar o consumidor mobile no MESMO PR, OU deixar o shape do proof-review como está e migrar só os endpoints sem consumidor mobile. Decidir explicitamente.
+- **Fatia A passo 2 (`_DOUBLE_OCCUPANCY`)** → **NÃO remover do serializer** — usada em 3 validações (`serializers.py:196` max_tenants, :476 "1 ou 2", :493 resident_dependent), não só no create. Manter no serializer OU mover para módulo de constantes e importar nos dois.
+- **Fatia A signal de sync `last_rent_increase_date`** → `transfer_lease` cria lease via `Lease.objects.create()` sem setar o campo (`lease_service.py:76-89`), e `terminate/transfer` usam `.update()` (não dispara post_save). Tratar esses caminhos OU documentar que o sync não cobre `.update()`. Considerar manter o sync no service em vez de signal.
+- **Fatia F (ExpenseInstallmentSerializer → nested)** → **ALTO RISCO: NÃO fazer como descrito.** Frontend tem `expense: z.number()` (`expense-installment.schema.ts:5`); objeto aninhado **quebra o parse e esvazia a lista** (re-introduz o bug "parcelas vazias"). `ExpenseSimpleSerializer` NÃO existe. Módulo legado/deprecated → **reescopar p/ correção mínima OU pular** (gap de depreciação).
+- **Fatia E item 3 (PaymentProof.validate_reference_month)** → o plano NORMALIZA (`replace(day=1)`), mas `RentPaymentSerializer.validate_reference_month` (:1109-1113) **REJEITA** dia≠1. Alinhar (rejeitar é o precedente) OU justificar a divergência.
+- **Critério "?person_id=abc → 400 não 500"**: `rent_calendar`/`change_due_date`/`adjust_rent` já dão 400 (`views.py:790-808`, :521-553) — só o SHAPE está errado. 500 real só em `financial_views.py:161`, `transfer` (KeyError), `mark_paid` (DoesNotExist). Não superdimensionar.
+
+### GAPS DA AUDITORIA QUE FALTAM (adicionar)
+- **`UserAdminSerializer` (`user_admin_views.py:41,50`) chama `set_password()` sem `validate_password()`** — achado P4.1 em NENHUM plano. Adicionar `validate_password(password, user)` no create/update.
+- **`month_advance_views.py:79, 99, 136`** usam `int(year)/int(month)` crus (além de 116/125/159) → cobrir TODOS no helper de parse de query-param.
+
+### DEPENDÊNCIA / COLISÃO
+- **Este plano (P4.1) é o DONO de `core/services/lease_creation_service.py` (`LeaseCreationService`) e da reescrita de `LeaseSerializer.create`.** O P4.3 (passo 2) tentava criar o MESMO arquivo + re-extrair a derivação → **P4.3 passa a depender de P4.1**; P4.3 NÃO recria esse service. (Roadmap atualizado: P4.3 `Depende de: P4.1`.)
+
+---
+
 ## Objetivo
 
 Restaurar as camadas documentadas do backend (`Views -> Services -> Models`; serializers apenas validacao/transformacao) extraindo a logica de negocio que hoje vive em serializers e viewsets para services stateless, padronizar o shape de erro de toda a API no formato DRF (`{"detail": ...}` / erros por campo), e eliminar a classe de bugs em que entradas invalidas geram 500 (KeyError, `int()`/datas cruas, `DoesNotExist`). O foco e os endpoints ATIVOS (Lease, portal do inquilino, PIX, comprovante PIX); no modulo financeiro pessoal DEPRECATED, apenas correcoes minimas de robustez (sem refatoracao profunda).
