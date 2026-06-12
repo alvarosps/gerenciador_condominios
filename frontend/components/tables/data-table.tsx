@@ -47,12 +47,14 @@ interface DataTableProps<T extends object> {
   dataSource?: T[];
   columns: Column<T>[];
   loading?: boolean;
-  pagination?: boolean | {
-    pageSize?: number;
-    total?: number;
-    current?: number;
-    onChange?: (page: number, pageSize: number) => void;
-  };
+  pagination?:
+    | boolean
+    | {
+        pageSize?: number;
+        total?: number;
+        current?: number;
+        onChange?: (page: number, pageSize: number) => void;
+      };
   rowKey?: string | ((record: T) => string);
   rowSelection?: RowSelection<T>;
   defaultSortKey?: string;
@@ -76,7 +78,9 @@ export function DataTable<T extends object>({
       : PAGINATION.DEFAULT_PAGE_SIZE
   );
   const [sortKey, setSortKey] = useState<string | null>(defaultSortKey ?? null);
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc' | null>(defaultSortDirection ?? null);
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc' | null>(
+    defaultSortDirection ?? null
+  );
 
   const showPagination = pagination !== false;
   const paginationConfig = typeof pagination === 'object' ? pagination : {};
@@ -116,10 +120,8 @@ export function DataTable<T extends object>({
     getRowKey(_record, start + index)
   );
   const allSelected =
-    paginatedData.length > 0 &&
-    allCurrentPageKeys.every((key) => selectedKeys.includes(key));
-  const someSelected =
-    allCurrentPageKeys.some((key) => selectedKeys.includes(key)) && !allSelected;
+    paginatedData.length > 0 && allCurrentPageKeys.every((key) => selectedKeys.includes(key));
+  const someSelected = allCurrentPageKeys.some((key) => selectedKeys.includes(key)) && !allSelected;
 
   const handlePageChange = (page: number): void => {
     setCurrentPage(page);
@@ -163,9 +165,7 @@ export function DataTable<T extends object>({
 
       rowSelection.onChange(newSelectedKeys, newSelectedRows);
     } else {
-      const newSelectedKeys = selectedKeys.filter(
-        (key) => !allCurrentPageKeys.includes(key)
-      );
+      const newSelectedKeys = selectedKeys.filter((key) => !allCurrentPageKeys.includes(key));
       const newSelectedRows = dataSource.filter((_record, index) => {
         const key = getRowKey(_record, index);
         return newSelectedKeys.includes(key);
@@ -224,7 +224,7 @@ export function DataTable<T extends object>({
                   <Checkbox
                     checked={someSelected ? 'indeterminate' : allSelected}
                     onCheckedChange={handleSelectAll}
-                    aria-label="Select all"
+                    aria-label="Selecionar todos"
                   />
                 </TableHead>
               )}
@@ -243,7 +243,7 @@ export function DataTable<T extends object>({
                               ? 'text-primary'
                               : 'text-muted-foreground/30'
                           )}
-                          aria-label={`Sort ${column.title} ascending`}
+                          aria-label={`Ordenar ${column.title} crescente`}
                         >
                           ▲
                         </button>
@@ -256,7 +256,7 @@ export function DataTable<T extends object>({
                               ? 'text-primary'
                               : 'text-muted-foreground/30'
                           )}
-                          aria-label={`Sort ${column.title} descending`}
+                          aria-label={`Ordenar ${column.title} decrescente`}
                         >
                           ▼
                         </button>
@@ -293,7 +293,7 @@ export function DataTable<T extends object>({
                           onCheckedChange={(checked) =>
                             handleSelectRow(record, start + index, checked as boolean)
                           }
-                          aria-label="Select row"
+                          aria-label="Selecionar linha"
                         />
                       </TableCell>
                     )}

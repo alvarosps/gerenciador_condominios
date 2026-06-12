@@ -141,6 +141,17 @@ class TestAdminProofsAPI:
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
+    def test_review_already_reviewed_proof_returns_409(
+        self, authenticated_api_client, pending_proof
+    ):
+        pending_proof.status = "approved"
+        pending_proof.save(update_fields=["status"])
+        url = f"{self.list_url}{pending_proof.pk}/review/"
+        response = authenticated_api_client.post(url, {"action": "reject"}, format="json")
+
+        assert response.status_code == status.HTTP_409_CONFLICT
+        assert "detail" in response.data
+
     def test_list_requires_authentication(self, api_client):
         response = api_client.get(self.list_url)
         assert response.status_code == status.HTTP_401_UNAUTHORIZED

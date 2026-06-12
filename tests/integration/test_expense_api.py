@@ -305,6 +305,16 @@ class TestExpenseAPI:
 
     # --- Actions ---
 
+    def test_filter_invalid_person_id_returns_400(self, authenticated_api_client):
+        """Regression: filter did int(person_id) on raw query param -> ValueError 500."""
+        response = authenticated_api_client.get(self.url, {"person_id": "abc"})
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    def test_mark_paid_nonexistent_returns_404(self, authenticated_api_client):
+        """Regression: select_for_update().get(pk=pk) on a missing pk -> DoesNotExist 500."""
+        response = authenticated_api_client.post(f"{self.url}999999/mark_paid/")
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+
     def test_mark_paid(self, authenticated_api_client, simple_expense):
         url = f"{self.url}{simple_expense.pk}/mark_paid/"
         response = authenticated_api_client.post(url)

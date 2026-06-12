@@ -29,5 +29,17 @@ class TestCustomExceptionHandler:
         assert response is not None
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
+    def test_object_does_not_exist_maps_to_404(self) -> None:
+        from django.core.exceptions import ObjectDoesNotExist
+
+        response = custom_exception_handler(ObjectDoesNotExist("missing"), {})
+        assert response is not None
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert "detail" in response.data
+
+    def test_key_error_returns_none(self) -> None:
+        # KeyError stays a 500 (programming error); not masked as a 400.
+        assert custom_exception_handler(KeyError("apartment_id"), {}) is None
+
     def test_unknown_exception_returns_none(self) -> None:
         assert custom_exception_handler(RuntimeError("boom"), {}) is None

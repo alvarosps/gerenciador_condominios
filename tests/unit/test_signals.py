@@ -17,9 +17,12 @@ from core.models import (
 from tests.factories import (
     make_apartment,
     make_building,
+    make_credit_card,
     make_dependent,
+    make_expense_category,
     make_furniture,
     make_lease,
+    make_person_income,
     make_tenant,
 )
 
@@ -399,7 +402,64 @@ class TestFinancialSettingsSignal:
         settings.save()
 
         called_patterns = [call.args[0] for call in spy.call_args_list]
-        assert "daily-control*" in called_patterns
         assert "cash-flow*" in called_patterns
         assert "financial-dashboard*" in called_patterns
         assert "dashboard-late-payment*" in called_patterns
+
+
+@pytest.mark.unit
+@pytest.mark.django_db
+class TestCoreModelRealPrefixInvalidation:
+    """P4.2 — core writes invalidate the real hyphenated prefixes, not the dead *Model* glob."""
+
+    def test_lease_save_invalidates_real_dashboard_prefixes(
+        self, apartment, tenant, mocker
+    ) -> None:
+        from core.cache import CacheManager
+
+        spy = mocker.spy(CacheManager, "invalidate_pattern")
+        make_lease(apartment=apartment, tenant=tenant, rental_value=Decimal("1000.00"))
+        patterns = [c.args[0] for c in spy.call_args_list]
+        assert "dashboard-lease-metrics*" in patterns
+        assert "dashboard-financial-summary*" in patterns
+        assert "cash-flow-projection*" in patterns
+        assert not any("*Lease*" in p for p in patterns)
+
+    def test_tenant_save_invalidates_tenant_not_building_stats(self, mocker) -> None:
+        from core.cache import CacheManager
+
+        spy = mocker.spy(CacheManager, "invalidate_pattern")
+        make_tenant()
+        patterns = [c.args[0] for c in spy.call_args_list]
+        assert "dashboard-tenant-stats*" in patterns
+        assert "dashboard-building-stats*" not in patterns
+
+
+@pytest.mark.unit
+@pytest.mark.django_db
+class TestNewFinancialModelInvalidation:
+    """P4.2 — PersonIncome / CreditCard / ExpenseCategory now invalidate financial caches."""
+
+    def test_person_income_save_invalidates_financial_caches(self, mocker) -> None:
+        from core.cache import CacheManager
+
+        spy = mocker.spy(CacheManager, "invalidate_pattern")
+        make_person_income()
+        patterns = [c.args[0] for c in spy.call_args_list]
+        assert "financial-dashboard*" in patterns
+
+    def test_credit_card_save_invalidates_financial_caches(self, mocker) -> None:
+        from core.cache import CacheManager
+
+        spy = mocker.spy(CacheManager, "invalidate_pattern")
+        make_credit_card()
+        patterns = [c.args[0] for c in spy.call_args_list]
+        assert "financial-dashboard*" in patterns
+
+    def test_expense_category_save_invalidates_financial_caches(self, mocker) -> None:
+        from core.cache import CacheManager
+
+        spy = mocker.spy(CacheManager, "invalidate_pattern")
+        make_expense_category(name="Signal Cat")
+        patterns = [c.args[0] for c in spy.call_args_list]
+        assert "financial-dashboard*" in patterns

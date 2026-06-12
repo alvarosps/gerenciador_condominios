@@ -9,7 +9,9 @@ from decimal import Decimal
 from typing import Any
 
 from django.db import transaction
+from django.utils import timezone
 
+from core.cache import invalidate_legacy_financial_caches
 from core.models import (
     Expense,
     ExpenseInstallment,
@@ -129,11 +131,14 @@ class PersonPaymentScheduleService:
 
         person = Person.objects.get(pk=person_id)
 
-        # Soft-delete existing schedules for this person/month
+        # Soft-delete existing schedules for this person/month. The bulk .update() must set
+        # deleted_at (a row with is_deleted=True but deleted_at=None is an inconsistent
+        # soft-delete) and, since it bypasses post_save, invalidate caches explicitly.
         PersonPaymentSchedule.objects.filter(
             person_id=person_id,
             reference_month=reference_month,
-        ).update(is_deleted=True)
+        ).update(is_deleted=True, deleted_at=timezone.now())
+        invalidate_legacy_financial_caches()
 
         created = []
         for entry in entries:

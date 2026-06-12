@@ -665,6 +665,10 @@ class Dependent(AuditMixin, SoftDeleteMixin, models.Model):
         super().save(*args, **kwargs)
 
 
+DOUBLE_OCCUPANCY = 2
+"""number_of_tenants tier that uses Apartment.rental_value_double for pricing."""
+
+
 class Lease(AuditMixin, SoftDeleteMixin, models.Model):
     """
     Represents a rental lease/contract for an apartment.

@@ -9,6 +9,8 @@ Endpoint: /api/admin/users/
 from typing import Any
 
 from django.contrib.auth.models import User
+from django.contrib.auth.password_validation import validate_password as django_validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers, viewsets
 
 from core.permissions import IsAdminUser
@@ -19,6 +21,14 @@ class UserAdminSerializer(serializers.ModelSerializer[User]):
 
     password = serializers.CharField(write_only=True, required=False, min_length=8)
     date_joined = serializers.DateTimeField(read_only=True)
+
+    def validate_password(self, value: str) -> str:
+        """Run Django's configured password validators (strength, similarity, etc.)."""
+        try:
+            django_validate_password(value, self.instance)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(list(exc.messages)) from exc
+        return value
 
     class Meta:
         model = User

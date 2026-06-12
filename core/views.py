@@ -11,7 +11,7 @@ from django.db.models import Count, DateField, Q, QuerySet
 from django.db.models.expressions import RawSQL
 from django.http import FileResponse, HttpResponseBase
 from django.utils import timezone
-from rest_framework import status, viewsets
+from rest_framework import serializers, status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.request import Request
@@ -33,9 +33,11 @@ from .serializers import (
     LeaseSerializer,
     RentAdjustmentSerializer,
     TenantSerializer,
+    TransferLeaseSerializer,
 )
 from .services import DashboardService, FeeCalculatorService
 from .services.contract_service import ContractService
+from .services.lease_creation_service import LeaseCreationService
 from .services.lease_service import change_tenant_due_day, terminate_lease, transfer_lease
 from .services.rent_adjustment_service import RentAdjustmentService
 from .services.rent_schedule_service import RentScheduleService
@@ -282,6 +284,17 @@ class LeaseViewSet(viewsets.ModelViewSet):
     queryset = Lease.objects.all().order_by("id")
     serializer_class = LeaseSerializer
     permission_classes = [CanModifyLease]
+
+    def perform_create(self, serializer: serializers.BaseSerializer[Lease]) -> None:
+        """Delegate lease creation to LeaseCreationService (business logic out of the serializer)."""
+        validated = dict(serializer.validated_data)
+        tenants = validated.pop("tenants", [])
+        serializer.instance = LeaseCreationService.create(validated_data=validated, tenants=tenants)
+
+    def perform_update(self, serializer: serializers.BaseSerializer[Lease]) -> None:
+        """Apply the update, then sync the apartment's last_rent_increase_date via the service."""
+        lease = serializer.save()
+        LeaseCreationService.sync_apartment_last_rent_increase_date(lease)
 
     def _apply_lease_status_filters(
         self, queryset: QuerySet[Lease], params: Any
@@ -577,8 +590,10 @@ class LeaseViewSet(viewsets.ModelViewSet):
     def transfer(self, request: Request, pk: int | None = None) -> Response:
         """Transfer a lease to a new apartment."""
         lease = self.get_object()
+        payload = TransferLeaseSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
         try:
-            new_lease = transfer_lease(lease.id, request.data.copy(), request.user)
+            new_lease = transfer_lease(lease.id, dict(payload.validated_data), request.user)
         except ValueError as e:
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         serializer = self.get_serializer(new_lease)

@@ -3,12 +3,12 @@
 import pytest
 from django.test import override_settings
 
+import core.cache
 from core.cache import (
     CacheManager,
     cache_result,
     get_cache_key,
     get_model_cache_key,
-    invalidate_related_caches,
 )
 
 LOCMEM_CACHE = {
@@ -185,13 +185,11 @@ class TestCacheManager:
         # Either 0 (no Redis) or exception caught and returns 0
         assert count == 0
 
-    def test_invalidate_model_without_redis_returns_zero(self):
-        count = CacheManager.invalidate_model("Building", pk=1)
-        assert count == 0
-
-    def test_invalidate_model_all_without_redis_returns_zero(self):
-        count = CacheManager.invalidate_model("Building")
-        assert count == 0
+    def test_invalidate_model_and_related_removed(self):
+        # Dead invalidation (CacheManager.invalidate_model -> "*Model*" glob never matched the
+        # real hyphenated prefixes) was removed in P4.2; ensure it does not come back.
+        assert not hasattr(CacheManager, "invalidate_model")
+        assert not hasattr(core.cache, "invalidate_related_caches")
 
     def test_get_cache_stats_without_redis(self):
         stats = CacheManager.get_cache_stats()
@@ -199,16 +197,6 @@ class TestCacheManager:
         assert "keyspace_hits" in stats
         assert "keyspace_misses" in stats
         assert "hit_rate" in stats
-
-
-@pytest.mark.unit
-class TestInvalidateRelatedCaches:
-    def test_runs_without_error(self, mocker):
-        mock_instance = mocker.MagicMock()
-        mock_instance.__class__.__name__ = "Building"
-        mock_instance.pk = 9903
-        # Should not raise — invalidate_pattern handles Redis errors gracefully
-        invalidate_related_caches(mock_instance, ["Apartment", "Lease"])
 
 
 @pytest.mark.unit
@@ -297,10 +285,12 @@ class TestCacheManagerInvalidateWithRedis:
         """Covers lines 288-306: Redis backend, get_redis_connection used."""
         mock_redis = mocker.MagicMock()
         mock_redis.info.return_value = {"keyspace_hits": 100, "keyspace_misses": 20}
-        mock_redis.keys.return_value = [b"key1", b"key2"]
+        # get_cache_stats counts via non-blocking scan_iter (not the blocking KEYS).
+        mock_redis.scan_iter.return_value = iter([b"key1", b"key2"])
         mocker.patch("core.cache.get_redis_connection", return_value=mock_redis)
         stats = CacheManager.get_cache_stats()
         assert stats["total_keys"] == 2
+        mock_redis.keys.assert_not_called()
         assert stats["keyspace_hits"] == 100
         assert stats["keyspace_misses"] == 20
         assert stats["hit_rate"] > 0

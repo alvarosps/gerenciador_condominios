@@ -9,7 +9,7 @@ from typing import cast
 
 from django.contrib.auth.models import User
 from django.http import HttpResponseBase
-from django.utils import timezone
+from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.request import Request
@@ -21,9 +21,7 @@ from core.pagination import CustomPageNumberPagination
 from core.permissions import IsAdminUser
 from core.serializers import PaymentProofSerializer
 from core.services.file_response_service import proof_file_response
-from core.services.notification_service import notify_proof_reviewed
-
-_VALID_REVIEW_ACTIONS = ("approve", "reject")
+from core.services.proof_review_service import ProofReviewService
 
 
 class AdminProofViewSet(ViewSet):
@@ -62,43 +60,13 @@ class AdminProofViewSet(ViewSet):
         Approve or reject a payment proof.
         Body: {"action": "approve"|"reject", "reason": "..."}
         """
-        if not pk:
-            return Response(
-                {"error": "Comprovante não encontrado"},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-        try:
-            proof = PaymentProof.objects.get(pk=pk)
-        except PaymentProof.DoesNotExist:
-            return Response(
-                {"error": "Comprovante não encontrado"},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-
-        if proof.status != "pending":
-            return Response(
-                {"error": "Apenas comprovantes pendentes podem ser revisados."},
-                status=status.HTTP_409_CONFLICT,
-            )
-
-        action_type = request.data.get("action")
-        if action_type not in _VALID_REVIEW_ACTIONS:
-            return Response(
-                {"error": "action deve ser 'approve' ou 'reject'"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        proof.reviewed_by = cast(User, request.user)
-        proof.reviewed_at = timezone.now()
-
-        if action_type == "approve":
-            proof.status = "approved"
-        else:
-            proof.status = "rejected"
-            proof.rejection_reason = request.data.get("reason", "")
-
-        proof.save(update_fields=["status", "reviewed_by", "reviewed_at", "rejection_reason"])
-        notify_proof_reviewed(proof)
+        proof = get_object_or_404(PaymentProof, pk=pk)
+        proof = ProofReviewService.review(
+            proof=proof,
+            action=request.data.get("action", ""),
+            reason=request.data.get("reason", ""),
+            user=cast(User, request.user),
+        )
         return Response(PaymentProofSerializer(proof).data)
 
     @action(detail=True, methods=["get"], url_path="file")

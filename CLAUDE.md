@@ -80,7 +80,7 @@ npm run lint && npm run type-check            # ESLint + TypeScript
 - IMPORTANT: PDF generation requer Chrome instalado — path detection Windows-specific em `contract_service.py`
 - CRITICAL: Default querysets excluem soft-deleted records — usar `with_deleted()` quando necessário
 - IMPORTANT: Redis cache com invalidação automática via signals — ao mudar models/signals, verificar impacto no cache
-- IMPORTANT: `CacheManager.invalidate_model(name, pk)` e `invalidate_pattern(pattern)` — cache invalida automaticamente em save/delete via signals
+- IMPORTANT: `CacheManager.invalidate_pattern("<prefix>*")` (chaves hifenizadas) — cache invalida automaticamente em save/delete via signals; receivers do core mapeiam model→prefixos reais em `_CORE_MODEL_CACHE_PREFIXES` (P4.2; o antigo `invalidate_model`/`*Model*` foi removido por nunca casar)
 - Tag fee: R$20 (1 tenant) / R$40 (2+), não-reembolsável (a tag é de propriedade do inquilino; perdeu, compra outra a R$20/un.) — `FeeCalculatorService.calculate_tag_fee` em `core/services/fee_calculator.py` (valores via `settings.DEFAULT_TAG_FEE_SINGLE/MULTIPLE`)
 - Late fee: 5% ao dia × (rental_value ÷ 30) × days_late — lógica em `fee_calculator.py`
 - Furniture no contrato = Apartment furniture − Tenant furniture

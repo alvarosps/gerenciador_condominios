@@ -1,18 +1,11 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
-import {
-  Search,
-  Building2,
-  DoorOpen,
-  Users,
-  FileText,
-  Package,
-  Loader2,
-} from 'lucide-react';
+import { Search, Building2, DoorOpen, Users, FileText, Package, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useDebounce } from '@/lib/hooks/use-debounce';
 import { apiClient } from '@/lib/api/client';
+import { ROUTES } from '@/lib/utils/constants';
 import { formatCurrency, formatCpfCnpj, formatPhone } from '@/lib/utils/formatters';
 import { type Building } from '@/lib/schemas/building.schema';
 import { type Apartment } from '@/lib/schemas/apartment.schema';
@@ -20,12 +13,7 @@ import { type Tenant } from '@/lib/schemas/tenant.schema';
 import { type Lease } from '@/lib/schemas/lease.schema';
 import { type Furniture } from '@/lib/schemas/furniture.schema';
 import { Input } from '@/components/ui/input';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
@@ -75,7 +63,7 @@ export function GlobalSearch() {
             title: item.name,
             subtitle: `Número: ${item.street_number}`,
             metadata: item.address,
-            url: '/dashboard/buildings',
+            url: ROUTES.BUILDINGS,
           });
         }
       });
@@ -89,7 +77,7 @@ export function GlobalSearch() {
             title: `Apartamento ${item.number}`,
             subtitle: item.building?.name ?? 'Sem prédio',
             metadata: `${formatCurrency(item.rental_value)} - ${item.is_rented ? 'Alugado' : 'Disponível'}`,
-            url: '/dashboard/apartments',
+            url: ROUTES.APARTMENTS,
           });
         }
       });
@@ -103,7 +91,7 @@ export function GlobalSearch() {
             title: item.name,
             subtitle: formatCpfCnpj(item.cpf_cnpj),
             metadata: `${formatPhone(item.phone)} - ${item.profession}`,
-            url: '/dashboard/tenants',
+            url: ROUTES.TENANTS,
           });
         }
       });
@@ -117,7 +105,7 @@ export function GlobalSearch() {
             title: `Locação - ${item.responsible_tenant?.name ?? 'Sem inquilino'}`,
             subtitle: `${item.apartment?.building?.name ?? ''} Apto ${item.apartment?.number ?? ''}`,
             metadata: `${formatCurrency(item.apartment?.rental_value ?? 0)} - Venc. dia ${item.responsible_tenant?.due_day ?? '-'}`,
-            url: '/dashboard/leases',
+            url: ROUTES.LEASES,
           });
         }
       });
@@ -131,7 +119,7 @@ export function GlobalSearch() {
             title: item.name,
             subtitle: 'Móvel',
             metadata: item.description ?? '',
-            url: '/dashboard/furniture',
+            url: ROUTES.FURNITURE,
           });
         }
       });
@@ -192,7 +180,9 @@ export function GlobalSearch() {
     }
   };
 
-  const getBadgeVariant = (_type: SearchResult['type']): 'default' | 'secondary' | 'destructive' | 'outline' => {
+  const getBadgeVariant = (
+    _type: SearchResult['type']
+  ): 'default' | 'secondary' | 'destructive' | 'outline' => {
     return 'secondary';
   };
 
@@ -267,16 +257,12 @@ export function GlobalSearch() {
             ) : searchTerm && !isSearching ? (
               <div className="flex flex-col items-center justify-center py-8 text-center">
                 <Search className="h-12 w-12 text-muted-foreground/30" />
-                <p className="mt-4 text-sm text-muted-foreground">
-                  Nenhum resultado encontrado
-                </p>
+                <p className="mt-4 text-sm text-muted-foreground">Nenhum resultado encontrado</p>
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center py-8 text-center text-muted-foreground">
                 <Search className="h-12 w-12 opacity-30" />
-                <p className="mt-4">
-                  Digite pelo menos 2 caracteres para buscar
-                </p>
+                <p className="mt-4">Digite pelo menos 2 caracteres para buscar</p>
                 <p className="text-sm mt-2">
                   Busque por nome, documento, endereço, ou qualquer informação
                 </p>

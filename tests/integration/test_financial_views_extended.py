@@ -322,7 +322,7 @@ class TestExpenseGenerateInstallmentsEdgeCases:
         url = f"/api/expenses/{installment_expense.pk}/generate_installments/"
         response = authenticated_api_client.post(url, {}, format="json")
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "Parcelas já foram geradas" in response.data["error"]
+        assert "Parcelas já foram geradas" in response.data["detail"]
 
     def test_generate_installments_not_installment_returns_400(
         self, authenticated_api_client, expense

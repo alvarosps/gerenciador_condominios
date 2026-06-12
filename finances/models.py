@@ -493,6 +493,11 @@ _EMBEDDED_NEEDS_CONSUMPTION_MSG = (
     "Plano embutido exige uma conta de consumo (água, luz ou internet)."
 )
 
+# Employee payroll invariants (mirrored by EmployeeSerializer.validate — DRF skips clean()).
+_ERR_BASE_SALARY_NEGATIVE = "O salário base não pode ser negativo."
+_ERR_FIXED_NEEDS_BASE = "Funcionário fixo/misto exige um salário base positivo."
+_ERR_VARIABLE_NO_BASE = "Funcionário variável não pode ter salário base."
+
 
 class InstallmentPlan(AuditMixin, SoftDeleteMixin, models.Model):
     """Installment plan (embedded OR standalone). Materializes Installments (schedule)."""
@@ -641,20 +646,16 @@ class Employee(AuditMixin, SoftDeleteMixin, models.Model):
     def clean(self) -> None:
         super().clean()
         if self.base_salary is not None and self.base_salary < 0:
-            raise ValidationError({"base_salary": "O salário base não pode ser negativo."})
+            raise ValidationError({"base_salary": _ERR_BASE_SALARY_NEGATIVE})
         needs_base = self.payment_type in (EmployeePaymentType.FIXED, EmployeePaymentType.MIXED)
         if needs_base and (self.base_salary is None or self.base_salary <= 0):
-            raise ValidationError(
-                {"base_salary": "Funcionário fixo/misto exige um salário base positivo."}
-            )
+            raise ValidationError({"base_salary": _ERR_FIXED_NEEDS_BASE})
         if (
             self.payment_type == EmployeePaymentType.VARIABLE
             and self.base_salary is not None
             and self.base_salary > 0
         ):
-            raise ValidationError(
-                {"base_salary": "Funcionário variável não pode ter salário base."}
-            )
+            raise ValidationError({"base_salary": _ERR_VARIABLE_NO_BASE})
 
 
 # =============================================================================

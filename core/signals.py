@@ -23,14 +23,15 @@ from django.db.models import Exists, OuterRef
 from django.db.models.signals import m2m_changed, post_delete, post_save
 from django.dispatch import receiver
 
-from .cache import CacheManager, invalidate_related_caches
+from .cache import CacheManager, invalidate_legacy_financial_caches
 from .models import (
     Apartment,
     Building,
+    CreditCard,
     Dependent,
-    DeviceToken,
     EmployeePayment,
     Expense,
+    ExpenseCategory,
     ExpenseInstallment,
     ExpenseMonthSkip,
     FinancialSettings,
@@ -38,9 +39,8 @@ from .models import (
     Income,
     Lease,
     MonthSnapshot,
-    Notification,
-    PaymentProof,
     Person,
+    PersonIncome,
     PersonPayment,
     PersonPaymentSchedule,
     RentAdjustment,
@@ -65,6 +65,41 @@ def _invalidate_finance_module_caches() -> None:
         CacheManager.invalidate_pattern(f"{prefix}*")
 
 
+# Real @cache_result key prefixes that a core-model write must invalidate. The old
+# CacheManager.invalidate_model("Model") produced "*Model*" globs that never matched these
+# hyphenated prefixes, so core invalidation only worked by TTL expiry (120-300s). The keys are
+# hyphenated, so the glob is "<prefix>*" ("<prefix>:*" never matches — same trap as the
+# financial caches). finance-* stays handled by _invalidate_finance_module_caches() at the
+# Apartment/Lease receivers, so it is intentionally not duplicated here.
+_PROPERTY_CACHE_PREFIXES = (
+    "dashboard-financial-summary",
+    "dashboard-lease-metrics",
+    "dashboard-building-stats",
+    "dashboard-tenant-stats",
+    "dashboard-late-payment",
+    "cash-flow-projection",
+)
+_CORE_MODEL_CACHE_PREFIXES: dict[str, tuple[str, ...]] = {
+    "Building": _PROPERTY_CACHE_PREFIXES,
+    "Apartment": _PROPERTY_CACHE_PREFIXES,
+    "Lease": _PROPERTY_CACHE_PREFIXES,
+    "Tenant": (
+        "dashboard-financial-summary",
+        "dashboard-lease-metrics",
+        "dashboard-tenant-stats",
+        "dashboard-late-payment",
+    ),
+    "Furniture": ("dashboard-financial-summary", "dashboard-lease-metrics"),
+    "Dependent": ("dashboard-tenant-stats",),
+}
+
+
+def _invalidate_core_model_caches(model_name: str) -> None:
+    """Invalidate the real cache prefixes a core-model write affects (no-op if none)."""
+    for prefix in _CORE_MODEL_CACHE_PREFIXES.get(model_name, ()):
+        CacheManager.invalidate_pattern(f"{prefix}*")
+
+
 # =============================================================================
 # Building Signals
 # =============================================================================
@@ -82,7 +117,7 @@ def invalidate_building_cache_on_save(
     action = "created" if created else "updated"
     logger.info(f"Building {instance.pk} {action}, invalidating caches")
 
-    invalidate_related_caches(instance, related_models=["Apartment", "Lease"])
+    _invalidate_core_model_caches("Building")
 
 
 @receiver(post_delete, sender=Building)
@@ -93,7 +128,7 @@ def invalidate_building_cache_on_delete(
     Invalidate Building caches when a Building is deleted.
     """
     logger.info(f"Building {instance.pk} deleted, invalidating caches")
-    invalidate_related_caches(instance, related_models=["Apartment", "Lease"])
+    _invalidate_core_model_caches("Building")
 
 
 # =============================================================================
@@ -113,7 +148,7 @@ def invalidate_apartment_cache_on_save(
     action = "created" if created else "updated"
     logger.info(f"Apartment {instance.pk} {action}, invalidating caches")
 
-    invalidate_related_caches(instance, related_models=["Building", "Lease"])
+    _invalidate_core_model_caches("Apartment")
     # owner / rental value changes condominium revenue + projection (design §11, NET-NEW)
     _invalidate_finance_module_caches()
 
@@ -126,7 +161,7 @@ def invalidate_apartment_cache_on_delete(
     Invalidate Apartment caches when an Apartment is deleted.
     """
     logger.info(f"Apartment {instance.pk} deleted, invalidating caches")
-    invalidate_related_caches(instance, related_models=["Building", "Lease"])
+    _invalidate_core_model_caches("Apartment")
     _invalidate_finance_module_caches()
 
 
@@ -139,7 +174,7 @@ def invalidate_apartment_furniture_cache(
     """
     if action in ["post_add", "post_remove", "post_clear"]:
         logger.info(f"Apartment {instance.pk} furniture changed, invalidating caches")
-        invalidate_related_caches(instance, related_models=["Furniture", "Lease"])
+        _invalidate_core_model_caches("Apartment")
 
 
 # =============================================================================
@@ -159,7 +194,7 @@ def invalidate_tenant_cache_on_save(
     action = "created" if created else "updated"
     logger.info(f"Tenant {instance.pk} {action}, invalidating caches")
 
-    invalidate_related_caches(instance, related_models=["Lease", "Dependent"])
+    _invalidate_core_model_caches("Tenant")
 
 
 @receiver(post_delete, sender=Tenant)
@@ -170,7 +205,7 @@ def invalidate_tenant_cache_on_delete(
     Invalidate Tenant caches when a Tenant is deleted.
     """
     logger.info(f"Tenant {instance.pk} deleted, invalidating caches")
-    invalidate_related_caches(instance, related_models=["Lease", "Dependent"])
+    _invalidate_core_model_caches("Tenant")
 
 
 @receiver(m2m_changed, sender=Tenant.furnitures.through)
@@ -182,7 +217,7 @@ def invalidate_tenant_furniture_cache(
     """
     if action in ["post_add", "post_remove", "post_clear"]:
         logger.info(f"Tenant {instance.pk} furniture changed, invalidating caches")
-        invalidate_related_caches(instance, related_models=["Furniture", "Lease"])
+        _invalidate_core_model_caches("Tenant")
 
 
 # =============================================================================
@@ -218,7 +253,7 @@ def invalidate_lease_cache_on_save(
     action = "created" if created else "updated"
     logger.info(f"Lease {instance.pk} {action}, invalidating caches")
 
-    invalidate_related_caches(instance, related_models=["Apartment", "Tenant"])
+    _invalidate_core_model_caches("Lease")
     # collectibility / salary-offset / prepaid changes condominium revenue (design §11)
     _invalidate_finance_module_caches()
 
@@ -229,7 +264,7 @@ def invalidate_lease_cache_on_delete(sender: type[Lease], instance: Lease, **kwa
     Invalidate Lease caches when a Lease is deleted.
     """
     logger.info(f"Lease {instance.pk} deleted, invalidating caches")
-    invalidate_related_caches(instance, related_models=["Apartment", "Tenant"])
+    _invalidate_core_model_caches("Lease")
     _invalidate_finance_module_caches()
 
 
@@ -242,7 +277,7 @@ def invalidate_lease_tenants_cache(
     """
     if action in ["post_add", "post_remove", "post_clear"]:
         logger.info(f"Lease {instance.pk} tenants changed, invalidating caches")
-        invalidate_related_caches(instance, related_models=["Tenant"])
+        _invalidate_core_model_caches("Lease")
 
 
 # =============================================================================
@@ -262,7 +297,7 @@ def invalidate_furniture_cache_on_save(
     action = "created" if created else "updated"
     logger.info(f"Furniture {instance.pk} {action}, invalidating caches")
 
-    invalidate_related_caches(instance, related_models=["Apartment", "Tenant", "Lease"])
+    _invalidate_core_model_caches("Furniture")
 
 
 @receiver(post_delete, sender=Furniture)
@@ -273,7 +308,7 @@ def invalidate_furniture_cache_on_delete(
     Invalidate Furniture caches when Furniture is deleted.
     """
     logger.info(f"Furniture {instance.pk} deleted, invalidating caches")
-    invalidate_related_caches(instance, related_models=["Apartment", "Tenant", "Lease"])
+    _invalidate_core_model_caches("Furniture")
 
 
 # =============================================================================
@@ -293,7 +328,7 @@ def invalidate_dependent_cache_on_save(
     action = "created" if created else "updated"
     logger.info(f"Dependent {instance.pk} {action}, invalidating caches")
 
-    invalidate_related_caches(instance, related_models=["Tenant"])
+    _invalidate_core_model_caches("Dependent")
 
 
 @receiver(post_delete, sender=Dependent)
@@ -304,7 +339,7 @@ def invalidate_dependent_cache_on_delete(
     Invalidate Dependent caches when a Dependent is deleted.
     """
     logger.info(f"Dependent {instance.pk} deleted, invalidating caches")
-    invalidate_related_caches(instance, related_models=["Tenant"])
+    _invalidate_core_model_caches("Dependent")
 
 
 # =============================================================================
@@ -315,14 +350,9 @@ def invalidate_dependent_cache_on_delete(
 def _invalidate_financial_caches(model_name: str, pk: int) -> None:
     """Invalidate all financial dashboard caches affected by financial model changes."""
     logger.info(f"{model_name} {pk} changed, invalidating financial caches")
-    # Keys are hyphen-prefixed (e.g. "financial-dashboard-debt-type"), not colon-separated,
-    # so the glob must be "<prefix>*" — "<prefix>:*" never matches and leaves caches stale.
-    CacheManager.invalidate_pattern("daily-control*")
-    CacheManager.invalidate_pattern("cash-flow*")
-    CacheManager.invalidate_pattern("financial-dashboard*")
-    # RentPayment / FinancialSettings route through here, so the condominium-finance
-    # module caches are invalidated for them too (DRY).
-    _invalidate_finance_module_caches()
+    # cash-flow* / financial-dashboard* + the condominium-finance caches (RentPayment /
+    # FinancialSettings route through here, so finance-* is invalidated for them too).
+    invalidate_legacy_financial_caches()
 
 
 @receiver(post_save, sender=Person)
@@ -534,60 +564,52 @@ def invalidate_employee_payment_cache_on_delete(
     _invalidate_financial_caches("EmployeePayment", instance.pk)
 
 
-# =============================================================================
-# Mobile Model Signals
-# =============================================================================
-
-
-@receiver(post_save, sender=PaymentProof)
-def invalidate_payment_proof_cache_on_save(
-    sender: type[PaymentProof], instance: PaymentProof, created: bool, **kwargs: Any
+@receiver(post_save, sender=PersonIncome)
+def invalidate_person_income_cache_on_save(
+    sender: type[PersonIncome], instance: PersonIncome, created: bool, **kwargs: Any
 ) -> None:
     action = "created" if created else "updated"
-    logger.info(f"PaymentProof {instance.pk} {action}, invalidating caches")
-    invalidate_related_caches(instance, related_models=["Lease"])
+    logger.info(f"PersonIncome {instance.pk} {action}, invalidating financial caches")
+    _invalidate_financial_caches("PersonIncome", instance.pk)
 
 
-@receiver(post_delete, sender=PaymentProof)
-def invalidate_payment_proof_cache_on_delete(
-    sender: type[PaymentProof], instance: PaymentProof, **kwargs: Any
+@receiver(post_delete, sender=PersonIncome)
+def invalidate_person_income_cache_on_delete(
+    sender: type[PersonIncome], instance: PersonIncome, **kwargs: Any
 ) -> None:
-    logger.info(f"PaymentProof {instance.pk} deleted, invalidating caches")
-    invalidate_related_caches(instance, related_models=["Lease"])
+    _invalidate_financial_caches("PersonIncome", instance.pk)
 
 
-@receiver(post_save, sender=Notification)
-def invalidate_notification_cache_on_save(
-    sender: type[Notification], instance: Notification, created: bool, **kwargs: Any
-) -> None:
-    action = "created" if created else "updated"
-    logger.info(f"Notification {instance.pk} {action}, invalidating caches")
-    CacheManager.invalidate_model("Notification", instance.pk)
-
-
-@receiver(post_delete, sender=Notification)
-def invalidate_notification_cache_on_delete(
-    sender: type[Notification], instance: Notification, **kwargs: Any
-) -> None:
-    logger.info(f"Notification {instance.pk} deleted, invalidating caches")
-    CacheManager.invalidate_model("Notification", instance.pk)
-
-
-@receiver(post_save, sender=DeviceToken)
-def invalidate_device_token_cache_on_save(
-    sender: type[DeviceToken], instance: DeviceToken, created: bool, **kwargs: Any
+@receiver(post_save, sender=CreditCard)
+def invalidate_credit_card_cache_on_save(
+    sender: type[CreditCard], instance: CreditCard, created: bool, **kwargs: Any
 ) -> None:
     action = "created" if created else "updated"
-    logger.info(f"DeviceToken {instance.pk} {action}, invalidating caches")
-    CacheManager.invalidate_model("DeviceToken", instance.pk)
+    logger.info(f"CreditCard {instance.pk} {action}, invalidating financial caches")
+    _invalidate_financial_caches("CreditCard", instance.pk)
 
 
-@receiver(post_delete, sender=DeviceToken)
-def invalidate_device_token_cache_on_delete(
-    sender: type[DeviceToken], instance: DeviceToken, **kwargs: Any
+@receiver(post_delete, sender=CreditCard)
+def invalidate_credit_card_cache_on_delete(
+    sender: type[CreditCard], instance: CreditCard, **kwargs: Any
 ) -> None:
-    logger.info(f"DeviceToken {instance.pk} deleted, invalidating caches")
-    CacheManager.invalidate_model("DeviceToken", instance.pk)
+    _invalidate_financial_caches("CreditCard", instance.pk)
+
+
+@receiver(post_save, sender=ExpenseCategory)
+def invalidate_expense_category_cache_on_save(
+    sender: type[ExpenseCategory], instance: ExpenseCategory, created: bool, **kwargs: Any
+) -> None:
+    action = "created" if created else "updated"
+    logger.info(f"ExpenseCategory {instance.pk} {action}, invalidating financial caches")
+    _invalidate_financial_caches("ExpenseCategory", instance.pk)
+
+
+@receiver(post_delete, sender=ExpenseCategory)
+def invalidate_expense_category_cache_on_delete(
+    sender: type[ExpenseCategory], instance: ExpenseCategory, **kwargs: Any
+) -> None:
+    _invalidate_financial_caches("ExpenseCategory", instance.pk)
 
 
 # =============================================================================
@@ -623,40 +645,13 @@ def connect_all_signals() -> None:
 
 
 def disconnect_all_signals() -> None:
+    """Disconnect the toggleable signals (the Lease -> Apartment.is_rented sync).
+
+    Useful for testing or temporary suspension. Only the receivers in
+    _TOGGLEABLE_RECEIVERS are disconnectable here — Django keys on (receiver, sender),
+    so the historical sender-only disconnect() calls were silent no-ops. connect_all_signals
+    restores exactly these. Use with caution: disabling can lead to stale caches.
     """
-    Disconnect all cache invalidation signals.
-
-    Useful for testing or temporary suspension of cache invalidation.
-
-    Warning: Use with caution! Disabling signals can lead to stale caches.
-    """
-    # Disconnect all post_save signals
-    post_save.disconnect(sender=Building)
-    post_save.disconnect(sender=Apartment)
-    post_save.disconnect(sender=Tenant)
-    post_save.disconnect(sync_apartment_is_rented, sender=Lease)
-    post_save.disconnect(sender=Lease)
-    post_save.disconnect(sender=Furniture)
-    post_save.disconnect(sender=Dependent)
-    post_save.disconnect(sender=PaymentProof)
-    post_save.disconnect(sender=Notification)
-    post_save.disconnect(sender=DeviceToken)
-
-    # Disconnect all post_delete signals
-    post_delete.disconnect(sender=Building)
-    post_delete.disconnect(sender=Apartment)
-    post_delete.disconnect(sender=Tenant)
-    post_delete.disconnect(sync_apartment_is_rented_on_delete, sender=Lease)
-    post_delete.disconnect(sender=Lease)
-    post_delete.disconnect(sender=Furniture)
-    post_delete.disconnect(sender=Dependent)
-    post_delete.disconnect(sender=PaymentProof)
-    post_delete.disconnect(sender=Notification)
-    post_delete.disconnect(sender=DeviceToken)
-
-    # Disconnect m2m_changed signals
-    m2m_changed.disconnect(sender=Apartment.furnitures.through)
-    m2m_changed.disconnect(sender=Tenant.furnitures.through)
-    m2m_changed.disconnect(sender=Lease.tenants.through)
-
-    logger.warning("All cache invalidation signals disconnected")
+    for signal, handler, sender in _TOGGLEABLE_RECEIVERS:
+        signal.disconnect(handler, sender=sender)
+    logger.warning("is_rented sync signals disconnected")

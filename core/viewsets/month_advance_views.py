@@ -7,6 +7,7 @@ from rest_framework.response import Response
 
 from core.models import MonthSnapshot
 from core.permissions import IsAdminUser
+from core.query_params import parse_int_param
 from core.services.month_advance_service import MonthAdvanceService
 
 
@@ -104,25 +105,25 @@ class MonthAdvanceViewSet(viewsets.ViewSet):
     @action(detail=False, methods=["get"])
     def get_status(self, request: Request) -> Response:
         """Check month status and validation."""
-        year = request.query_params.get("year")
-        month = request.query_params.get("month")
+        year = parse_int_param(request.query_params.get("year"), field="year")
+        month = parse_int_param(request.query_params.get("month"), field="month")
 
-        if not year or not month:
+        if year is None or month is None:
             return Response(
                 {"error": "year and month query params are required"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        result = self.service.get_status(int(year), int(month))
+        result = self.service.get_status(year, month)
         return Response(result)
 
     @action(detail=False, methods=["get"])
     def snapshots(self, request: Request) -> Response:
         """List all snapshots, optionally filtered by year."""
-        year = request.query_params.get("year")
+        year = parse_int_param(request.query_params.get("year"), field="year")
         qs = MonthSnapshot.objects.all()
-        if year:
-            qs = qs.filter(reference_month__year=int(year))
+        if year is not None:
+            qs = qs.filter(reference_month__year=year)
         serializer = MonthSnapshotSerializer(qs, many=True)
         return Response(serializer.data)
 
@@ -147,14 +148,14 @@ class MonthAdvanceViewSet(viewsets.ViewSet):
     @action(detail=False, methods=["get"])
     def preview(self, request: Request) -> Response:
         """Preview next month without advancing."""
-        year = request.query_params.get("year")
-        month = request.query_params.get("month")
+        year = parse_int_param(request.query_params.get("year"), field="year")
+        month = parse_int_param(request.query_params.get("month"), field="month")
 
-        if not year or not month:
+        if year is None or month is None:
             return Response(
                 {"error": "year and month query params are required"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        result = self.service.get_next_month_preview(int(year), int(month))
+        result = self.service.get_next_month_preview(year, month)
         return Response(result)

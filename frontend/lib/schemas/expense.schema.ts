@@ -6,8 +6,9 @@ import { expenseCategorySchema } from './expense-category.schema';
 import { expenseInstallmentSchema } from './expense-installment.schema';
 import {
   EXPENSE_TYPES,
-  isPersonFieldVisible,
-  isBuildingFieldVisible,
+  PERSON_REQUIRED_TYPES,
+  BUILDING_REQUIRED_TYPES,
+  type ExpenseType,
 } from '@/lib/utils/expense-type-config';
 
 const expenseBaseSchema = z.object({
@@ -75,33 +76,59 @@ interface ExpenseValidationData {
   total_installments?: number | null;
 }
 
-export function validateExpenseRules(
-  data: ExpenseValidationData,
-  ctx: z.RefinementCtx,
-): void {
+export function validateExpenseRules(data: ExpenseValidationData, ctx: z.RefinementCtx): void {
   const type = data.expense_type;
 
   if (type === 'card_purchase') {
     if (!data.person_id) {
-      ctx.addIssue({ code: 'custom', message: 'Pessoa é obrigatória para compra no cartão', path: ['person_id'] });
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Pessoa é obrigatória para compra no cartão',
+        path: ['person_id'],
+      });
     }
     if (!data.credit_card_id) {
-      ctx.addIssue({ code: 'custom', message: 'Cartão é obrigatório para compra no cartão', path: ['credit_card_id'] });
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Cartão é obrigatório para compra no cartão',
+        path: ['credit_card_id'],
+      });
     }
   }
 
-  if (isPersonFieldVisible(type) && type !== 'card_purchase' && !data.person_id) {
-    ctx.addIssue({ code: 'custom', message: 'Pessoa é obrigatória para este tipo de empréstimo', path: ['person_id'] });
+  if (
+    PERSON_REQUIRED_TYPES.includes(type as ExpenseType) &&
+    type !== 'card_purchase' &&
+    !data.person_id
+  ) {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'Pessoa é obrigatória para este tipo de empréstimo',
+      path: ['person_id'],
+    });
   }
 
-  if (isBuildingFieldVisible(type) && !data.building_id) {
-    ctx.addIssue({ code: 'custom', message: 'Prédio é obrigatório para este tipo de despesa', path: ['building_id'] });
+  if (BUILDING_REQUIRED_TYPES.includes(type as ExpenseType) && !data.building_id) {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'Prédio é obrigatório para este tipo de despesa',
+      path: ['building_id'],
+    });
   }
 
   if (data.is_installment && (!data.total_installments || data.total_installments < 2)) {
-    ctx.addIssue({ code: 'custom', message: 'Número de parcelas deve ser pelo menos 2', path: ['total_installments'] });
+    ctx.addIssue({
+      code: 'custom',
+      message: 'Número de parcelas deve ser pelo menos 2',
+      path: ['total_installments'],
+    });
   }
 }
+
+// Read schema: the API read shape omits the write-only *_id fields, so applying
+// validateExpenseRules (which requires them) on read throws a ZodError that empties the
+// whole list. Read hooks use this; only the form resolver uses expenseSchema.
+export const expenseReadSchema = expenseBaseSchema;
 
 export const expenseSchema = expenseBaseSchema.superRefine(validateExpenseRules);
 

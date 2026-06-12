@@ -84,7 +84,7 @@ Furniture ↔ Tenant (M2M)
 - `CacheManager` + `@cache_result` decorator in `core/cache.py`
 - Automatic invalidation via Django signals in `core/signals.py`
 - When adding new models: add signal handlers for cache invalidation
-- `CacheManager.invalidate_model(name, pk)` and `invalidate_pattern(pattern)`
+- `CacheManager.invalidate_pattern("<prefix>*")` — core receivers map model→real prefixes via `_CORE_MODEL_CACHE_PREFIXES` (P4.2; `invalidate_model`/`*Model*` removed, never matched)
 
 ## ViewSet Patterns
 

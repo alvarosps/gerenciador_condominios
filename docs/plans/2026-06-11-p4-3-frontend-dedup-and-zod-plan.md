@@ -1,7 +1,44 @@
 # Plano P4.3 — Frontend: dedup de modais + criação atômica de lease + gotcha Zod + dead code
 
-> **Estado:** PLANEJADO — não executado
-> **Prioridade:** FASE P4 · **Branch sugerida:** `refactor/frontend-quality` · **Depende de:** nenhum
+> **Estado:** EXECUTADO PARCIAL (branch `refactor/p4-architecture-quality`, commit 90aef43, 2026-06-12).
+> **Prioridade:** FASE P4 · **Branch sugerida:** `refactor/frontend-quality` · **Depende de:** **P4.1** (dono do endpoint atômico + `LeaseCreationService`; ver colisão abaixo)
+>
+> ### ✅ FEITO (bugs ativos, baixo risco)
+> - **Passo 1** — `condominium_id` defaulta em `EmployeeSerializer`/`InstallmentPlanSerializer` (creates voltaram a funcionar; testes em `test_finance_crud_api.py`).
+> - **Passo 6** — `expenseReadSchema` (sem superRefine) separado do form schema; `validateExpenseRules` corrigido para `PERSON_REQUIRED_TYPES`/`BUILDING_REQUIRED_TYPES` (não os opcionais) — fim do "lista de despesas vazia". Teste em `lib/schemas/__tests__/expense.schema.test.ts`.
+> - **Passo 7** — `invalidateFinanceMoneyCaches` compartilhado: bill/payment mutations invalidam overview/balance/byCategory/projection/ownerDistribution (+ reserves no caminho reserve).
+> - **Passo 10** — global-search → `ROUTES.*` reais (fim do 404 em todo clique).
+> - **Coverage critic** — 4 aria-labels do `data-table` traduzidos para PT.
+>
+> ### ⏸️ DEFERIDO (refactors grandes/acoplados — follow-up dedicado)
+> Passos 2,3,4 (endpoint atômico `create_with_resident` + unificação `LeaseFormModal`/deletar `tenant-lease-modal`) — refactor de UI grande + acoplado, alto risco, precisa de cobertura MSW extensa. Passo 5 (tag_fee no backend) é acoplado a isso. Passo 8 (`parseList` em ~30 hooks), Passo 9 (`client.ts` unwrap + eslint-disable), Passo 11 (`main-layout` `useCurrentUser` — tem CONFLITO de contrato com `enabled:Boolean(user)`), Passo 12 (sidebar `/admin/users` gated, Bell, re-export, datas split-based no legado). **Motivo:** a não-atomicidade só se manifesta se o POST da lease falhar após os PATCHes do tenant; entregar os bugs ativos primeiro e fazer o refactor grande num PR focado preserva o gate de qualidade por fase.
+
+---
+
+## ⚠️ REVISÃO 2026-06-12 (pós P1/P2/HF-1) — LEIA PRIMEIRO; supera os passos abaixo onde conflitar
+
+Revisão code-grounded (master #17). P1/P2/HF-1 NÃO tocaram nos 2 modais de lease, nos schemas de expense, nos serializers de Employee/InstallmentPlan, na invalidação de bills/payments, nem no global-search/header/sidebar — os achados centrais foram reconfirmados. Mas:
+
+### DEPENDÊNCIA / COLISÃO CRÍTICA
+- **`core/services/lease_creation_service.py` e a reescrita de `LeaseSerializer.create` são propriedade do P4.1.** O passo 2 deste plano tentava criar o MESMO arquivo + re-extrair a derivação → **este plano agora depende de P4.1**. O backend atômico (lease + dependente residente + due_day em transação) é entregue pelo P4.1; aqui o passo 2 só CONSOME o endpoint atômico (1 mutation hook), não recria o service.
+
+### JÁ FEITO — remover/reescopar
+- **Passo 12 — deletar hooks mortos `useCreatePayment`/`useUpdatePayment` de `use-payments.ts`** → FEITO no P2.3 (`use-payments.ts:49-52`). Remover do plano; manter só a extensão de invalidação.
+- **Passo 7 (escopo)** → não existem create/update de payment; a invalidação "de payment" aplica-se a `useDeletePayment` (`use-payments.ts:59`, unpay) e ao `usePayBill` (`use-bills.ts:285`). As query-keys citadas TODAS existem (`query-keys.ts:227-252` overview/monthlyBalance/byCategory/projection/ownerDistribution; :203-214 reserves/reserveMovements). Reescopar o passo 7 para citar `usePayBill`.
+
+### GAPS / CONFLITOS
+- **Passo 11 (main-layout usar `useCurrentUser`)** → CONFLITO: `useCurrentUser` tem `enabled: Boolean(user)` (`use-auth.ts:116`), logo NÃO dispara quando `user` é null — que é exatamente o caso do main-layout (restaurar sessão por cookie quando `isAuthenticated && !user`, `main-layout.tsx:27-33`). Além disso, o `main-layout.tsx:35-47` tem o role-guard do P1.2 (cookie de papel) que NÃO pode ser removido. Reescopar: ou (a) ajustar `useCurrentUser` para `enabled: isAuthenticated` e setar o store via efeito, ou (b) manter o fetch manual. NÃO quebrar o guard do P1.2.
+- **Passo 12 (/admin/users no sidebar gated por is_staff)** → o `sidebar.tsx` NÃO tem nenhuma consciência de auth hoje (grep `is_staff|useAuthStore` → 0 matches). Especificar a fiação nova (`useAuthStore`) para ler `user.is_staff`.
+- **Passo 2/3 (não-atomicidade)** → afeta TAMBÉM o caminho de EDIÇÃO standalone (`lease-form-modal.tsx:322-327` faz PATCH /tenants para create E update), não só a criação. O endpoint atômico (do P4.1) deve cobrir os dois.
+- **Passo 5 (tag_fee default no backend)** → é requisito NOVO real (hoje `tag_fee` default=0, serializer não deriva). Confirmar com o backend (P4.1) que deriva tag_fee no create a partir de number_of_tenants/settings.
+- **Passo 1 (condominium_id de Employee/InstallmentPlan)** → CONFIRMADO ainda faltando (`finances/serializers.py:485-487` InstallmentPlan, EmployeeSerializer) — achado ALTO, válido.
+- **Passo 9 (remover unwrap + eslint-disable do client.ts)** → TODOS os hooks de lista já usam `PaginatedResponse<T> | T[]` + `extractResults` (`use-bills.ts:98`, `use-leases.ts:25` etc.) → o risco de "hooks tipados só como `T[]`" é baixo; a remoção do unwrap é segura.
+- **Passo 8 (parseList)** → contagem real: 32 ocorrências de `.map(...parse)` em 30 arquivos de hook (use-installment-plans e use-rent-adjustments têm 2 cada).
+
+### GAP DA AUDITORIA QUE FALTA (adicionar)
+- **aria-labels em INGLÊS no `data-table.tsx`** (:227 'Select all', :246/259 'Sort ... ascending/descending', :296 'Select row') — achado P4.3 da auditoria em NENHUM passo. Adicionar a tradução PT junto da limpeza de UI do passo 12 (todo o resto da UI já é PT).
+
+---
 
 ## Objetivo
 
