@@ -11,11 +11,7 @@ import { type AxiosError } from 'axios';
  * Type guard to check if an error is an AxiosError.
  */
 export function isAxiosError(error: unknown): error is AxiosError {
-  return (
-    error instanceof Error &&
-    'isAxiosError' in error &&
-    (error as AxiosError).isAxiosError
-  );
+  return error instanceof Error && 'isAxiosError' in error && (error as AxiosError).isAxiosError;
 }
 
 /**
@@ -58,9 +54,7 @@ export function isNotFoundError(error: unknown): boolean {
  */
 export function isServerError(error: unknown): boolean {
   return (
-    isAxiosError(error) &&
-    error.response?.status !== undefined &&
-    error.response.status >= 500
+    isAxiosError(error) && error.response?.status !== undefined && error.response.status >= 500
   );
 }
 
@@ -105,6 +99,16 @@ export function getErrorMessage(
       // Format: { non_field_errors: ["message"] } (DRF validation)
       if (Array.isArray(responseData.non_field_errors)) {
         return responseData.non_field_errors.join(', ');
+      }
+      // Format: { field: ["message", ...] } (DRF field-level validation)
+      for (const [field, value] of Object.entries(responseData)) {
+        if (
+          Array.isArray(value) &&
+          value.length > 0 &&
+          value.every((item): item is string => typeof item === 'string')
+        ) {
+          return `${field}: ${value.join(', ')}`;
+        }
       }
     }
 

@@ -4,7 +4,13 @@
 
 import { describe, it, expect } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
-import { useTenants, useTenant, useCreateTenant, useUpdateTenant, useDeleteTenant } from '../use-tenants';
+import {
+  useTenants,
+  useTenant,
+  useCreateTenant,
+  useUpdateTenant,
+  useDeleteTenant,
+} from '../use-tenants';
 import { createWrapper, createTestQueryClient } from '@/tests/test-utils';
 import { mockTenants } from '@/tests/mocks/data';
 
@@ -89,7 +95,7 @@ describe('useTenants', () => {
         is_company: false,
         phone: '(11) 98888-7777',
         email: 'joao.novo@email.com',
-        marital_status: 'Solteiro',
+        marital_status: 'Solteiro(a)',
         profession: 'Desenvolvedor',
         furnitures: [],
         dependents: [],
@@ -113,7 +119,7 @@ describe('useTenants', () => {
         is_company: false,
         phone: '(11) 98888-7777',
         email: 'familia.silva@email.com',
-        marital_status: 'Casado',
+        marital_status: 'Casado(a)',
         profession: 'Contador',
         furnitures: [],
         dependents: [
