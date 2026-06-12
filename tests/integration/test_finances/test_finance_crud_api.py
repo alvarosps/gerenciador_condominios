@@ -216,3 +216,30 @@ def test_installment_plan_create_without_condominium_id_defaults(authenticated_a
     )
     assert resp.status_code == status.HTTP_201_CREATED, resp.data
     assert resp.data["condominium"]["id"] == Condominium.get_default().id
+
+
+def test_employee_variable_with_base_salary_returns_400(authenticated_api_client):
+    make_condominium()
+    resp = authenticated_api_client.post(
+        "/api/finances/employees/",
+        {
+            "name": "Diarista",
+            "payment_type": "variable",
+            "base_salary": "300.00",
+            "default_due_day": 5,
+        },
+        format="json",
+    )
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    assert "base_salary" in resp.data
+
+
+def test_employee_fixed_without_base_salary_returns_400(authenticated_api_client):
+    make_condominium()
+    resp = authenticated_api_client.post(
+        "/api/finances/employees/",
+        {"name": "Zelador", "payment_type": "fixed", "default_due_day": 5},
+        format="json",
+    )
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    assert "base_salary" in resp.data

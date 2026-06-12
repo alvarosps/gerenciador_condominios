@@ -33,6 +33,9 @@ describe('expenseSchema (form)', () => {
   it('still requires person_id/credit_card_id for a card_purchase form', () => {
     const result = expenseSchema.safeParse(cardPurchaseRead);
     expect(result.success).toBe(false);
+    const paths = result.success ? [] : result.error.issues.map((i) => i.path.join('.'));
+    expect(paths).toContain('person_id');
+    expect(paths).toContain('credit_card_id');
   });
 
   it('does not require a person for fixed_expense (PERSON_REQUIRED_TYPES fix)', () => {
@@ -42,5 +45,25 @@ describe('expenseSchema (form)', () => {
       description: 'Internet',
     });
     expect(result.success).toBe(true);
+  });
+
+  it('requires a building for water_bill but not for fixed_expense (BUILDING_REQUIRED_TYPES fix)', () => {
+    const waterNoBuilding = expenseSchema.safeParse({
+      ...cardPurchaseRead,
+      expense_type: 'water_bill',
+      description: 'Conta de água',
+    });
+    expect(waterNoBuilding.success).toBe(false);
+    const paths = waterNoBuilding.success
+      ? []
+      : waterNoBuilding.error.issues.map((i) => i.path.join('.'));
+    expect(paths).toContain('building_id');
+
+    const fixedNoBuilding = expenseSchema.safeParse({
+      ...cardPurchaseRead,
+      expense_type: 'fixed_expense',
+      description: 'Internet',
+    });
+    expect(fixedNoBuilding.success).toBe(true);
   });
 });

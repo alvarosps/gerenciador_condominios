@@ -19,7 +19,10 @@ from core.services.timezone import today_sp
 from finances.models import (
     _CONSUMPTION_TYPES,
     _EMBEDDED_NEEDS_CONSUMPTION_MSG,
+    _ERR_BASE_SALARY_NEGATIVE,
+    _ERR_FIXED_NEEDS_BASE,
     _ERR_IDENTIFIER_REQUIRED,
+    _ERR_VARIABLE_NO_BASE,
     _TYPED_IDENTITY_ACCOUNT_TYPES,
     Bill,
     BillingAccount,
@@ -30,6 +33,7 @@ from finances.models import (
     CondoMonthClose,
     ElectricityBillStatement,
     Employee,
+    EmployeePaymentType,
     IncomeEntry,
     Installment,
     InstallmentPlan,
@@ -608,6 +612,23 @@ class EmployeeSerializer(serializers.ModelSerializer):
     def validate(self, attrs: dict[str, object]) -> dict[str, object]:
         # The Employee form never sends condominium_id (singleton), so default it on create.
         _apply_default_condominium(self.instance, attrs)
+        # DRF skips Model.clean(); mirror Employee.clean()'s payroll invariants so the API
+        # returns a clean 400 instead of accepting an invalid record (or a 500 on the
+        # negative-salary CheckConstraint). Single source of the rules is the model.
+        payment_type = attrs.get("payment_type", getattr(self.instance, "payment_type", None))
+        raw_salary = attrs.get("base_salary", getattr(self.instance, "base_salary", None))
+        base_salary = raw_salary if isinstance(raw_salary, Decimal) else None
+        if base_salary is not None and base_salary < 0:
+            raise serializers.ValidationError({"base_salary": _ERR_BASE_SALARY_NEGATIVE})
+        needs_base = payment_type in (EmployeePaymentType.FIXED, EmployeePaymentType.MIXED)
+        if needs_base and (base_salary is None or base_salary <= 0):
+            raise serializers.ValidationError({"base_salary": _ERR_FIXED_NEEDS_BASE})
+        if (
+            payment_type == EmployeePaymentType.VARIABLE
+            and base_salary is not None
+            and base_salary > 0
+        ):
+            raise serializers.ValidationError({"base_salary": _ERR_VARIABLE_NO_BASE})
         return attrs
 
 

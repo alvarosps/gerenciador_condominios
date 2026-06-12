@@ -705,10 +705,10 @@ class TestFinancialSerializerValidation:
         assert not serializer.is_valid()
         assert "amount_paid" in serializer.errors
 
-    def test_payment_proof_reference_month_must_be_first_day(self) -> None:
-        serializer = PaymentProofSerializer(data={"reference_month": "2026-03-15"})
-        assert not serializer.is_valid()
-        assert "reference_month" in serializer.errors
+    def test_payment_proof_reference_month_normalized_to_first_day(self) -> None:
+        # Tenant free-text input is normalized to the competence month, not rejected.
+        normalized = PaymentProofSerializer().validate_reference_month(date(2026, 3, 15))
+        assert normalized == date(2026, 3, 1)
 
     def test_person_income_end_before_start_invalid(self, person: Person) -> None:
         serializer = PersonIncomeSerializer(

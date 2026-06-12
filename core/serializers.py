@@ -1314,7 +1314,10 @@ class PaymentProofSerializer(serializers.ModelSerializer):
         return validate_proof_file(value)
 
     def validate_reference_month(self, value: date) -> date:
-        return _validate_first_day_of_month(value)
+        # The tenant types this as free text in the mobile app, so NORMALIZE to the first of the
+        # month (reference_month is a competence month) rather than rejecting like the admin-entered
+        # RentPayment — a tenant entering the day they paid must not be blocked with an opaque error.
+        return value.replace(day=1)
 
 
 class NotificationSerializer(serializers.ModelSerializer):

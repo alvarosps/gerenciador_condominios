@@ -3,8 +3,7 @@
 Single source of truth for the rental-value derivation, the lease-creation defaults,
 and mirroring the lease's ``last_rent_increase_date`` onto its apartment. The serializer
 must not contain business logic (architecture rule: ``Serializers -> Models``), so
-``LeaseViewSet.perform_create``/``perform_update`` and the atomic ``create_with_resident``
-flow delegate here.
+``LeaseViewSet.perform_create``/``perform_update`` delegate here.
 """
 
 from decimal import Decimal
