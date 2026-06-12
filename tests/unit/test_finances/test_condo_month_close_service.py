@@ -26,6 +26,8 @@ from tests.factories import (
     make_condominium,
     make_lease,
     make_rent_payment,
+    make_reserve,
+    make_reserve_movement,
 )
 
 pytestmark = pytest.mark.django_db
@@ -161,9 +163,72 @@ def test_reopen_recomputes_following_closed_months() -> None:
 
 
 @freeze_time("2026-06-15")
+def test_close_in_the_middle_recomputes_following_carry_forward() -> None:
+    """REGRESSÃO (P2.3 step 6): close M+1 first (gap-free anchor at M+1), then close M (earlier).
+    M+1 must recompute its carried_in from M's new carry_forward_out — not keep its stale value."""
+    FinancialSettings.objects.create(
+        pk=1,
+        initial_balance=Decimal("0.00"),
+        initial_balance_date=date(2026, 4, 1),
+        rent_tracking_start_date=date(2026, 4, 1),
+    )
+    _active_bill("100.00", date(2026, 4, 1))  # April net -100
+    _active_bill("100.00", date(2026, 5, 1))  # May net -100
+    CondoMonthCloseService.close(2026, 4)
+    may = CondoMonthCloseService.close(2026, 5)
+    assert may.carry_forward_out == Decimal("-200.00")  # -100 + (-100)
+
+    # Reopen April, then re-close it; closing April (with May still closed) must roll forward into
+    # May so May's carry stays -200 (April -100 folded into May -100).
+    CondoMonthCloseService.reopen(2026, 4)
+    may.refresh_from_db()
+    assert may.carry_forward_out == Decimal("-100.00")  # April no longer folded
+    CondoMonthCloseService.close(2026, 4)  # close-in-the-middle (May already closed)
+    may.refresh_from_db()
+    assert may.carry_forward_out == Decimal("-200.00")  # recomputed forward from April
+
+
+@freeze_time("2026-06-15")
 def test_reopen_nonexistent_month_rejected() -> None:
     with pytest.raises(ValidationError):
         CondoMonthCloseService.reopen(2026, 6)
+
+
+@freeze_time("2026-06-15")
+def test_reserve_balance_end_freezes_only_movements_through_month_end() -> None:
+    """REGRESSÃO (P2.3 step 7): a reserve deposit in M+1 must NOT inflate M's frozen
+    reserve_balance_end (it freezes movements with movement_date < 1st of M+1, not all-time)."""
+    condominium = make_condominium()
+    reserve = make_reserve(condominium=condominium)
+    make_reserve_movement(
+        reserve=reserve, kind="deposit", amount=Decimal("500.00"), movement_date=date(2026, 6, 10)
+    )
+    # A deposit in the NEXT month (July) — must be excluded from June's frozen figure.
+    make_reserve_movement(
+        reserve=reserve, kind="deposit", amount=Decimal("300.00"), movement_date=date(2026, 7, 5)
+    )
+
+    june = CondoMonthCloseService.close(2026, 6)
+
+    assert june.reserve_balance_end == Decimal("500.00")  # NOT 800 (July deposit excluded)
+
+
+@freeze_time("2026-06-15")
+def test_reserve_balance_as_of_filters_movement_date() -> None:
+    condominium = make_condominium()
+    reserve = make_reserve(condominium=condominium)
+    make_reserve_movement(
+        reserve=reserve, kind="deposit", amount=Decimal("500.00"), movement_date=date(2026, 6, 10)
+    )
+    make_reserve_movement(
+        reserve=reserve, kind="deposit", amount=Decimal("300.00"), movement_date=date(2026, 7, 5)
+    )
+    # as_of=1st of July → only movements strictly before July count.
+    assert CondoBalanceService.reserve_balance(condominium.id, as_of=date(2026, 7, 1)) == Decimal(
+        "500.00"
+    )
+    # No as_of → all-time (dashboard) unchanged.
+    assert CondoBalanceService.reserve_balance(condominium.id) == Decimal("800.00")
 
 
 @freeze_time("2026-06-15")

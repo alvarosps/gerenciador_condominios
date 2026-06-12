@@ -471,6 +471,7 @@ class BillSkip(AuditMixin, models.Model):
 
 class InstallmentPlanState(models.TextChoices):
     ACTIVE = "active", "Ativo"
+    MATERIALIZED = "materialized", "Materializado"
     PAID = "paid", "Quitado"
     DEFERRED = "deferred", "Adiado"
     CANCELED = "canceled", "Cancelado"
@@ -719,6 +720,16 @@ class ReserveMovement(AuditMixin, SoftDeleteMixin, models.Model):
     movement_date = models.DateField()
     bill = models.ForeignKey(
         Bill, null=True, blank=True, on_delete=models.SET_NULL, related_name="reserve_movements"
+    )
+    # Deterministic link to the Payment that drove a reserve-funded withdrawal (SET_NULL mirrors
+    # `bill`: soft-deleting the Payment must not erase the ledger history). unpay() reverses the
+    # movement through this FK instead of the old bill+kind+amount heuristic (design §4.3).
+    payment = models.ForeignKey(
+        "Payment",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="reserve_movements",
     )
     reference = models.CharField(max_length=200, blank=True)
     notes = models.TextField(blank=True)

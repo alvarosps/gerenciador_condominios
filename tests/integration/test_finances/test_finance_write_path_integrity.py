@@ -83,9 +83,10 @@ def test_patch_payment_cannot_mutate_amount_or_funded_from(authenticated_api_cli
         format="json",
     )
 
-    assert resp.status_code == status.HTTP_200_OK
+    # The default payment write route is blocked (405 PT) — change a payment only via unpay()+pay().
+    assert resp.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
     payment.refresh_from_db()
-    assert payment.amount == Decimal("300.00")  # read-only: PATCH is ignored
+    assert payment.amount == Decimal("300.00")  # unchanged
     assert payment.funded_from == "caixa"
 
 

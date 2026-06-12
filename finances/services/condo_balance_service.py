@@ -131,15 +131,20 @@ class CondoBalanceService:
         return quantize_money(total)
 
     @staticmethod
-    def reserve_balance(condominium_id: int | None = None) -> Decimal:
+    def reserve_balance(condominium_id: int | None = None, as_of: date | None = None) -> Decimal:
         """Reserve = Σ deposits - Σ withdrawals (never negative; the guard lives in withdraw/pay).
 
         Movements of a soft-deleted Reserve are excluded (a forward-FK join does not apply the
-        parent's default manager, so this must be explicit — soft-delete rule).
+        parent's default manager, so this must be explicit — soft-delete rule). ``as_of`` (the 1st
+        of M+1, exclusive) bounds the ledger to movements through the end of month M, so a frozen
+        CondoMonthClose freezes the reserve at the month end, not the all-time balance (P2.3 step 7);
+        without ``as_of`` it is the live all-time balance (the dashboard / total_balance).
         """
         movements = ReserveMovement.objects.filter(reserve__is_deleted=False)
         if condominium_id is not None:
             movements = movements.filter(reserve__condominium_id=condominium_id)
+        if as_of is not None:
+            movements = movements.filter(movement_date__lt=as_of)
         deposits = (
             movements.filter(kind=ReserveMovementKind.DEPOSIT).aggregate(total=Sum("amount"))[
                 "total"

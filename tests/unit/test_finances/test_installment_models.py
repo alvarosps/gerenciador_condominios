@@ -37,6 +37,7 @@ def test_lifecycle_state_default_and_choices() -> None:
     assert plan.lifecycle_state == InstallmentPlanState.ACTIVE
     assert {c[0] for c in InstallmentPlanState.choices} == {
         "active",
+        "materialized",
         "paid",
         "deferred",
         "canceled",

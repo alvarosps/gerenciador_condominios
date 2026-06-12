@@ -14,8 +14,9 @@ from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.db import transaction
 
-from finances.models import Bill, Reserve, ReserveMovement, ReserveMovementKind
+from finances.models import Bill, Payment, Reserve, ReserveMovement, ReserveMovementKind
 from finances.services.condo_balance_service import CondoBalanceService
+from finances.services.condo_month_close_service import CondoMonthCloseService
 
 logger = logging.getLogger(__name__)
 
@@ -36,9 +37,14 @@ class ReserveService:
         notes: str = "",
         user: User | None = None,
     ) -> ReserveMovement:
-        """Cash -> reserve transfer. Total balance unchanged (cash -amount, reserve +amount)."""
+        """Cash -> reserve transfer. Total balance unchanged (cash -amount, reserve +amount).
+
+        Rejected (PT 400) when the movement_date's competence month is closed — a reserve transfer
+        in a frozen month would silently change that month's reserve_balance_end (design §4.3/§4.7).
+        """
         if amount <= 0:
             raise ValidationError(_AMOUNT_POSITIVE)
+        CondoMonthCloseService.assert_open(movement_date.replace(day=1))
         with transaction.atomic():
             movement = ReserveMovement.objects.create(
                 reserve=reserve,
@@ -60,13 +66,19 @@ class ReserveService:
         movement_date: date,
         *,
         bill: Bill | None = None,
+        payment: Payment | None = None,
         reference: str = "",
         notes: str = "",
         user: User | None = None,
     ) -> ReserveMovement:
-        """Reserve -> cash (bill=null) or reserve-funded bill payment (bill set). Reserve never negative."""
+        """Reserve -> cash (bill=null) or reserve-funded bill payment (bill set). Reserve never negative.
+
+        Rejected (PT 400) when the movement_date's competence month is closed (mirrors deposit).
+        ``payment`` (set by BillPaymentService.pay) is the deterministic link unpay reverses by.
+        """
         if amount <= 0:
             raise ValidationError(_AMOUNT_POSITIVE)
+        CondoMonthCloseService.assert_open(movement_date.replace(day=1))
         with transaction.atomic():
             locked = Reserve.objects.select_for_update().get(pk=reserve.pk)
             if amount > CondoBalanceService.reserve_balance(locked.condominium_id):
@@ -77,6 +89,7 @@ class ReserveService:
                 amount=amount,
                 movement_date=movement_date,
                 bill=bill,
+                payment=payment,
                 reference=reference,
                 notes=notes,
                 created_by=user,
