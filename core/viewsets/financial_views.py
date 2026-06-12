@@ -2,10 +2,8 @@
 
 import logging
 from datetime import date
-from decimal import ROUND_HALF_UP, Decimal
 from typing import cast
 
-from dateutil.relativedelta import relativedelta
 from django.contrib.auth.models import User
 from django.db import transaction
 from django.db.models import QuerySet
@@ -32,6 +30,7 @@ from core.models import (
     RentPayment,
 )
 from core.permissions import IsAdminUser
+from core.query_params import parse_date_param, parse_int_param
 from core.serializers import (
     CreditCardSerializer,
     EmployeePaymentSerializer,
@@ -156,21 +155,21 @@ class ExpenseViewSet(viewsets.ModelViewSet):
     def _apply_expense_id_filters(
         self, queryset: QuerySet[Expense], params: QueryDict
     ) -> QuerySet[Expense]:
-        person_id = params.get("person_id")
+        person_id = parse_int_param(params.get("person_id"), field="person_id")
         if person_id is not None:
-            queryset = queryset.filter(person_id=int(person_id))
-        credit_card_id = params.get("credit_card_id")
+            queryset = queryset.filter(person_id=person_id)
+        credit_card_id = parse_int_param(params.get("credit_card_id"), field="credit_card_id")
         if credit_card_id is not None:
-            queryset = queryset.filter(credit_card_id=int(credit_card_id))
+            queryset = queryset.filter(credit_card_id=credit_card_id)
         expense_type = params.get("expense_type")
         if expense_type is not None:
             queryset = queryset.filter(expense_type=expense_type)
-        category_id = params.get("category_id")
+        category_id = parse_int_param(params.get("category_id"), field="category_id")
         if category_id is not None:
-            queryset = queryset.filter(category_id=int(category_id))
-        building_id = params.get("building_id")
+            queryset = queryset.filter(category_id=category_id)
+        building_id = parse_int_param(params.get("building_id"), field="building_id")
         if building_id is not None:
-            queryset = queryset.filter(building_id=int(building_id))
+            queryset = queryset.filter(building_id=building_id)
         return queryset
 
     def _apply_expense_bool_filters(
@@ -212,49 +211,24 @@ class ExpenseViewSet(viewsets.ModelViewSet):
 
         if not expense.is_installment or not expense.total_installments:
             return Response(
-                {"error": "Despesa não é parcelada ou não tem total de parcelas definido."},
+                {"detail": "Despesa não é parcelada ou não tem total de parcelas definido."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         if expense.installments.exists():
             return Response(
-                {"error": "Parcelas já foram geradas para esta despesa."},
+                {"detail": "Parcelas já foram geradas para esta despesa."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        start_date_str = request.data.get("start_date")
-        start_date = date.fromisoformat(start_date_str) if start_date_str else expense.expense_date
-
-        installment_amount = (Decimal(expense.total_amount) / expense.total_installments).quantize(
-            Decimal("0.01"), rounding=ROUND_HALF_UP
+        start_date = (
+            parse_date_param(request.data.get("start_date"), field="start_date")
+            or expense.expense_date
         )
 
-        has_credit_card = expense.credit_card_id is not None
-        user = cast(User, request.user)
-
-        installments = []
-        for i in range(1, expense.total_installments + 1):
-            if has_credit_card:
-                due_date = (start_date + relativedelta(months=i - 1)).replace(
-                    day=expense.credit_card.due_day
-                )
-            else:
-                due_date = start_date + relativedelta(months=i - 1)
-
-            installments.append(
-                ExpenseInstallment(
-                    expense=expense,
-                    installment_number=i,
-                    total_installments=expense.total_installments,
-                    amount=installment_amount,
-                    due_date=due_date,
-                    created_by=user,
-                    updated_by=user,
-                )
-            )
-
-        with transaction.atomic():
-            ExpenseInstallment.objects.bulk_create(installments)
+        ExpenseService.generate_installments(
+            expense=expense, start_date=start_date, user=cast(User, request.user)
+        )
 
         expense = self.get_queryset().get(pk=expense.pk)
         serializer = self.get_serializer(expense)
@@ -322,13 +296,13 @@ class ExpenseInstallmentViewSet(viewsets.ModelViewSet):
         if due_date_to is not None:
             queryset = queryset.filter(due_date__lte=due_date_to)
 
-        person_id = params.get("person_id")
+        person_id = parse_int_param(params.get("person_id"), field="person_id")
         if person_id is not None:
-            queryset = queryset.filter(expense__person_id=int(person_id))
+            queryset = queryset.filter(expense__person_id=person_id)
 
-        credit_card_id = params.get("credit_card_id")
+        credit_card_id = parse_int_param(params.get("credit_card_id"), field="credit_card_id")
         if credit_card_id is not None:
-            queryset = queryset.filter(expense__credit_card_id=int(credit_card_id))
+            queryset = queryset.filter(expense__credit_card_id=credit_card_id)
 
         return queryset
 
@@ -395,17 +369,17 @@ class IncomeViewSet(viewsets.ModelViewSet):
 
         params = self.request.query_params
 
-        person_id = params.get("person_id")
+        person_id = parse_int_param(params.get("person_id"), field="person_id")
         if person_id is not None:
-            queryset = queryset.filter(person_id=int(person_id))
+            queryset = queryset.filter(person_id=person_id)
 
-        building_id = params.get("building_id")
+        building_id = parse_int_param(params.get("building_id"), field="building_id")
         if building_id is not None:
-            queryset = queryset.filter(building_id=int(building_id))
+            queryset = queryset.filter(building_id=building_id)
 
-        category_id = params.get("category_id")
+        category_id = parse_int_param(params.get("category_id"), field="category_id")
         if category_id is not None:
-            queryset = queryset.filter(category_id=int(category_id))
+            queryset = queryset.filter(category_id=category_id)
 
         is_recurring = params.get("is_recurring")
         if is_recurring is not None:

@@ -15,6 +15,16 @@ from tests.constants import TEST_PASSWORD, TEST_PASSWORD_NEW
 @pytest.mark.integration
 @pytest.mark.django_db
 class TestUserAdminViewSet:
+    def test_create_user_weak_password_returns_400(self, authenticated_api_client):
+        """validate_password runs Django's validators (rejects common/numeric passwords)."""
+        response = authenticated_api_client.post(
+            "/api/admin/users/",
+            data={"username": "fraco", "password": "12345678"},
+            format="json",
+        )
+        assert response.status_code == 400
+        assert "password" in response.data
+
     def test_create_user_with_password_hashes_it(self, authenticated_api_client):
         response = authenticated_api_client.post(
             "/api/admin/users/",

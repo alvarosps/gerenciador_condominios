@@ -23,12 +23,15 @@ from core.serializers import (
     ExpenseCategorySerializer,
     ExpenseInstallmentSerializer,
     ExpenseSerializer,
+    FinancialSettingsSerializer,
     IncomeSerializer,
+    PaymentProofSerializer,
     PersonIncomeSerializer,
     PersonSerializer,
     RentPaymentSerializer,
     TenantSerializer,
 )
+from tests.factories import make_lease
 
 # =============================================================================
 # Fixtures
@@ -661,3 +664,65 @@ class TestIncomeSerializer:
         assert serializer.is_valid(), serializer.errors
         income = serializer.save()
         assert income.person_id == person.pk
+
+
+@pytest.mark.unit
+@pytest.mark.django_db
+class TestFinancialSerializerValidation:
+    """P4.1 Fatia E/F — money/date validation on financial serializers."""
+
+    def test_income_negative_amount_invalid(self) -> None:
+        serializer = IncomeSerializer(
+            data={"description": "x", "amount": "-10.00", "income_date": "2026-01-10"}
+        )
+        assert not serializer.is_valid()
+        assert "amount" in serializer.errors
+
+    def test_income_zero_amount_invalid(self) -> None:
+        serializer = IncomeSerializer(
+            data={"description": "x", "amount": "0", "income_date": "2026-01-10"}
+        )
+        assert not serializer.is_valid()
+        assert "amount" in serializer.errors
+
+    def test_income_positive_amount_passes_amount_validation(self) -> None:
+        serializer = IncomeSerializer(
+            data={"description": "x", "amount": "10.00", "income_date": "2026-01-10"}
+        )
+        serializer.is_valid()
+        assert "amount" not in serializer.errors
+
+    def test_rent_payment_negative_amount_invalid(self, admin_user) -> None:
+        lease = make_lease(user=admin_user)
+        serializer = RentPaymentSerializer(
+            data={
+                "lease_id": lease.pk,
+                "reference_month": "2026-03-01",
+                "amount_paid": "-5.00",
+                "payment_date": "2026-03-05",
+            }
+        )
+        assert not serializer.is_valid()
+        assert "amount_paid" in serializer.errors
+
+    def test_payment_proof_reference_month_must_be_first_day(self) -> None:
+        serializer = PaymentProofSerializer(data={"reference_month": "2026-03-15"})
+        assert not serializer.is_valid()
+        assert "reference_month" in serializer.errors
+
+    def test_person_income_end_before_start_invalid(self, person: Person) -> None:
+        serializer = PersonIncomeSerializer(
+            data={
+                "person_id": person.pk,
+                "income_type": "fixed_stipend",
+                "fixed_amount": "100.00",
+                "start_date": "2026-05-01",
+                "end_date": "2026-04-01",
+            }
+        )
+        assert not serializer.is_valid()
+        assert "end_date" in serializer.errors
+
+    def test_financial_settings_updated_by_is_read_only(self) -> None:
+        serializer = FinancialSettingsSerializer()
+        assert serializer.fields["updated_by"].read_only is True

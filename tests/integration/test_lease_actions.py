@@ -393,3 +393,43 @@ class TestLeaseSignalIsRented:
     def test_apartment_is_rented_remains_false_without_lease(self, apartment):
         """An apartment without a lease should have is_rented=False."""
         assert apartment.is_rented is False
+
+
+@pytest.mark.integration
+@pytest.mark.django_db
+class TestTransferLease:
+    url_template = "/api/leases/{pk}/transfer/"
+
+    def test_transfer_missing_apartment_id_returns_400(
+        self, authenticated_api_client, lease, tenant
+    ):
+        """Regression: transfer_lease read payload['apartment_id'] directly -> KeyError 500."""
+        url = self.url_template.format(pk=lease.pk)
+        response = authenticated_api_client.post(
+            url, {"responsible_tenant_id": tenant.pk}, format="json"
+        )
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "apartment_id" in response.data
+
+    def test_transfer_to_new_apartment_succeeds(
+        self, authenticated_api_client, lease, tenant, building, admin_user
+    ):
+        target = make_apartment(
+            building=building,
+            number=202,
+            user=admin_user,
+            rental_value=Decimal("1600.00"),
+            max_tenants=2,
+        )
+        url = self.url_template.format(pk=lease.pk)
+        response = authenticated_api_client.post(
+            url,
+            {
+                "apartment_id": target.pk,
+                "responsible_tenant_id": tenant.pk,
+                "validity_months": 12,
+            },
+            format="json",
+        )
+        assert response.status_code == status.HTTP_201_CREATED
+        assert response.data["apartment"]["id"] == target.pk

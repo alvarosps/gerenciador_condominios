@@ -11,6 +11,7 @@ from core.validators import BrazilianPhoneValidator, CNPJValidator, CPFValidator
 from core.validators.upload import validate_proof_file
 
 from .models import (
+    DOUBLE_OCCUPANCY,
     Apartment,
     Building,
     ContractRule,
@@ -40,8 +41,6 @@ from .models import (
 
 User = get_user_model()
 
-_DOUBLE_OCCUPANCY = 2  # number_of_tenants tier that uses rental_value_double
-
 # Mirrors the DB UniqueConstraint (unique_active_lease_per_apartment, condition is_deleted=False):
 # an apartment may have at most one active (non-soft-deleted) lease. Surfaced as a clean 400
 # instead of letting the constraint raise IntegrityError 500. Reused by the onboarding service.
@@ -51,6 +50,16 @@ APARTMENT_ALREADY_LEASED_ERROR = "Este apartamento já possui um contrato ativo.
 # Dependent instances created during this save() in input order (the model has no Meta.ordering).
 # Consumed by the onboarding service to resolve a newly-created resident dependent by index.
 _CREATED_DEPENDENTS_ATTR = "_created_dependents"
+
+REFERENCE_MONTH_FIRST_DAY_ERROR = "O mês de referência deve ser o primeiro dia do mês."
+_POSITIVE_AMOUNT_ERROR = "O valor deve ser positivo."
+
+
+def _validate_first_day_of_month(value: date) -> date:
+    """Ensure a reference month is anchored to the first day of the month."""
+    if value.day != 1:
+        raise serializers.ValidationError(REFERENCE_MONTH_FIRST_DAY_ERROR)
+    return value
 
 
 class BuildingSerializer(serializers.ModelSerializer):
@@ -193,7 +202,7 @@ class ApartmentSerializer(serializers.ModelSerializer):
             getattr(self.instance, "rental_value", None) if self.instance else None,
         )
 
-        if max_tenants == _DOUBLE_OCCUPANCY and rental_value_double is None:
+        if max_tenants == DOUBLE_OCCUPANCY and rental_value_double is None:
             raise serializers.ValidationError(
                 {"rental_value_double": "Obrigatório quando max_tenants é 2."}
             )
@@ -473,7 +482,7 @@ class LeaseSerializer(serializers.ModelSerializer):
             getattr(self.instance, "number_of_tenants", 1) if self.instance else 1,
         )
 
-        if number_of_tenants not in (1, _DOUBLE_OCCUPANCY):
+        if number_of_tenants not in (1, DOUBLE_OCCUPANCY):
             raise serializers.ValidationError({"number_of_tenants": "Deve ser 1 ou 2."})
 
         apartment = attrs.get(
@@ -490,7 +499,7 @@ class LeaseSerializer(serializers.ModelSerializer):
                 }
             )
 
-        if number_of_tenants == _DOUBLE_OCCUPANCY:
+        if number_of_tenants == DOUBLE_OCCUPANCY:
             resident_dependent = attrs.get("resident_dependent")
 
             if resident_dependent is not None:
@@ -531,41 +540,13 @@ class LeaseSerializer(serializers.ModelSerializer):
         if qs.exists():
             raise serializers.ValidationError({"apartment": [APARTMENT_ALREADY_LEASED_ERROR]})
 
-    def create(self, validated_data: dict[str, Any]) -> Lease:
-        """Create lease with tenant relationships.
-
-        If rental_value is not provided, derives it from the apartment based on
-        number_of_tenants: uses apartment.rental_value_double for 2 tenants when
-        available, otherwise falls back to apartment.rental_value.
-        """
-        tenants = validated_data.pop("tenants", [])
-        if "rental_value" not in validated_data:
-            apartment: Apartment = validated_data["apartment"]
-            number_of_tenants: int = validated_data.get("number_of_tenants", 1)
-            if number_of_tenants == _DOUBLE_OCCUPANCY and apartment.rental_value_double is not None:
-                validated_data["rental_value"] = apartment.rental_value_double
-            else:
-                validated_data["rental_value"] = apartment.rental_value
-        if "last_rent_increase_date" not in validated_data:
-            validated_data["last_rent_increase_date"] = validated_data["start_date"]
-
-        lease = Lease(**validated_data)
-        lease.full_clean()
-        lease.save()
-        if tenants:
-            lease.tenants.set(tenants)
-
-        # Sync last_rent_increase_date to apartment
-        apartment = lease.apartment
-        apartment.last_rent_increase_date = lease.last_rent_increase_date
-        apartment.save(update_fields=["last_rent_increase_date"])
-
-        return lease
-
     def update(self, instance: Lease, validated_data: dict[str, Any]) -> Lease:
-        """Update lease with tenant relationships."""
+        """Update lease with tenant relationships.
+
+        The apartment's last_rent_increase_date is synced by LeaseViewSet.perform_update
+        (Views -> Services), keeping business logic out of the serializer.
+        """
         tenants = validated_data.pop("tenants", None)
-        rent_date_changed = "last_rent_increase_date" in validated_data
 
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
@@ -575,13 +556,33 @@ class LeaseSerializer(serializers.ModelSerializer):
         if tenants is not None:
             instance.tenants.set(tenants)
 
-        # Sync last_rent_increase_date to apartment
-        if rent_date_changed:
-            apartment = instance.apartment
-            apartment.last_rent_increase_date = instance.last_rent_increase_date
-            apartment.save(update_fields=["last_rent_increase_date"])
-
         return instance
+
+
+class TransferLeaseSerializer(serializers.Serializer[dict[str, Any]]):
+    """Validate the transfer payload so missing/invalid fields are a 400, not a KeyError 500.
+
+    The transfer service (``transfer_lease``) reads these keys directly; this serializer
+    guarantees their presence/types before that call. Business rules (tenant existence,
+    target apartment already leased) stay in the service and surface as ValueError -> 400.
+    """
+
+    apartment_id = serializers.IntegerField()
+    responsible_tenant_id = serializers.IntegerField()
+    tenant_ids = serializers.ListField(
+        child=serializers.IntegerField(), required=False, default=list
+    )
+    validity_months = serializers.IntegerField(required=False, min_value=1, default=12)
+    start_date = serializers.DateField(required=False)
+    rental_value = serializers.DecimalField(
+        max_digits=10, decimal_places=2, required=False, allow_null=True
+    )
+    deposit_amount = serializers.DecimalField(
+        max_digits=10, decimal_places=2, required=False, allow_null=True
+    )
+    tag_fee = serializers.DecimalField(max_digits=10, decimal_places=2, required=False)
+    cleaning_fee_paid = serializers.BooleanField(required=False, default=False)
+    tag_deposit_paid = serializers.BooleanField(required=False, default=False)
 
 
 class LandlordSerializer(serializers.ModelSerializer):
@@ -1024,6 +1025,16 @@ class PersonIncomeSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
 
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
+        attrs = super().validate(attrs)
+        start_date = attrs.get("start_date", getattr(self.instance, "start_date", None))
+        end_date = attrs.get("end_date", getattr(self.instance, "end_date", None))
+        if start_date and end_date and end_date < start_date:
+            raise serializers.ValidationError(
+                {"end_date": "A data final não pode ser anterior à data inicial."}
+            )
+        return attrs
+
     def get_current_value(self, obj: PersonIncome) -> str:
         if obj.income_type == "apartment_rent" and obj.apartment:
             lease = obj.apartment.leases.first()
@@ -1084,6 +1095,11 @@ class IncomeSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
 
+    def validate_amount(self, value: Decimal) -> Decimal:
+        if value <= 0:
+            raise serializers.ValidationError(_POSITIVE_AMOUNT_ERROR)
+        return value
+
 
 class RentPaymentSerializer(FinalizedMonthProtectionMixin, serializers.ModelSerializer):
     lease = LeaseSerializer(read_only=True)
@@ -1106,11 +1122,14 @@ class RentPaymentSerializer(FinalizedMonthProtectionMixin, serializers.ModelSeri
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
 
-    def validate_reference_month(self, value: date) -> date:
-        if value.day != 1:
-            msg = "O mês de referência deve ser o primeiro dia do mês."
-            raise serializers.ValidationError(msg)
+    def validate_amount_paid(self, value: Decimal) -> Decimal:
+        # Mirrors the DB CheckConstraint rent_payment_amount_positive (a clean 400 vs a 500).
+        if value <= 0:
+            raise serializers.ValidationError(_POSITIVE_AMOUNT_ERROR)
         return value
+
+    def validate_reference_month(self, value: date) -> date:
+        return _validate_first_day_of_month(value)
 
     def _get_reference_month(self, attrs: dict[str, Any]) -> date | None:
         reference_month = attrs.get("reference_month")
@@ -1149,10 +1168,7 @@ class EmployeePaymentSerializer(FinalizedMonthProtectionMixin, serializers.Model
         read_only_fields = ["id", "total_paid", "created_at", "updated_at"]
 
     def validate_reference_month(self, value: date) -> date:
-        if value.day != 1:
-            msg = "O mês de referência deve ser o primeiro dia do mês."
-            raise serializers.ValidationError(msg)
-        return value
+        return _validate_first_day_of_month(value)
 
     def _get_reference_month(self, attrs: dict[str, Any]) -> date | None:
         reference_month = attrs.get("reference_month")
@@ -1187,10 +1203,7 @@ class PersonPaymentSerializer(FinalizedMonthProtectionMixin, serializers.ModelSe
         read_only_fields = ["id", "created_at", "updated_at"]
 
     def validate_reference_month(self, value: date) -> date:
-        if value.day != 1:
-            msg = "O mês de referência deve ser o primeiro dia do mês."
-            raise serializers.ValidationError(msg)
-        return value
+        return _validate_first_day_of_month(value)
 
     def _get_reference_month(self, attrs: dict[str, Any]) -> date | None:
         reference_month = attrs.get("reference_month")
@@ -1224,10 +1237,7 @@ class PersonPaymentScheduleSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "created_at", "updated_at"]
 
     def validate_reference_month(self, value: date) -> date:
-        if value.day != 1:
-            msg = "reference_month must be the first day of the month."
-            raise serializers.ValidationError(msg)
-        return value
+        return _validate_first_day_of_month(value)
 
     def validate_due_day(self, value: int) -> int:
         validate_due_day(value)
@@ -1255,10 +1265,7 @@ class ExpenseMonthSkipSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "expense_description", "created_at", "updated_at"]
 
     def validate_reference_month(self, value: date) -> date:
-        if value.day != 1:
-            msg = "reference_month must be the first day of the month."
-            raise serializers.ValidationError(msg)
-        return value
+        return _validate_first_day_of_month(value)
 
 
 class FinancialSettingsSerializer(serializers.ModelSerializer):
@@ -1275,7 +1282,7 @@ class FinancialSettingsSerializer(serializers.ModelSerializer):
             "updated_at",
             "updated_by",
         ]
-        read_only_fields = ["id", "updated_at"]
+        read_only_fields = ["id", "updated_at", "updated_by"]
 
 
 class PaymentProofSerializer(serializers.ModelSerializer):
@@ -1305,6 +1312,9 @@ class PaymentProofSerializer(serializers.ModelSerializer):
 
     def validate_file(self, value: Any) -> Any:
         return validate_proof_file(value)
+
+    def validate_reference_month(self, value: date) -> date:
+        return _validate_first_day_of_month(value)
 
 
 class NotificationSerializer(serializers.ModelSerializer):

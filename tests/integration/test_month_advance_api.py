@@ -231,6 +231,12 @@ class TestMonthAdvanceAPI:
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
+    def test_status_endpoint_malformed_year_returns_400(self, authenticated_api_client):
+        """Regression: int(year) on a raw query param -> ValueError 500."""
+        response = authenticated_api_client.get(self.status_url, {"year": "abc", "month": 1})
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
     # --- snapshots list ---
 
     def test_snapshots_list_endpoint(self, authenticated_api_client, finalized_jan_snapshot):
