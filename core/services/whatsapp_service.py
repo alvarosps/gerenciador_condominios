@@ -1,3 +1,4 @@
+import json
 import re
 import secrets
 
@@ -64,7 +65,7 @@ def send_whatsapp_message(
         from_=f"whatsapp:{settings.TWILIO_WHATSAPP_FROM}",
         to=f"whatsapp:{to_phone}",
         content_sid=template_sid,
-        content_variables=template_variables,
+        content_variables=json.dumps(template_variables),
     )
     return str(message.sid)
 

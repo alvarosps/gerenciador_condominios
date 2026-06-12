@@ -23,8 +23,6 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 
 from core.models import (
-    FinancialSettings,
-    Landlord,
     Lease,
     Notification,
     PaymentProof,
@@ -44,7 +42,7 @@ from core.services.contract_service import ContractService
 from core.services.fee_calculator import FeeCalculatorService
 from core.services.file_response_service import proof_file_response
 from core.services.notification_service import notify_new_proof
-from core.services.pix_service import generate_pix_payload
+from core.services.pix_service import generate_pix_payload, resolve_pix_recipient
 
 logger = logging.getLogger(__name__)
 
@@ -251,33 +249,12 @@ class TenantViewSet(viewsets.ViewSet):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        apt = lease.apartment
-
-        # Determine PIX key: owner's key (kitnet) or default (condomínio)
-        pix_key = ""
-        pix_key_type = ""
-        merchant_name = "Condomínio"
-
-        if apt.owner and apt.owner.pix_key:
-            pix_key = apt.owner.pix_key
-            pix_key_type = apt.owner.pix_key_type
-            merchant_name = apt.owner.name
-        else:
-            settings_obj = FinancialSettings.objects.filter(pk=1).first()
-            if settings_obj and settings_obj.default_pix_key:
-                pix_key = settings_obj.default_pix_key
-                pix_key_type = settings_obj.default_pix_key_type
-            landlord = Landlord.get_active()
-            if landlord:
-                merchant_name = landlord.name
+        recipient = resolve_pix_recipient(lease)
 
         try:
             payload = generate_pix_payload(
-                pix_key=pix_key,
-                pix_key_type=pix_key_type,
                 amount=lease.rental_value,
-                merchant_name=merchant_name,
-                city="Sao Paulo",
+                **recipient,
             )
         except ValueError as e:
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)

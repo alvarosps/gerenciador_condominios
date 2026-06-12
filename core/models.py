@@ -1687,6 +1687,12 @@ class FinancialSettings(models.Model):
     default_pix_key_type = models.CharField(
         max_length=10, blank=True, default="", choices=PIX_KEY_TYPE_CHOICES
     )
+    default_city = models.CharField(
+        max_length=100,
+        blank=True,
+        default="",
+        help_text="Cidade exibida no PIX (campo 60 do EMV); vazio usa a cidade do locador.",
+    )
     rent_tracking_start_date = models.DateField(
         null=True,
         blank=True,
