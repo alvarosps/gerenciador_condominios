@@ -257,7 +257,7 @@ def _mark_installment_paid(item_id: int, payment_date: date) -> dict[str, Any]:
             return {"status": "already_paid", "message": "Parcela já está paga."}
         item.is_paid = True
         item.paid_date = payment_date
-        item.save(update_fields=["is_paid", "paid_date", "updated_at"])
+        item.save(update_fields=["is_paid", "paid_date"])
     return {"status": "ok", "message": f"Parcela {item_id} marcada como paga."}
 
 
@@ -294,7 +294,7 @@ def _mark_expense_paid(item_id: int, payment_date: date) -> dict[str, Any]:
             return {"status": "already_paid", "message": "Despesa já está paga."}
         item.is_paid = True
         item.paid_date = payment_date
-        item.save(update_fields=["is_paid", "paid_date", "updated_at"])
+        item.save(update_fields=["is_paid", "paid_date"])
     return {"status": "ok", "message": f"Despesa {item_id} marcada como paga."}
 
 
@@ -310,7 +310,7 @@ def _mark_income_received(item_id: int, payment_date: date) -> dict[str, Any]:
             return {"status": "already_paid", "message": "Receita já está recebida."}
         item.is_received = True
         item.received_date = payment_date
-        item.save(update_fields=["is_received", "received_date", "updated_at"])
+        item.save(update_fields=["is_received", "received_date"])
     return {"status": "ok", "message": f"Receita {item_id} marcada como recebida."}
 
 

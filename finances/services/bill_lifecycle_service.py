@@ -28,7 +28,8 @@ class BillLifecycleService:
         bill.lifecycle_state = state
         if user is not None:
             bill.updated_by = user
-        bill.save(update_fields=["lifecycle_state", "updated_by", "updated_at"])
+        # AuditMixin.save appends updated_at to update_fields automatically.
+        bill.save(update_fields=["lifecycle_state", "updated_by"])
         return bill
 
     @staticmethod

@@ -328,4 +328,5 @@ class BillGenerationService:
                 )
             if materialized:
                 plan.lifecycle_state = InstallmentPlanState.MATERIALIZED
-                plan.save(update_fields=["lifecycle_state", "updated_at"])
+                # AuditMixin.save appends updated_at to update_fields automatically.
+                plan.save(update_fields=["lifecycle_state"])

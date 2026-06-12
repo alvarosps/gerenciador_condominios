@@ -258,7 +258,8 @@ class BillService:
             setattr(bill, field, header[field])
         bill.updated_by = user
         bill.full_clean()
-        bill.save(update_fields=[*changed, "updated_by", "updated_at"])
+        # AuditMixin.save appends updated_at to update_fields automatically.
+        bill.save(update_fields=[*changed, "updated_by"])
 
     @staticmethod
     def update_with_lines(

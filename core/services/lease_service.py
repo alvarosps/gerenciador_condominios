@@ -97,5 +97,5 @@ def change_tenant_due_day(tenant: Tenant, new_due_day: int) -> None:
     """Update a tenant's rent due day with validation."""
     tenant.due_day = new_due_day
     tenant.full_clean()
-    tenant.updated_at = timezone.now()
-    tenant.save(update_fields=["due_day", "updated_at"])
+    # AuditMixin.save appends updated_at to update_fields automatically.
+    tenant.save(update_fields=["due_day"])

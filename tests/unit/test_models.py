@@ -5,17 +5,23 @@ from decimal import Decimal
 
 import pytest
 from django.core.exceptions import ValidationError
+from django.db import IntegrityError, transaction
+from django.db.models import ProtectedError
 
 from core.models import (
     Apartment,
     Building,
     ContractRule,
     Dependent,
+    Expense,
     Furniture,
     Landlord,
     Lease,
+    RentAdjustment,
+    RentPayment,
     Tenant,
 )
+from core.services.landlord_service import LandlordService
 from tests.constants import TEST_PASSWORD
 from tests.factories import (
     make_apartment,
@@ -23,6 +29,7 @@ from tests.factories import (
     make_dependent,
     make_furniture,
     make_lease,
+    make_rent_payment,
     make_tenant,
 )
 
@@ -285,6 +292,8 @@ class TestLandlordModel:
         assert active.pk == landlord.pk
 
     def test_only_one_active_landlord(self, landlord: Landlord) -> None:
+        # Activation is owned by LandlordService (the model no longer auto-deactivates on save);
+        # the partial unique constraint guarantees a single active landlord.
         second = Landlord.objects.create(
             name="Proprietário 2",
             marital_status="Solteiro(a)",
@@ -296,9 +305,11 @@ class TestLandlordModel:
             city="Rio de Janeiro",
             state="RJ",
             zip_code="20000-000",
-            is_active=True,
+            is_active=False,
         )
+        LandlordService.activate(second)
         landlord.refresh_from_db()
+        second.refresh_from_db()
         assert landlord.is_active is False
         assert second.is_active is True
 
@@ -448,3 +459,260 @@ class TestDefaultManagerSoftDelete:
         all_pks = set(Furniture.all_objects.values_list("pk", flat=True))
         assert keep.pk in all_pks
         assert gone.pk in all_pks
+
+
+# =============================================================================
+# AuditMixin.save respects update_fields
+# =============================================================================
+
+
+@pytest.mark.unit
+class TestAuditMixinUpdateFields:
+    """A partial save (update_fields) must still persist updated_at — the audit trail was
+    previously skipped when the caller's update_fields omitted it."""
+
+    def test_save_with_update_fields_persists_updated_at(self, tenant: Tenant) -> None:
+        original = Tenant.objects.get(pk=tenant.pk).updated_at
+        tenant.warning_count = 7
+        tenant.save(update_fields=["warning_count"])
+        reloaded = Tenant.objects.get(pk=tenant.pk)
+        assert reloaded.updated_at > original
+        assert reloaded.warning_count == 7
+
+    def test_save_with_update_fields_does_not_touch_other_fields(self, tenant: Tenant) -> None:
+        original_name = tenant.name
+        tenant.warning_count = 3
+        # Mutate a field NOT in update_fields — it must not be persisted.
+        tenant.name = "Nome Que Não Deve Persistir"
+        tenant.save(update_fields=["warning_count"])
+        reloaded = Tenant.objects.get(pk=tenant.pk)
+        assert reloaded.name == original_name
+        assert reloaded.warning_count == 3
+
+    def test_full_save_still_updates_updated_at(self, tenant: Tenant) -> None:
+        original = Tenant.objects.get(pk=tenant.pk).updated_at
+        tenant.warning_count = 9
+        tenant.save()
+        assert Tenant.objects.get(pk=tenant.pk).updated_at > original
+
+
+# =============================================================================
+# CPF/CNPJ normalization at the single entry point
+# =============================================================================
+
+
+@pytest.mark.unit
+class TestCpfCnpjNormalization:
+    def test_tenant_cpf_normalized_to_digits_on_save(self) -> None:
+        tenant = make_tenant(cpf_cnpj="529.982.247-25")
+        assert tenant.cpf_cnpj == "52998224725"
+        assert Tenant.objects.get(pk=tenant.pk).cpf_cnpj == "52998224725"
+
+    def test_company_cnpj_normalized_on_save(self) -> None:
+        tenant = make_tenant(cpf_cnpj="11.222.333/0001-81", is_company=True)
+        assert tenant.cpf_cnpj == "11222333000181"
+
+    def test_formatted_and_raw_cpf_are_same_identity(self) -> None:
+        make_tenant(cpf_cnpj="52998224725")
+        # Recreating with the formatted form of the same CPF must collide (same identity).
+        with pytest.raises((IntegrityError, ValidationError)), transaction.atomic():
+            make_tenant(cpf_cnpj="529.982.247-25")
+
+    def test_landlord_cpf_normalized_on_save(self) -> None:
+        landlord = Landlord.objects.create(
+            name="Locador Normalizado",
+            marital_status="Casado(a)",
+            cpf_cnpj="529.982.247-25",
+            phone="11999990000",
+            street="Rua X",
+            street_number="1",
+            neighborhood="Centro",
+            city="São Paulo",
+            state="SP",
+            zip_code="01000-000",
+            is_active=False,
+        )
+        assert landlord.cpf_cnpj == "52998224725"
+
+    def test_dependent_cpf_normalized_on_save(self) -> None:
+        dep = make_dependent(cpf_cnpj="529.982.247-25")
+        assert dep.cpf_cnpj == "52998224725"
+
+    def test_dependent_blank_cpf_stays_blank(self) -> None:
+        dep = make_dependent(cpf_cnpj="")
+        assert dep.cpf_cnpj == ""
+
+
+# =============================================================================
+# Apartment.delete fires sync_apartment_is_rented
+# =============================================================================
+
+
+@pytest.mark.unit
+class TestApartmentDeleteCascade:
+    def test_apartment_delete_sets_is_rented_false_via_signal(self) -> None:
+        lease = make_lease()
+        apartment = lease.apartment
+        apartment.is_rented = True
+        apartment.save(update_fields=["is_rented"])
+        lease_updated_before = Lease.objects.get(pk=lease.pk).updated_at
+
+        apartment.delete()
+
+        # Lease soft-deleted, with a fresh updated_at (per-instance delete fired the signal).
+        deleted_lease = Lease.all_objects.get(pk=lease.pk)
+        assert deleted_lease.is_deleted is True
+        assert deleted_lease.updated_at > lease_updated_before
+        # is_rented recalculated to False (no active lease remains).
+        assert Apartment.all_objects.get(pk=apartment.pk).is_rented is False
+
+    def test_apartment_restore_then_is_rented_consistent(self) -> None:
+        lease = make_lease()
+        apartment = lease.apartment
+        apartment.delete()
+        apartment.restore()
+        # After restore there is no active lease, so is_rented must not be a stale True.
+        assert Apartment.all_objects.get(pk=apartment.pk).is_rented is False
+
+
+# =============================================================================
+# RentPayment.lease PROTECT
+# =============================================================================
+
+
+@pytest.mark.unit
+class TestRentPaymentProtect:
+    def test_hard_delete_lease_with_payments_is_protected(self) -> None:
+        payment = make_rent_payment()
+        lease = payment.lease
+        with pytest.raises(ProtectedError):
+            lease.delete(hard_delete=True)
+        # Payment history preserved.
+        assert RentPayment.all_objects.filter(pk=payment.pk).exists()
+
+    def test_soft_delete_lease_keeps_payments(self) -> None:
+        payment = make_rent_payment()
+        lease = payment.lease
+        lease.delete()  # soft delete
+        assert RentPayment.all_objects.filter(pk=payment.pk).exists()
+
+
+# =============================================================================
+# Expense.clean and money CheckConstraints
+# =============================================================================
+
+
+@pytest.mark.unit
+class TestExpenseCleanNonNegative:
+    def test_expense_clean_allows_zero(self) -> None:
+        expense = Expense(
+            description="Conta zerada",
+            expense_type="one_time_expense",
+            total_amount=Decimal("0.00"),
+            expense_date=date(2026, 1, 1),
+        )
+        expense.full_clean()  # must not raise
+
+    def test_expense_clean_rejects_negative(self) -> None:
+        expense = Expense(
+            description="Conta negativa",
+            expense_type="one_time_expense",
+            total_amount=Decimal("-1.00"),
+            expense_date=date(2026, 1, 1),
+        )
+        with pytest.raises(ValidationError):
+            expense.full_clean()
+
+
+@pytest.mark.unit
+class TestMoneyCheckConstraints:
+    """Negative money values must be rejected at the DB level (CheckConstraints).
+
+    A bulk ``.update()`` is used to bypass ``save()``/``full_clean`` and exercise the DB constraint
+    directly (the model's full_clean would otherwise catch it first as a ValidationError).
+    """
+
+    def test_lease_tag_fee_negative_rejected_by_db(self) -> None:
+        lease = make_lease()
+        with pytest.raises(IntegrityError), transaction.atomic():
+            Lease.objects.filter(pk=lease.pk).update(tag_fee=Decimal("-1.00"))
+
+    def test_lease_deposit_amount_negative_rejected_by_db(self) -> None:
+        lease = make_lease()
+        with pytest.raises(IntegrityError), transaction.atomic():
+            Lease.objects.filter(pk=lease.pk).update(deposit_amount=Decimal("-1.00"))
+
+    def test_lease_pending_rental_value_negative_rejected_by_db(self) -> None:
+        lease = make_lease()
+        with pytest.raises(IntegrityError), transaction.atomic():
+            Lease.objects.filter(pk=lease.pk).update(pending_rental_value=Decimal("-1.00"))
+
+    def test_rent_adjustment_previous_value_negative_rejected(self) -> None:
+        ra = RentAdjustment.objects.create(
+            lease=make_lease(),
+            adjustment_date=date(2026, 1, 1),
+            percentage=Decimal("5.00"),
+            previous_value=Decimal("1000.00"),
+            new_value=Decimal("1050.00"),
+        )
+        with pytest.raises(IntegrityError), transaction.atomic():
+            RentAdjustment.objects.filter(pk=ra.pk).update(previous_value=Decimal("-1.00"))
+
+    def test_rent_adjustment_new_value_negative_rejected(self) -> None:
+        ra = RentAdjustment.objects.create(
+            lease=make_lease(),
+            adjustment_date=date(2026, 1, 1),
+            percentage=Decimal("5.00"),
+            previous_value=Decimal("1000.00"),
+            new_value=Decimal("1050.00"),
+        )
+        with pytest.raises(IntegrityError), transaction.atomic():
+            RentAdjustment.objects.filter(pk=ra.pk).update(new_value=Decimal("-1.00"))
+
+
+# =============================================================================
+# Landlord single-active invariant + service
+# =============================================================================
+
+
+@pytest.mark.unit
+class TestLandlordActivation:
+    def _make_landlord(self, *, name: str, cpf: str, is_active: bool) -> Landlord:
+        return Landlord.objects.create(
+            name=name,
+            marital_status="Casado(a)",
+            cpf_cnpj=cpf,
+            phone="11999990000",
+            street="Rua",
+            street_number="1",
+            neighborhood="Centro",
+            city="São Paulo",
+            state="SP",
+            zip_code="01000-000",
+            is_active=is_active,
+        )
+
+    def test_activate_deactivates_others(self) -> None:
+        first = self._make_landlord(name="L1", cpf="52998224725", is_active=True)
+        second = self._make_landlord(name="L2", cpf="11144477735", is_active=False)
+        LandlordService.activate(second)
+        first.refresh_from_db()
+        second.refresh_from_db()
+        assert first.is_active is False
+        assert second.is_active is True
+        assert Landlord.objects.filter(is_active=True).count() == 1
+
+    def test_partial_unique_active_landlord_constraint(self) -> None:
+        self._make_landlord(name="L1", cpf="52998224725", is_active=True)
+        # A second active landlord must be rejected by the partial unique constraint.
+        with pytest.raises(IntegrityError), transaction.atomic():
+            self._make_landlord(name="L2", cpf="11144477735", is_active=True)
+
+    def test_activate_sets_updated_at_on_deactivated(self) -> None:
+        first = self._make_landlord(name="L1", cpf="52998224725", is_active=True)
+        original_updated = Landlord.objects.get(pk=first.pk).updated_at
+        second = self._make_landlord(name="L2", cpf="11144477735", is_active=False)
+        LandlordService.activate(second)
+        first.refresh_from_db()
+        assert first.is_active is False
+        assert first.updated_at > original_updated

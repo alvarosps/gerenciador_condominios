@@ -152,6 +152,34 @@ class TestLandlordViewSet:
         response = regular_authenticated_api_client.put(self.url, LANDLORD_PAYLOAD, format="json")
         assert response.status_code == status.HTTP_403_FORBIDDEN
 
+    def test_put_activates_via_service_keeping_single_active(self, authenticated_api_client):
+        # A pre-existing inactive landlord must not block creating/activating a new one, and the
+        # result must be exactly one active landlord (LandlordService.activate + partial constraint).
+        Landlord.objects.create(
+            name="Antigo Inativo",
+            marital_status="Casado(a)",
+            cpf_cnpj="11144477735",
+            phone="11900000000",
+            street="Rua Velha",
+            street_number="10",
+            neighborhood="Centro",
+            city="São Paulo",
+            state="SP",
+            zip_code="01000-000",
+            is_active=False,
+        )
+        response = authenticated_api_client.put(self.url, LANDLORD_PAYLOAD, format="json")
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["is_active"] is True
+        assert Landlord.objects.filter(is_active=True).count() == 1
+
+    def test_put_normalizes_cpf_to_digits(self, authenticated_api_client):
+        response = authenticated_api_client.put(self.url, LANDLORD_PAYLOAD, format="json")
+        assert response.status_code == status.HTTP_200_OK
+        active = Landlord.get_active()
+        assert active is not None
+        assert active.cpf_cnpj == "52998224725"
+
 
 # ---------------------------------------------------------------------------
 # ContractRuleViewSet — CRUD

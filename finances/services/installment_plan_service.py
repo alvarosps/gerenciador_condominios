@@ -143,7 +143,8 @@ class InstallmentPlanService:
 
             locked.lifecycle_state = BillLifecycleState.CANCELED
             locked.updated_by = user
-            locked.save(update_fields=["lifecycle_state", "updated_by", "updated_at"])
+            # AuditMixin.save appends updated_at to update_fields automatically.
+            locked.save(update_fields=["lifecycle_state", "updated_by"])
 
         logger.info(
             "Converted deferred bill %s into installment plan %s (%s installments)",

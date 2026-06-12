@@ -11,6 +11,7 @@ Endpoints:
 """
 
 import logging
+import re
 from datetime import timedelta
 from typing import cast
 
@@ -46,6 +47,17 @@ _MAX_VERIFY_ATTEMPTS = 3
 _GENERIC_REQUEST_DETAIL = "Se o CPF/CNPJ estiver cadastrado, um código foi enviado via WhatsApp."
 _GENERIC_VERIFY_ERROR = "Código inválido."
 
+_NON_DIGITS = re.compile(r"[^0-9]")
+
+
+def _normalize_cpf_cnpj(value: str) -> str:
+    """Strip formatting so lookups match the digits-only stored Tenant.cpf_cnpj.
+
+    The tenant document is normalized to digits on save, so a request carrying a formatted
+    CPF ("529.982.247-25") or its raw form must both resolve to the same identity here.
+    """
+    return _NON_DIGITS.sub("", value or "")
+
 
 class WhatsAppAuthViewSet(viewsets.ViewSet):
     """
@@ -73,7 +85,7 @@ class WhatsAppAuthViewSet(viewsets.ViewSet):
             400 if cpf_cnpj is missing.
             429 if the rate limit has been exceeded (3 codes in 15 minutes).
         """
-        cpf_cnpj: str = request.data.get("cpf_cnpj", "").strip()
+        cpf_cnpj = _normalize_cpf_cnpj(request.data.get("cpf_cnpj", ""))
         if not cpf_cnpj:
             return Response({"error": "cpf_cnpj é obrigatório"}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -128,7 +140,7 @@ class WhatsAppAuthViewSet(viewsets.ViewSet):
             400 with a generic "Código inválido." for an unknown CPF/CNPJ, a missing pending
                 verification, or a wrong code (no enumeration).
         """
-        cpf_cnpj: str = request.data.get("cpf_cnpj", "").strip()
+        cpf_cnpj = _normalize_cpf_cnpj(request.data.get("cpf_cnpj", ""))
         code: str = request.data.get("code", "").strip()
 
         if not cpf_cnpj or not code:

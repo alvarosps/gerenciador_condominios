@@ -202,7 +202,7 @@ class ExpenseViewSet(viewsets.ModelViewSet):
             expense = Expense.objects.select_for_update().get(pk=pk)
             expense.is_paid = True
             expense.paid_date = paid_date
-            expense.save(update_fields=["is_paid", "paid_date", "updated_at"])
+            expense.save(update_fields=["is_paid", "paid_date"])
         serializer = self.get_serializer(expense)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -337,7 +337,7 @@ class ExpenseInstallmentViewSet(viewsets.ModelViewSet):
         if not expense.installments.filter(is_paid=False).exists():
             expense.is_paid = True
             expense.paid_date = timezone.now().date()
-            expense.save(update_fields=["is_paid", "paid_date", "updated_at"])
+            expense.save(update_fields=["is_paid", "paid_date"])
 
     @action(detail=True, methods=["post"])
     def mark_paid(self, request: Request, pk: str | None = None) -> Response:
@@ -348,7 +348,7 @@ class ExpenseInstallmentViewSet(viewsets.ModelViewSet):
             installment = ExpenseInstallment.objects.select_for_update().get(pk=pk)
             installment.is_paid = True
             installment.paid_date = paid_date
-            installment.save(update_fields=["is_paid", "paid_date", "updated_at"])
+            installment.save(update_fields=["is_paid", "paid_date"])
             self._check_and_complete_expense(installment.expense)
 
         serializer = self.get_serializer(installment)
@@ -434,7 +434,7 @@ class IncomeViewSet(viewsets.ModelViewSet):
             income = Income.objects.select_for_update().get(pk=pk)
             income.is_received = True
             income.received_date = received_date
-            income.save(update_fields=["is_received", "received_date", "updated_at"])
+            income.save(update_fields=["is_received", "received_date"])
         serializer = self.get_serializer(income)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -525,7 +525,7 @@ class EmployeePaymentViewSet(viewsets.ModelViewSet):
             payment = EmployeePayment.objects.select_for_update().get(pk=pk)
             payment.is_paid = True
             payment.payment_date = payment_date
-            payment.save(update_fields=["is_paid", "payment_date", "updated_at"])
+            payment.save(update_fields=["is_paid", "payment_date"])
         serializer = self.get_serializer(payment)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
