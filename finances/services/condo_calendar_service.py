@@ -10,9 +10,9 @@ from decimal import Decimal
 from typing import Any
 
 from core.services.rent_schedule_service import RentScheduleService
+from core.services.timezone import today_sp
 from finances.models import Bill
 from finances.money import money_str
-from finances.services.timezone import today_sp
 
 
 def _bill_exit(bill: Bill) -> dict[str, Any]:

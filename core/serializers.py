@@ -54,12 +54,18 @@ _CREATED_DEPENDENTS_ATTR = "_created_dependents"
 
 
 class BuildingSerializer(serializers.ModelSerializer):
+    # Uniqueness of street_number among active buildings is enforced by DRF's auto-generated
+    # UniqueValidator, whose queryset already excludes soft-deleted rows (it mirrors the partial
+    # unique_active_building_street_number constraint) — a clean 400, and a soft-deleted number is
+    # reusable.
     class Meta:
         model = Building
         fields = "__all__"
 
 
 class FurnitureSerializer(serializers.ModelSerializer):
+    # Same as BuildingSerializer: the partial unique_active_furniture_name constraint yields a
+    # soft-delete-aware UniqueValidator on name automatically.
     class Meta:
         model = Furniture
         fields = "__all__"
@@ -201,6 +207,11 @@ class ApartmentSerializer(serializers.ModelSerializer):
                 {"rental_value_double": ("rental_value_double deve ser >= rental_value.")}
             )
 
+        # (building, number) uniqueness is enforced by DRF's auto-generated
+        # UniqueTogetherValidator, whose queryset already excludes soft-deleted rows (matching the
+        # partial unique_active_apartment_per_building constraint) — so a soft-deleted number can
+        # be reused and an active duplicate yields a clean 400 (non_field_errors), never a 500.
+
         return attrs
 
     def create(self, validated_data: dict[str, Any]) -> Apartment:
@@ -259,6 +270,11 @@ class TenantSerializer(serializers.ModelSerializer):
     furniture_ids = serializers.PrimaryKeyRelatedField(
         queryset=Furniture.objects.all(), many=True, write_only=True, required=False
     )
+    # Declared explicitly with no auto UniqueValidator: uniqueness must be checked against the
+    # NORMALIZED (digits-only) value in validate() — DRF's auto validator would compare the raw
+    # input ("529.982.247-25") against stored digits and miss the collision. max_length mirrors
+    # the model field.
+    cpf_cnpj = serializers.CharField(max_length=20)
 
     class Meta:
         model = Tenant
@@ -296,15 +312,31 @@ class TenantSerializer(serializers.ModelSerializer):
         )
 
         if cpf_cnpj:
+            validator = CNPJValidator() if is_company else CPFValidator()
             try:
-                if is_company:
-                    CNPJValidator()(cpf_cnpj)
-                else:
-                    CPFValidator()(cpf_cnpj)
+                cleaned = validator(cpf_cnpj)
             except serializers.ValidationError as e:
                 raise serializers.ValidationError({"cpf_cnpj": str(e)}) from e
+            self._validate_unique_cpf_cnpj(cleaned)
 
         return attrs
+
+    def _validate_unique_cpf_cnpj(self, cleaned: str | None) -> None:
+        """Reject a CPF/CNPJ already held by another active tenant.
+
+        Compares against the normalized (digits-only) form so a formatted value and its raw form
+        are the same identity. The DB uniqueness is a partial constraint (active rows only), so
+        this surfaces a clean 400 and lets a soft-deleted tenant's document be reused.
+        """
+        if not cleaned:
+            return
+        qs = Tenant.objects.filter(cpf_cnpj=cleaned)  # SoftDeleteManager excludes deleted
+        if self.instance is not None:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise serializers.ValidationError(
+                {"cpf_cnpj": "Já existe um inquilino com este CPF/CNPJ."}
+            )
 
     @staticmethod
     def _create_dependent(
@@ -994,7 +1026,7 @@ class PersonIncomeSerializer(serializers.ModelSerializer):
 
     def get_current_value(self, obj: PersonIncome) -> str:
         if obj.income_type == "apartment_rent" and obj.apartment:
-            lease = obj.apartment.leases.filter(is_deleted=False).first()
+            lease = obj.apartment.leases.first()
             if lease is not None:
                 return str(lease.rental_value)
             return str(obj.apartment.rental_value)

@@ -23,6 +23,9 @@ REQUEST_URL = "/api/auth/whatsapp/request/"
 VERIFY_URL = "/api/auth/whatsapp/verify/"
 
 _CPF = "529.982.247-25"
+# Tenant.cpf_cnpj is normalized to digits on save and the auth view normalizes the request
+# input, so verifications are persisted/looked-up by the digits-only form.
+_CPF_DIGITS = "52998224725"
 _PHONE = "(11) 98765-4321"
 
 # Generic, identical responses that must not reveal whether a CPF/CNPJ is a tenant.
@@ -86,7 +89,7 @@ class TestRequestCode:
         assert response.status_code == status.HTTP_200_OK
         assert response.data["detail"] == _GENERIC_REQUEST_DETAIL
         mock_send.assert_called_once()
-        assert WhatsAppVerification.objects.filter(cpf_cnpj=_CPF).count() == 1
+        assert WhatsAppVerification.objects.filter(cpf_cnpj=_CPF_DIGITS).count() == 1
 
     def test_request_code_unknown_cpf_returns_same_generic_200(self):
         """Unknown CPF must NOT enumerate: same generic 200, no verification, no send."""
@@ -133,7 +136,9 @@ class TestVerifyCode:
         with patch("core.viewsets.auth_views.send_verification_code"):
             client.post(REQUEST_URL, {"cpf_cnpj": _CPF}, format="json")
 
-        verification = WhatsAppVerification.objects.filter(cpf_cnpj=_CPF).latest("created_at")
+        verification = WhatsAppVerification.objects.filter(cpf_cnpj=_CPF_DIGITS).latest(
+            "created_at"
+        )
         response = client.post(
             VERIFY_URL,
             {"cpf_cnpj": _CPF, "code": verification.code},
@@ -157,7 +162,9 @@ class TestVerifyCode:
         with patch("core.viewsets.auth_views.send_verification_code"):
             client.post(REQUEST_URL, {"cpf_cnpj": _CPF}, format="json")
 
-        verification = WhatsAppVerification.objects.filter(cpf_cnpj=_CPF).latest("created_at")
+        verification = WhatsAppVerification.objects.filter(cpf_cnpj=_CPF_DIGITS).latest(
+            "created_at"
+        )
         response = client.post(
             VERIFY_URL,
             {"cpf_cnpj": _CPF, "code": "000000"},
@@ -232,7 +239,9 @@ class TestVerifyCode:
             assert response.status_code == status.HTTP_400_BAD_REQUEST
 
         # Fourth attempt (even with the right code) is blocked with 429
-        verification = WhatsAppVerification.objects.filter(cpf_cnpj=_CPF).latest("created_at")
+        verification = WhatsAppVerification.objects.filter(cpf_cnpj=_CPF_DIGITS).latest(
+            "created_at"
+        )
         response = client.post(
             VERIFY_URL,
             {"cpf_cnpj": _CPF, "code": verification.code},
@@ -248,7 +257,9 @@ class TestVerifyCode:
         # First login — creates the user
         with patch("core.viewsets.auth_views.send_verification_code"):
             client.post(REQUEST_URL, {"cpf_cnpj": _CPF}, format="json")
-        verification = WhatsAppVerification.objects.filter(cpf_cnpj=_CPF).latest("created_at")
+        verification = WhatsAppVerification.objects.filter(cpf_cnpj=_CPF_DIGITS).latest(
+            "created_at"
+        )
         client.post(VERIFY_URL, {"cpf_cnpj": _CPF, "code": verification.code}, format="json")
 
         tenant.refresh_from_db()
@@ -257,7 +268,9 @@ class TestVerifyCode:
         # Second login — must reuse the same user
         with patch("core.viewsets.auth_views.send_verification_code"):
             client.post(REQUEST_URL, {"cpf_cnpj": _CPF}, format="json")
-        verification2 = WhatsAppVerification.objects.filter(cpf_cnpj=_CPF).latest("created_at")
+        verification2 = WhatsAppVerification.objects.filter(cpf_cnpj=_CPF_DIGITS).latest(
+            "created_at"
+        )
         response = client.post(
             VERIFY_URL, {"cpf_cnpj": _CPF, "code": verification2.code}, format="json"
         )

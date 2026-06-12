@@ -25,6 +25,7 @@ from django.utils import timezone
 from core.cache import cache_result
 from core.models import Apartment, Building, Dependent, Lease, RentPayment, Tenant
 from core.services.rent_schedule_service import RentScheduleService
+from core.services.timezone import today_sp
 
 from .fee_calculator import FeeCalculatorService
 
@@ -312,7 +313,7 @@ class DashboardService:
         """
         logger.info("Calculating late payment summary")
 
-        today = timezone.now().date()
+        today = today_sp()
         month_start = today.replace(day=1)
 
         late_leases = []

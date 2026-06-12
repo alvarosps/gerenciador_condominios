@@ -14,11 +14,12 @@ import pytest
 from freezegun import freeze_time
 from rest_framework import status
 
-from core.models import Landlord, Lease
+from core.models import Landlord, Lease, RentPayment
 from tests.factories import (
     make_apartment,
     make_building,
     make_lease,
+    make_rent_payment,
     make_tenant,
 )
 
@@ -227,6 +228,68 @@ class TestCalculateLateFee:
         assert "message" in response.data or Decimal(
             str(response.data.get("late_fee", 0))
         ) == Decimal("0.00")
+
+    @freeze_time("2026-03-15")
+    def test_overdue_current_month_no_payment(
+        self, authenticated_api_client, lease, apartment, tenant
+    ):
+        """Overdue with no RentPayment for the month → 200 with positive fee."""
+        assert not RentPayment.objects.filter(
+            lease=lease, reference_month=date(2026, 3, 1)
+        ).exists()
+        url = self.url_template.format(pk=lease.pk)
+        response = authenticated_api_client.get(url)
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["late_days"] == 5
+        assert Decimal(str(response.data["late_fee"])) > Decimal("0.00")
+
+    @freeze_time("2026-03-15")
+    def test_already_paid_returns_message(
+        self, authenticated_api_client, lease, apartment, tenant, admin_user
+    ):
+        """Regression: when the month's rent is already paid, no fee is reported."""
+        make_rent_payment(
+            lease=lease,
+            user=admin_user,
+            reference_month=date(2026, 3, 1),
+            amount_paid=Decimal("1500.00"),
+            payment_date=date(2026, 3, 4),
+        )
+        url = self.url_template.format(pk=lease.pk)
+        response = authenticated_api_client.get(url)
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["message"] == "Aluguel já pago neste mês."
+        assert "late_fee" not in response.data
+
+    @freeze_time("2026-02-20")
+    def test_due_day_31_in_february_no_500(self, authenticated_api_client, apartment, admin_user):
+        """Regression: due_day 31 must be clamped to Feb 28 instead of raising on date()."""
+        tnt = make_tenant(
+            cpf_cnpj="52998224725",
+            user=admin_user,
+            name="Tenant Fev 31",
+            phone="11999990055",
+            marital_status="Solteiro(a)",
+            profession="Tester",
+            due_day=31,
+        )
+        lse = make_lease(
+            apartment=apartment,
+            tenant=tnt,
+            user=admin_user,
+            start_date=date(2026, 1, 1),
+            validity_months=12,
+            tag_fee=Decimal("50.00"),
+            rental_value=Decimal("1500.00"),
+        )
+        url = self.url_template.format(pk=lse.pk)
+        response = authenticated_api_client.get(url)
+
+        # today=Feb 20, clamped due=Feb 28 → not late yet, but crucially no 500.
+        assert response.status_code == status.HTTP_200_OK
+        assert "message" in response.data
 
 
 @pytest.fixture

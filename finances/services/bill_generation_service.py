@@ -7,7 +7,9 @@ Session 41 extends ensure_month_bills with installments (standalone -> own Bill;
 embedded -> a line on the recurring account's Bill, dedup) and payroll
 (Bill(employee=…) with base + salary-offset lines). Deterministic order:
 recurring/seed -> embedded -> standalone -> payroll, then mark fully-materialized
-plans as PAID.
+plans as MATERIALIZED (every parcela has a bill/line — generation is done — but NOT paid;
+PAID-by-payment is a separate, future decision, so a materialized IPTU plan with an overdue
+parcela is still monitored by IptuAlertService — design §9.1 / P2.3 step 9).
 """
 
 import logging
@@ -69,7 +71,7 @@ class BillGenerationService:
         Idempotent and race-safe (get_or_create on the partial uniques + IntegrityError
         tolerance). Deterministic order: (1) recurring + seed, (2) embedded installments
         (a line on the recurring Bill from step 1), (3) standalone installments (own Bill),
-        (4) payroll. Then mark fully-materialized plans as PAID. Returns the ensured bills.
+        (4) payroll. Then mark fully-materialized plans as MATERIALIZED. Returns the ensured bills.
         """
         month_start = date(year, month, 1)
         bills: list[Bill] = []
@@ -86,8 +88,8 @@ class BillGenerationService:
         bills.extend(BillGenerationService._generate_installment_bills(year, month, user))
         # (4) payroll -> Bill(employee=…) with base + salary-offset lines.
         bills.extend(BillGenerationService._generate_payroll_bills(year, month, user))
-        # A plan whose every installment is now materialized is fully scheduled -> PAID.
-        BillGenerationService._mark_completed_plans_paid()
+        # A plan whose every installment now has a bill/line is fully materialized (NOT paid).
+        BillGenerationService._mark_completed_plans_materialized()
         return bills
 
     @staticmethod
@@ -304,8 +306,14 @@ class BillGenerationService:
                 )
 
     @staticmethod
-    def _mark_completed_plans_paid() -> None:
-        """Mark an ACTIVE plan PAID once every installment is materialized (bill/line exists)."""
+    def _mark_completed_plans_materialized() -> None:
+        """Mark an ACTIVE plan MATERIALIZED once every installment has a bill/line.
+
+        MATERIALIZED means generation is done (nothing left to materialize), NOT that the plan was
+        paid — no payment is recorded here. A materialized plan does not regenerate parcelas (the
+        per-month query filters ACTIVE) but IS still monitored for overdue parcelas (IptuAlert),
+        because PAID-by-payment is a separate, future decision (design §9.1 / P2.3 step 9).
+        """
         for plan in InstallmentPlan.objects.filter(lifecycle_state=InstallmentPlanState.ACTIVE):
             installments = list(Installment.objects.filter(plan=plan))
             if not installments:
@@ -319,5 +327,6 @@ class BillGenerationService:
                     Bill.objects.filter(installment=inst).exists() for inst in installments
                 )
             if materialized:
-                plan.lifecycle_state = InstallmentPlanState.PAID
-                plan.save(update_fields=["lifecycle_state", "updated_at"])
+                plan.lifecycle_state = InstallmentPlanState.MATERIALIZED
+                # AuditMixin.save appends updated_at to update_fields automatically.
+                plan.save(update_fields=["lifecycle_state"])

@@ -24,7 +24,6 @@ import { DayDetailDrawer } from './_components/day-detail-drawer';
 import { ExpenseFormModal } from '@/app/(dashboard)/financial/expenses/_components/expense-form-modal';
 import type { DailyBreakdownDay } from '@/lib/api/hooks/use-daily-control';
 
-
 export default function DailyControlPage() {
   const { user } = useAuthStore();
   const isAdmin = user?.is_staff ?? false;
@@ -92,9 +91,7 @@ export default function DailyControlPage() {
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-bold">Controle Diário</h1>
-          <p className="text-muted-foreground mt-1">
-            Acompanhe entradas e saídas dia a dia
-          </p>
+          <p className="text-muted-foreground mt-1">Acompanhe entradas e saídas dia a dia</p>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
           <div className="flex items-center gap-2">
@@ -216,12 +213,19 @@ export default function DailyControlPage() {
           </SelectContent>
         </Select>
 
-        {(filters.direction !== 'all' || filters.status !== 'all' || (filters.person ?? filters.building) !== undefined) && (
+        {(filters.direction !== 'all' ||
+          filters.status !== 'all' ||
+          (filters.person ?? filters.building) !== undefined) && (
           <Button
             variant="ghost"
             size="sm"
             onClick={() =>
-              setFilters({ direction: 'all', status: 'all', person: undefined, building: undefined })
+              setFilters({
+                direction: 'all',
+                status: 'all',
+                person: undefined,
+                building: undefined,
+              })
             }
           >
             Limpar filtros
@@ -235,15 +239,13 @@ export default function DailyControlPage() {
         isLoading={isBreakdownLoading}
         filters={filters}
         isAdmin={isAdmin}
+        year={year}
+        month={month}
         onDayClick={handleDayClick}
       />
 
       {/* Day Detail Drawer */}
-      <DayDetailDrawer
-        day={selectedDay}
-        open={drawerOpen}
-        onClose={handleDrawerClose}
-      />
+      <DayDetailDrawer day={selectedDay} open={drawerOpen} onClose={handleDrawerClose} />
 
       {isCreating && (
         <ExpenseFormModal

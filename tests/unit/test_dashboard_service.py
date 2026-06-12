@@ -365,7 +365,7 @@ class TestLatePaymentSummarySSOT:
     """Regression tests for routing the late-payment summary through the
     rent-collectibility single source of truth (RentScheduleService)."""
 
-    @freeze_time("2026-03-15")
+    @freeze_time("2026-03-15 12:00:00")
     def test_late_fee_uses_effective_rental_value(self, apartment_rented, admin_user):
         # Pending adjustment in effect for March (date = first of the frozen month):
         # the late fee must be computed on the effective value (1200), not 1000.
@@ -738,7 +738,7 @@ class TestLatePaymentSummaryTrackingBoundary:
             updated_by=admin_user,
         )
 
-    @freeze_time("2026-06-15")
+    @freeze_time("2026-06-15 12:00:00")
     def test_boundary_limits_scan_to_one_month(self, building, admin_user):
         """Core regression: with boundary=2026-06-01 the lease that started in 2024
         is only scanned from June 2026, so late_months==1 and late_days is small (5)."""

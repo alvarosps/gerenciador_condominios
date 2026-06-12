@@ -376,13 +376,36 @@ class DailyControlViewSet(viewsets.ViewSet):
             )
 
         try:
-            result = DailyControlService.mark_item_paid(item_type, item_id_int, payment_date)
+            year, month = self._parse_optional_year_month(request)
+        except (ValueError, TypeError):
+            return Response(
+                {"error": "Os campos 'year' e 'month' devem ser inteiros válidos."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            result = DailyControlService.mark_item_paid(
+                item_type, item_id_int, payment_date, year=year, month=month
+            )
         except ObjectDoesNotExist as e:
             return Response({"error": str(e)}, status=status.HTTP_404_NOT_FOUND)
         except ValueError as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
         return Response(result, status=status.HTTP_200_OK)
+
+    @staticmethod
+    def _parse_optional_year_month(request: Request) -> tuple[int | None, int | None]:
+        """Parse optional ``year``/``month`` from the payload (credit_card displayed month).
+
+        Returns ``(None, None)`` when both are absent; raises ``ValueError``/``TypeError``
+        if either is present but not a valid integer. Other item types ignore the pair.
+        """
+        year_val = request.data.get("year")
+        month_val = request.data.get("month")
+        year = int(year_val) if year_val is not None else None
+        month = int(month_val) if month_val is not None else None
+        return year, month
 
     def _mark_person_schedule_paid(self, request: Request, payment_date: date) -> Response:
         person_id_val = request.data.get("person_id")

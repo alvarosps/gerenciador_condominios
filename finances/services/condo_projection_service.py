@@ -13,7 +13,7 @@ month and folds the cash balance:
 The baseline of the running cash is CondoBalanceService.cash_balance(current month), anchored on
 the last closed month. Internal sums stay raw Decimals; quantize_money is applied once at the
 output boundary so the projection, the dashboard and a frozen CondoMonthClose never differ by a
-cent. "Today / current month" comes only from finances.services.timezone (settings is UTC).
+cent. "Today / current month" comes only from core.services.timezone (settings is UTC).
 
 Embedded-installment dedup (design §7/§8): a recurring account's expected_amount is the CONSUMO;
 the embedded parcela is its Installment, counted on top — exactly as ensure_month_bills
@@ -28,6 +28,7 @@ from typing import Any
 from django.db.models import Sum
 
 from core.services.rent_schedule_service import RentScheduleService
+from core.services.timezone import current_month_sp
 from finances.models import (
     BillingAccount,
     CondoMonthClose,
@@ -41,7 +42,6 @@ from finances.models import (
 from finances.money import money_str, quantize_money
 from finances.services.bill_generation_service import BillGenerationService
 from finances.services.condo_balance_service import CondoBalanceService, _next_month
-from finances.services.timezone import current_month_sp
 
 ZERO = Decimal(0)
 

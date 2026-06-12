@@ -12,11 +12,6 @@ export interface PaymentFilters {
   date_to?: string;
 }
 
-type PaymentWrite = Omit<
-  Payment,
-  'id' | 'condominium' | 'allocations' | 'created_at' | 'updated_at'
->;
-
 export function usePayments(filters?: PaymentFilters) {
   const cleanFilters = filters
     ? Object.fromEntries(Object.entries(filters).filter(([, v]) => v !== undefined))
@@ -51,28 +46,9 @@ function invalidatePaymentCaches(queryClient: ReturnType<typeof useQueryClient>)
   void queryClient.invalidateQueries({ queryKey: queryKeys.finances.overdueBills.all });
 }
 
-export function useCreatePayment() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (data: PaymentWrite) => {
-      const response = await apiClient.post<Payment>(ENDPOINT, data);
-      return response.data;
-    },
-    onSuccess: () => invalidatePaymentCaches(queryClient),
-  });
-}
-
-export function useUpdatePayment() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (data: Partial<Payment> & { id: number }) => {
-      const { condominium: _condominium, allocations: _allocations, ...updateData } = data;
-      const response = await apiClient.put<Payment>(`${ENDPOINT}${data.id}/`, updateData);
-      return response.data;
-    },
-    onSuccess: () => invalidatePaymentCaches(queryClient),
-  });
-}
+// A Payment's value/funding is set EXCLUSIVELY by the backend's pay action (POST bills/{id}/pay/),
+// and a payment is reversed by deleting it (unpay). The default POST/PUT payment routes are blocked
+// (405) on the backend, so no create/update hook exists here — change a payment via pay + unpay.
 
 export function useDeletePayment() {
   const queryClient = useQueryClient();

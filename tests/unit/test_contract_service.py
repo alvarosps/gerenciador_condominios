@@ -144,6 +144,32 @@ class TestCalculateLeaseFurniture:
         result = ContractService.calculate_lease_furniture(lease)
         assert result == []
 
+    def test_excludes_soft_deleted_apartment_furniture(self, apartment, lease, admin_user):
+        """Regression: soft-deleted furniture must not leak into the lease furniture list."""
+        kept = make_furniture(name="Fogão Ativo CF", user=admin_user)
+        removed = make_furniture(name="Armário Deletado CF", user=admin_user)
+        apartment.furnitures.add(kept, removed)
+        removed.delete()
+
+        result = ContractService.calculate_lease_furniture(lease)
+        names = [f.name for f in result]
+        assert "Fogão Ativo CF" in names
+        assert "Armário Deletado CF" not in names
+
+    def test_excludes_soft_deleted_tenant_from_subtraction(
+        self, apartment, tenant, second_tenant, lease, admin_user
+    ):
+        """A soft-deleted tenant must not subtract their furniture from the lease list."""
+        lease.tenants.add(second_tenant)
+        couch = make_furniture(name="Sofá Soft CF", user=admin_user)
+        apartment.furnitures.add(couch)
+        second_tenant.furnitures.add(couch)
+        second_tenant.delete()
+
+        result = ContractService.calculate_lease_furniture(lease)
+        names = [f.name for f in result]
+        assert "Sofá Soft CF" in names
+
 
 @pytest.mark.unit
 class TestPrepareContractContext:
@@ -247,6 +273,22 @@ class TestPrepareContractContextFurnitureNames:
 
         object_names = sorted(f.name for f in context["furnitures"])
         assert sorted(context["furniture_names"]) == object_names
+
+    def test_soft_deleted_furniture_absent_from_context(
+        self, lease, apartment, landlord, admin_user
+    ):
+        """Regression: a soft-deleted item leaks into neither furnitures nor furniture_names."""
+        kept = make_furniture(name="Cama Ativa FN", user=admin_user)
+        removed = make_furniture(name="Estante Deletada FN", user=admin_user)
+        apartment.furnitures.add(kept, removed)
+        removed.delete()
+
+        context = ContractService.prepare_contract_context(lease)
+
+        context_names = {f.name for f in context["furnitures"]}
+        assert "Cama Ativa FN" in context_names
+        assert "Estante Deletada FN" not in context_names
+        assert "Estante Deletada FN" not in context["furniture_names"]
 
 
 @pytest.mark.unit

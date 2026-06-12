@@ -18,7 +18,12 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { useMarkItemPaid } from '@/lib/api/hooks/use-daily-control';
-import type { DailyBreakdownDay, DailyEntry, DailyExit, MarkPaidRequest } from '@/lib/api/hooks/use-daily-control';
+import type {
+  DailyBreakdownDay,
+  DailyEntry,
+  DailyExit,
+  MarkPaidRequest,
+} from '@/lib/api/hooks/use-daily-control';
 import { useCreateExpenseMonthSkip } from '@/lib/api/hooks/use-expense-month-skips';
 import { formatCurrency, formatDate } from '@/lib/utils/formatters';
 import { cn } from '@/lib/utils';
@@ -37,6 +42,8 @@ interface Props {
   isLoading: boolean;
   filters: DailyFilters;
   isAdmin: boolean;
+  year: number;
+  month: number;
   onDayClick?: (day: DailyBreakdownDay) => void;
 }
 
@@ -50,7 +57,11 @@ function isOverdueExit(exit: DailyExit, dateStr: string): boolean {
   return exitDate < today;
 }
 
-function getItemStatus(item: DailyEntry | DailyExit, dateStr: string, isExit: boolean): 'paid' | 'overdue' | 'pending' {
+function getItemStatus(
+  item: DailyEntry | DailyExit,
+  dateStr: string,
+  isExit: boolean
+): 'paid' | 'overdue' | 'pending' {
   if (item.paid) return 'paid';
   if (isExit) {
     const exit = item as DailyExit;
@@ -64,9 +75,17 @@ function StatusBadge({ status }: { status: 'paid' | 'overdue' | 'pending' }) {
     return <Badge className="bg-success/10 text-success hover:bg-success/10 text-xs">Pago</Badge>;
   }
   if (status === 'overdue') {
-    return <Badge variant="destructive" className="text-xs">Vencida</Badge>;
+    return (
+      <Badge variant="destructive" className="text-xs">
+        Vencida
+      </Badge>
+    );
   }
-  return <Badge variant="secondary" className="text-xs">Pendente</Badge>;
+  return (
+    <Badge variant="secondary" className="text-xs">
+      Pendente
+    </Badge>
+  );
 }
 
 function MarkPaidButton({
@@ -75,13 +94,27 @@ function MarkPaidButton({
   dateStr,
   isPending,
   onMarkPaid,
+  year,
+  month,
 }: {
   itemType: MarkPaidRequest['item_type'];
   itemId: number;
   dateStr: string;
   isPending: boolean;
   onMarkPaid: (req: MarkPaidRequest) => void;
+  year?: number;
+  month?: number;
 }) {
+  const handleClick = () => {
+    const req: MarkPaidRequest = { item_type: itemType, item_id: itemId, payment_date: dateStr };
+    // Credit-card settlement targets the displayed month, not the server month.
+    if (itemType === 'credit_card' && year !== undefined && month !== undefined) {
+      req.year = year;
+      req.month = month;
+    }
+    onMarkPaid(req);
+  };
+
   return (
     <Button
       variant="ghost"
@@ -89,7 +122,7 @@ function MarkPaidButton({
       className="h-7 w-7 p-0"
       title="Marcar como pago"
       disabled={isPending}
-      onClick={() => onMarkPaid({ item_type: itemType, item_id: itemId, payment_date: dateStr })}
+      onClick={handleClick}
     >
       <CheckCircle2 className="h-4 w-4 text-success" />
     </Button>
@@ -170,7 +203,9 @@ function EntryRow({ entry, dateStr, isAdmin, isPending, onMarkPaid }: EntryRowPr
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm font-medium truncate">{entry.description}</span>
-          <Badge variant="outline" className="text-xs shrink-0">{entry.type}</Badge>
+          <Badge variant="outline" className="text-xs shrink-0">
+            {entry.type}
+          </Badge>
         </div>
       </div>
       <div className="flex items-center gap-2 shrink-0">
@@ -198,25 +233,31 @@ interface PersonScheduleExitRowProps {
   onPayPerson: (exit: DailyExit) => void;
 }
 
-function PersonScheduleExitRow({ exit, dateStr, isAdmin, isPending, onPayPerson }: PersonScheduleExitRowProps) {
+function PersonScheduleExitRow({
+  exit,
+  dateStr,
+  isAdmin,
+  isPending,
+  onPayPerson,
+}: PersonScheduleExitRowProps) {
   const status = getItemStatus(exit, dateStr, true);
 
   return (
     <div
       className={cn(
         'flex items-center gap-3 py-2 px-3 rounded-lg hover:bg-muted/50 transition-colors',
-        status === 'overdue' && 'bg-destructive/10',
+        status === 'overdue' && 'bg-destructive/10'
       )}
     >
       <User className="h-5 w-5 text-primary shrink-0" />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm font-medium truncate">{exit.description}</span>
-          <Badge variant="outline" className="text-xs shrink-0">pessoa</Badge>
+          <Badge variant="outline" className="text-xs shrink-0">
+            pessoa
+          </Badge>
         </div>
-        {exit.person && (
-          <div className="text-xs text-muted-foreground mt-0.5">{exit.person}</div>
-        )}
+        {exit.person && <div className="text-xs text-muted-foreground mt-0.5">{exit.person}</div>}
       </div>
       <div className="flex items-center gap-2 shrink-0">
         <StatusBadge status={status} />
@@ -245,11 +286,23 @@ interface ExitRowProps {
   referenceMonth: string;
   isAdmin: boolean;
   isPending: boolean;
+  year: number;
+  month: number;
   onMarkPaid: (req: MarkPaidRequest) => void;
   onPayPerson: (exit: DailyExit) => void;
 }
 
-function ExitRow({ exit, dateStr, referenceMonth, isAdmin, isPending, onMarkPaid, onPayPerson }: ExitRowProps) {
+function ExitRow({
+  exit,
+  dateStr,
+  referenceMonth,
+  isAdmin,
+  isPending,
+  year,
+  month,
+  onMarkPaid,
+  onPayPerson,
+}: ExitRowProps) {
   if (exit.type === 'person_schedule') {
     return (
       <PersonScheduleExitRow
@@ -268,14 +321,16 @@ function ExitRow({ exit, dateStr, referenceMonth, isAdmin, isPending, onMarkPaid
     <div
       className={cn(
         'flex items-center gap-3 py-2 px-3 rounded-lg hover:bg-muted/50 transition-colors',
-        status === 'overdue' && 'bg-destructive/10',
+        status === 'overdue' && 'bg-destructive/10'
       )}
     >
       <ArrowUpCircle className="h-5 w-5 text-destructive shrink-0" />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm font-medium truncate">{exit.description}</span>
-          <Badge variant="outline" className="text-xs shrink-0">{exit.type}</Badge>
+          <Badge variant="outline" className="text-xs shrink-0">
+            {exit.type}
+          </Badge>
         </div>
         {(exit.person ?? exit.card ?? exit.building) && (
           <div className="text-xs text-muted-foreground mt-0.5 flex gap-1 flex-wrap">
@@ -296,6 +351,8 @@ function ExitRow({ exit, dateStr, referenceMonth, isAdmin, isPending, onMarkPaid
               dateStr={dateStr}
               isPending={isPending}
               onMarkPaid={onMarkPaid}
+              year={year}
+              month={month}
             />
             <SkipButton
               exitId={exit.id}
@@ -329,7 +386,7 @@ function TimelineSkeleton() {
 
 function filterDay(
   day: DailyBreakdownDay,
-  filters: DailyFilters,
+  filters: DailyFilters
 ): { entries: DailyEntry[]; exits: DailyExit[] } {
   let entries = day.entries;
   let exits = day.exits;
@@ -368,7 +425,15 @@ interface SelectedPersonExit {
   referenceMonth: string;
 }
 
-export function DailyTimeline({ data, isLoading, filters, isAdmin, onDayClick }: Props) {
+export function DailyTimeline({
+  data,
+  isLoading,
+  filters,
+  isAdmin,
+  year,
+  month,
+  onDayClick,
+}: Props) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [selectedPersonExit, setSelectedPersonExit] = useState<SelectedPersonExit | null>(null);
   const markPaidMutation = useMarkItemPaid();
@@ -382,14 +447,14 @@ export function DailyTimeline({ data, isLoading, filters, isAdmin, onDayClick }:
         toast.error('Erro ao marcar item como pago');
       }
     },
-    [markPaidMutation],
+    [markPaidMutation]
   );
 
   const handleMarkPaidSync = useCallback(
     (req: MarkPaidRequest) => {
       void handleMarkPaid(req);
     },
-    [handleMarkPaid],
+    [handleMarkPaid]
   );
 
   const toggleCollapse = useCallback((dateStr: string) => {
@@ -404,9 +469,12 @@ export function DailyTimeline({ data, isLoading, filters, isAdmin, onDayClick }:
     });
   }, []);
 
-  const handlePayPerson = useCallback((exit: DailyExit, dateStr: string, referenceMonth: string) => {
-    setSelectedPersonExit({ exit, dateStr, referenceMonth });
-  }, []);
+  const handlePayPerson = useCallback(
+    (exit: DailyExit, dateStr: string, referenceMonth: string) => {
+      setSelectedPersonExit({ exit, dateStr, referenceMonth });
+    },
+    []
+  );
 
   if (isLoading) {
     return <TimelineSkeleton />;
@@ -427,11 +495,17 @@ export function DailyTimeline({ data, isLoading, filters, isAdmin, onDayClick }:
           const { entries, exits } = filterDay(day, filters);
           const hasItems = entries.length > 0 || exits.length > 0;
 
-          if (!hasItems && (filters.direction !== 'all' || filters.status !== 'all' || filters.person || filters.building)) {
+          if (
+            !hasItems &&
+            (filters.direction !== 'all' ||
+              filters.status !== 'all' ||
+              filters.person ||
+              filters.building)
+          ) {
             return null;
           }
 
-          const isCollapsed = collapsed.has(day.date) ?? (!hasItems);
+          const isCollapsed = collapsed.has(day.date) ?? !hasItems;
           const cumulativeBalance = day.cumulative_balance;
 
           const dayReferenceMonth = format(parseISO(day.date), 'yyyy-MM') + '-01';
@@ -448,9 +522,13 @@ export function DailyTimeline({ data, isLoading, filters, isAdmin, onDayClick }:
               >
                 <div className="flex items-center gap-3">
                   <span className="font-semibold text-sm">{formatDate(day.date)}</span>
-                  <span className="text-xs text-muted-foreground capitalize">{day.day_of_week}</span>
+                  <span className="text-xs text-muted-foreground capitalize">
+                    {day.day_of_week}
+                  </span>
                   {!hasItems && (
-                    <Badge variant="secondary" className="text-xs">Sem movimentações</Badge>
+                    <Badge variant="secondary" className="text-xs">
+                      Sem movimentações
+                    </Badge>
                   )}
                 </div>
                 <div className="flex items-center gap-3">
@@ -471,7 +549,7 @@ export function DailyTimeline({ data, isLoading, filters, isAdmin, onDayClick }:
                   <span
                     className={cn(
                       'text-sm font-bold',
-                      cumulativeBalance >= 0 ? 'text-success' : 'text-destructive',
+                      cumulativeBalance >= 0 ? 'text-success' : 'text-destructive'
                     )}
                   >
                     {formatCurrency(cumulativeBalance)}
@@ -499,8 +577,12 @@ export function DailyTimeline({ data, isLoading, filters, isAdmin, onDayClick }:
                       referenceMonth={exit.reference_month ?? dayReferenceMonth}
                       isAdmin={isAdmin}
                       isPending={markPaidMutation.isPending}
+                      year={year}
+                      month={month}
                       onMarkPaid={handleMarkPaidSync}
-                      onPayPerson={(e) => handlePayPerson(e, day.date, exit.reference_month ?? dayReferenceMonth)}
+                      onPayPerson={(e) =>
+                        handlePayPerson(e, day.date, exit.reference_month ?? dayReferenceMonth)
+                      }
                     />
                   ))}
                 </div>

@@ -26,6 +26,7 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 
 from core.models import Building, Condominium
+from core.services.timezone import today_sp
 from finances.models import (
     Bill,
     BillingAccount,
@@ -38,7 +39,6 @@ from finances.models import (
     WaterBillStatement,
 )
 from finances.services.condo_month_close_service import CondoMonthCloseService
-from finances.services.timezone import today_sp
 
 logger = logging.getLogger(__name__)
 
@@ -206,7 +206,11 @@ class BillService:
         collides — raises IntegrityError; it is caught here and surfaced as a PT ValidationError
         (400) instead of a 500. The idempotency match (InvoiceDraftService) routes the modal to
         update_with_lines first; this is the defensive backstop.
+
+        Rejected (PT 400) when the competence month is closed — a new bill there would change that
+        month's frozen result (mirrors update_with_lines / delete — design §4.7).
         """
+        CondoMonthCloseService.assert_open(draft.competence_month)
         try:
             with transaction.atomic():
                 bill = Bill(
@@ -254,7 +258,8 @@ class BillService:
             setattr(bill, field, header[field])
         bill.updated_by = user
         bill.full_clean()
-        bill.save(update_fields=[*changed, "updated_by", "updated_at"])
+        # AuditMixin.save appends updated_at to update_fields automatically.
+        bill.save(update_fields=[*changed, "updated_by"])
 
     @staticmethod
     def update_with_lines(
@@ -288,12 +293,29 @@ class BillService:
         return bill
 
     @staticmethod
+    def update_header(bill: Bill, header: dict[str, object], user: User | None = None) -> Bill:
+        """Update ONLY a bill's editable header fields (the Contas modal's edit mode, P2.3 step 1).
+
+        The default DRF update used to write any field (including competence_month) with no guard;
+        this is the guarded replacement the viewset delegates to. competence_month is immutable
+        (only _EDITABLE_HEADER_FIELDS are applied) and a closed competence month is rejected
+        (assert_open). Lines/payments are NOT touched — that is update_with_lines' job (design §6).
+        """
+        CondoMonthCloseService.assert_open(bill.competence_month)
+        with transaction.atomic():
+            BillService._apply_header(bill, header, user)
+        return bill
+
+    @staticmethod
     def delete(bill: Bill, user: User | None = None) -> None:
         """Soft-delete the bill and cascade the soft-delete to its live statement.
 
         SoftDeleteMixin.delete() only touches the record itself (it does not walk the reverse
-        OneToOne), so the statement is soft-deleted explicitly here (design §7.3).
+        OneToOne), so the statement is soft-deleted explicitly here (design §7.3). Rejected
+        (PT 400) when the competence month is closed — deleting a frozen-month bill would change
+        that month's frozen result (design §4.7).
         """
+        CondoMonthCloseService.assert_open(bill.competence_month)
         with transaction.atomic():
             for live_model in (WaterBillStatement, ElectricityBillStatement):
                 for statement in live_model.objects.filter(bill=bill):

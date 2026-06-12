@@ -14,7 +14,7 @@ Rules (design §4):
 - Reserve is the deposit/withdrawal ledger; transfers are zero-sum on the total balance.
 - Internal sums are raw Decimals; the figure is quantized once at the output boundary
   (quantize_money), so the dashboard and the frozen CondoMonthClose never differ by a cent.
-- "today / current month" only via finances.services.timezone (settings is UTC).
+- "today / current month" only via core.services.timezone (settings is UTC).
 """
 
 from datetime import date
@@ -25,6 +25,7 @@ from django.db.models import QuerySet, Sum
 
 from core.models import FinancialSettings, RentPayment
 from core.services.rent_schedule_service import RentScheduleService
+from core.services.timezone import current_month_sp, today_sp
 from finances.models import (
     Bill,
     BillLifecycleState,
@@ -37,7 +38,6 @@ from finances.models import (
     ReserveMovementKind,
 )
 from finances.money import quantize_money
-from finances.services.timezone import current_month_sp, today_sp
 
 ZERO = Decimal(0)
 ZERO_MONEY = Decimal("0.00")
@@ -131,15 +131,20 @@ class CondoBalanceService:
         return quantize_money(total)
 
     @staticmethod
-    def reserve_balance(condominium_id: int | None = None) -> Decimal:
+    def reserve_balance(condominium_id: int | None = None, as_of: date | None = None) -> Decimal:
         """Reserve = Σ deposits - Σ withdrawals (never negative; the guard lives in withdraw/pay).
 
         Movements of a soft-deleted Reserve are excluded (a forward-FK join does not apply the
-        parent's default manager, so this must be explicit — soft-delete rule).
+        parent's default manager, so this must be explicit — soft-delete rule). ``as_of`` (the 1st
+        of M+1, exclusive) bounds the ledger to movements through the end of month M, so a frozen
+        CondoMonthClose freezes the reserve at the month end, not the all-time balance (P2.3 step 7);
+        without ``as_of`` it is the live all-time balance (the dashboard / total_balance).
         """
         movements = ReserveMovement.objects.filter(reserve__is_deleted=False)
         if condominium_id is not None:
             movements = movements.filter(reserve__condominium_id=condominium_id)
+        if as_of is not None:
+            movements = movements.filter(movement_date__lt=as_of)
         deposits = (
             movements.filter(kind=ReserveMovementKind.DEPOSIT).aggregate(total=Sum("amount"))[
                 "total"

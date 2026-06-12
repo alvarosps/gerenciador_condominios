@@ -4,11 +4,34 @@ Implements the BCB (Banco Central do Brasil) specification for static PIX QR cod
 Generates both the EMV copia e cola string and the payload metadata dict.
 """
 
+import unicodedata
 from decimal import Decimal
+
+from core.models import FinancialSettings, Landlord, Lease
+
+_MERCHANT_NAME_MAX = 25
+_CITY_MAX = 15
+_DEFAULT_MERCHANT_NAME = "Condomínio"
+_DEFAULT_CITY = "Porto Alegre"
+
+
+def _sanitize_ascii(value: str) -> str:
+    """Reduce a string to uppercase ASCII per the BCB PIX spec.
+
+    Strips diacritics via NFKD normalization, drops any remaining non-ASCII
+    bytes, and uppercases the result. "João" -> "JOAO", "São Paulo" -> "SAO PAULO".
+    """
+    normalized = unicodedata.normalize("NFKD", value)
+    ascii_bytes = normalized.encode("ascii", "ignore")
+    return ascii_bytes.decode("ascii").upper()
 
 
 def _crc16_ccitt(data: str) -> str:
-    """Calculate CRC16-CCITT for EMV PIX payload."""
+    """Calculate CRC16-CCITT for EMV PIX payload.
+
+    The EMV payload is ASCII by specification; all dynamic fields are sanitized
+    upstream, so encoding as ASCII here is the correct, strict behavior.
+    """
     crc = 0xFFFF
     for byte in data.encode("ascii"):
         crc ^= byte << 8
@@ -22,8 +45,12 @@ def _crc16_ccitt(data: str) -> str:
 
 
 def _emv_field(tag: str, value: str) -> str:
-    """Format an EMV TLV field: tag + length (2 digits) + value."""
-    return f"{tag}{len(value):02d}{value}"
+    """Format an EMV TLV field: tag + length (2 digits) + value.
+
+    The length is the number of BYTES of the value (UTF-8 encoded) per the EMV
+    spec, not the number of characters.
+    """
+    return f"{tag}{len(value.encode('utf-8')):02d}{value}"
 
 
 def generate_pix_emv(
@@ -48,8 +75,8 @@ def generate_pix_emv(
         + _emv_field("53", "986")  # Transaction Currency (BRL)
         + _emv_field("54", f"{amount:.2f}")  # Transaction Amount
         + _emv_field("58", "BR")  # Country Code
-        + _emv_field("59", merchant_name[:25])  # Merchant Name (max 25)
-        + _emv_field("60", city[:15])  # Merchant City (max 15)
+        + _emv_field("59", _sanitize_ascii(merchant_name)[:_MERCHANT_NAME_MAX])  # Merchant Name
+        + _emv_field("60", _sanitize_ascii(city)[:_CITY_MAX])  # Merchant City
         + _emv_field("62", _emv_field("05", txid))  # Additional Data (txid)
     )
 
@@ -88,4 +115,53 @@ def generate_pix_payload(
         "pix_key_type": pix_key_type,
         "amount": f"{amount:.2f}",
         "merchant_name": merchant_name,
+    }
+
+
+def _resolve_city(landlord: Landlord | None, settings_obj: FinancialSettings | None) -> str:
+    """Resolve the PIX recipient city: active landlord, then settings, then default."""
+    if landlord and landlord.city:
+        return landlord.city
+    if settings_obj and settings_obj.default_city:
+        return settings_obj.default_city
+    return _DEFAULT_CITY
+
+
+def resolve_pix_recipient(lease: Lease) -> dict[str, str]:
+    """Resolve the PIX recipient (key, type, merchant name, city) for a lease.
+
+    Resolution rules:
+      - PIX key/type/name: the apartment owner's key (kitnet) when present;
+        otherwise the FinancialSettings default key/type with the active
+        landlord's name (falling back to the "Condomínio" default name).
+      - City: the active landlord's city, then FinancialSettings.default_city,
+        then the module default (Porto Alegre).
+    """
+    apartment = lease.apartment
+    owner = apartment.owner
+
+    if owner and owner.pix_key:
+        pix_key = owner.pix_key
+        pix_key_type = owner.pix_key_type
+        merchant_name = owner.name
+    else:
+        pix_key = ""
+        pix_key_type = ""
+        merchant_name = _DEFAULT_MERCHANT_NAME
+
+    settings_obj = FinancialSettings.objects.filter(pk=1).first()
+    landlord = Landlord.get_active()
+
+    if not (owner and owner.pix_key):
+        if settings_obj and settings_obj.default_pix_key:
+            pix_key = settings_obj.default_pix_key
+            pix_key_type = settings_obj.default_pix_key_type
+        if landlord:
+            merchant_name = landlord.name
+
+    return {
+        "pix_key": pix_key,
+        "pix_key_type": pix_key_type,
+        "merchant_name": merchant_name,
+        "city": _resolve_city(landlord, settings_obj),
     }

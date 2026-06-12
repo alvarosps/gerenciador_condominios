@@ -13,7 +13,6 @@ from typing import Any
 
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
-from django.utils import timezone
 
 from core.models import (
     Expense,
@@ -29,6 +28,7 @@ from core.models import (
 )
 from core.services.person_payment_schedule_service import PersonPaymentScheduleService
 from core.services.rent_schedule_service import DAYS_OF_WEEK_PT, RentScheduleService
+from core.services.timezone import today_sp
 
 
 class DailyControlService:
@@ -112,7 +112,7 @@ class DailyControlService:
         Includes expected vs actual totals, overdue counts, and balance projections.
         Excludes skipped expenses and uses schedule totals for persons with payment schedules.
         """
-        today = timezone.now().date()
+        today = today_sp()
         month_start = date(year, month, 1)
         next_month_start = _next_month_start(year, month)
 
@@ -211,17 +211,25 @@ class DailyControlService:
         return Decimal("0.00")
 
     @staticmethod
-    def mark_item_paid(item_type: str, item_id: int, payment_date: date) -> dict[str, Any]:
+    def mark_item_paid(
+        item_type: str,
+        item_id: int,
+        payment_date: date,
+        year: int | None = None,
+        month: int | None = None,
+    ) -> dict[str, Any]:
         """
         Mark an item as paid.
 
-        Supports: "installment", "expense", "income".
-        Validates item exists and is not already paid.
+        Supports: "installment", "credit_card", "expense", "income".
+        Validates item exists and is not already paid. For "credit_card", ``year``/``month``
+        select the displayed month whose installments are settled; when omitted, the month
+        of ``payment_date`` is used (never the raw server clock).
         """
         if item_type == "installment":
             return _mark_installment_paid(item_id, payment_date)
         if item_type == "credit_card":
-            return _mark_credit_card_paid(item_id, payment_date)
+            return _mark_credit_card_paid(item_id, payment_date, year, month)
         if item_type == "expense":
             return _mark_expense_paid(item_id, payment_date)
         if item_type == "income":
@@ -257,15 +265,27 @@ def _mark_installment_paid(item_id: int, payment_date: date) -> dict[str, Any]:
             return {"status": "already_paid", "message": "Parcela já está paga."}
         item.is_paid = True
         item.paid_date = payment_date
-        item.save(update_fields=["is_paid", "paid_date", "updated_at"])
+        item.save(update_fields=["is_paid", "paid_date"])
     return {"status": "ok", "message": f"Parcela {item_id} marcada como paga."}
 
 
-def _mark_credit_card_paid(card_id: int, payment_date: date) -> dict[str, Any]:
-    """Mark all unpaid installments for a credit card in the current month as paid."""
-    today = timezone.now().date()
-    month_start = today.replace(day=1)
-    next_month = _next_month_start(today.year, today.month)
+def _mark_credit_card_paid(
+    card_id: int,
+    payment_date: date,
+    year: int | None = None,
+    month: int | None = None,
+) -> dict[str, Any]:
+    """Mark all unpaid installments for a credit card in the displayed month as paid.
+
+    The target month is the explicit ``year``/``month`` (the month shown in the UI) when
+    given; otherwise it is derived from ``payment_date`` — never the raw server clock,
+    which is in UTC and would settle the wrong month near the day/month boundary.
+    """
+    if year is not None and month is not None:
+        month_start = date(year, month, 1)
+    else:
+        month_start = payment_date.replace(day=1)
+    next_month = _next_month_start(month_start.year, month_start.month)
 
     with transaction.atomic():
         unpaid = ExpenseInstallment.objects.select_for_update().filter(
@@ -294,7 +314,7 @@ def _mark_expense_paid(item_id: int, payment_date: date) -> dict[str, Any]:
             return {"status": "already_paid", "message": "Despesa já está paga."}
         item.is_paid = True
         item.paid_date = payment_date
-        item.save(update_fields=["is_paid", "paid_date", "updated_at"])
+        item.save(update_fields=["is_paid", "paid_date"])
     return {"status": "ok", "message": f"Despesa {item_id} marcada como paga."}
 
 
@@ -310,7 +330,7 @@ def _mark_income_received(item_id: int, payment_date: date) -> dict[str, Any]:
             return {"status": "already_paid", "message": "Receita já está recebida."}
         item.is_received = True
         item.received_date = payment_date
-        item.save(update_fields=["is_received", "received_date", "updated_at"])
+        item.save(update_fields=["is_received", "received_date"])
     return {"status": "ok", "message": f"Receita {item_id} marcada como recebida."}
 
 

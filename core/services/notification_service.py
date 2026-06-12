@@ -14,10 +14,10 @@ import requests as http_requests
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.utils import timezone
-from finances.services.timezone import SAO_PAULO_TZ
 from pywebpush import WebPushException, webpush
 
 from core.models import DeviceToken, Notification, PaymentProof, WebPushSubscription
+from core.services.timezone import SAO_PAULO_TZ
 
 logger = logging.getLogger(__name__)
 

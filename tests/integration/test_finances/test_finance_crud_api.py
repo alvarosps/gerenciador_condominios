@@ -99,14 +99,18 @@ def test_bill_pagination(authenticated_api_client):
 
 def test_bill_create_and_soft_delete(authenticated_api_client):
     cond = make_condominium()
+    # The default POST /bills/ is blocked (P2.3); the canonical create path is create_with_lines.
     resp = authenticated_api_client.post(
-        "/api/finances/bills/",
+        "/api/finances/bills/create_with_lines/",
         {
-            "condominium_id": cond.id,
-            "competence_month": "2026-06-15",
-            "due_date": "2026-06-10",
-            "description": "Conta avulsa",
-            "behavior": "one_time",
+            "bill": {
+                "condominium_id": cond.id,
+                "competence_month": "2026-06-15",
+                "due_date": "2026-06-10",
+                "description": "Conta avulsa",
+                "behavior": "one_time",
+            },
+            "line_items": [{"description": "Item", "amount": "120.00"}],
         },
         format="json",
     )

@@ -20,18 +20,18 @@ from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.db import transaction
 
+from core.services.timezone import today_sp
 from finances.models import (
     Bill,
+    BillLifecycleState,
     FundedFrom,
     Payment,
     PaymentAllocation,
     Reserve,
     ReserveMovement,
-    ReserveMovementKind,
 )
 from finances.services.condo_month_close_service import CondoMonthCloseService
 from finances.services.reserve_service import ReserveService
-from finances.services.timezone import today_sp
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +45,7 @@ class _BillRemaining(Protocol):
 _AMOUNT_NON_POSITIVE = "O valor do pagamento deve ser positivo."
 _OVER_ALLOCATION = "O valor do pagamento excede o saldo devedor da conta."
 _NO_RESERVE = "Nenhuma reserva configurada para o condomínio."
+_BILL_NOT_ACTIVE = "Só é possível pagar uma conta ativa."
 
 
 class BillPaymentService:
@@ -61,9 +62,13 @@ class BillPaymentService:
         """Pay a Bill (partial or total). Σ(allocation) == payment.amount; over-allocation rejected.
 
         funded_from='reserve' additionally debits the condominium reserve via a
-        ReserveMovement(withdrawal, bill=...) with a balance guard (design §4.3).
+        ReserveMovement(withdrawal, bill=..., payment=...) with a balance guard (design §4.3).
+        Only an ACTIVE bill is payable — a CANCELED/SUSPENDED/DEFERRED one would be a double
+        charge (its expense is already excluded from the result), so it is rejected (PT 400).
         """
         CondoMonthCloseService.assert_open(bill.competence_month)
+        if bill.lifecycle_state != BillLifecycleState.ACTIVE:
+            raise ValidationError(_BILL_NOT_ACTIVE)
         today = today_sp()
         with transaction.atomic():
             locked = Bill.objects.select_for_update().get(pk=bill.pk)
@@ -92,7 +97,9 @@ class BillPaymentService:
                 updated_by=user,
             )
             if payment.funded_from == FundedFrom.RESERVE:
-                BillPaymentService._withdraw_reserve_for_bill(locked, amount, payment_date, user)
+                BillPaymentService._withdraw_reserve_for_bill(
+                    locked, payment, amount, payment_date, user
+                )
             logger.info("Bill %s paid %s (funded_from=%s)", locked.pk, amount, funded_from)
         return payment
 
@@ -100,35 +107,30 @@ class BillPaymentService:
     def unpay(payment: Payment, user: User | None = None) -> None:
         """Reverse a payment by soft-deleting it and its allocations (recomposes amount_remaining).
 
-        A reserve-funded payment also reverses its ReserveMovement(withdrawal) so the reserve
-        balance is restored. Rejected on a closed competence month (assert_open).
+        A reserve-funded payment also reverses every ReserveMovement(withdrawal) linked to it by
+        the deterministic ``payment`` FK (never the old bill+kind+amount heuristic, which could
+        reverse a sibling payment's movement). Rejected on a closed competence month (assert_open).
         """
-        from_reserve = payment.funded_from == FundedFrom.RESERVE
         with transaction.atomic():
             for allocation in payment.allocations.all():
                 CondoMonthCloseService.assert_open(allocation.bill.competence_month)
-                if from_reserve:
-                    movement = (
-                        ReserveMovement.objects.filter(
-                            bill=allocation.bill,
-                            kind=ReserveMovementKind.WITHDRAWAL,
-                            amount=allocation.amount,
-                        )
-                        .order_by("-id")
-                        .first()
-                    )
-                    if movement is not None:
-                        movement.delete(deleted_by=user)
                 allocation.delete(deleted_by=user)
+            for movement in ReserveMovement.objects.filter(payment=payment):
+                movement.delete(deleted_by=user)
             payment.delete(deleted_by=user)
             logger.info("Payment %s reversed", payment.pk)
 
     @staticmethod
     def _withdraw_reserve_for_bill(
-        bill: Bill, amount: Decimal, movement_date: date, user: User | None
+        bill: Bill, payment: Payment, amount: Decimal, movement_date: date, user: User | None
     ) -> None:
-        """Debit the condominium reserve for a bill payment (guard lives in ReserveService.withdraw)."""
+        """Debit the condominium reserve for a bill payment (guard lives in ReserveService.withdraw).
+
+        The withdrawal carries the driving ``payment`` so unpay can reverse it deterministically.
+        """
         reserve = Reserve.objects.filter(condominium=bill.condominium).order_by("id").first()
         if reserve is None:
             raise ValidationError(_NO_RESERVE)
-        ReserveService.withdraw(reserve, amount, movement_date, bill=bill, user=user)
+        ReserveService.withdraw(
+            reserve, amount, movement_date, bill=bill, payment=payment, user=user
+        )

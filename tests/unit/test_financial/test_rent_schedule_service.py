@@ -462,13 +462,15 @@ class TestGetMonthSchedule:
         assert item["is_paid"] is True
         assert item["payment_date"] == "2026-03-07"
 
-    @freeze_time("2026-03-20")
+    @freeze_time("2026-03-20 12:00:00")
     def test_overdue_item_in_current_month_has_late_fee(self, lease) -> None:
         schedule = RentScheduleService.get_month_schedule(2026, 3)
         item = _find_item(schedule, lease.id)
         assert item["is_overdue"] is True
         assert item["day_passed"] is True
-        expected = FeeCalculatorService.calculate_late_fee(Decimal("1200.00"), 7, date(2026, 3, 20))
+        expected = FeeCalculatorService.calculate_late_fee(
+            Decimal("1200.00"), date(2026, 3, 7), date(2026, 3, 20)
+        )
         assert item["late_days"] == expected["late_days"]
         assert item["late_fee"] == str(expected["late_fee"])
         assert item["late_days"] > 0
@@ -738,11 +740,13 @@ class TestGetMonthStats:
         assert stats["vacant_kitnets_count"] == 2
         assert stats["vacant_kitnets_value"] == "1700.00"
 
-    @freeze_time("2026-03-20")
+    @freeze_time("2026-03-20 12:00:00")
     def test_overdue_count_and_fee_current_month(self, lease) -> None:
         stats = RentScheduleService.get_month_stats(2026, 3)
         assert stats["overdue_count"] == 1
-        expected = FeeCalculatorService.calculate_late_fee(Decimal("1200.00"), 7, date(2026, 3, 20))
+        expected = FeeCalculatorService.calculate_late_fee(
+            Decimal("1200.00"), date(2026, 3, 7), date(2026, 3, 20)
+        )
         assert stats["overdue_total_fee"] == str(expected["late_fee"])
         assert Decimal(stats["overdue_total_fee"]) > Decimal("0.00")
 
@@ -793,7 +797,7 @@ class TestGetMonthStats:
 
 @pytest.mark.django_db
 class TestTogglePayment:
-    @freeze_time("2026-03-03")
+    @freeze_time("2026-03-03 12:00:00")
     def test_creates_payment_when_unpaid_before_due(self, lease, admin_user) -> None:
         result = RentScheduleService.toggle_payment(lease.id, date(2026, 3, 1), admin_user)
         assert result["status"] == "ok"
@@ -802,7 +806,7 @@ class TestTogglePayment:
         assert payment.amount_paid == Decimal("1200.00")
         assert payment.payment_date == date(2026, 3, 3)
 
-    @freeze_time("2026-03-20")
+    @freeze_time("2026-03-20 12:00:00")
     def test_creates_payment_when_unpaid_overdue(self, lease, admin_user) -> None:
         result = RentScheduleService.toggle_payment(lease.id, date(2026, 3, 1), admin_user)
         assert result["status"] == "ok"

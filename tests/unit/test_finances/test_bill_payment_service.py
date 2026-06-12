@@ -10,7 +10,13 @@ from decimal import Decimal
 
 import pytest
 from django.core.exceptions import ValidationError
-from finances.models import Bill, Payment
+from finances.models import (
+    Bill,
+    BillLifecycleState,
+    Payment,
+    ReserveMovement,
+    ReserveMovementKind,
+)
 from finances.services.bill_payment_service import BillPaymentService
 from finances.services.condo_balance_service import CondoBalanceService
 
@@ -148,3 +154,74 @@ def test_sequential_over_allocation_rejected() -> None:
     with pytest.raises(ValidationError):
         BillPaymentService.pay(bill, PAY_DATE, amount=Decimal("600.00"))
     assert _amounts(bill).amount_paid == Decimal("600.00")
+
+
+# --- lifecycle guard: paying a non-ACTIVE bill is a double-charge bug (P2.3 step 1) ---
+
+
+@pytest.mark.parametrize(
+    "state",
+    [
+        BillLifecycleState.CANCELED,
+        BillLifecycleState.SUSPENDED,
+        BillLifecycleState.DEFERRED,
+    ],
+)
+def test_pay_rejects_non_active_bill(state: str) -> None:
+    bill = _bill_with_total("300.00")
+    bill.lifecycle_state = state
+    bill.save(update_fields=["lifecycle_state"])
+    before = Payment.objects.count()
+    with pytest.raises(ValidationError):
+        BillPaymentService.pay(bill, PAY_DATE)
+    assert Payment.objects.count() == before  # nothing persisted (no double charge)
+    assert _amounts(bill).payment_status == "open"
+
+
+def test_pay_accepts_active_bill() -> None:
+    bill = _bill_with_total("300.00")
+    payment = BillPaymentService.pay(bill, PAY_DATE)
+    assert payment.amount == Decimal("300.00")
+    assert _amounts(bill).payment_status == "paid"
+
+
+# --- ReserveMovement.payment FK: deterministic link (P2.3 step 10) ---
+
+
+def test_reserve_payment_records_movement_with_payment_fk() -> None:
+    bill = _bill_with_total("300.00")
+    reserve = _reserve_with_balance(bill, "500.00")
+    payment = BillPaymentService.pay(bill, PAY_DATE, funded_from="reserve")
+    movement = reserve.movements.get(kind=ReserveMovementKind.WITHDRAWAL)
+    assert movement.payment_id == payment.pk
+    assert movement.bill_id == bill.pk
+
+
+def test_unpay_reverses_via_payment_fk() -> None:
+    bill = _bill_with_total("300.00")
+    _reserve_with_balance(bill, "500.00")
+    payment = BillPaymentService.pay(bill, PAY_DATE, funded_from="reserve")
+    BillPaymentService.unpay(payment)
+    # The withdrawal resolved by the FK is soft-deleted; the reserve balance is restored.
+    assert not ReserveMovement.objects.filter(payment=payment).exists()
+    assert CondoBalanceService.reserve_balance(bill.condominium_id) == Decimal("500.00")
+
+
+def test_unpay_reverses_only_its_own_movement_when_two_share_bill_and_amount() -> None:
+    """Two distinct reserve payments of the SAME bill+amount: unpay of one reverses ONLY its
+    own movement (the old bill+kind+amount heuristic would reverse the wrong one)."""
+    bill = _bill_with_total("600.00")
+    _reserve_with_balance(bill, "1000.00")
+    pay_a = BillPaymentService.pay(bill, PAY_DATE, amount=Decimal("300.00"), funded_from="reserve")
+    pay_b = BillPaymentService.pay(bill, PAY_DATE, amount=Decimal("300.00"), funded_from="reserve")
+    move_a = ReserveMovement.objects.get(payment=pay_a)
+    move_b = ReserveMovement.objects.get(payment=pay_b)
+    assert move_a.pk != move_b.pk
+
+    BillPaymentService.unpay(pay_a)
+
+    assert not ReserveMovement.objects.filter(pk=move_a.pk).exists()  # only pay_a's reversed
+    assert ReserveMovement.objects.filter(pk=move_b.pk).exists()
+    assert ReserveMovement.objects.get(pk=move_b.pk).payment_id == pay_b.pk
+    # 600 deposited - 300 (pay_b still standing) = 700 after restoring pay_a's 300.
+    assert CondoBalanceService.reserve_balance(bill.condominium_id) == Decimal("700.00")

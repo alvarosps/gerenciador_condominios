@@ -16,6 +16,7 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 
 from core.services.rent_schedule_service import RentScheduleService
+from core.services.timezone import today_sp
 from finances.models import (
     Bill,
     BillingAccountType,
@@ -25,7 +26,6 @@ from finances.models import (
     InstallmentPlan,
     InstallmentPlanState,
 )
-from finances.services.timezone import today_sp
 
 logger = logging.getLogger(__name__)
 
@@ -143,7 +143,8 @@ class InstallmentPlanService:
 
             locked.lifecycle_state = BillLifecycleState.CANCELED
             locked.updated_by = user
-            locked.save(update_fields=["lifecycle_state", "updated_by", "updated_at"])
+            # AuditMixin.save appends updated_at to update_fields automatically.
+            locked.save(update_fields=["lifecycle_state", "updated_by"])
 
         logger.info(
             "Converted deferred bill %s into installment plan %s (%s installments)",

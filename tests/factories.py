@@ -29,13 +29,17 @@ TEST_CPFS = [
 
 _cpf_cycle = itertools.cycle(TEST_CPFS)
 
+_condominium_seq = itertools.count(1)
+
 
 def _next_cpf() -> str:
     return next(_cpf_cycle)
 
 
 def make_condominium(user=None, **kwargs):
-    defaults = {"name": "Test Condominium"}
+    # Unique default name: Condominium.name is unique among active rows
+    # (unique_active_condominium_name), so a fixed literal would collide across factory calls.
+    defaults = {"name": f"Test Condominium {next(_condominium_seq)}"}
     if user:
         defaults["created_by"] = user
         defaults["updated_by"] = user

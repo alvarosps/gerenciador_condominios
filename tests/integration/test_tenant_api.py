@@ -285,6 +285,30 @@ class TestTenantPix:
         assert response.status_code == 200
         assert "pix_copy_paste" in response.data
 
+    def test_pix_with_accented_owner_name_returns_200(self, tenant_client, tenant_user, admin_user):
+        # Regression: an accented merchant name used to crash _crc16_ccitt → 500.
+        _, _, lease = tenant_user
+        owner = Person.objects.create(
+            name="André São",
+            relationship="Proprietário",
+            phone="11955554444",
+            pix_key="andre@apto.com",
+            pix_key_type="email",
+            is_owner=True,
+            created_by=admin_user,
+            updated_by=admin_user,
+        )
+        apt = lease.apartment
+        apt.owner = owner
+        apt.save(update_fields=["owner"])
+
+        response = tenant_client.post("/api/tenant/payments/pix/")
+        assert response.status_code == 200
+        assert response.data["pix_copy_paste"]
+        # EMV merchant-name field (tag 59) must be sanitized to ASCII uppercase.
+        assert "ANDRE SAO" in response.data["pix_copy_paste"]
+        assert "André" not in response.data["pix_copy_paste"]
+
     def test_missing_pix_key_returns_400(self, tenant_client):
         # No apartment owner pix key and no FinancialSettings default → ValueError → 400.
         response = tenant_client.post("/api/tenant/payments/pix/")

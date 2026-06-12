@@ -129,7 +129,7 @@ def test_no_duplicate_digest_across_sp_midnight(recipient: User) -> None:
     2026-07-15) a digest sent NOW carries SP day 2026-07-15. A same-SP-day re-run
     (is_notification_sent_on(today_sp()=2026-07-15)) must detect it → no duplicate. A naive
     UTC sent_at__date=2026-07-15 lookup would miss it (the row's UTC date is 2026-07-16)."""
-    from finances.services.timezone import today_sp
+    from core.services.timezone import today_sp
 
     # The send happens NOW (02:30 UTC). today_sp() at this instant is the SP calendar day.
     assert today_sp() == date(2026, 7, 15)

@@ -15,6 +15,7 @@ from rest_framework import serializers
 
 from core.models import Building, Condominium, Lease, Person
 from core.serializers import BuildingSerializer, LeaseSerializer, PersonSimpleSerializer
+from core.services.timezone import today_sp
 from finances.models import (
     _CONSUMPTION_TYPES,
     _EMBEDDED_NEEDS_CONSUMPTION_MSG,
@@ -41,7 +42,6 @@ from finances.models import (
     WaterBillStatement,
 )
 from finances.money import money_str
-from finances.services.timezone import today_sp
 
 _ERR_DUPLICATE_BILLING_ACCOUNT = "Já existe uma conta ativa com este prédio, tipo e inscrição/UC."
 
@@ -416,6 +416,12 @@ class BillSkipSerializer(serializers.ModelSerializer):
         fields = ["id", "billing_account", "billing_account_id", "reference_month"]
         read_only_fields = ["id", "billing_account"]
 
+    def validate_reference_month(self, value: date) -> date:
+        # DRF.create() does not call Model.clean(); normalize to the 1st here too (mirrors
+        # BillSkip.clean + BillSerializer.validate_competence_month) so the (account, month)
+        # uniqueness and the generation lookup match regardless of the day sent.
+        return value.replace(day=1)
+
 
 class PaymentAllocationSerializer(serializers.ModelSerializer):
     class Meta:
@@ -466,8 +472,12 @@ class InstallmentSerializer(serializers.ModelSerializer):
 
     def get_is_overdue(self, obj: Installment) -> bool:
         # No "paid" semantics on Installment (the realized side lives on BillLineItem, S41);
-        # overdue = past due AND the plan is still active.
-        return obj.due_date < today_sp() and obj.plan.lifecycle_state == InstallmentPlanState.ACTIVE
+        # overdue = past due AND the plan is still ACTIVE or MATERIALIZED (a fully materialized
+        # plan whose parcela bill is unpaid is still overdue — MATERIALIZED ≠ pago, P2.3 step 9).
+        return obj.due_date < today_sp() and obj.plan.lifecycle_state in (
+            InstallmentPlanState.ACTIVE,
+            InstallmentPlanState.MATERIALIZED,
+        )
 
 
 class InstallmentPlanSerializer(serializers.ModelSerializer):
@@ -649,6 +659,7 @@ class ReserveMovementSerializer(serializers.ModelSerializer):
             "amount",
             "movement_date",
             "bill",
+            "payment",
             "reference",
             "notes",
             "created_at",
@@ -658,7 +669,8 @@ class ReserveMovementSerializer(serializers.ModelSerializer):
         # ReserveService enforces the never-negative guard (design §4.3/§18). The viewset is a
         # ReadOnlyModelViewSet, so exposing a write path here (which would bypass that guard) is
         # neither offered nor needed — every field is read-only. bill is a PK on read (set =
-        # withdrawal to pay a bill, null = cash transfer).
+        # withdrawal to pay a bill, null = cash transfer); payment is the deterministic link to
+        # the driving Payment (null for a manual cash transfer — P2.3 step 10).
         read_only_fields = fields
 
 
@@ -726,16 +738,16 @@ class IncomeEntrySerializer(serializers.ModelSerializer):
 
 class CondoMonthCloseSerializer(serializers.ModelSerializer):
     condominium = CondominiumSimpleSerializer(read_only=True)
-    condominium_id = serializers.PrimaryKeyRelatedField(
-        queryset=Condominium.objects.all(), source="condominium", write_only=True
-    )
 
     class Meta:
         model = CondoMonthClose
+        # Fully read-only: the viewset is a ReadOnlyModelViewSet and the only write path is
+        # condo-month-closes/{close,reopen} (the service computes every frozen figure). A
+        # snapshot's identity (condominium, reference_month) is immutable once frozen, so neither
+        # is writable here — the serializer serializes responses, it never persists (P2.3 step 5).
         fields = [
             "id",
             "condominium",
-            "condominium_id",
             "reference_month",
             "status",
             "closed_at",
@@ -747,17 +759,4 @@ class CondoMonthCloseSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-        # The canonical write path is condo-month-closes/{close,reopen}; the frozen figures are
-        # computed by the service, never set directly through the serializer.
-        read_only_fields = [
-            "id",
-            "status",
-            "closed_at",
-            "net_result",
-            "cash_balance_end",
-            "reserve_balance_end",
-            "carry_forward_out",
-            "breakdown",
-            "created_at",
-            "updated_at",
-        ]
+        read_only_fields = fields

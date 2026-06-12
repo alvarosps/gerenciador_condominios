@@ -57,10 +57,15 @@ class IptuAlertService:
         """Risco de perda de parcelamento de IPTU. 1 parcela vencida = WARNING; >=2 = CRITICAL.
 
         Read-only via ``Bill.with_amounts(today).is_overdue`` — sem N+1, sem soma em Python.
-        SEMPRE chamar com ``today_sp()`` (settings é UTC).
+        SEMPRE chamar com ``today_sp()`` (settings é UTC). ACTIVE e MATERIALIZED são monitorados:
+        um plano totalmente materializado (todas as parcelas viraram bills) com parcela vencida
+        não paga continua em risco — MATERIALIZED ≠ pago (P2.3 step 9).
         """
         plans = InstallmentPlan.objects.filter(
-            lifecycle_state=InstallmentPlanState.ACTIVE,
+            lifecycle_state__in=[
+                InstallmentPlanState.ACTIVE,
+                InstallmentPlanState.MATERIALIZED,
+            ],
             embedded=False,
             billing_account__account_type=BillingAccountType.IPTU,
         ).select_related("billing_account", "building")

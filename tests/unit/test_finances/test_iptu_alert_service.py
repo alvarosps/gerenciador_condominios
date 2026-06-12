@@ -116,7 +116,7 @@ def test_evaluate_ignores_non_iptu_account_type() -> None:
 
 @freeze_time(FROZEN)
 def test_evaluate_ignores_inactive_plan() -> None:
-    """Plano IPTU avulso com lifecycle_state != ACTIVE (deferred/paid/canceled) é excluído."""
+    """Plano IPTU avulso com lifecycle_state != ACTIVE/MATERIALIZED (deferred/paid/canceled) é excluído."""
     account = _iptu_account()
     for state in (
         InstallmentPlanState.DEFERRED,
@@ -127,6 +127,22 @@ def test_evaluate_ignores_inactive_plan() -> None:
         _parcela_bill(plan, number=1, due_date=date(2026, 6, 10))
 
     assert IptuAlertService.evaluate(date(2026, 7, 15)) == []
+
+
+@freeze_time(FROZEN)
+def test_evaluate_monitors_materialized_plan_with_overdue_parcela() -> None:
+    """REGRESSÃO (P2.3 step 9): um plano IPTU totalmente MATERIALIZED (todas as parcelas viraram
+    bills) com 1 parcela vencida não paga AINDA é monitorado — antes virava PAID e o alerta sumia."""
+    account = _iptu_account()
+    plan = _iptu_plan(account, lifecycle_state=InstallmentPlanState.MATERIALIZED)
+    _parcela_bill(plan, number=1, due_date=date(2026, 6, 10))
+
+    rows = IptuAlertService.evaluate(date(2026, 7, 15))
+
+    assert len(rows) == 1
+    assert rows[0].level == IptuAlertService.LEVEL_WARNING
+    assert rows[0].overdue_count == 1
+    assert rows[0].plan_id == plan.pk
 
 
 @freeze_time(FROZEN)

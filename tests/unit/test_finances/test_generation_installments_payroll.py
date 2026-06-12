@@ -162,10 +162,10 @@ def test_materialization_copies_schedule_and_realized_edit_keeps_schedule() -> N
     assert inst.amount == Decimal("400.00")  # schedule preserved (no realized -> schedule sync)
 
 
-# --- last installment -> plan paid ---
+# --- last installment -> plan MATERIALIZED (NOT paid: no payment happened — P2.3 step 9) ---
 
 
-def test_last_installment_materialized_marks_plan_paid() -> None:
+def test_last_installment_materialized_marks_plan_materialized() -> None:
     plan = make_installment_plan(embedded=False, installment_count=2)
     make_installment(plan=plan, number=1, due_date=date(2026, 1, 10), amount=Decimal("50.00"))
     make_installment(plan=plan, number=2, due_date=date(2026, 2, 10), amount=Decimal("50.00"))
@@ -176,7 +176,21 @@ def test_last_installment_materialized_marks_plan_paid() -> None:
 
     BillGenerationService.ensure_month_bills(2026, 2)  # last installment materialized
     plan.refresh_from_db()
-    assert plan.lifecycle_state == InstallmentPlanState.PAID
+    # MATERIALIZED, not PAID — every parcela has a bill/line but none was actually paid.
+    assert plan.lifecycle_state == InstallmentPlanState.MATERIALIZED
+
+
+def test_materialized_plan_does_not_regenerate_installment_bills() -> None:
+    plan = make_installment_plan(embedded=False, installment_count=1)
+    make_installment(plan=plan, number=1, due_date=date(2026, 2, 10), amount=Decimal("50.00"))
+
+    BillGenerationService.ensure_month_bills(2026, 2)
+    plan.refresh_from_db()
+    assert plan.lifecycle_state == InstallmentPlanState.MATERIALIZED
+    first_count = Bill.all_objects.filter(installment__plan=plan).count()
+
+    BillGenerationService.ensure_month_bills(2026, 2)  # second run must not duplicate
+    assert Bill.all_objects.filter(installment__plan=plan).count() == first_count
 
 
 # --- payroll ---

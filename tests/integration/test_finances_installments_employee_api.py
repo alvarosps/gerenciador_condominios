@@ -10,8 +10,8 @@ from finances.models import (
     InstallmentPlan,
     InstallmentPlanState,
 )
-from finances.services.timezone import today_sp
 
+from core.services.timezone import today_sp
 from tests.factories import (
     make_bill,
     make_bill_line_item,

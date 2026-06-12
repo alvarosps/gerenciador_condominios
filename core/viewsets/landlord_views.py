@@ -18,6 +18,7 @@ from rest_framework.response import Response
 from ..models import Landlord
 from ..permissions import IsAdminUser
 from ..serializers import LandlordSerializer
+from ..services.landlord_service import LandlordService
 
 logger = logging.getLogger(__name__)
 
@@ -76,7 +77,9 @@ class LandlordViewSet(viewsets.ViewSet):
             serializer = LandlordSerializer(data=request.data)
 
         if serializer.is_valid():
-            serializer.save(is_active=True)
+            landlord = serializer.save()
+            # Activation (single-active invariant) is owned by the service, not the serializer.
+            LandlordService.activate(landlord, updated_by=request.user)
             logger.info(f"Landlord updated: {serializer.data.get('name')}")
             return Response(serializer.data, status=status.HTTP_200_OK)
 

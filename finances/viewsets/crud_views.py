@@ -23,9 +23,11 @@ from rest_framework.decorators import action
 from rest_framework.parsers import MultiPartParser
 from rest_framework.request import Request
 from rest_framework.response import Response
+from rest_framework.serializers import BaseSerializer
 
 from core.pagination import CustomPageNumberPagination, LargePageNumberPagination
 from core.permissions import IsAdminUser
+from core.services.timezone import today_sp
 from finances.models import (
     Bill,
     BillingAccount,
@@ -65,10 +67,16 @@ from finances.services.condo_month_close_service import CondoMonthCloseService
 from finances.services.invoice_draft_service import InvoiceDraftService
 from finances.services.invoice_parsing.registry import detect_and_parse
 from finances.services.reserve_service import ReserveService
-from finances.services.timezone import today_sp
 from finances.viewsets.query_params import int_param
 
 MONTHS_IN_YEAR = 12
+
+# The default DRF CRUD write routes bypass the rich-path guards; these messages (PT) explain the
+# 405 the closed routes return and point the client at the canonical action (P2.3 steps 3/4).
+_PAYMENT_WRITE_BLOCKED = (
+    "Pagamentos são criados e editados apenas via contas/{id}/pay e contas/{id}/unpay."
+)
+_BILL_CREATE_BLOCKED = "Contas são criadas via contas/create_with_lines (com as linhas)."
 
 
 def _parse_year_month(data: dict[str, object]) -> tuple[int, int]:
@@ -170,6 +178,24 @@ class PaymentViewSet(viewsets.ModelViewSet):
         if date_to is not None:
             queryset = queryset.filter(payment_date__lte=date_to)
         return queryset
+
+    def create(self, request: Request, *args: object, **kwargs: object) -> Response:
+        # A Payment (amount/funded_from read-only) created via the default route would either 500
+        # (amount missing) or desync Σ(allocation) from amount and orphan any reserve withdrawal.
+        # The only write path is contas/{id}/pay (P2.3 step 3).
+        return Response(
+            {"detail": _PAYMENT_WRITE_BLOCKED}, status=status.HTTP_405_METHOD_NOT_ALLOWED
+        )
+
+    def update(self, request: Request, *args: object, **kwargs: object) -> Response:
+        # Editing a payment in place would desync its allocations / reserve ghost (§4.8); change
+        # a payment only via unpay() + pay().
+        return Response(
+            {"detail": _PAYMENT_WRITE_BLOCKED}, status=status.HTTP_405_METHOD_NOT_ALLOWED
+        )
+
+    def partial_update(self, request: Request, *args: object, **kwargs: object) -> Response:
+        return self.update(request, *args, **kwargs)
 
     def destroy(self, request: Request, *args: object, **kwargs: object) -> Response:
         """Reverse a payment through the single reversal path (BillPaymentService.unpay).
@@ -553,15 +579,54 @@ class BillViewSet(viewsets.ModelViewSet):
         draft = InvoiceDraftService.build_draft(parsed)
         return Response(draft, status=status.HTTP_200_OK)
 
+    def create(self, request: Request, *args: object, **kwargs: object) -> Response:
+        # The default create cannot write line items (amount_total derives from them), so a bill
+        # created here would always be empty AND would bypass the closed-month / identity guards.
+        # The only creation path is create_with_lines (P2.3 step 4).
+        return Response({"detail": _BILL_CREATE_BLOCKED}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    def update(self, request: Request, *args: object, **kwargs: object) -> Response:
+        """Edit ONLY a bill's header fields (the Contas modal's edit mode), through the guard.
+
+        The default DRF update wrote any field (competence_month included) with no guard. Here the
+        validated header is delegated to BillService.update_header, which keeps competence_month
+        immutable, rejects a closed competence month (assert_open), and never touches lines/payments
+        (those go through update_with_lines / pay). Lines stay editable only via update_with_lines.
+        """
+        partial = bool(kwargs.get("partial", False))
+        bill = self.get_object()
+        serializer = self.get_serializer(bill, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        # competence_month is immutable; drop it (+ condominium, never reassigned) so only the
+        # editable header reaches the service (mirrors update_with_lines).
+        header = {
+            field: value
+            for field, value in serializer.validated_data.items()
+            if field not in ("competence_month", "condominium")
+        }
+        try:
+            BillService.update_header(bill, header, user=cast(User, request.user))
+        except ValidationError as exc:
+            return Response({"error": str(exc.messages[0])}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(self._serialized_bill(bill), status=status.HTTP_200_OK)
+
+    def partial_update(self, request: Request, *args: object, **kwargs: object) -> Response:
+        kwargs["partial"] = True
+        return self.update(request, *args, **kwargs)
+
     def destroy(self, request: Request, *args: object, **kwargs: object) -> Response:
         """Soft-delete the bill through BillService.delete, which cascades to its statement.
 
         The default destroy would SoftDeleteMixin.delete() only the Bill row, leaving a live
         water/electricity statement orphaned (it would still surface via the reverse accessor on
-        a re-fetched soft-deleted bill — design §7.3). delete soft-deletes the statement first.
+        a re-fetched soft-deleted bill — design §7.3). delete soft-deletes the statement first
+        and rejects (PT 400) a closed competence month (assert_open).
         """
         bill = self.get_object()
-        BillService.delete(bill, user=cast(User, request.user))
+        try:
+            BillService.delete(bill, user=cast(User, request.user))
+        except ValidationError as exc:
+            return Response({"error": str(exc.messages[0])}, status=status.HTTP_400_BAD_REQUEST)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -670,8 +735,30 @@ class IncomeEntryViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(income_date__lte=date_to)
         return queryset
 
+    def perform_create(self, serializer: BaseSerializer[IncomeEntry]) -> None:
+        # An income in a closed month changes that month's frozen cash/competence; reject it here
+        # (the architecture rule keeps assert_open out of the serializer — P2.3 step 2).
+        self._assert_income_month_open(serializer)
+        serializer.save()
 
-class CondoMonthCloseViewSet(viewsets.ModelViewSet):
+    def perform_update(self, serializer: BaseSerializer[IncomeEntry]) -> None:
+        self._assert_income_month_open(serializer)
+        serializer.save()
+
+    @staticmethod
+    def _assert_income_month_open(serializer: BaseSerializer[IncomeEntry]) -> None:
+        """Reject the write when the income's competence month (income_date) is closed.
+
+        On a PATCH that omits income_date, the existing instance's date is the competence to guard.
+        """
+        instance = serializer.instance
+        existing = instance.income_date if isinstance(instance, IncomeEntry) else None
+        income_date = cast("date | None", serializer.validated_data.get("income_date", existing))
+        if income_date is not None:
+            CondoMonthCloseService.assert_open(income_date.replace(day=1))
+
+
+class CondoMonthCloseViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = CondoMonthCloseSerializer
     permission_classes = [IsAdminUser]
     pagination_class = CustomPageNumberPagination

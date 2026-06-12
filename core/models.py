@@ -29,9 +29,9 @@ from core.jinja_environment import build_contract_jinja_env
 
 # Import validators (note: we don't enforce these on existing data)
 from core.validators import (
+    CNPJValidator,
+    CPFValidator,
     validate_brazilian_phone,
-    validate_cnpj,
-    validate_cpf,
     validate_due_day,
     validate_lease_dates,
     validate_tenant_count,
@@ -106,9 +106,17 @@ class AuditMixin(models.Model):
         abstract = True
 
     def save(self, *args: Any, **kwargs: Any) -> None:
-        """Override save to automatically update updated_at timestamp."""
+        """Override save to automatically update updated_at timestamp.
+
+        When the caller passes ``update_fields`` for a partial update, ``updated_at`` is
+        appended to the set so the audit trail is never silently skipped (a partial save
+        that omitted it used to leave the record's modification time stale).
+        """
         if self.pk:  # If updating existing record
             self.updated_at = timezone.now()
+            update_fields = kwargs.get("update_fields")
+            if update_fields is not None:
+                kwargs["update_fields"] = {*update_fields, "updated_at"}
         super().save(*args, **kwargs)
 
 
@@ -172,8 +180,8 @@ class SoftDeleteMixin(models.Model):
         self.deleted_at = timezone.now()
         if deleted_by:
             self.deleted_by = deleted_by
-        self.updated_at = timezone.now()
-        self.save(update_fields=["is_deleted", "deleted_at", "deleted_by", "updated_at"])
+        # AuditMixin.save appends updated_at to update_fields automatically.
+        self.save(update_fields=["is_deleted", "deleted_at", "deleted_by"])
         return 0, {}
 
     def restore(self, restored_by: Any = None) -> None:
@@ -188,10 +196,8 @@ class SoftDeleteMixin(models.Model):
         self.deleted_by = None
         if restored_by:
             self.updated_by = restored_by
-        self.updated_at = timezone.now()
-        self.save(
-            update_fields=["is_deleted", "deleted_at", "deleted_by", "updated_by", "updated_at"]
-        )
+        # AuditMixin.save appends updated_at to update_fields automatically.
+        self.save(update_fields=["is_deleted", "deleted_at", "deleted_by", "updated_by"])
 
 
 # =============================================================================
@@ -221,6 +227,16 @@ class Condominium(AuditMixin, SoftDeleteMixin, models.Model):
 
     all_objects = models.Manager()  # Access all objects including deleted
     objects = SoftDeleteManager()
+
+    class Meta:
+        default_manager_name = "objects"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["name"],
+                condition=models.Q(is_deleted=False),
+                name="unique_active_condominium_name",
+            ),
+        ]
 
     def __str__(self) -> str:
         """Return string representation of condominium."""
@@ -259,7 +275,7 @@ class Building(AuditMixin, SoftDeleteMixin, models.Model):
     """
 
     street_number = models.PositiveIntegerField(
-        unique=True, help_text="Número da rua (ex.: 836 ou 850)"
+        db_index=True, help_text="Número da rua (ex.: 836 ou 850)"
     )
     name = models.CharField(max_length=100, help_text="Nome do prédio")
     address = models.CharField(max_length=200, help_text="Endereço completo do prédio")
@@ -274,6 +290,16 @@ class Building(AuditMixin, SoftDeleteMixin, models.Model):
     # Custom manager that excludes soft-deleted objects
     all_objects = models.Manager()  # Access all objects including deleted
     objects = SoftDeleteManager()
+
+    class Meta:
+        default_manager_name = "objects"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["street_number"],
+                condition=models.Q(is_deleted=False),
+                name="unique_active_building_street_number",
+            ),
+        ]
 
     def __str__(self) -> str:
         """Return string representation of building."""
@@ -304,7 +330,7 @@ class Building(AuditMixin, SoftDeleteMixin, models.Model):
         deleted_by: Any = None,
     ) -> tuple[int, dict[str, int]]:
         if not hard_delete:
-            for apartment in self.apartments.filter(is_deleted=False):
+            for apartment in self.apartments.all():
                 apartment.delete(hard_delete=False, deleted_by=deleted_by)
         return super().delete(
             using=using, keep_parents=keep_parents, hard_delete=hard_delete, deleted_by=deleted_by
@@ -324,13 +350,23 @@ class Furniture(AuditMixin, SoftDeleteMixin, models.Model):
     """
 
     name = models.CharField(
-        max_length=100, unique=True, help_text="Nome do móvel (ex.: Fogão, Geladeira, etc.)"
+        max_length=100, db_index=True, help_text="Nome do móvel (ex.: Fogão, Geladeira, etc.)"
     )
     description = models.TextField(blank=True, default="")
 
     # Custom manager that excludes soft-deleted objects
     all_objects = models.Manager()  # Access all objects including deleted
     objects = SoftDeleteManager()
+
+    class Meta:
+        default_manager_name = "objects"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["name"],
+                condition=models.Q(is_deleted=False),
+                name="unique_active_furniture_name",
+            ),
+        ]
 
     def __str__(self) -> str:
         """Return string representation of furniture."""
@@ -406,7 +442,7 @@ class Apartment(AuditMixin, SoftDeleteMixin, models.Model):
     objects = SoftDeleteManager()
 
     class Meta:
-        unique_together = ("building", "number")
+        default_manager_name = "objects"
         ordering = ["building__street_number", "number"]
         indexes = [
             # Composite indexes (Phase 5) for common query patterns
@@ -416,6 +452,11 @@ class Apartment(AuditMixin, SoftDeleteMixin, models.Model):
             models.Index(fields=["is_rented"], name="apt_is_rented_idx"),
         ]
         constraints = [
+            models.UniqueConstraint(
+                fields=["building", "number"],
+                condition=models.Q(is_deleted=False),
+                name="unique_active_apartment_per_building",
+            ),
             models.CheckConstraint(
                 condition=models.Q(rental_value__gte=0),
                 name="apt_rental_value_non_negative",
@@ -438,11 +479,10 @@ class Apartment(AuditMixin, SoftDeleteMixin, models.Model):
         deleted_by: Any = None,
     ) -> tuple[int, dict[str, int]]:
         if not hard_delete:
-            self.leases.filter(is_deleted=False).update(
-                is_deleted=True,
-                deleted_at=timezone.now(),
-                deleted_by=deleted_by,
-            )
+            # Iterate per instance so Lease.delete() fires post_save → sync_apartment_is_rented
+            # (a bulk .update() bypasses signals, leaving is_rented stale after a later restore).
+            for lease in self.leases.filter(is_deleted=False):
+                lease.delete(hard_delete=False, deleted_by=deleted_by)
         return super().delete(
             using=using, keep_parents=keep_parents, hard_delete=hard_delete, deleted_by=deleted_by
         )
@@ -493,7 +533,6 @@ class Tenant(AuditMixin, SoftDeleteMixin, models.Model):
     name = models.CharField(max_length=150, help_text="Nome completo ou razão social")
     cpf_cnpj = models.CharField(
         max_length=20,
-        unique=True,
         help_text="CPF (ou CNPJ em caso de empresa)",
         db_index=True,  # Add index for faster lookups
     )
@@ -531,10 +570,18 @@ class Tenant(AuditMixin, SoftDeleteMixin, models.Model):
     objects = SoftDeleteManager()
 
     class Meta:
+        default_manager_name = "objects"
         indexes = [
             # Composite indexes (Phase 5) for common query patterns
             models.Index(fields=["is_company", "name"], name="tenant_type_name_idx"),
             models.Index(fields=["marital_status", "is_company"], name="tenant_status_type_idx"),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["cpf_cnpj"],
+                condition=models.Q(is_deleted=False),
+                name="unique_active_tenant_cpf_cnpj",
+            ),
         ]
 
     def __str__(self) -> str:
@@ -549,22 +596,22 @@ class Tenant(AuditMixin, SoftDeleteMixin, models.Model):
 
     def clean(self) -> None:
         """
-        Validate tenant data.
+        Validate and normalize tenant data.
 
-        Validates:
-        - CPF format when is_company=False
-        - CNPJ format when is_company=True
+        Validates the CPF (when ``is_company`` is False) or CNPJ (when True), and normalizes
+        ``cpf_cnpj`` to digits only — the single entry point so a formatted value and its raw
+        form ("529.982.247-25" vs "52998224725") become the same stored identity. ``save``
+        calls ``full_clean`` on every create/update without ``update_fields``, so the API
+        always reaches this.
 
         Note: This is only called when full_clean() is explicitly invoked.
         """
         super().clean()
 
         if self.cpf_cnpj:
+            validator = CNPJValidator() if self.is_company else CPFValidator()
             try:
-                if self.is_company:
-                    validate_cnpj(self.cpf_cnpj)
-                else:
-                    validate_cpf(self.cpf_cnpj)
+                self.cpf_cnpj = validator(self.cpf_cnpj) or ""
             except ValidationError as e:
                 raise ValidationError({"cpf_cnpj": e.message}) from e
 
@@ -600,9 +647,22 @@ class Dependent(AuditMixin, SoftDeleteMixin, models.Model):
     all_objects = models.Manager()  # Access all objects including deleted
     objects = SoftDeleteManager()
 
+    class Meta:
+        default_manager_name = "objects"
+
     def __str__(self) -> str:
         """Return string representation of dependent."""
         return f"{self.name} (dependente de {self.tenant.name})"
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        """Normalize the optional cpf_cnpj to digits at the single entry point.
+
+        Dependents are created via ``objects.create`` (not ``full_clean``), so normalization
+        lives in ``save`` to cover every write path; the blank default is left untouched.
+        """
+        if not kwargs.get("update_fields") and self.cpf_cnpj:
+            self.cpf_cnpj = re.sub(r"[^0-9]", "", self.cpf_cnpj)
+        super().save(*args, **kwargs)
 
 
 class Lease(AuditMixin, SoftDeleteMixin, models.Model):
@@ -718,6 +778,7 @@ class Lease(AuditMixin, SoftDeleteMixin, models.Model):
     objects = SoftDeleteManager()
 
     class Meta:
+        default_manager_name = "objects"
         indexes = [
             # Single-column indexes (Phase 3)
             models.Index(fields=["start_date"], name="lease_start_date_idx"),
@@ -736,6 +797,18 @@ class Lease(AuditMixin, SoftDeleteMixin, models.Model):
             models.CheckConstraint(
                 condition=models.Q(rental_value__gte=0),
                 name="lease_rental_value_non_negative",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(tag_fee__gte=0),
+                name="lease_tag_fee_non_negative",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(deposit_amount__gte=0),
+                name="lease_deposit_amount_non_negative",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(pending_rental_value__gte=0),
+                name="lease_pending_rental_value_non_negative",
             ),
         ]
 
@@ -803,7 +876,18 @@ class RentAdjustment(AuditMixin, SoftDeleteMixin, models.Model):
     objects = SoftDeleteManager()
 
     class Meta:
+        default_manager_name = "objects"
         ordering = ["-adjustment_date"]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(previous_value__gte=0),
+                name="rent_adjustment_previous_value_non_negative",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(new_value__gte=0),
+                name="rent_adjustment_new_value_non_negative",
+            ),
+        ]
 
     def __str__(self) -> str:
         """Return string representation of rent adjustment."""
@@ -886,18 +970,31 @@ class Landlord(AuditMixin, SoftDeleteMixin, models.Model):
     objects = SoftDeleteManager()
 
     class Meta:
+        default_manager_name = "objects"
         verbose_name = "Locador"
         verbose_name_plural = "Locadores"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["is_active"],
+                condition=models.Q(is_active=True, is_deleted=False),
+                name="unique_active_landlord",
+            ),
+        ]
 
     def __str__(self) -> str:
         """Return string representation of landlord."""
         return self.name
 
     def save(self, *args: Any, **kwargs: Any) -> None:
-        """Ensure only one active landlord exists."""
-        if self.is_active:
-            # Deactivate other landlords
-            Landlord.objects.filter(is_active=True).exclude(pk=self.pk).update(is_active=False)
+        """Normalize cpf_cnpj to digits at the single entry point.
+
+        Activation (ensuring a single active landlord) lives in
+        ``core.services.landlord_service.LandlordService.activate``, enforced at the DB level by
+        the ``unique_active_landlord`` partial constraint. Validation of the CPF/CNPJ checksum is
+        owned by ``LandlordSerializer``; here we only strip formatting so lookups are by digits.
+        """
+        if not kwargs.get("update_fields") and self.cpf_cnpj:
+            self.cpf_cnpj = re.sub(r"[^0-9]", "", self.cpf_cnpj)
         super().save(*args, **kwargs)
 
     @property
@@ -949,6 +1046,7 @@ class ContractRule(AuditMixin, SoftDeleteMixin, models.Model):
     objects = SoftDeleteManager()
 
     class Meta:
+        default_manager_name = "objects"
         ordering = ["order", "id"]
         verbose_name = "Regra do Condomínio"
         verbose_name_plural = "Regras do Condomínio"
@@ -1143,7 +1241,8 @@ class ContractTemplate(AuditMixin, models.Model):
             if not target.is_active:
                 target.is_active = True
                 target.updated_by = user
-                target.save(update_fields=["is_active", "updated_by", "updated_at"])
+                # AuditMixin.save appends updated_at to update_fields automatically.
+                target.save(update_fields=["is_active", "updated_by"])
         return target
 
 
@@ -1192,6 +1291,7 @@ class Person(AuditMixin, SoftDeleteMixin, models.Model):
     objects = SoftDeleteManager()
 
     class Meta:
+        default_manager_name = "objects"
         ordering = ["name"]
 
     def __str__(self) -> str:
@@ -1214,6 +1314,7 @@ class CreditCard(AuditMixin, SoftDeleteMixin, models.Model):
     objects = SoftDeleteManager()
 
     class Meta:
+        default_manager_name = "objects"
         ordering = ["person", "nickname"]
         constraints = [
             models.UniqueConstraint(
@@ -1246,6 +1347,7 @@ class ExpenseCategory(AuditMixin, SoftDeleteMixin, models.Model):
     objects = SoftDeleteManager()
 
     class Meta:
+        default_manager_name = "objects"
         ordering = ["name"]
         verbose_name_plural = "Expense categories"
 
@@ -1313,6 +1415,7 @@ class Expense(AuditMixin, SoftDeleteMixin, models.Model):
     objects = SoftDeleteManager()
 
     class Meta:
+        default_manager_name = "objects"
         ordering = ["-expense_date"]
         indexes = [
             models.Index(fields=["-expense_date"], name="expense_date_idx"),
@@ -1339,7 +1442,7 @@ class Expense(AuditMixin, SoftDeleteMixin, models.Model):
                 # billed that uses expected_monthly_amount, or a zero-value charge such as a
                 # 0 IPTU). Migration 0040 had tightened this to > 0, regressing those cases.
                 condition=models.Q(total_amount__gte=0),
-                name="expense_total_amount_positive",
+                name="expense_total_amount_non_negative",
             ),
         ]
 
@@ -1348,8 +1451,8 @@ class Expense(AuditMixin, SoftDeleteMixin, models.Model):
 
     def clean(self) -> None:
         super().clean()
-        if self.total_amount is not None and self.total_amount <= 0:
-            raise ValidationError({"total_amount": "O valor total deve ser positivo."})
+        if self.total_amount is not None and self.total_amount < 0:
+            raise ValidationError({"total_amount": "O valor total não pode ser negativo."})
 
     def delete(
         self,
@@ -1366,7 +1469,7 @@ class Expense(AuditMixin, SoftDeleteMixin, models.Model):
         )
         # Cascade soft-delete to child installments
         if not hard_delete:
-            self.installments.filter(is_deleted=False).update(
+            self.installments.all().update(
                 is_deleted=True,
                 deleted_at=self.deleted_at,
                 deleted_by=deleted_by,
@@ -1399,6 +1502,7 @@ class ExpenseInstallment(AuditMixin, SoftDeleteMixin, models.Model):
     objects = SoftDeleteManager()
 
     class Meta:
+        default_manager_name = "objects"
         ordering = ["due_date", "installment_number"]
         constraints = [
             models.UniqueConstraint(
@@ -1443,6 +1547,7 @@ class PersonIncome(AuditMixin, SoftDeleteMixin, models.Model):
     objects = SoftDeleteManager()
 
     class Meta:
+        default_manager_name = "objects"
         ordering = ["-start_date"]
 
     def __str__(self) -> str:
@@ -1472,6 +1577,7 @@ class Income(AuditMixin, SoftDeleteMixin, models.Model):
     objects = SoftDeleteManager()
 
     class Meta:
+        default_manager_name = "objects"
         ordering = ["-income_date"]
 
     def __str__(self) -> str:
@@ -1479,7 +1585,9 @@ class Income(AuditMixin, SoftDeleteMixin, models.Model):
 
 
 class RentPayment(AuditMixin, SoftDeleteMixin, models.Model):
-    lease = models.ForeignKey(Lease, related_name="rent_payments", on_delete=models.CASCADE)
+    # PROTECT: a rent payment is real money received — a hard delete of the lease must never
+    # cascade-erase it (mirrors finances.PaymentAllocation.bill). Soft delete is unaffected.
+    lease = models.ForeignKey(Lease, related_name="rent_payments", on_delete=models.PROTECT)
     reference_month = models.DateField()
     amount_paid = models.DecimalField(max_digits=12, decimal_places=2)
     payment_date = models.DateField()
@@ -1489,6 +1597,7 @@ class RentPayment(AuditMixin, SoftDeleteMixin, models.Model):
     objects = SoftDeleteManager()
 
     class Meta:
+        default_manager_name = "objects"
         ordering = ["-reference_month"]
         constraints = [
             models.UniqueConstraint(
@@ -1530,6 +1639,7 @@ class EmployeePayment(AuditMixin, SoftDeleteMixin, models.Model):
     objects = SoftDeleteManager()
 
     class Meta:
+        default_manager_name = "objects"
         ordering = ["-reference_month"]
         constraints = [
             models.UniqueConstraint(
@@ -1569,6 +1679,7 @@ class PersonPayment(AuditMixin, SoftDeleteMixin, models.Model):
     objects = SoftDeleteManager()
 
     class Meta:
+        default_manager_name = "objects"
         ordering = ["-payment_date"]
         indexes = [
             models.Index(fields=["person", "reference_month"], name="person_payment_month_idx"),
@@ -1609,6 +1720,7 @@ class PersonPaymentSchedule(AuditMixin, SoftDeleteMixin, models.Model):
     objects = SoftDeleteManager()
 
     class Meta:
+        default_manager_name = "objects"
         ordering = ["reference_month", "due_day"]
         constraints = [
             models.UniqueConstraint(
@@ -1657,6 +1769,12 @@ class FinancialSettings(models.Model):
     default_pix_key = models.CharField(max_length=100, blank=True, default="")
     default_pix_key_type = models.CharField(
         max_length=10, blank=True, default="", choices=PIX_KEY_TYPE_CHOICES
+    )
+    default_city = models.CharField(
+        max_length=100,
+        blank=True,
+        default="",
+        help_text="Cidade exibida no PIX (campo 60 do EMV); vazio usa a cidade do locador.",
     )
     rent_tracking_start_date = models.DateField(
         null=True,
@@ -1881,6 +1999,7 @@ class PaymentProof(AuditMixin, SoftDeleteMixin, models.Model):
     objects = SoftDeleteManager()
 
     class Meta:
+        default_manager_name = "objects"
         indexes = [
             models.Index(fields=["status", "-created_at"]),
             models.Index(fields=["lease", "reference_month"]),

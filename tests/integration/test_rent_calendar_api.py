@@ -117,7 +117,7 @@ def collectible_lease(admin_user) -> Lease:
 
 @pytest.mark.integration
 class TestRentCalendarRead:
-    @freeze_time("2026-06-02")
+    @freeze_time("2026-06-02 12:00:00")
     def test_returns_top_level_shape(self, authenticated_api_client, collectible_lease):
         response = authenticated_api_client.get(RENT_CALENDAR_URL, {"year": 2026, "month": 6})
         assert response.status_code == status.HTTP_200_OK
@@ -129,7 +129,7 @@ class TestRentCalendarRead:
         assert isinstance(data["days"], list)
         assert isinstance(data["stats"], dict)
 
-    @freeze_time("2026-06-02")
+    @freeze_time("2026-06-02 12:00:00")
     def test_day_and_item_shape(self, authenticated_api_client, collectible_lease):
         response = authenticated_api_client.get(RENT_CALENDAR_URL, {"year": 2026, "month": 6})
         assert response.status_code == status.HTTP_200_OK
@@ -159,7 +159,7 @@ class TestRentCalendarRead:
         assert item["lease_id"] == collectible_lease.pk
         assert item["tenant_name"] == "João Silva"
 
-    @freeze_time("2026-06-02")
+    @freeze_time("2026-06-02 12:00:00")
     def test_stats_shape(self, authenticated_api_client, collectible_lease):
         response = authenticated_api_client.get(RENT_CALENDAR_URL, {"year": 2026, "month": 6})
         assert response.status_code == status.HTTP_200_OK
@@ -177,7 +177,7 @@ class TestRentCalendarRead:
         ):
             assert key in stats
 
-    @freeze_time("2026-06-02")
+    @freeze_time("2026-06-02 12:00:00")
     def test_building_id_filter_restricts_items(self, authenticated_api_client):
         building_a = _make_building(200)
         apartment_a = _make_apartment(building_a, number=201)
@@ -199,33 +199,33 @@ class TestRentCalendarRead:
         assert lease_a.pk in lease_ids
         assert lease_b.pk not in lease_ids
 
-    @freeze_time("2026-06-02")
+    @freeze_time("2026-06-02 12:00:00")
     def test_month_out_of_range_returns_400(self, authenticated_api_client):
         response = authenticated_api_client.get(RENT_CALENDAR_URL, {"year": 2026, "month": 13})
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
-    @freeze_time("2026-06-02")
+    @freeze_time("2026-06-02 12:00:00")
     def test_year_out_of_range_returns_400(self, authenticated_api_client):
         # Out-of-range year must be a clean 400, not a 500 from date(year, 1, 1).
         response = authenticated_api_client.get(RENT_CALENDAR_URL, {"year": 99999, "month": 6})
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
-    @freeze_time("2026-06-02")
+    @freeze_time("2026-06-02 12:00:00")
     def test_non_integer_year_returns_400(self, authenticated_api_client):
         response = authenticated_api_client.get(RENT_CALENDAR_URL, {"year": "abc", "month": 6})
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
-    @freeze_time("2026-06-02")
+    @freeze_time("2026-06-02 12:00:00")
     def test_non_integer_month_returns_400(self, authenticated_api_client):
         response = authenticated_api_client.get(RENT_CALENDAR_URL, {"year": 2026, "month": "xyz"})
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
-    @freeze_time("2026-06-02")
+    @freeze_time("2026-06-02 12:00:00")
     def test_missing_params_returns_400(self, authenticated_api_client):
         response = authenticated_api_client.get(RENT_CALENDAR_URL)
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
-    @freeze_time("2026-06-02")
+    @freeze_time("2026-06-02 12:00:00")
     def test_non_integer_building_id_returns_400(self, authenticated_api_client):
         response = authenticated_api_client.get(
             RENT_CALENDAR_URL, {"year": 2026, "month": 6, "building_id": "abc"}
@@ -245,7 +245,7 @@ class TestRentCalendarRead:
 
 @pytest.mark.integration
 class TestToggleRentPayment:
-    @freeze_time("2026-06-02")
+    @freeze_time("2026-06-02 12:00:00")
     def test_toggle_creates_and_then_soft_deletes(
         self, authenticated_api_client, collectible_lease
     ):
@@ -272,7 +272,7 @@ class TestToggleRentPayment:
         )
         assert deleted.is_deleted is True
 
-    @freeze_time("2026-06-10")
+    @freeze_time("2026-06-10 12:00:00")
     def test_refuses_unmark_when_paid_and_day_passed(
         self, authenticated_api_client, admin_user, collectible_lease
     ):
@@ -294,7 +294,7 @@ class TestToggleRentPayment:
             lease=collectible_lease, reference_month=reference_month
         ).exists()
 
-    @freeze_time("2026-06-02")
+    @freeze_time("2026-06-02 12:00:00")
     def test_finalized_month_blocks_toggle(
         self, authenticated_api_client, admin_user, collectible_lease
     ):
@@ -313,14 +313,14 @@ class TestToggleRentPayment:
             lease=collectible_lease, reference_month=reference_month
         ).exists()
 
-    @freeze_time("2026-06-02")
+    @freeze_time("2026-06-02 12:00:00")
     def test_missing_lease_id_returns_400(self, authenticated_api_client):
         response = authenticated_api_client.post(
             TOGGLE_URL, {"reference_month": "2026-06-01"}, format="json"
         )
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
-    @freeze_time("2026-06-02")
+    @freeze_time("2026-06-02 12:00:00")
     def test_non_numeric_lease_id_returns_400(self, authenticated_api_client):
         # Non-numeric lease_id must be a clean 400, not a 500 from the ORM lookup.
         response = authenticated_api_client.post(
@@ -328,14 +328,14 @@ class TestToggleRentPayment:
         )
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
-    @freeze_time("2026-06-02")
+    @freeze_time("2026-06-02 12:00:00")
     def test_missing_reference_month_returns_400(self, authenticated_api_client, collectible_lease):
         response = authenticated_api_client.post(
             TOGGLE_URL, {"lease_id": collectible_lease.pk}, format="json"
         )
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
-    @freeze_time("2026-06-02")
+    @freeze_time("2026-06-02 12:00:00")
     def test_invalid_reference_month_returns_400(self, authenticated_api_client, collectible_lease):
         response = authenticated_api_client.post(
             TOGGLE_URL,

@@ -20,10 +20,10 @@ from django.db import transaction
 
 from core.models import Condominium
 from core.services.rent_schedule_service import RentScheduleService
+from core.services.timezone import now_sp
 from finances.models import CondoMonthClose, CondoMonthCloseStatus
 from finances.money import money_str, quantize_money
 from finances.services.condo_balance_service import CondoBalanceService, _next_month
-from finances.services.timezone import now_sp
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +69,12 @@ class CondoMonthCloseService:
 
     @staticmethod
     def close(year: int, month: int, user: User | None = None) -> CondoMonthClose:
-        """Close month M chronologically; freeze net/cash/reserve/carry_forward/breakdown."""
+        """Close month M chronologically; freeze net/cash/reserve/carry_forward/breakdown.
+
+        If a later month is already closed (a close-in-the-middle, allowed by _guard_no_gap when
+        the gap is forward), the following closed months are recomputed in the same transaction so
+        their carried_in/running_cash anchor on M's NEW frozen figures (design §4.7 / P2.3 step 6).
+        """
         reference_month = date(year, month, 1)
         condominium = CondoMonthCloseService._condominium()
         with transaction.atomic():
@@ -93,6 +98,7 @@ class CondoMonthCloseService:
             snapshot.status = CondoMonthCloseStatus.CLOSED
             snapshot.closed_at = now_sp()
             snapshot.save()
+            CondoMonthCloseService._recompute_following(reference_month, condominium, user)
             logger.info("Closed condo month %s", reference_month)
         return snapshot
 
@@ -113,53 +119,74 @@ class CondoMonthCloseService:
             snapshot.closed_at = None
             snapshot.updated_by = user
             snapshot.save()
-
-            subsequent = list(
-                CondoMonthClose.objects.select_for_update()
-                .filter(
-                    condominium=condominium,
-                    reference_month__gt=reference_month,
-                    status=CondoMonthCloseStatus.CLOSED,
-                )
-                .order_by("reference_month")
-            )
-            if subsequent:
-                # Running fold: start from the cash at the end of the reopened month (M is now
-                # open, so cash_balance(first day of M+1) walks the open tail through M without
-                # referencing any still-closed month's frozen value).
-                running_cash = CondoBalanceService.cash_balance(subsequent[0].reference_month)
-                for snap in subsequent:
-                    running_cash += CondoBalanceService.cash_change_of_month(
-                        snap.reference_month.year, snap.reference_month.month
-                    )
-                    CondoMonthCloseService._apply_frozen_figures(
-                        snap, cash_balance_end=running_cash, user=user
-                    )
-                    snap.save()
-            logger.info(
-                "Reopened condo month %s (recomputed %d following)",
-                reference_month,
-                len(subsequent),
-            )
+            count = CondoMonthCloseService._recompute_following(reference_month, condominium, user)
+            logger.info("Reopened condo month %s (recomputed %d following)", reference_month, count)
         return snapshot
 
     # ------------------------------------------------------------------ helpers
 
     @staticmethod
+    def _recompute_following(
+        reference_month: date, condominium: Condominium, user: User | None
+    ) -> int:
+        """Re-freeze every still-closed month after M from M's current state (a running cash fold).
+
+        The cash baseline is re-derived from the persisted state of M (closed → its frozen
+        cash_balance_end; open → the walked open tail), so a month is never its own baseline. The
+        carry_forward fold is anchored each step on the running carried_in computed here, not re-read
+        from the DB, so the cascade is correct even before the intermediate saves land (design §4.7).
+        Returns the number of following months recomputed (for logging). Caller is inside atomic().
+        """
+        subsequent = list(
+            CondoMonthClose.objects.select_for_update()
+            .filter(
+                condominium=condominium,
+                reference_month__gt=reference_month,
+                status=CondoMonthCloseStatus.CLOSED,
+            )
+            .order_by("reference_month")
+        )
+        if not subsequent:
+            return 0
+        running_cash = CondoBalanceService.cash_balance(subsequent[0].reference_month)
+        running_carried_in = CondoMonthCloseService.carried_in_for(subsequent[0].reference_month)
+        for snap in subsequent:
+            running_cash += CondoBalanceService.cash_change_of_month(
+                snap.reference_month.year, snap.reference_month.month
+            )
+            running_carried_in = CondoMonthCloseService._apply_frozen_figures(
+                snap, cash_balance_end=running_cash, user=user, carried_in=running_carried_in
+            )
+            snap.save()
+        return len(subsequent)
+
+    @staticmethod
     def _apply_frozen_figures(
-        snapshot: CondoMonthClose, cash_balance_end: Decimal, user: User | None
-    ) -> None:
-        """Set the frozen figures on a snapshot (DRY between close and the reopen cascade)."""
+        snapshot: CondoMonthClose,
+        cash_balance_end: Decimal,
+        user: User | None,
+        carried_in: Decimal | None = None,
+    ) -> Decimal:
+        """Set the frozen figures on a snapshot (DRY between close and the cascade recompute).
+
+        ``carried_in`` (the cascade's running fold value) overrides the DB-read anchor so the
+        recompute does not depend on intermediate saves landing first. Returns this month's
+        carry_forward_out so the caller can chain it as the next month's carried_in.
+        """
         year, month = snapshot.reference_month.year, snapshot.reference_month.month
         net_result = CondoBalanceService.result_of_month(year, month)
-        reserve_balance_end = CondoBalanceService.reserve_balance()
+        # Freeze the reserve at the END of this month (as_of = 1st of M+1, exclusive) — NOT the
+        # all-time balance, so a later deposit/withdrawal never drifts a closed snapshot (§4.7).
+        reserve_balance_end = CondoBalanceService.reserve_balance(
+            as_of=_next_month(snapshot.reference_month)
+        )
         snapshot.net_result = net_result
         snapshot.cash_balance_end = cash_balance_end
         snapshot.reserve_balance_end = reserve_balance_end
         # Pre-tracking isolation lives in folded_distribution: an untracked month freezes
         # carry_forward_out = 0.00 so its net never leaks into the first tracked month's fold (§4.7).
         _, _, snapshot.carry_forward_out = CondoMonthCloseService.folded_distribution(
-            snapshot.reference_month, net_result
+            snapshot.reference_month, net_result, carried_in=carried_in
         )
         # overview()'s live cash_balance re-derives from sibling closes; during the reopen cascade
         # those are not yet persisted, so pin breakdown's cash/total to the frozen figures already
@@ -176,14 +203,17 @@ class CondoMonthCloseService:
         breakdown["expenses_total"] = money_str(expense)
         snapshot.breakdown = breakdown
         snapshot.updated_by = user
+        return snapshot.carry_forward_out
 
     @staticmethod
     def folded_distribution(
-        reference_month: date, net: Decimal
+        reference_month: date, net: Decimal, carried_in: Decimal | None = None
     ) -> tuple[Decimal, Decimal, Decimal]:
         """(carried_in, available, carried_out) for a month's net, honoring pre-tracking isolation.
 
-        A TRACKED month folds the net with the anchored carried_in (§4.7 fold_step). A pre-tracking
+        A TRACKED month folds the net with the anchored carried_in (§4.7 fold_step). When the caller
+        supplies ``carried_in`` (the cascade's running value), it is used instead of re-reading the
+        DB, so a forward recompute does not depend on intermediate saves landing first. A pre-tracking
         month (before FinancialSettings.rent_tracking_start_date) is ISOLATED: its net is shown but
         never accumulated — carried_in = carried_out = 0.00 — so it can never leak a spurious
         negative into the first tracked month's fold. This is the SINGLE place that decision lives,
@@ -191,9 +221,13 @@ class CondoMonthCloseService:
         all three), so the frozen snapshot and the distribution can never contradict each other.
         """
         if RentScheduleService.is_month_tracked(reference_month.year, reference_month.month):
-            carried_in = CondoMonthCloseService.carried_in_for(reference_month)
-            available, carried_out = fold_step(net, carried_in)
-            return carried_in, available, carried_out
+            anchored_carried_in = (
+                carried_in
+                if carried_in is not None
+                else CondoMonthCloseService.carried_in_for(reference_month)
+            )
+            available, carried_out = fold_step(net, anchored_carried_in)
+            return anchored_carried_in, available, carried_out
         return ZERO_MONEY, max(ZERO_MONEY, net), ZERO_MONEY
 
     @staticmethod
