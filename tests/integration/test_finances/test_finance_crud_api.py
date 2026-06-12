@@ -8,6 +8,7 @@ from finances.models import Bill
 from freezegun import freeze_time
 from rest_framework import status
 
+from core.models import Condominium
 from tests.factories import (
     make_bill,
     make_bill_line_item,
@@ -179,3 +180,39 @@ def test_payment_list_with_allocations(authenticated_api_client):
     row = next(p for p in resp.data["results"] if p["id"] == payment.id)
     assert len(row["allocations"]) == 1
     assert row["allocations"][0]["amount"] == "50.00"
+
+
+# P4.3 — condominium_id defaults to the singleton on create (form omits it).
+
+
+def test_employee_create_without_condominium_id_defaults(authenticated_api_client):
+    make_condominium()
+    resp = authenticated_api_client.post(
+        "/api/finances/employees/",
+        {
+            "name": "Zelador",
+            "payment_type": "fixed",
+            "base_salary": "2000.00",
+            "default_due_day": 5,
+        },
+        format="json",
+    )
+    assert resp.status_code == status.HTTP_201_CREATED, resp.data
+    assert resp.data["condominium"]["id"] == Condominium.get_default().id
+
+
+def test_installment_plan_create_without_condominium_id_defaults(authenticated_api_client):
+    make_condominium()
+    resp = authenticated_api_client.post(
+        "/api/finances/installment-plans/",
+        {
+            "description": "Parcelamento sem condomínio",
+            "total_amount": "1200.00",
+            "installment_count": 12,
+            "start_due_date": "2026-06-10",
+            "default_due_day": 10,
+        },
+        format="json",
+    )
+    assert resp.status_code == status.HTTP_201_CREATED, resp.data
+    assert resp.data["condominium"]["id"] == Condominium.get_default().id

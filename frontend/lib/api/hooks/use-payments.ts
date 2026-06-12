@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
 import { queryKeys } from '../query-keys';
+import { invalidateFinanceMoneyCaches } from './use-bills';
 import { type Payment, paymentSchema } from '@/lib/schemas/finances/payment.schema';
 import { type PaginatedResponse, extractResults } from '@/lib/types/api';
 
@@ -44,6 +45,10 @@ function invalidatePaymentCaches(queryClient: ReturnType<typeof useQueryClient>)
   void queryClient.invalidateQueries({ queryKey: queryKeys.finances.bills.all });
   void queryClient.invalidateQueries({ queryKey: queryKeys.finances.combinedCalendar.all });
   void queryClient.invalidateQueries({ queryKey: queryKeys.finances.overdueBills.all });
+  // Unpay reverses money + can restore a reserve withdrawal, so refresh the dashboards/reserves.
+  invalidateFinanceMoneyCaches(queryClient);
+  void queryClient.invalidateQueries({ queryKey: queryKeys.finances.reserves.all });
+  void queryClient.invalidateQueries({ queryKey: queryKeys.finances.reserveMovements.all });
 }
 
 // A Payment's value/funding is set EXCLUSIVELY by the backend's pay action (POST bills/{id}/pay/),

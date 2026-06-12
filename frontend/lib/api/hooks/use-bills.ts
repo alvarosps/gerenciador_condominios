@@ -115,10 +115,21 @@ export function useBill(id: number | null) {
   });
 }
 
+/** Invalidate the condominium money dashboards (overview, balance, projection, …) that any
+ *  bill/payment mutation affects. Shared by bill and payment hooks so they stay consistent. */
+export function invalidateFinanceMoneyCaches(queryClient: ReturnType<typeof useQueryClient>) {
+  void queryClient.invalidateQueries({ queryKey: queryKeys.finances.overview.all });
+  void queryClient.invalidateQueries({ queryKey: queryKeys.finances.monthlyBalance.all });
+  void queryClient.invalidateQueries({ queryKey: queryKeys.finances.byCategory.all });
+  void queryClient.invalidateQueries({ queryKey: queryKeys.finances.projection.all });
+  void queryClient.invalidateQueries({ queryKey: queryKeys.finances.ownerDistribution.all });
+}
+
 function invalidateBillCaches(queryClient: ReturnType<typeof useQueryClient>) {
   void queryClient.invalidateQueries({ queryKey: queryKeys.finances.bills.all });
   void queryClient.invalidateQueries({ queryKey: queryKeys.finances.combinedCalendar.all });
   void queryClient.invalidateQueries({ queryKey: queryKeys.finances.overdueBills.all });
+  invalidateFinanceMoneyCaches(queryClient);
 }
 
 export function useCreateBillWithLines() {
@@ -161,7 +172,7 @@ export function useUpdateBillWithLines() {
     mutationFn: async (payload: UpdateBillWithLines) => {
       const { data } = await apiClient.post<Bill>(
         `${ENDPOINT}${payload.bill_id}/update_with_lines/`,
-        { bill: payload.bill, line_items: payload.line_items, statement: payload.statement ?? null },
+        { bill: payload.bill, line_items: payload.line_items, statement: payload.statement ?? null }
       );
       return billSchema.parse(data);
     },
@@ -204,7 +215,7 @@ export function useGenerateMonthBills() {
     mutationFn: async (params: { year: number; month: number }) => {
       const { data } = await apiClient.post<{ created: number; bills: Bill[] }>(
         `${ENDPOINT}generate_month/`,
-        params,
+        params
       );
       return data;
     },
@@ -231,7 +242,7 @@ function markBillPaidInCalendar(calendar: CombinedCalendar, billId: number): Com
       bill_exits: day.bill_exits.map((exit) =>
         exit.bill_id === billId
           ? { ...exit, payment_status: 'paid', amount_remaining: '0.00', is_overdue: false }
-          : exit,
+          : exit
       ),
     })),
   };
@@ -282,7 +293,13 @@ export function usePayBill() {
       context?.previousBills.forEach(([key, data]) => queryClient.setQueryData(key, data));
       context?.previousCalendar.forEach(([key, data]) => queryClient.setQueryData(key, data));
     },
-    onSettled: () => invalidateBillCaches(queryClient),
+    onSettled: (_data, _error, request) => {
+      invalidateBillCaches(queryClient);
+      if (request.funded_from === 'reserve') {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.finances.reserves.all });
+        void queryClient.invalidateQueries({ queryKey: queryKeys.finances.reserveMovements.all });
+      }
+    },
   });
 }
 

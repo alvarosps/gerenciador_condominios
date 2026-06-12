@@ -483,7 +483,10 @@ class InstallmentSerializer(serializers.ModelSerializer):
 class InstallmentPlanSerializer(serializers.ModelSerializer):
     condominium = CondominiumSimpleSerializer(read_only=True)
     condominium_id = serializers.PrimaryKeyRelatedField(
-        queryset=Condominium.objects.all(), source="condominium", write_only=True
+        queryset=Condominium.objects.all(),
+        source="condominium",
+        write_only=True,
+        required=False,
     )
     building = BuildingSerializer(read_only=True)
     building_id = serializers.PrimaryKeyRelatedField(
@@ -538,6 +541,8 @@ class InstallmentPlanSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "created_at", "updated_at"]
 
     def validate(self, attrs: dict[str, object]) -> dict[str, object]:
+        # The InstallmentPlan form never sends condominium_id (singleton), so default it on create.
+        _apply_default_condominium(self.instance, attrs)
         # DRF does not call Model.clean(); mirror the embedded->consumption-account invariant
         # (design §4) so the API cannot create an inconsistent plan. Single source of the rule
         # is the model (_CONSUMPTION_TYPES / message), re-expressed here only because DRF skips clean().
@@ -556,7 +561,10 @@ class InstallmentPlanSerializer(serializers.ModelSerializer):
 class EmployeeSerializer(serializers.ModelSerializer):
     condominium = CondominiumSimpleSerializer(read_only=True)
     condominium_id = serializers.PrimaryKeyRelatedField(
-        queryset=Condominium.objects.all(), source="condominium", write_only=True
+        queryset=Condominium.objects.all(),
+        source="condominium",
+        write_only=True,
+        required=False,
     )
     person = PersonSimpleSerializer(read_only=True)
     person_id = serializers.PrimaryKeyRelatedField(
@@ -596,6 +604,11 @@ class EmployeeSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
+
+    def validate(self, attrs: dict[str, object]) -> dict[str, object]:
+        # The Employee form never sends condominium_id (singleton), so default it on create.
+        _apply_default_condominium(self.instance, attrs)
+        return attrs
 
 
 class ReserveSimpleSerializer(serializers.ModelSerializer):

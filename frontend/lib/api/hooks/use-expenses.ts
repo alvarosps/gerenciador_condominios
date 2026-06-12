@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
 import { queryKeys } from '../query-keys';
-import { type Expense, expenseSchema } from '@/lib/schemas/expense.schema';
+import { type Expense, expenseReadSchema } from '@/lib/schemas/expense.schema';
 import { type PaginatedResponse, extractResults } from '@/lib/types/api';
 
 export interface ExpenseFilters {
@@ -27,7 +27,7 @@ export function useExpenses(filters?: ExpenseFilters) {
         params: { page_size: 10000, ...cleanFilters },
       });
       const expenses = extractResults(data);
-      return expenses.map((expense) => expenseSchema.parse(expense));
+      return expenses.map((expense) => expenseReadSchema.parse(expense));
     },
   });
 }
@@ -38,7 +38,7 @@ export function useExpense(id: number | null) {
     queryFn: async () => {
       if (!id) throw new Error('Expense ID is required');
       const { data } = await apiClient.get<Expense>(`/expenses/${id}/`);
-      return expenseSchema.parse(data);
+      return expenseReadSchema.parse(data);
     },
     enabled: Boolean(id),
   });
@@ -49,7 +49,18 @@ export function useCreateExpense() {
 
   return useMutation({
     mutationFn: async (
-      data: Omit<Expense, 'id' | 'person' | 'credit_card' | 'building' | 'category' | 'installments' | 'remaining_installments' | 'total_paid' | 'total_remaining'>,
+      data: Omit<
+        Expense,
+        | 'id'
+        | 'person'
+        | 'credit_card'
+        | 'building'
+        | 'category'
+        | 'installments'
+        | 'remaining_installments'
+        | 'total_paid'
+        | 'total_remaining'
+      >
     ) => {
       const response = await apiClient.post<Expense>('/expenses/', data);
       return response.data;
@@ -127,7 +138,7 @@ export function useGenerateInstallments() {
   return useMutation({
     mutationFn: async (expenseId: number) => {
       const { data } = await apiClient.post<{ message: string; installments_created: number }>(
-        `/expenses/${expenseId}/generate_installments/`,
+        `/expenses/${expenseId}/generate_installments/`
       );
       return data;
     },
