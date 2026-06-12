@@ -95,7 +95,7 @@ interface UseCrudPageReturn<T> {
 
   // Export state and handlers
   isExporting: boolean;
-  handleExport: (format: 'excel' | 'csv', data: T[]) => void;
+  handleExport: (format: 'excel' | 'csv', data: T[]) => Promise<void>;
 }
 
 /**
@@ -211,13 +211,17 @@ export function useCrudPage<T extends { id?: number }>({
 
     try {
       await deleteMutation.mutateAsync(deleteId);
-      toast.success(`${entityName.charAt(0).toUpperCase() + entityName.slice(1)} excluído com sucesso`);
+      toast.success(
+        `${entityName.charAt(0).toUpperCase() + entityName.slice(1)} excluído com sucesso`
+      );
       setDeleteDialogOpen(false);
       setDeleteId(null);
       setItemToDelete(null);
       onDeleteSuccess?.();
     } catch (error) {
-      const message = deleteErrorMessage ?? `Erro ao excluir ${entityName}. Verifique se não há dependências vinculadas.`;
+      const message =
+        deleteErrorMessage ??
+        `Erro ao excluir ${entityName}. Verifique se não há dependências vinculadas.`;
       toast.error(message);
       onDeleteError?.(error as Error);
       handleError(error, 'useCrudPage.handleDelete');
@@ -229,7 +233,7 @@ export function useCrudPage<T extends { id?: number }>({
     if (!bulkDeleteMutation || bulkOps.selectedRowKeys.length === 0) return;
 
     try {
-      const ids = bulkOps.selectedRowKeys.map(key => Number(key));
+      const ids = bulkOps.selectedRowKeys.map((key) => Number(key));
       await bulkDeleteMutation.mutateAsync(ids);
       toast.success(`${ids.length} ${entityNamePlural} excluídos com sucesso`);
       setBulkDeleteDialogOpen(false);
@@ -242,7 +246,7 @@ export function useCrudPage<T extends { id?: number }>({
 
   // Export handler
   const handleExport = useCallback(
-    (format: 'excel' | 'csv', data: T[]) => {
+    async (format: 'excel' | 'csv', data: T[]) => {
       if (!exportColumns || !exportFilename) {
         toast.warning('Exportação não configurada');
         return;
@@ -253,15 +257,17 @@ export function useCrudPage<T extends { id?: number }>({
         return;
       }
 
+      // exportToExcel/exportToCSV are async (they lazy-import xlsx), so await keeps a rejection
+      // inside this try/catch instead of escaping as an unhandled promise.
       try {
         if (format === 'excel') {
-          exportToExcel(data, exportColumns, {
+          await exportToExcel(data, exportColumns, {
             filename: exportFilename,
             sheetName: exportSheetName ?? entityNamePlural,
           });
           toast.success('Arquivo Excel exportado com sucesso!');
         } else {
-          exportToCSV(data, exportColumns, {
+          await exportToCSV(data, exportColumns, {
             filename: exportFilename,
           });
           toast.success('Arquivo CSV exportado com sucesso!');

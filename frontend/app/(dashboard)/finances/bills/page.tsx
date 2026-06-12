@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useRef, useState } from 'react';
-import { CalendarPlus, FileUp, Plus } from 'lucide-react';
+import { CalendarPlus, ChevronLeft, ChevronRight, FileUp, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import {
@@ -37,6 +37,7 @@ import {
 } from '@/lib/api/hooks/use-bills';
 import { useAuthStore } from '@/store/auth-store';
 import { handleError } from '@/lib/utils/error-handler';
+import { formatMonthYear } from '@/lib/utils/formatters';
 import { useCrudPage } from '@/lib/hooks/use-crud-page';
 import type { Bill } from '@/lib/schemas/finances/bill.schema';
 import type { BillFilters } from '@/lib/api/hooks/use-bills';
@@ -60,18 +61,33 @@ export default function BillsPage() {
   const isAdmin = user?.is_staff ?? false;
 
   const now = new Date();
-  const [period] = useState({ year: now.getFullYear(), month: now.getMonth() + 1 });
+  const [period, setPeriod] = useState({ year: now.getFullYear(), month: now.getMonth() + 1 });
+  const [competenceMode, setCompetenceMode] = useState<'month' | typeof ALL>('month');
   const [lifecycleFilter, setLifecycleFilter] = useState<string>(ALL);
   const [payingBill, setPayingBill] = useState<Bill | null>(null);
   const [importDraft, setImportDraft] = useState<ParsedInvoice | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const parseInvoice = useParseInvoice();
 
+  // Default to the current month's competence so the page no longer pulls every bill in history;
+  // "Todas as competências" opts back into the full set. The ISO is built from period (not a Date)
+  // to stay timezone-safe — it matches the backend's exact-date competence_month filter.
+  const competenceMonthParam =
+    competenceMode === ALL
+      ? undefined
+      : `${String(period.year)}-${String(period.month).padStart(2, '0')}-01`;
+
   // Building is rendered as one table per building (accordion), not a filter; only the situação
-  // (lifecycle) filter stays — applied server-side across all buildings.
+  // (lifecycle) + competência filters stay — applied server-side across all buildings.
   const filters: BillFilters = {
     ...(lifecycleFilter === ALL ? {} : { lifecycle_state: lifecycleFilter }),
+    ...(competenceMonthParam ? { competence_month: competenceMonthParam } : {}),
   };
+
+  function shiftMonth(delta: number) {
+    const base = new Date(period.year, period.month - 1 + delta, 1);
+    setPeriod({ year: base.getFullYear(), month: base.getMonth() + 1 });
+  }
 
   const { data: bills, isLoading } = useBills(filters);
 
@@ -127,7 +143,7 @@ export default function BillsPage() {
         onError: (error) => {
           handleError(error, 'Erro ao gerar contas do mês');
         },
-      },
+      }
     );
   }
 
@@ -157,7 +173,11 @@ export default function BillsPage() {
         </div>
         {isAdmin && (
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" onClick={handleGenerateMonth} disabled={generateMonth.isPending}>
+            <Button
+              variant="outline"
+              onClick={handleGenerateMonth}
+              disabled={generateMonth.isPending}
+            >
               <CalendarPlus className="mr-2 h-4 w-4" />
               Gerar contas do mês
             </Button>
@@ -191,6 +211,45 @@ export default function BillsPage() {
       )}
 
       <div className="mb-4 flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-1">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => shiftMonth(-1)}
+            disabled={competenceMode === ALL}
+            aria-label="Mês anterior"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <span
+            className={`min-w-[10rem] text-center text-sm font-medium ${
+              competenceMode === ALL ? 'text-muted-foreground' : ''
+            }`}
+          >
+            {formatMonthYear(period.year, period.month)}
+          </span>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => shiftMonth(1)}
+            disabled={competenceMode === ALL}
+            aria-label="Próximo mês"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+        <Select
+          value={competenceMode}
+          onValueChange={(value) => setCompetenceMode(value as 'month' | typeof ALL)}
+        >
+          <SelectTrigger className="w-52">
+            <SelectValue placeholder="Competência" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="month">Mês selecionado</SelectItem>
+            <SelectItem value={ALL}>Todas as competências</SelectItem>
+          </SelectContent>
+        </Select>
         <Select value={lifecycleFilter} onValueChange={setLifecycleFilter}>
           <SelectTrigger className="w-40">
             <SelectValue placeholder="Situação" />
@@ -266,9 +325,7 @@ export default function BillsPage() {
             <AlertDialogTitle>Excluir conta</AlertDialogTitle>
             <AlertDialogDescription>
               Tem certeza que deseja excluir{' '}
-              {crud.itemToDelete?.description
-                ? `"${crud.itemToDelete.description}"`
-                : 'esta conta'}
+              {crud.itemToDelete?.description ? `"${crud.itemToDelete.description}"` : 'esta conta'}
               ? Esta ação não pode ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>

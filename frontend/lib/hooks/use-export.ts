@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
 import { formatCurrency, formatCpfCnpj, formatPhone } from '@/lib/utils/formatters';
 import { handleError } from '@/lib/utils/error-handler';
@@ -24,7 +23,7 @@ function toStr(value: unknown): string {
 export function useExport() {
   const [isExporting, setIsExporting] = useState(false);
 
-  const exportToExcel = <T extends Record<string, unknown>>(
+  const exportToExcel = async <T extends Record<string, unknown>>(
     data: T[],
     columns: {
       key: string;
@@ -36,14 +35,16 @@ export function useExport() {
     setIsExporting(true);
 
     try {
+      // Lazy-load xlsx (~300KB) only when an export actually runs, so it stays out of the
+      // initial bundle of every CRUD page that imports useExport via useCrudPage (P5.2).
+      const XLSX = await import('xlsx');
+
       // Transform data to match column definitions
       const formattedData = data.map((record) => {
         const row: Record<string, string | number> = {};
         columns.forEach((column) => {
           const value = record[column.key];
-          const formattedValue = column.format
-            ? column.format(value, record)
-            : toStr(value);
+          const formattedValue = column.format ? column.format(value, record) : toStr(value);
           row[column.label] = formattedValue;
         });
         return row;
@@ -52,25 +53,16 @@ export function useExport() {
       // Create workbook and worksheet
       const worksheet = XLSX.utils.json_to_sheet(formattedData);
       const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(
-        workbook,
-        worksheet,
-        options.sheetName ?? 'Dados'
-      );
+      XLSX.utils.book_append_sheet(workbook, worksheet, options.sheetName ?? 'Dados');
 
       // Auto-size columns
       const maxWidths: number[] = [];
       columns.forEach((column, idx) => {
         const headerLength = column.label.length;
         const maxContentLength = Math.max(
-          ...formattedData.map((row) =>
-            String(row[column.label] ?? '').length
-          )
+          ...formattedData.map((row) => String(row[column.label] ?? '').length)
         );
-        maxWidths[idx] = Math.min(
-          Math.max(headerLength, maxContentLength) + 2,
-          50
-        );
+        maxWidths[idx] = Math.min(Math.max(headerLength, maxContentLength) + 2, 50);
       });
       worksheet['!cols'] = maxWidths.map((width) => ({ width }));
 
@@ -92,7 +84,7 @@ export function useExport() {
     }
   };
 
-  const exportToCSV = <T extends Record<string, unknown>>(
+  const exportToCSV = async <T extends Record<string, unknown>>(
     data: T[],
     columns: {
       key: string;
@@ -104,14 +96,15 @@ export function useExport() {
     setIsExporting(true);
 
     try {
+      // Lazy-load xlsx only when exporting (see exportToExcel) — keeps it off the initial bundle.
+      const XLSX = await import('xlsx');
+
       // Transform data to match column definitions
       const formattedData = data.map((record) => {
         const row: Record<string, string | number> = {};
         columns.forEach((column) => {
           const value = record[column.key];
-          const formattedValue = column.format
-            ? column.format(value, record)
-            : toStr(value);
+          const formattedValue = column.format ? column.format(value, record) : toStr(value);
           row[column.label] = formattedValue;
         });
         return row;
@@ -177,7 +170,8 @@ export const apartmentExportColumns = [
   {
     key: 'building' as const,
     label: 'Prédio',
-    format: (value: unknown) => (value && typeof value === 'object' && 'name' in value ? String(value.name) : ''),
+    format: (value: unknown) =>
+      value && typeof value === 'object' && 'name' in value ? String(value.name) : '',
   },
   {
     key: 'rental_value' as const,
@@ -226,7 +220,13 @@ export const leaseExportColumns = [
     label: 'Apartamento',
     format: (value: unknown) => {
       if (value && typeof value === 'object' && 'number' in value) {
-        const building = 'building' in value && value.building && typeof value.building === 'object' && 'name' in value.building ? String(value.building.name) : '';
+        const building =
+          'building' in value &&
+          value.building &&
+          typeof value.building === 'object' &&
+          'name' in value.building
+            ? String(value.building.name)
+            : '';
         return `${building} - Apto ${String(value.number)}`;
       }
       return '';
@@ -235,7 +235,8 @@ export const leaseExportColumns = [
   {
     key: 'responsible_tenant' as const,
     label: 'Inquilino Responsável',
-    format: (value: unknown) => (value && typeof value === 'object' && 'name' in value ? String(value.name) : ''),
+    format: (value: unknown) =>
+      value && typeof value === 'object' && 'name' in value ? String(value.name) : '',
   },
   {
     key: 'start_date' as const,
@@ -268,12 +269,18 @@ export const leaseExportColumns = [
   {
     key: 'apartment' as const,
     label: 'Valor do Aluguel',
-    format: (value: unknown) => (value && typeof value === 'object' && 'rental_value' in value ? formatCurrency(Number(value.rental_value) || 0) : formatCurrency(0)),
+    format: (value: unknown) =>
+      value && typeof value === 'object' && 'rental_value' in value
+        ? formatCurrency(Number(value.rental_value) || 0)
+        : formatCurrency(0),
   },
   {
     key: 'apartment' as const,
     label: 'Taxa de Limpeza',
-    format: (value: unknown) => (value && typeof value === 'object' && 'cleaning_fee' in value ? formatCurrency(Number(value.cleaning_fee) || 0) : formatCurrency(0)),
+    format: (value: unknown) =>
+      value && typeof value === 'object' && 'cleaning_fee' in value
+        ? formatCurrency(Number(value.cleaning_fee) || 0)
+        : formatCurrency(0),
   },
   {
     key: 'tag_fee' as const,
@@ -308,22 +315,26 @@ export const expenseExportColumns = [
   {
     key: 'person' as const,
     label: 'Pessoa',
-    format: (value: unknown) => (value && typeof value === 'object' && 'name' in value ? String(value.name) : ''),
+    format: (value: unknown) =>
+      value && typeof value === 'object' && 'name' in value ? String(value.name) : '',
   },
   {
     key: 'credit_card' as const,
     label: 'Cartão',
-    format: (value: unknown) => (value && typeof value === 'object' && 'nickname' in value ? String(value.nickname) : ''),
+    format: (value: unknown) =>
+      value && typeof value === 'object' && 'nickname' in value ? String(value.nickname) : '',
   },
   {
     key: 'building' as const,
     label: 'Prédio',
-    format: (value: unknown) => (value && typeof value === 'object' && 'name' in value ? String(value.name) : ''),
+    format: (value: unknown) =>
+      value && typeof value === 'object' && 'name' in value ? String(value.name) : '',
   },
   {
     key: 'category' as const,
     label: 'Categoria',
-    format: (value: unknown) => (value && typeof value === 'object' && 'name' in value ? String(value.name) : ''),
+    format: (value: unknown) =>
+      value && typeof value === 'object' && 'name' in value ? String(value.name) : '',
   },
   {
     key: 'expense_date' as const,
@@ -352,7 +363,8 @@ export const incomeExportColumns = [
   {
     key: 'person' as const,
     label: 'Pessoa',
-    format: (value: unknown) => (value && typeof value === 'object' && 'name' in value ? String(value.name) : ''),
+    format: (value: unknown) =>
+      value && typeof value === 'object' && 'name' in value ? String(value.name) : '',
   },
   {
     key: 'is_received' as const,
@@ -379,7 +391,13 @@ export const rentPaymentExportColumns = [
       if (value && typeof value === 'object' && 'apartment' in value) {
         const apt = (value as Record<string, unknown>).apartment;
         if (apt && typeof apt === 'object' && 'number' in apt) {
-          const building = 'building' in apt && apt.building && typeof apt.building === 'object' && 'name' in apt.building ? String(apt.building.name) : '';
+          const building =
+            'building' in apt &&
+            apt.building &&
+            typeof apt.building === 'object' &&
+            'name' in apt.building
+              ? String(apt.building.name)
+              : '';
           return `${String((apt as Record<string, unknown>).number)} - ${building}`;
         }
       }
