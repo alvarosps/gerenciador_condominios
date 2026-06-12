@@ -739,7 +739,7 @@ class FinancialDashboardService:
         salary_offset_apartments: list[dict[str, Any]] = []
 
         for apt in rented_apartments:
-            lease = apt.leases.filter(is_deleted=False).first()
+            lease = apt.leases.first()
             if lease is None:
                 continue
 

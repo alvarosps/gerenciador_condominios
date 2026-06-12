@@ -17,7 +17,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 
-from .models import Apartment, Building, Furniture, Lease, Tenant
+from .models import Apartment, Building, Furniture, Lease, RentPayment, Tenant
 from .permissions import (
     CanGenerateContract,
     CanModifyLease,
@@ -464,22 +464,35 @@ class LeaseViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["get"], permission_classes=[IsTenantOrAdmin])
     def calculate_late_fee(self, request: Request, pk: int | None = None) -> Response:
         """
-        Calculate late payment fee for a lease.
+        Calculate late payment fee for a lease's rent in the current month.
 
         Permissions: Tenant (only their lease) or Admin
 
-        Uses FeeCalculatorService for business logic.
+        Skips the fee when the month's rent is already paid, clamps the due day to the
+        current month (so due_day 31 in February becomes Feb 28), and delegates the
+        real-date arithmetic to FeeCalculatorService.
         """
         lease = self.get_object()
+        today = timezone.now().date()
+        reference_month = today.replace(day=1)
 
-        # Delegate to service layer
+        already_paid = RentPayment.objects.filter(
+            lease=lease, reference_month=reference_month
+        ).exists()
+        if already_paid:
+            return Response({"message": "Aluguel já pago neste mês."}, status=status.HTTP_200_OK)
+
+        clamped_due = RentScheduleService.clamp_due_day(
+            lease.responsible_tenant.due_day, today.year, today.month
+        )
+        due_date = date(today.year, today.month, clamped_due)
+
         result = FeeCalculatorService.calculate_late_fee(
             rental_value=lease.rental_value,
-            due_day=lease.responsible_tenant.due_day,
-            current_date=timezone.now().date(),
+            due_date=due_date,
+            current_date=today,
         )
 
-        # Return appropriate response
         if result["is_late"]:
             return Response(
                 {"late_days": result["late_days"], "late_fee": result["late_fee"]},

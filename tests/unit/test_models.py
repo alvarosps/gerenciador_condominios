@@ -378,3 +378,73 @@ class TestSoftDeleteManager:
         b.refresh_from_db()
         assert b.is_deleted is False
         assert b.updated_by == user
+
+
+@pytest.mark.unit
+class TestDefaultManagerSoftDelete:
+    """The default manager of every soft-delete model must exclude deleted rows.
+
+    Django elects ``_default_manager`` (used by ALL reverse/related managers) from the
+    Meta ``default_manager_name``; without it the first-declared manager (``all_objects``)
+    would leak soft-deleted rows through related managers like ``apartment.furnitures``.
+    """
+
+    def test_default_manager_is_soft_delete_manager(self) -> None:
+        from core.models import Expense, ExpenseInstallment, RentAdjustment
+        from core.models import SoftDeleteManager as Manager
+
+        for model in (Furniture, Tenant, Lease, RentAdjustment, Expense, ExpenseInstallment):
+            assert isinstance(model._default_manager, Manager), model.__name__
+
+    def test_related_manager_excludes_soft_deleted_furniture(self) -> None:
+        apartment = make_apartment()
+        keep = make_furniture(name="Sofá Ativo")
+        gone = make_furniture(name="Mesa Deletada")
+        apartment.furnitures.add(keep, gone)
+        gone.delete()
+
+        names = {f.name for f in apartment.furnitures.all()}
+        assert names == {"Sofá Ativo"}
+
+    def test_related_manager_excludes_soft_deleted_tenant(self) -> None:
+        lease = make_lease()
+        responsible = lease.responsible_tenant
+        extra = make_tenant(name="Inquilino Extra")
+        lease.tenants.add(responsible, extra)
+        extra.delete()
+
+        names = {t.name for t in lease.tenants.all()}
+        assert extra.name not in names
+        assert responsible.name in names
+
+    def test_related_manager_excludes_soft_deleted_rent_adjustment(self) -> None:
+        from core.models import RentAdjustment
+
+        lease = make_lease()
+        keep = RentAdjustment.objects.create(
+            lease=lease,
+            adjustment_date=date(2026, 1, 1),
+            percentage=Decimal("5.00"),
+            previous_value=Decimal("1000.00"),
+            new_value=Decimal("1050.00"),
+        )
+        gone = RentAdjustment.objects.create(
+            lease=lease,
+            adjustment_date=date(2026, 2, 1),
+            percentage=Decimal("3.00"),
+            previous_value=Decimal("1050.00"),
+            new_value=Decimal("1081.50"),
+        )
+        gone.delete()
+
+        pks = {ra.pk for ra in lease.rent_adjustments.all()}
+        assert pks == {keep.pk}
+
+    def test_all_objects_still_includes_deleted(self) -> None:
+        keep = make_furniture(name="Cadeira Viva")
+        gone = make_furniture(name="Cadeira Morta")
+        gone.delete()
+
+        all_pks = set(Furniture.all_objects.values_list("pk", flat=True))
+        assert keep.pk in all_pks
+        assert gone.pk in all_pks

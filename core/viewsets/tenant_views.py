@@ -59,11 +59,9 @@ def _get_tenant(request: Request) -> Tenant | None:
 
 def _get_active_lease(tenant: Tenant) -> Lease | None:
     """Return the active (non-deleted) lease for a tenant, or None."""
-    return (
-        tenant.leases_responsible.filter(is_deleted=False)
-        .select_related("apartment", "apartment__building", "apartment__owner")
-        .first()
-    )
+    return tenant.leases_responsible.select_related(
+        "apartment", "apartment__building", "apartment__owner"
+    ).first()
 
 
 class TenantViewSet(viewsets.ViewSet):

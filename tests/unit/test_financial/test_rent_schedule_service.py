@@ -468,7 +468,9 @@ class TestGetMonthSchedule:
         item = _find_item(schedule, lease.id)
         assert item["is_overdue"] is True
         assert item["day_passed"] is True
-        expected = FeeCalculatorService.calculate_late_fee(Decimal("1200.00"), 7, date(2026, 3, 20))
+        expected = FeeCalculatorService.calculate_late_fee(
+            Decimal("1200.00"), date(2026, 3, 7), date(2026, 3, 20)
+        )
         assert item["late_days"] == expected["late_days"]
         assert item["late_fee"] == str(expected["late_fee"])
         assert item["late_days"] > 0
@@ -742,7 +744,9 @@ class TestGetMonthStats:
     def test_overdue_count_and_fee_current_month(self, lease) -> None:
         stats = RentScheduleService.get_month_stats(2026, 3)
         assert stats["overdue_count"] == 1
-        expected = FeeCalculatorService.calculate_late_fee(Decimal("1200.00"), 7, date(2026, 3, 20))
+        expected = FeeCalculatorService.calculate_late_fee(
+            Decimal("1200.00"), date(2026, 3, 7), date(2026, 3, 20)
+        )
         assert stats["overdue_total_fee"] == str(expected["late_fee"])
         assert Decimal(stats["overdue_total_fee"]) > Decimal("0.00")
 

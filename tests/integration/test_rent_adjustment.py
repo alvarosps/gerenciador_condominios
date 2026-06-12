@@ -453,6 +453,42 @@ class TestGetEligibleLeasesExtra:
         assert matching["last_adjustment"] is not None
         assert matching["last_adjustment"]["percentage"] == "5.00"
 
+    def test_eligible_leases_ignore_soft_deleted_adjustment(self) -> None:
+        """Regression: a soft-deleted RentAdjustment must not become last_adjustment."""
+        apartment = _make_apartment(_make_building(9707))
+        lease = _make_lease(
+            apartment,
+            _make_tenant(_CPF_4),
+            start_date=date.today() - relativedelta(months=25),
+            validity_months=36,
+        )
+
+        # Real adjustment 13 months ago opens the window now.
+        RentAdjustment.objects.create(
+            lease=Lease.objects.get(pk=lease.pk),
+            adjustment_date=date.today() - relativedelta(months=13),
+            percentage=Decimal("5.00"),
+            previous_value=Decimal("1400.00"),
+            new_value=Decimal("1470.00"),
+            apartment_updated=False,
+        )
+        # A later, soft-deleted adjustment must be ignored (would otherwise win by date).
+        ghost = RentAdjustment.objects.create(
+            lease=Lease.objects.get(pk=lease.pk),
+            adjustment_date=date.today() - relativedelta(months=1),
+            percentage=Decimal("9.99"),
+            previous_value=Decimal("1470.00"),
+            new_value=Decimal("1616.85"),
+            apartment_updated=False,
+        )
+        ghost.delete()
+
+        result = RentAdjustmentService.get_eligible_leases()
+
+        matching = next(item for item in result["alerts"] if item["lease_id"] == lease.pk)
+        assert matching["last_adjustment"] is not None
+        assert matching["last_adjustment"]["percentage"] == "5.00"
+
 
 # Valid CPFs (checksum verified) — reserved for new test classes below
 _CPF_16 = "98765432100"

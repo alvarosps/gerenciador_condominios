@@ -104,6 +104,7 @@ class Category(AuditMixin, SoftDeleteMixin, models.Model):
     objects = SoftDeleteManager()
 
     class Meta:
+        default_manager_name = "objects"
         ordering = ["sort_order", "name"]
         verbose_name_plural = "Categories"
         constraints = [
@@ -186,6 +187,7 @@ class BillingAccount(AuditMixin, SoftDeleteMixin, models.Model):
     objects = BillingAccountManager()
 
     class Meta:
+        default_manager_name = "objects"
         ordering = ["name"]
         constraints = [
             models.CheckConstraint(
@@ -313,6 +315,7 @@ class Bill(AuditMixin, SoftDeleteMixin, models.Model):
     objects = BillManager()
 
     class Meta:
+        default_manager_name = "objects"
         ordering = ["-competence_month", "due_date"]
         constraints = [
             models.UniqueConstraint(
@@ -363,6 +366,7 @@ class BillLineItem(AuditMixin, SoftDeleteMixin, models.Model):
     objects = SoftDeleteManager()
 
     class Meta:
+        default_manager_name = "objects"
         constraints = [
             models.CheckConstraint(
                 condition=Q(amount__gte=0),
@@ -394,6 +398,7 @@ class Payment(AuditMixin, SoftDeleteMixin, models.Model):
     objects = SoftDeleteManager()
 
     class Meta:
+        default_manager_name = "objects"
         ordering = ["-payment_date"]
         constraints = [
             models.CheckConstraint(
@@ -420,6 +425,7 @@ class PaymentAllocation(AuditMixin, SoftDeleteMixin, models.Model):
     objects = SoftDeleteManager()
 
     class Meta:
+        default_manager_name = "objects"
         constraints = [
             models.CheckConstraint(
                 condition=Q(amount__gt=0),
@@ -527,6 +533,7 @@ class InstallmentPlan(AuditMixin, SoftDeleteMixin, models.Model):
     objects = SoftDeleteManager()
 
     class Meta:
+        default_manager_name = "objects"
         ordering = ["start_due_date", "description"]
         constraints = [
             models.CheckConstraint(
@@ -569,6 +576,7 @@ class Installment(AuditMixin, SoftDeleteMixin, models.Model):
     objects = SoftDeleteManager()
 
     class Meta:
+        default_manager_name = "objects"
         ordering = ["due_date", "number"]
         constraints = [
             models.UniqueConstraint(
@@ -617,6 +625,7 @@ class Employee(AuditMixin, SoftDeleteMixin, models.Model):
     objects = SoftDeleteManager()
 
     class Meta:
+        default_manager_name = "objects"
         ordering = ["name"]
         constraints = [
             models.CheckConstraint(
@@ -686,6 +695,7 @@ class Reserve(AuditMixin, SoftDeleteMixin, models.Model):
     objects = SoftDeleteManager()
 
     class Meta:
+        default_manager_name = "objects"
         ordering = ["name"]
 
     def __str__(self) -> str:
@@ -718,6 +728,7 @@ class ReserveMovement(AuditMixin, SoftDeleteMixin, models.Model):
 
     class Meta:
         # Deterministic ledger (design §4.3): same movement_date ties broken by insertion id.
+        default_manager_name = "objects"
         ordering = ["movement_date", "id"]
         constraints = [
             models.CheckConstraint(
@@ -760,6 +771,7 @@ class IncomeEntry(AuditMixin, SoftDeleteMixin, models.Model):
     objects = SoftDeleteManager()
 
     class Meta:
+        default_manager_name = "objects"
         ordering = ["-income_date"]
         constraints = [
             models.CheckConstraint(
@@ -857,6 +869,9 @@ class WaterBillStatement(AuditMixin, SoftDeleteMixin, models.Model):
     all_objects = models.Manager()
     objects = SoftDeleteManager()
 
+    class Meta:
+        default_manager_name = "objects"
+
     def __str__(self) -> str:
         return f"Água {self.consumo_m3} m³ — {self.bill}"
 
@@ -878,6 +893,9 @@ class ElectricityBillStatement(AuditMixin, SoftDeleteMixin, models.Model):
 
     all_objects = models.Manager()
     objects = SoftDeleteManager()
+
+    class Meta:
+        default_manager_name = "objects"
 
     def __str__(self) -> str:
         return f"Luz {self.consumo_kwh} kWh — {self.bill}"

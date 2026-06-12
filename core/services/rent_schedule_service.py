@@ -272,7 +272,6 @@ class RentScheduleService:
             payment = payments.get(lease.pk)
             item = RentScheduleService._build_item(
                 lease=lease,
-                clamped_due=clamped_due,
                 clamped_due_date=clamped_due_date,
                 payment=payment,
                 context=context,
@@ -353,7 +352,7 @@ class RentScheduleService:
                 overdue_count += 1
                 if is_current_month:
                     fee = FeeCalculatorService.calculate_late_fee(
-                        effective_value, clamped_due, today
+                        effective_value, clamped_due_date, today
                     )
                     overdue_total_fee += _as_decimal(fee["late_fee"])
 
@@ -473,7 +472,6 @@ class RentScheduleService:
     @staticmethod
     def _build_item(
         lease: Lease,
-        clamped_due: int,
         clamped_due_date: date,
         payment: RentPayment | None,
         context: _MonthContext,
@@ -495,7 +493,7 @@ class RentScheduleService:
         late_fee = ZERO
         late_days = 0
         if is_overdue and context.is_current_month:
-            fee = FeeCalculatorService.calculate_late_fee(effective_value, clamped_due, today)
+            fee = FeeCalculatorService.calculate_late_fee(effective_value, clamped_due_date, today)
             late_fee = _as_decimal(fee["late_fee"])
             late_days = int(fee["late_days"])
 

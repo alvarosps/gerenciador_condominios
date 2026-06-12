@@ -35,7 +35,7 @@ class TestCalculateLateFee:
     def test_payment_is_late_returns_correct_keys(self):
         result = FeeCalculatorService.calculate_late_fee(
             rental_value=Decimal("1500.00"),
-            due_day=10,
+            due_date=date(2025, 1, 10),
             current_date=date(2025, 1, 15),
         )
         assert "is_late" in result
@@ -43,67 +43,105 @@ class TestCalculateLateFee:
         assert "late_fee" in result
         assert "message" in result
 
-    def test_payment_is_late_when_current_day_after_due_day(self):
+    def test_payment_is_late_when_current_date_after_due_date(self):
         result = FeeCalculatorService.calculate_late_fee(
             rental_value=Decimal("1500.00"),
-            due_day=10,
+            due_date=date(2025, 1, 10),
             current_date=date(2025, 1, 15),
         )
         assert result["is_late"] is True
         assert result["late_days"] == 5
 
-    def test_late_fee_amount_calculated_correctly(self):
-        # daily_rate = 1500/30 = 50; late_days = 5; fee = 50 * 5 * 0.05
+    def test_late_fee_same_month(self):
+        # daily_rate = 1500/30 = 50; late_days = 5; fee = quantize(50 * 5 * 0.05) = 12.50
         result = FeeCalculatorService.calculate_late_fee(
             rental_value=Decimal("1500.00"),
-            due_day=10,
+            due_date=date(2025, 1, 10),
             current_date=date(2025, 1, 15),
         )
         daily_rate = Decimal("1500.00") / Decimal(str(settings.DAYS_PER_MONTH))
-        expected_fee = daily_rate * 5 * Decimal(str(settings.LATE_FEE_PERCENTAGE))
+        expected_fee = (daily_rate * 5 * Decimal(str(settings.LATE_FEE_PERCENTAGE))).quantize(
+            Decimal("0.01")
+        )
         assert result["late_fee"] == expected_fee
 
-    def test_payment_on_due_day_is_not_late(self):
+    def test_late_fee_cross_month_overdue(self):
+        # Regression: rent due Jan 25, still unpaid on Feb 10 → 16 days late, fee > 0.
+        # The old implementation compared only current_date.day (10) > due_day (25) → R$0.
         result = FeeCalculatorService.calculate_late_fee(
             rental_value=Decimal("1500.00"),
-            due_day=10,
+            due_date=date(2026, 1, 25),
+            current_date=date(2026, 2, 10),
+        )
+        assert result["is_late"] is True
+        assert result["late_days"] == 16
+        assert result["late_fee"] > Decimal("0.00")
+
+    def test_due_day_31_overdue_in_february(self):
+        # Regression: due_day 31 clamped by the caller to Feb 28; current Mar 5 → 5 days late.
+        # The old day-only comparison never marked due_day 31 as late in February.
+        result = FeeCalculatorService.calculate_late_fee(
+            rental_value=Decimal("1500.00"),
+            due_date=date(2026, 2, 28),
+            current_date=date(2026, 3, 5),
+        )
+        assert result["is_late"] is True
+        assert result["late_days"] == 5
+
+    def test_payment_on_due_date_is_not_late(self):
+        result = FeeCalculatorService.calculate_late_fee(
+            rental_value=Decimal("1500.00"),
+            due_date=date(2025, 1, 10),
             current_date=date(2025, 1, 10),
         )
         assert result["is_late"] is False
         assert result["late_days"] == 0
         assert result["late_fee"] == Decimal("0.00")
 
-    def test_payment_before_due_day_is_not_late(self):
+    def test_payment_before_due_date_is_not_late(self):
         result = FeeCalculatorService.calculate_late_fee(
             rental_value=Decimal("1500.00"),
-            due_day=15,
+            due_date=date(2025, 1, 15),
             current_date=date(2025, 1, 10),
         )
         assert result["is_late"] is False
         assert result["late_fee"] == Decimal("0.00")
 
+    def test_late_fee_is_quantized_two_places(self):
+        # 1234.56/30 * 3 * 0.05 = 6.1728 → quantized ROUND_HALF_UP to 6.17.
+        result = FeeCalculatorService.calculate_late_fee(
+            rental_value=Decimal("1234.56"),
+            due_date=date(2026, 3, 10),
+            current_date=date(2026, 3, 13),
+        )
+        late_fee = result["late_fee"]
+        assert isinstance(late_fee, Decimal)
+        assert -late_fee.as_tuple().exponent == 2
+        assert late_fee == Decimal("6.17")
+
     def test_negative_rental_raises(self):
         with pytest.raises(ValueError, match="non-negative"):
             FeeCalculatorService.calculate_late_fee(
                 rental_value=Decimal(-100),
-                due_day=10,
+                due_date=date(2025, 1, 10),
                 current_date=date(2025, 1, 15),
             )
 
     def test_large_rental_value(self):
         result = FeeCalculatorService.calculate_late_fee(
             rental_value=Decimal("999999.99"),
-            due_day=1,
+            due_date=date(2025, 1, 1),
             current_date=date(2025, 1, 31),
         )
         assert result["is_late"] is True
         assert isinstance(result["late_fee"], Decimal)
         assert result["late_fee"] > Decimal(0)
+        assert -result["late_fee"].as_tuple().exponent == 2
 
     def test_one_day_late(self):
         result = FeeCalculatorService.calculate_late_fee(
             rental_value=Decimal("3000.00"),
-            due_day=10,
+            due_date=date(2025, 1, 10),
             current_date=date(2025, 1, 11),
         )
         assert result["is_late"] is True

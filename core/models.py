@@ -222,6 +222,9 @@ class Condominium(AuditMixin, SoftDeleteMixin, models.Model):
     all_objects = models.Manager()  # Access all objects including deleted
     objects = SoftDeleteManager()
 
+    class Meta:
+        default_manager_name = "objects"
+
     def __str__(self) -> str:
         """Return string representation of condominium."""
         return self.name
@@ -275,6 +278,9 @@ class Building(AuditMixin, SoftDeleteMixin, models.Model):
     all_objects = models.Manager()  # Access all objects including deleted
     objects = SoftDeleteManager()
 
+    class Meta:
+        default_manager_name = "objects"
+
     def __str__(self) -> str:
         """Return string representation of building."""
         return f"{self.name} - {self.street_number}"
@@ -304,7 +310,7 @@ class Building(AuditMixin, SoftDeleteMixin, models.Model):
         deleted_by: Any = None,
     ) -> tuple[int, dict[str, int]]:
         if not hard_delete:
-            for apartment in self.apartments.filter(is_deleted=False):
+            for apartment in self.apartments.all():
                 apartment.delete(hard_delete=False, deleted_by=deleted_by)
         return super().delete(
             using=using, keep_parents=keep_parents, hard_delete=hard_delete, deleted_by=deleted_by
@@ -331,6 +337,9 @@ class Furniture(AuditMixin, SoftDeleteMixin, models.Model):
     # Custom manager that excludes soft-deleted objects
     all_objects = models.Manager()  # Access all objects including deleted
     objects = SoftDeleteManager()
+
+    class Meta:
+        default_manager_name = "objects"
 
     def __str__(self) -> str:
         """Return string representation of furniture."""
@@ -406,6 +415,7 @@ class Apartment(AuditMixin, SoftDeleteMixin, models.Model):
     objects = SoftDeleteManager()
 
     class Meta:
+        default_manager_name = "objects"
         unique_together = ("building", "number")
         ordering = ["building__street_number", "number"]
         indexes = [
@@ -438,7 +448,7 @@ class Apartment(AuditMixin, SoftDeleteMixin, models.Model):
         deleted_by: Any = None,
     ) -> tuple[int, dict[str, int]]:
         if not hard_delete:
-            self.leases.filter(is_deleted=False).update(
+            self.leases.all().update(
                 is_deleted=True,
                 deleted_at=timezone.now(),
                 deleted_by=deleted_by,
@@ -531,6 +541,7 @@ class Tenant(AuditMixin, SoftDeleteMixin, models.Model):
     objects = SoftDeleteManager()
 
     class Meta:
+        default_manager_name = "objects"
         indexes = [
             # Composite indexes (Phase 5) for common query patterns
             models.Index(fields=["is_company", "name"], name="tenant_type_name_idx"),
@@ -599,6 +610,9 @@ class Dependent(AuditMixin, SoftDeleteMixin, models.Model):
     # Custom manager that excludes soft-deleted objects
     all_objects = models.Manager()  # Access all objects including deleted
     objects = SoftDeleteManager()
+
+    class Meta:
+        default_manager_name = "objects"
 
     def __str__(self) -> str:
         """Return string representation of dependent."""
@@ -718,6 +732,7 @@ class Lease(AuditMixin, SoftDeleteMixin, models.Model):
     objects = SoftDeleteManager()
 
     class Meta:
+        default_manager_name = "objects"
         indexes = [
             # Single-column indexes (Phase 3)
             models.Index(fields=["start_date"], name="lease_start_date_idx"),
@@ -803,6 +818,7 @@ class RentAdjustment(AuditMixin, SoftDeleteMixin, models.Model):
     objects = SoftDeleteManager()
 
     class Meta:
+        default_manager_name = "objects"
         ordering = ["-adjustment_date"]
 
     def __str__(self) -> str:
@@ -886,6 +902,7 @@ class Landlord(AuditMixin, SoftDeleteMixin, models.Model):
     objects = SoftDeleteManager()
 
     class Meta:
+        default_manager_name = "objects"
         verbose_name = "Locador"
         verbose_name_plural = "Locadores"
 
@@ -949,6 +966,7 @@ class ContractRule(AuditMixin, SoftDeleteMixin, models.Model):
     objects = SoftDeleteManager()
 
     class Meta:
+        default_manager_name = "objects"
         ordering = ["order", "id"]
         verbose_name = "Regra do Condomínio"
         verbose_name_plural = "Regras do Condomínio"
@@ -1192,6 +1210,7 @@ class Person(AuditMixin, SoftDeleteMixin, models.Model):
     objects = SoftDeleteManager()
 
     class Meta:
+        default_manager_name = "objects"
         ordering = ["name"]
 
     def __str__(self) -> str:
@@ -1214,6 +1233,7 @@ class CreditCard(AuditMixin, SoftDeleteMixin, models.Model):
     objects = SoftDeleteManager()
 
     class Meta:
+        default_manager_name = "objects"
         ordering = ["person", "nickname"]
         constraints = [
             models.UniqueConstraint(
@@ -1246,6 +1266,7 @@ class ExpenseCategory(AuditMixin, SoftDeleteMixin, models.Model):
     objects = SoftDeleteManager()
 
     class Meta:
+        default_manager_name = "objects"
         ordering = ["name"]
         verbose_name_plural = "Expense categories"
 
@@ -1313,6 +1334,7 @@ class Expense(AuditMixin, SoftDeleteMixin, models.Model):
     objects = SoftDeleteManager()
 
     class Meta:
+        default_manager_name = "objects"
         ordering = ["-expense_date"]
         indexes = [
             models.Index(fields=["-expense_date"], name="expense_date_idx"),
@@ -1366,7 +1388,7 @@ class Expense(AuditMixin, SoftDeleteMixin, models.Model):
         )
         # Cascade soft-delete to child installments
         if not hard_delete:
-            self.installments.filter(is_deleted=False).update(
+            self.installments.all().update(
                 is_deleted=True,
                 deleted_at=self.deleted_at,
                 deleted_by=deleted_by,
@@ -1399,6 +1421,7 @@ class ExpenseInstallment(AuditMixin, SoftDeleteMixin, models.Model):
     objects = SoftDeleteManager()
 
     class Meta:
+        default_manager_name = "objects"
         ordering = ["due_date", "installment_number"]
         constraints = [
             models.UniqueConstraint(
@@ -1443,6 +1466,7 @@ class PersonIncome(AuditMixin, SoftDeleteMixin, models.Model):
     objects = SoftDeleteManager()
 
     class Meta:
+        default_manager_name = "objects"
         ordering = ["-start_date"]
 
     def __str__(self) -> str:
@@ -1472,6 +1496,7 @@ class Income(AuditMixin, SoftDeleteMixin, models.Model):
     objects = SoftDeleteManager()
 
     class Meta:
+        default_manager_name = "objects"
         ordering = ["-income_date"]
 
     def __str__(self) -> str:
@@ -1489,6 +1514,7 @@ class RentPayment(AuditMixin, SoftDeleteMixin, models.Model):
     objects = SoftDeleteManager()
 
     class Meta:
+        default_manager_name = "objects"
         ordering = ["-reference_month"]
         constraints = [
             models.UniqueConstraint(
@@ -1530,6 +1556,7 @@ class EmployeePayment(AuditMixin, SoftDeleteMixin, models.Model):
     objects = SoftDeleteManager()
 
     class Meta:
+        default_manager_name = "objects"
         ordering = ["-reference_month"]
         constraints = [
             models.UniqueConstraint(
@@ -1569,6 +1596,7 @@ class PersonPayment(AuditMixin, SoftDeleteMixin, models.Model):
     objects = SoftDeleteManager()
 
     class Meta:
+        default_manager_name = "objects"
         ordering = ["-payment_date"]
         indexes = [
             models.Index(fields=["person", "reference_month"], name="person_payment_month_idx"),
@@ -1609,6 +1637,7 @@ class PersonPaymentSchedule(AuditMixin, SoftDeleteMixin, models.Model):
     objects = SoftDeleteManager()
 
     class Meta:
+        default_manager_name = "objects"
         ordering = ["reference_month", "due_day"]
         constraints = [
             models.UniqueConstraint(
@@ -1881,6 +1910,7 @@ class PaymentProof(AuditMixin, SoftDeleteMixin, models.Model):
     objects = SoftDeleteManager()
 
     class Meta:
+        default_manager_name = "objects"
         indexes = [
             models.Index(fields=["status", "-created_at"]),
             models.Index(fields=["lease", "reference_month"]),

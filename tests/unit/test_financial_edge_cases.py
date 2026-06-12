@@ -27,10 +27,10 @@ pytestmark = [pytest.mark.django_db, pytest.mark.unit]
 
 class TestFeeCalculatorEdgeCases:
     def test_late_fee_zero_days(self) -> None:
-        """On the due day itself — not late, fee is zero."""
+        """On the due date itself — not late, fee is zero."""
         result = FeeCalculatorService.calculate_late_fee(
             rental_value=Decimal("1500.00"),
-            due_day=15,
+            due_date=date(2026, 3, 15),
             current_date=date(2026, 3, 15),
         )
         assert result["is_late"] is False
@@ -38,29 +38,33 @@ class TestFeeCalculatorEdgeCases:
         assert result["late_fee"] == Decimal("0.00")
 
     def test_late_fee_one_day(self) -> None:
-        """1 day late: fee = daily_rate × 1 × LATE_FEE_PERCENTAGE."""
+        """1 day late: fee = quantize(daily_rate × 1 × LATE_FEE_PERCENTAGE)."""
         rental_value = Decimal("1500.00")
         result = FeeCalculatorService.calculate_late_fee(
             rental_value=rental_value,
-            due_day=10,
+            due_date=date(2026, 3, 10),
             current_date=date(2026, 3, 11),
         )
         daily_rate = rental_value / Decimal(str(settings.DAYS_PER_MONTH))
-        expected = daily_rate * 1 * Decimal(str(settings.LATE_FEE_PERCENTAGE))
+        expected = (daily_rate * 1 * Decimal(str(settings.LATE_FEE_PERCENTAGE))).quantize(
+            Decimal("0.01")
+        )
         assert result["is_late"] is True
         assert result["late_days"] == 1
         assert result["late_fee"] == expected
 
     def test_late_fee_30_days(self) -> None:
-        """30 days late (due day 1, current day 31 same month)."""
+        """30 days late (due date Mar 1, current Mar 31 same month)."""
         rental_value = Decimal("900.00")
         result = FeeCalculatorService.calculate_late_fee(
             rental_value=rental_value,
-            due_day=1,
+            due_date=date(2026, 3, 1),
             current_date=date(2026, 3, 31),
         )
         daily_rate = rental_value / Decimal(str(settings.DAYS_PER_MONTH))
-        expected = daily_rate * 30 * Decimal(str(settings.LATE_FEE_PERCENTAGE))
+        expected = (daily_rate * 30 * Decimal(str(settings.LATE_FEE_PERCENTAGE))).quantize(
+            Decimal("0.01")
+        )
         assert result["late_days"] == 30
         assert result["late_fee"] == expected
 

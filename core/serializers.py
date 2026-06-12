@@ -994,7 +994,7 @@ class PersonIncomeSerializer(serializers.ModelSerializer):
 
     def get_current_value(self, obj: PersonIncome) -> str:
         if obj.income_type == "apartment_rent" and obj.apartment:
-            lease = obj.apartment.leases.filter(is_deleted=False).first()
+            lease = obj.apartment.leases.first()
             if lease is not None:
                 return str(lease.rental_value)
             return str(obj.apartment.rental_value)

@@ -10,7 +10,7 @@ This service handles all fee-related business logic:
 
 from calendar import monthrange
 from datetime import date
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 from django.conf import settings
 from django.utils import timezone
@@ -48,42 +48,53 @@ class FeeCalculatorService:
 
     @staticmethod
     def calculate_late_fee(
-        rental_value: Decimal, due_day: int, current_date: date
+        rental_value: Decimal, due_date: date, current_date: date
     ) -> dict[str, int | Decimal | str]:
         """
-        Calculate late payment fee based on days overdue.
+        Calculate late payment fee based on the real number of days overdue.
 
         The fee is calculated as:
-        late_fee = daily_rate × days_late × LATE_FEE_PERCENTAGE
+        late_fee = quantize(daily_rate × days_late × LATE_FEE_PERCENTAGE)
+
+        The number of days late is the full calendar difference between the actual
+        due date and the current date — so an unpaid rent due on Jan 25 is correctly
+        16 days late on Feb 10 (the previous day-only comparison wrongly returned R$0
+        across month boundaries). The caller is responsible for clamping the due day
+        to the month (e.g. due_day 31 → Feb 28) before building ``due_date``.
 
         Args:
             rental_value: Monthly rental value in BRL
-            due_day: Day of month when rent is due (1-31)
+            due_date: Actual rent due date (already clamped to the month by the caller)
             current_date: Current date to calculate from
 
         Returns:
             Dictionary with:
                 - is_late (bool): Whether payment is late
                 - late_days (int): Number of days late (0 if not late)
-                - late_fee (Decimal): Late fee amount (0.00 if not late)
+                - late_fee (Decimal): Late fee amount, quantized to 2 places (0.00 if not late)
                 - message (str): Descriptive message
 
         Examples:
             >>> service = FeeCalculatorService()
-            >>> result = service.calculate_late_fee(Decimal("1500.00"), 10, date(2025, 1, 15))
+            >>> result = service.calculate_late_fee(
+            ...     Decimal("1500.00"), date(2025, 1, 10), date(2025, 1, 15)
+            ... )
             >>> result["late_days"]
             5
             >>> result["late_fee"]
-            Decimal('12.50')  # (1500/30) × 5 × 0.05
+            Decimal('12.50')  # quantize((1500/30) × 5 × 0.05)
         """
         if rental_value < Decimal(0):
             msg = "rental_value must be non-negative"
             raise ValueError(msg)
-        if current_date.day > due_day:
-            late_days = current_date.day - due_day
+
+        late_days = (current_date - due_date).days
+        if late_days > 0:
             daily_rate = FeeCalculatorService.calculate_daily_rate(rental_value)
             late_fee_percentage = Decimal(str(settings.LATE_FEE_PERCENTAGE))
-            late_fee = daily_rate * late_days * late_fee_percentage
+            late_fee = (daily_rate * late_days * late_fee_percentage).quantize(
+                Decimal("0.01"), rounding=ROUND_HALF_UP
+            )
 
             return {
                 "is_late": True,

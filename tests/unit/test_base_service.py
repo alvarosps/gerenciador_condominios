@@ -55,9 +55,11 @@ class TestBaseServiceGetQueryset:
         qs = building_service.get_queryset()
         assert hasattr(qs, "filter")
 
-    def test_includes_soft_deleted_because_uses_default_manager(self, building_service, admin_user):
-        # BaseService uses _default_manager which is Building.all_objects (standard Manager)
-        # This means get_queryset() returns ALL objects, including soft-deleted ones.
+    def test_excludes_soft_deleted_because_default_manager_is_soft_delete(
+        self, building_service, admin_user
+    ):
+        # BaseService.get_queryset() uses _default_manager, which is now the SoftDeleteManager
+        # (objects). Soft-deleted records are therefore excluded; all_objects is the escape hatch.
         b = Building.objects.create(
             street_number=7702,
             name="Deleted",
@@ -67,8 +69,8 @@ class TestBaseServiceGetQueryset:
         )
         b.delete()
         qs = building_service.get_queryset()
-        # _default_manager is all_objects (Manager), not SoftDeleteManager, so deleted record is visible
-        assert qs.filter(pk=b.pk).exists()
+        assert not qs.filter(pk=b.pk).exists()
+        assert Building.all_objects.filter(pk=b.pk).exists()
 
 
 @pytest.mark.unit

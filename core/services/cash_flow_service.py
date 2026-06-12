@@ -801,7 +801,7 @@ class CashFlowService:
         )
 
         for apt in owned_apartments:
-            lease = apt.leases.filter(is_deleted=False).first()
+            lease = apt.leases.first()
             if lease is not None:
                 receives += lease.rental_value
                 receives_details.append(

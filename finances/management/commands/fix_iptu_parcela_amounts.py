@@ -155,7 +155,7 @@ class Command(BaseCommand):
             )
             return
 
-        lines = list(bill.line_items.filter(is_deleted=False))
+        lines = list(bill.line_items.all())
         if len(lines) != 1:
             self.stats["missing"] += 1
             self.stdout.write(
