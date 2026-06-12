@@ -1,7 +1,9 @@
 # Plano P4.1 — Camadas do backend: extrair services, padronizar erros, validar input
 
-> **Estado:** PLANEJADO — nao executado
+> **Estado:** EXECUTADO (branch `refactor/p4-architecture-quality`, commit 47e85d1, 2026-06-12) — full suite 2482 passed.
 > **Prioridade:** P4 (Arquitetura/Qualidade) · **Branch sugerida:** `refactor/backend-layering` · **Depende de:** P2 (para nao conflitar em arquivos quentes — `core/serializers.py`, `core/views.py`, `core/viewsets/*`)
+>
+> **Desvio de execução:** Fatia A usa sync no SERVICE (LeaseCreationService + viewset perform_create/perform_update), NÃO um post_save signal — um signal universal quebraria a semântica condicional do reajuste (apartment.last_rent_increase_date NÃO muda quando update_apartment_prices=False). Fatia 0/G: o sweep `{"error"}`→`{"detail"}` foi DEFERIDO para P6 (≈80 sites em ~15 viewsets, vários consumidos pelo mobile/frontend); entregue só a eliminação dos 500 reais (TransferLeaseSerializer, parse helpers, ObjectDoesNotExist→404, validate_password). query_params em `core/query_params.py` (não `core/utils/`, que já é módulo).
 
 ---
 

@@ -64,6 +64,8 @@ O app Expo está quebrado contra o backend (auth por cookie, dual pattern, shape
 ### P4 — Arquitetura e qualidade
 Mover lógica de negócio para services, padronizar erros, resiliência de cache + reescrita da invalidação morta, unificação dos modais de lease + criação atômica, e o gotcha Zod do dual pattern.
 
+> **STATUS (2026-06-12, branch `refactor/p4-architecture-quality`):** P4.1 **EXECUTADO** (47e85d1) · P4.2 **EXECUTADO** (34dfe98) · P4.3 **EXECUTADO PARCIAL** (90aef43 — bugs ativos: condominium_id, expense read schema, global-search, finance cache, aria-labels). Deferidos p/ PR focado: endpoint atômico + unificação LeaseFormModal, parseList sweep, client.ts unwrap, main-layout useCurrentUser, /admin/users sidebar, datas legadas. `{"error"}`→`{"detail"}` sweep deferido p/ P6. Full backend suite 2482 passed; frontend 926 tests + lint + type-check verdes.
+
 ### P5 — Performance
 N+1 nos serializers e dashboards, chamada síncrona ao IBGE no request, memoização de recomputações, e bundle do frontend (`xlsx` lazy + filtro de competência).
 

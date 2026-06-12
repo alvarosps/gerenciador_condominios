@@ -1,7 +1,9 @@
 # Plano P4.2 — Resiliência de cache + reescrita da invalidação do core
 
-> **Estado:** PLANEJADO — nao executado
+> **Estado:** EXECUTADO (branch `refactor/p4-architecture-quality`, commit 34dfe98, 2026-06-12) — full suite 2482 passed.
 > **Prioridade:** FASE P4 · **Branch sugerida:** `fix/cache-resilience` · **Depende de:** nenhum
+>
+> **Notas de execução:** todos os 6 passos entregues. `disconnect_all_signals`/`connect_all_signals` mantiveram o NOME (enxugados internamente para só os 2 receivers toggleáveis) — evita churn nos consumidores (conftest/tests). `invalidate_legacy_financial_caches` ficou em `core/cache.py` (não em `core.signals`) para os services chamarem sem inverter camadas. Receivers mortos de PaymentProof/Notification/DeviceToken removidos.
 
 ---
 
