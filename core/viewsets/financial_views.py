@@ -14,6 +14,7 @@ from rest_framework.decorators import action
 from rest_framework.request import Request
 from rest_framework.response import Response
 
+from core.cache import invalidate_legacy_financial_caches
 from core.models import (
     CreditCard,
     EmployeePayment,
@@ -354,6 +355,10 @@ class ExpenseInstallmentViewSet(viewsets.ModelViewSet):
             affected_expense_ids = set(installments.values_list("expense_id", flat=True))
             for expense in Expense.objects.filter(pk__in=affected_expense_ids):
                 self._check_and_complete_expense(expense)
+
+            # .update() bypasses post_save, so a partial pay (no expense completed) would
+            # leave the financial dashboards stale — invalidate explicitly.
+            invalidate_legacy_financial_caches()
 
         updated_installments = ExpenseInstallment.objects.filter(pk__in=installment_ids)
         serializer = self.get_serializer(updated_installments, many=True)

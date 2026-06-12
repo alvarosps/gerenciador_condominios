@@ -133,6 +133,9 @@ if _redis_url:
             "LOCATION": _redis_url,
             "OPTIONS": {
                 "CLIENT_CLASS": "django_redis.client.DefaultClient",
+                # A Redis outage must degrade to a cache miss (serve from DB), not a 500.
+                # Covers both @cache_result and the DRF throttle, which share this backend.
+                "IGNORE_EXCEPTIONS": True,
                 "CONNECTION_POOL_KWARGS": {
                     "max_connections": 50,
                     "retry_on_timeout": True,
@@ -144,6 +147,8 @@ if _redis_url:
             "TIMEOUT": config("CACHE_TIMEOUT", default=300, cast=int),  # 5 minutes default
         }
     }
+    # Log ignored Redis exceptions instead of swallowing them silently.
+    DJANGO_REDIS_LOG_IGNORED_EXCEPTIONS = True
 else:
     CACHES = {
         "default": {

@@ -14,6 +14,7 @@ from typing import Any
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 
+from core.cache import invalidate_legacy_financial_caches
 from core.models import (
     Expense,
     ExpenseInstallment,
@@ -296,6 +297,9 @@ def _mark_credit_card_paid(
             is_paid=False,
         )
         count = unpaid.update(is_paid=True, paid_date=payment_date)
+        if count:
+            # .update() bypasses post_save — invalidate the financial caches explicitly.
+            invalidate_legacy_financial_caches()
 
     if count == 0:
         return {"status": "already_paid", "message": "Todas as parcelas do cartão já estão pagas."}

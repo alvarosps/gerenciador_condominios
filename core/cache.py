@@ -17,7 +17,7 @@ Usage:
         return Lease.objects.filter(contract_generated=True)
 
     # Invalidate cache
-    CacheManager.invalidate_model('Lease', lease_id)
+    CacheManager.invalidate_pattern('lease_list*')
 """
 
 import hashlib
@@ -173,42 +173,15 @@ class CacheManager:
     """
     Centralized cache management with pattern-based invalidation.
 
-    Provides methods for invalidating caches by model, by pattern, or entirely.
+    Provides methods for invalidating caches by real key prefix, or entirely.
 
     Examples:
-        # Invalidate all caches for a specific Lease
-        CacheManager.invalidate_model('Lease', pk=1)
-
-        # Invalidate all Lease caches
-        CacheManager.invalidate_model('Lease')
-
-        # Invalidate by pattern
-        CacheManager.invalidate_pattern('lease_list:*')
+        # Invalidate by prefix (keys are hyphenated; use "<prefix>*")
+        CacheManager.invalidate_pattern('dashboard-lease-metrics*')
 
         # Clear all caches
         CacheManager.clear_all()
     """
-
-    @staticmethod
-    def invalidate_model(model_name: str, pk: int | None = None) -> int:
-        """
-        Invalidate all cache keys for a model or specific instance.
-
-        Args:
-            model_name: Name of the model
-            pk: Primary key of specific instance (None to invalidate all)
-
-        Returns:
-            Number of keys invalidated
-
-        Examples:
-            >>> CacheManager.invalidate_model("Lease", pk=1)
-            3
-            >>> CacheManager.invalidate_model("Apartment")
-            15
-        """
-        pattern = f"*{model_name}:{pk}*" if pk is not None else f"*{model_name}*"
-        return CacheManager.invalidate_pattern(pattern)
 
     @staticmethod
     def invalidate_pattern(pattern: str) -> int:
@@ -301,9 +274,9 @@ class CacheManager:
             info = redis_client.info("stats")
             key_prefix = settings.CACHES["default"].get("KEY_PREFIX", "condominios")
 
-            # Count keys with our prefix
+            # Count keys with our prefix via non-blocking scan (KEYS is O(N) and blocks prod).
             pattern = f"{key_prefix}:1:*"
-            keys_count = len(redis_client.keys(pattern))
+            keys_count = sum(1 for _ in redis_client.scan_iter(match=pattern, count=100))
 
             return {
                 "total_keys": keys_count,
@@ -325,26 +298,21 @@ class CacheManager:
             }
 
 
-def invalidate_related_caches(model_instance: Model, related_models: list[str]) -> None:
+# Legacy personal-finance prefixes (cash-flow / financial-dashboard) plus the condominium-finance
+# prefixes that legacy money changes also affect. Keys are hyphenated -> glob "<prefix>*".
+_LEGACY_FINANCIAL_CACHE_PREFIXES = (
+    "cash-flow",
+    "financial-dashboard",
+    "finance-dashboard",
+    "finance-projection",
+)
+
+
+def invalidate_legacy_financial_caches() -> None:
+    """Invalidate the legacy financial + condominium-finance dashboard caches.
+
+    Lives here (not in signals) so services can call it after a bulk ``.update()`` that
+    bypasses ``post_save`` — keeping the Service -> Signals dependency from existing.
     """
-    Invalidate caches for a model instance and its related models.
-
-    Args:
-        model_instance: Model instance that was modified
-        related_models: List of related model names to invalidate
-
-    Examples:
-        # When a Lease is updated, invalidate Apartment and Tenant caches too
-        invalidate_related_caches(lease, ['Apartment', 'Tenant'])
-    """
-    model_name = model_instance.__class__.__name__
-    pk = model_instance.pk
-
-    # Invalidate the instance itself
-    CacheManager.invalidate_model(model_name, pk)
-
-    # Invalidate related models
-    for related_model in related_models:
-        CacheManager.invalidate_model(related_model)
-
-    logger.info(f"Invalidated caches for {model_name}:{pk} and related models: {related_models}")
+    for prefix in _LEGACY_FINANCIAL_CACHE_PREFIXES:
+        CacheManager.invalidate_pattern(f"{prefix}*")
