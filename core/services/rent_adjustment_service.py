@@ -209,8 +209,8 @@ class RentAdjustmentService:
         today = timezone.now().date()
         alert_cutoff = today + relativedelta(months=alert_months)
 
-        # Fetch latest IPCA data (will only hit API if new months available)
-        IPCAService.fetch_latest()
+        # Read only from the DB — the external IPCA fetch runs in the daily cron
+        # (send_finance_alerts), never in the request path (P5.1).
         latest_ipca_month = IPCAService.get_latest_available_month()
 
         # Calculate a single IPCA percentage: last 12 months from latest available

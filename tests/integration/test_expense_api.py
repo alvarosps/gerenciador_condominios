@@ -4,6 +4,8 @@ from datetime import date
 from decimal import Decimal
 
 import pytest
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from freezegun import freeze_time
 from rest_framework import status
 
@@ -362,6 +364,73 @@ class TestExpenseAPI:
         url = f"{self.url}{simple_expense.pk}/generate_installments/"
         response = authenticated_api_client.post(url)
         assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    def test_totals_computed_over_prefetch_mixed_installments(
+        self, authenticated_api_client, card_expense, admin_user
+    ):
+        # P5.1: the 3 method fields must read the prefetched installments in Python and stay
+        # identical to the old .filter().count()/.aggregate(Sum) results. Mix paid + unpaid.
+        for i in range(1, 7):
+            make_expense_installment(
+                expense=card_expense,
+                user=admin_user,
+                installment_number=i,
+                total_installments=6,
+                amount=Decimal("200.00"),
+                due_date=date(2026, 6, 22),
+                is_paid=i <= 2,  # 2 paid (400), 4 unpaid (800)
+            )
+
+        response = authenticated_api_client.get(f"{self.url}{card_expense.pk}/")
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["remaining_installments"] == 4
+        assert response.data["total_paid"] == "400.00"
+        assert response.data["total_remaining"] == "800.00"
+
+    def test_totals_zero_when_no_installments(self, authenticated_api_client, simple_expense):
+        # Edge: an expense with no installments → "0" totals (not a crash, matches old behavior).
+        response = authenticated_api_client.get(f"{self.url}{simple_expense.pk}/")
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["remaining_installments"] == 0
+        assert response.data["total_paid"] == "0"
+        assert response.data["total_remaining"] == "0"
+
+    def test_list_totals_no_n_plus_one(self, authenticated_api_client, admin_user):
+        def _make_installment_expense(index: int) -> None:
+            expense = make_expense(
+                user=admin_user,
+                description=f"Parcelado {index}",
+                total_amount=Decimal("600.00"),
+                is_installment=True,
+                total_installments=3,
+            )
+            for n in range(1, 4):
+                make_expense_installment(
+                    expense=expense,
+                    user=admin_user,
+                    installment_number=n,
+                    total_installments=3,
+                    amount=Decimal("200.00"),
+                    due_date=date(2026, 6, 22),
+                    is_paid=n == 1,
+                )
+
+        for i in range(2):
+            _make_installment_expense(i)
+        with CaptureQueriesContext(connection) as ctx_small:
+            r1 = authenticated_api_client.get(self.url)
+        assert r1.status_code == status.HTTP_200_OK
+        small = len(ctx_small)
+
+        for i in range(2, 6):
+            _make_installment_expense(i)
+        with CaptureQueriesContext(connection) as ctx_large:
+            r2 = authenticated_api_client.get(self.url)
+        assert r2.status_code == status.HTTP_200_OK
+        large = len(ctx_large)
+
+        assert small == large, f"expense list totals scale with N: {small} -> {large} queries"
 
 
 @pytest.mark.integration

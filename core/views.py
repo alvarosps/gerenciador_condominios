@@ -17,6 +17,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 
+from .cache import cache_result
 from .models import Apartment, Building, Furniture, Lease, RentPayment, Tenant
 from .permissions import (
     CanGenerateContract,
@@ -48,6 +49,15 @@ MIN_MONTH = 1
 MAX_MONTH = 12
 MIN_YEAR = 2000
 MAX_YEAR = 2100
+
+_RENT_ADJUSTMENT_ALERTS_PREFIX = "dashboard-rent-adjustment-alerts"
+
+
+@cache_result(key_prefix=_RENT_ADJUSTMENT_ALERTS_PREFIX)
+def _cached_rent_adjustment_alerts(alert_months: int = 2) -> dict[str, Any]:
+    """Cache the rent-adjustment alert payload (invalidated by Lease/RentAdjustment/Landlord
+    writes via signals). Reads only the DB — the IPCA fetch happens in the daily cron."""
+    return RentAdjustmentService.get_eligible_leases(alert_months)
 
 
 @api_view(["GET"])
@@ -145,9 +155,13 @@ class ApartmentViewSet(viewsets.ModelViewSet):
         queryset = super().get_queryset()
 
         if self.action in ["list", "retrieve"]:
-            queryset = queryset.select_related("building").prefetch_related(
+            queryset = queryset.select_related(
+                "building",  # ForeignKey: Apartment -> Building
+                "owner",  # ForeignKey: Apartment -> Person (ApartmentSerializer.owner)
+            ).prefetch_related(
                 "furnitures",  # ManyToMany: Apartment -> Furnitures
-                "leases",  # Reverse FK: Apartment -> Leases (for active_lease)
+                # active_lease -> obj.leases.all() -> LeaseNestedForApartmentSerializer.responsible_tenant
+                "leases__responsible_tenant",
             )
 
         if self.action == "list":
@@ -348,6 +362,7 @@ class LeaseViewSet(viewsets.ModelViewSet):
         queryset = queryset.select_related(
             "apartment",  # ForeignKey: Lease -> Apartment
             "apartment__building",  # ForeignKey: Apartment -> Building
+            "apartment__owner",  # ForeignKey: Apartment -> Person (ApartmentSerializer.owner)
             "responsible_tenant",  # ForeignKey: Lease -> Tenant (responsible)
             "resident_dependent",  # ForeignKey: Lease -> Dependent (second occupant)
         )
@@ -362,9 +377,10 @@ class LeaseViewSet(viewsets.ModelViewSet):
 
         if self.action in ["list", "retrieve"]:
             queryset = queryset.prefetch_related(
-                "tenants",  # ManyToMany: Lease -> Tenants (all tenants)
-                "tenants__dependents",  # Reverse FK: Tenant -> Dependents
-                "tenants__furnitures",  # ManyToMany: Tenant -> Furnitures (tenant's own)
+                "tenants",  # ManyToMany: Lease -> Tenants (TenantSummarySerializer)
+                # ApartmentSerializer.get_active_lease reads obj.leases.all() ->
+                # LeaseNestedForApartmentSerializer.responsible_tenant.
+                "apartment__leases__responsible_tenant",
                 "apartment__furnitures",  # ManyToMany: Apartment -> Furnitures (apartment's)
                 "rent_adjustments",  # Reverse FK: Lease -> RentAdjustments
             )
@@ -925,7 +941,7 @@ class DashboardViewSet(viewsets.ViewSet):
         Returns leases whose 12-month adjustment window falls within the next
         2 months or is already overdue.
         """
-        data = RentAdjustmentService.get_eligible_leases()
+        data = _cached_rent_adjustment_alerts()
         return Response(
             data,
             status=status.HTTP_200_OK,

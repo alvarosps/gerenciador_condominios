@@ -48,11 +48,21 @@ class BillGenerationService:
         )
 
     @staticmethod
-    def is_account_eligible(account: BillingAccount, month_start: date) -> bool:
+    def is_account_eligible(
+        account: BillingAccount,
+        month_start: date,
+        *,
+        skip_index: "set[tuple[int, date]] | None" = None,
+    ) -> bool:
         """Active, within tracking_start_month..end_date, and not skipped for the month.
 
         Single source of the "this account generates a recurring bill in month M" predicate,
         shared with CondoProjectionService (the projection must never diverge from generation).
+
+        ``skip_index`` is an optional preloaded ``{(billing_account_id, reference_month)}`` set:
+        when given, the skip check reads it in memory instead of a ``BillSkip.exists()`` per call
+        (the projection batches it over its whole horizon — P5.1). The boolean is identical to the
+        per-query path; generation call sites pass nothing and keep the single-query check.
         """
         if account.lifecycle_state != BillingAccountState.ACTIVE:
             return False
@@ -60,6 +70,8 @@ class BillGenerationService:
             return False
         if account.end_date is not None and account.end_date < month_start:
             return False
+        if skip_index is not None:
+            return (account.pk, month_start) not in skip_index
         return not BillSkip.objects.filter(
             billing_account=account, reference_month=month_start
         ).exists()

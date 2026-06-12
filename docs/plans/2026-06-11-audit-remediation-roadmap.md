@@ -69,6 +69,8 @@ Mover lógica de negócio para services, padronizar erros, resiliência de cache
 ### P5 — Performance
 N+1 nos serializers e dashboards, chamada síncrona ao IBGE no request, memoização de recomputações, e bundle do frontend (`xlsx` lazy + filtro de competência).
 
+> **STATUS (2026-06-12):** ambos os planos P5.1/P5.2 **re-verificados contra o `master` pós-P4** (PR #18). P5.1 re-ancorado (P4.1 deslocou `core/views.py` ~+84 linhas) e o **item 1.5 reescrito** para o mapa de prefixos do P4.2 (`_CORE_MODEL_CACHE_PREFIXES`/`_PROPERTY_CACHE_PREFIXES` em `core/signals.py`, em vez de `invalidate_pattern` por handler); corrigidos item 1.4 (`rent_adjustment_alerts` em 918-932; `cache_result` não importado em views.py) e Passo 7 (horizonte default 12, não 36; ambos os loops de elegibilidade). P5.2 é P4-clean (só drift de um cite de backend); corrigidos a razão do `void` (config eslint, não `void` nos call sites), `__tests__/` inexistente + `use-crud-page.test.tsx` a criar, mensagem de erro do CSV e aria-labels acentuados. Nenhum passo virou redundante/obsoleto por P4 — só re-ancoragem + as correções acima.
+
 ### P6 — Testes, docs, CI e higiene
 Remover supressões de warning, migrar testes para a fronteira HTTP (mock policy), corrigir flakiness das factories, sincronizar toda a documentação com a realidade, e alinhar o CI ao gate canônico (incluir `finances/` e pyright).
 

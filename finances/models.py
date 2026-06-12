@@ -269,6 +269,29 @@ class BillQuerySet(models.QuerySet["Bill"]):
             )
         )
 
+    def with_list_relations(self) -> "BillQuerySet":
+        """Eager-load every relation the Bill serializer reads, so list/overdue do not N+1.
+
+        Covers the line-item category (BillLineItemSerializer nests CategorySerializer), the
+        installment→plan→billing_account chain (get_account_type) and the directly-linked FKs.
+        Shared by BillViewSet.get_queryset and the dashboard ``overdue`` queryset (design §4).
+        """
+        return self.select_related(
+            "building",
+            "category",
+            "billing_account",
+            "condominium",
+            "water_statement",
+            "electricity_statement",
+            "installment__plan__billing_account",
+        ).prefetch_related(
+            # BillLineItemSerializer nests CategorySerializer, which itself nests the
+            # category's condominium (and parent), so the category prefetch must reach both.
+            "line_items__category__condominium",
+            "line_items__category__parent",
+            "allocations",
+        )
+
 
 # SoftDeleteManager.get_queryset already filters is_deleted=False; from_queryset keeps
 # that and exposes with_amounts()/with_deleted() on Bill.objects (django-stubs friendly).

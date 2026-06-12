@@ -2,6 +2,8 @@
 
 > **Estado:** PLANEJADO — nao executado
 > **Prioridade:** FASE P5 · **Branch sugerida:** `perf/frontend-bundle` · **Depende de:** nenhum
+>
+> **Revisão 2026-06-12 (pós-merge de P4):** âncoras re-verificadas contra o `master` atual. P4.3 mexeu em `use-bills.ts` mas só adicionou `invalidateFinanceMoneyCaches` ABAIXO (linhas 118-126) das âncoras que este plano cita (15-23, 92-94, 99) — **zero drift** aqui. Correções aplicadas: (a) §A passo 6 — a razão de os consumidores compilarem não é "já usam `void`" (eles usam `onClick={() => crud.handleExport(...)}` puro), e sim `.eslintrc.json` `no-misused-promises` `checksVoidReturn.attributes:false`; (b) `use-crud-page.test.tsx` e o diretório `frontend/lib/hooks/__tests__/` **não existem** — são criação, não "estender"; (c) `bills-page.test.tsx` existe mas seu helper `setBillsResponse` não captura query params (precisa handler que capture); (d) mensagem de erro do CSV é "Erro ao exportar arquivo CSV"; (e) aria-labels acentuados; (f) cite de backend `crud_views.py` é 341-343, não 315-317.
 
 ## Objetivo
 
@@ -27,13 +29,13 @@ Passos (na ordem):
 3. Tornar `exportToCSV` **`async`** da mesma forma: `const XLSX = await import('xlsx');` no inicio do `try`, mantendo json_to_sheet/sheet_to_csv e a logica de Blob/download intactas.
 4. `setIsExporting(true)` permanece antes do `try`; o `finally { setIsExporting(false); }` continua valido (roda apos o `await`). O `catch` mantem `handleError(...)` + `throw new Error('Erro ao exportar arquivo' | '... CSV')`.
 5. **Atualizar o consumidor** `use-crud-page.ts`. O `handleExport` (linha 244) hoje e `useCallback((format, data) => { ... exportToExcel(...) ... })` sincrono e usa `try/catch`. Como `exportToExcel`/`exportToCSV` passam a retornar `Promise`, tornar o callback **`async`** e dar `await` nas chamadas para que o `try/catch` continue capturando a rejeicao (sem `await`, a Promise rejeitada escaparia do `try`). Os `toast.success(...)` so disparam apos o `await` resolver. Assinatura no `UseCrudPageReturn` (linha 98) passa de `handleExport: (format, data) => void` para `handleExport: (format, data) => Promise<void>` — atualizar o tipo da interface.
-6. **Verificar todos os consumidores de `handleExport`** (grep `handleExport` em `frontend/app`): hoje sao chamados em `onClick`/menu handlers que descartam o retorno; chamada `void crud.handleExport(...)` ou `onClick={() => { void crud.handleExport(...) }}` continua valida porque React aceita handler que retorna Promise (resultado ignorado). Conferir se algum chamador encadeia `.then`/depende do retorno sincrono — nenhum encontrado; se aparecer, ajustar para `await`.
+6. **Consumidores de `handleExport` — nenhuma edição necessária.** Os 10 call sites sao todos `onClick={() => crud.handleExport('excel'|'csv', <data> ?? [])}` **sem** `void` — em `buildings/page.tsx:135,139`, `apartments/page.tsx:250,254`, `leases/page.tsx:300,304`, `furniture/page.tsx:130,134`, `tenants/page.tsx:379,383`. Depois da mudança o arrow passa a retornar uma `Promise`, mas **compila limpo** porque `.eslintrc.json:31-34` define `@typescript-eslint/no-misused-promises` com `checksVoidReturn: { attributes: false }` — uma função que retorna Promise passada a um atributo JSX (`onClick`) NAO é sinalizada. **NAO adicionar `void`** (desnecessário; o arrow já descarta o resultado). A razão antiga ("já usam `void`") está errada — eles nunca usaram `void`; a garantia é a config do eslint. Nenhum chamador encadeia `.then`/depende do retorno síncrono.
 
 > Observacao DRY: o bloco `await import('xlsx')` aparece em duas funcoes irmas; **nao** extrair um wrapper so para isso (YAGNI) — duas linhas identicas e mais simples que um helper que so reexpoe o modulo. Manter inline.
 
 ### Parte B — seletor de competencia em `bills/page.tsx`
 
-Backend ja filtra: `finances/viewsets/crud_views.py:315-317` aplica `queryset.filter(competence_month=<param>)` como **match exato** de data (1o dia do mes, formato ISO `YYYY-MM-01`). `BillFilters` (em `use-bills.ts:15-23`) ja declara `competence_month?: string`. `useBills` ja remove chaves `undefined` antes de mandar como query param (linhas 92-94). Logo, **nenhuma** mudanca de backend/hook e necessaria — so a UI.
+Backend ja filtra: `finances/viewsets/crud_views.py:341-343` (dentro de `_apply_filters`: `competence_month = params.get("competence_month")` / `if competence_month is not None:` / `queryset = queryset.filter(competence_month=competence_month)`) aplica **match exato** de data (1o dia do mes, formato ISO `YYYY-MM-01`). `BillFilters` (em `use-bills.ts:15-23`, `competence_month?: string` na 18) ja declara o campo. `useBills` ja remove chaves `undefined` antes de mandar como query param (linhas 92-94). Logo, **nenhuma** mudanca de backend/hook e necessaria — so a UI.
 
 Estado atual do `BillsPage` (`bills/page.tsx`):
 - linha 62-63: `const now = new Date();` + `const [period] = useState({ year: now.getFullYear(), month: now.getMonth() + 1 });` (period e so-leitura, usado em `handleGenerateMonth`).
@@ -46,11 +48,11 @@ Passos (na ordem):
 2. Adicionar estado de modo de competencia: `const [competenceMode, setCompetenceMode] = useState<'month' | 'all'>('month');` — default `'month'` (mes corrente). Quando `'all'`, nao envia `competence_month` (mantem "todas as competencias").
 3. Calcular o valor ISO do filtro: derivar `const competenceMonthParam = competenceMode === 'all' ? undefined : \`${period.year}-${String(period.month).padStart(2, '0')}-01\`;`. Esse string casa com o `DateField` do backend (match exato no 1o dia do mes).
 4. Injetar no `filters` (linha 72): adicionar `...(competenceMonthParam ? { competence_month: competenceMonthParam } : {})`. Como `useBills` ja limpa `undefined`, o objeto fica limpo.
-5. UI do seletor: na barra de filtros existente (`div` da linha 193, hoje so com o Select de `lifecycleFilter`), adicionar, ANTES do Select de situacao, um grupo com:
-   - Botao chevron "Mes anterior" (`ChevronLeft`, `aria-label="Mes anterior"`) chamando `shiftMonth(-1)`.
+5. UI do seletor: na barra de filtros existente (`div` da linha 193 — `<div className="mb-4 flex flex-wrap items-center gap-3">`, hoje so com o Select de `lifecycleFilter` em 194-206), adicionar, ANTES do Select de situacao, um grupo com:
+   - Botao chevron "Mês anterior" (`ChevronLeft`, `aria-label="Mês anterior"`) chamando `shiftMonth(-1)`. **Manter os acentos** nos `aria-label` ("Mês anterior"/"Próximo mês") para casar com `distribution/page.tsx` e com seletores de teste sensíveis a acento.
    - Label central `formatMonthYear(period.year, period.month)` (`min-w-[10rem] text-center`), com `aria-hidden` quando em modo `'all'` ou desabilitado visualmente.
-   - Botao chevron "Proximo mes" (`ChevronRight`, `aria-label="Proximo mes"`) chamando `shiftMonth(1)`.
-   - Um `Select` (Shadcn, ja importado) "competencia" com duas opcoes: `<SelectItem value="month">Mes selecionado</SelectItem>` e `<SelectItem value="all">Todas as competencias</SelectItem>`, `value={competenceMode}` / `onValueChange={(v) => setCompetenceMode(v as 'month' | 'all')}`. Quando `'all'`, desabilitar os chevrons (`disabled`) e a label fica esmaecida (`text-muted-foreground`) — KISS, sem esconder.
+   - Botao chevron "Próximo mês" (`ChevronRight`, `aria-label="Próximo mês"`) chamando `shiftMonth(1)`.
+   - Um `Select` (Shadcn, ja importado em 24-30) "competencia" com duas opcoes: `<SelectItem value="month">Mês selecionado</SelectItem>` e `<SelectItem value="all">Todas as competências</SelectItem>`, `value={competenceMode}` / `onValueChange={(v) => setCompetenceMode(v as 'month' | 'all')}`. Quando `'all'`, desabilitar os chevrons (`disabled`) e a label fica esmaecida (`text-muted-foreground`) — KISS, sem esconder.
 6. Implementar `shiftMonth` identico ao da distribution page: `function shiftMonth(delta: number) { const base = new Date(period.year, period.month - 1 + delta, 1); setPeriod({ year: base.getFullYear(), month: base.getMonth() + 1 }); }`. Isso trata virada de ano corretamente.
 7. Imports a adicionar em `bills/page.tsx`: `ChevronLeft, ChevronRight` de `lucide-react` (ja importa `CalendarPlus, FileUp, Plus`); `formatMonthYear` de `@/lib/utils/formatters`.
 8. `handleGenerateMonth` (linha 120) continua usando `period.year`/`period.month` — agora o botao "Gerar contas do mes" passa a gerar para o mes **selecionado** no seletor (comportamento mais coerente, ja que period virou navegavel). Sem mudanca de codigo no handler, apenas o efeito de period ser mutavel. Confirmar no teste.
@@ -63,9 +65,10 @@ Passos (na ordem):
 - `frontend/lib/hooks/use-export.ts` — remover import estatico de `xlsx`; `exportToExcel` e `exportToCSV` viram `async` com `const XLSX = await import('xlsx')` no inicio do `try`.
 - `frontend/lib/hooks/use-crud-page.ts` — `handleExport` vira `async` com `await` nas chamadas de export; tipo no `UseCrudPageReturn` muda para `handleExport: (format: 'excel' | 'csv', data: T[]) => Promise<void>`.
 - `frontend/app/(dashboard)/finances/bills/page.tsx` — `period` mutavel + estado `competenceMode` + `shiftMonth` + `competenceMonthParam` no `filters`; seletor de competencia (chevrons + label + Select) na barra de filtros; imports `ChevronLeft/ChevronRight` e `formatMonthYear`.
-- `frontend/lib/hooks/__tests__/use-export.test.ts` — **criar** (se inexistente) testes para `useExport` cobrindo o caminho async + lazy import. (Conferir antes; se ja existir, estender.)
-- `frontend/lib/api/hooks/__tests__/use-bills.test.tsx` — estender: garantir que `useBills({ competence_month })` repassa o param (ja existe um teste "forwards filters as query params" na linha 74-97 cobrindo `competence_month: '2026-06-01'`; manter e usar como ancora de regressao).
-- `frontend/app/(dashboard)/finances/bills/__tests__/bills-page.test.tsx` — estender: default envia `competence_month` do mes corrente; alternar para "Todas as competencias" remove o param; chevrons navegam o mes e o param muda.
+- `frontend/lib/hooks/__tests__/use-export.test.ts` — **CRIAR** (confirmado inexistente). O proprio diretorio `frontend/lib/hooks/__tests__/` **nao existe ainda** — criar o diretorio junto com o arquivo. Testes para `useExport` cobrindo o caminho async + lazy import.
+- `frontend/lib/hooks/__tests__/use-crud-page.test.tsx` — **CRIAR** (confirmado inexistente; a redacao antiga "estender o __tests__ existente" estava ERRADA — nao ha arquivo nem diretorio). Mockar `useExport` na fronteira do hook (unico mock sancionado aqui, ja que o export real dispara xlsx/DOM). Cobrir os 4 cenarios de `handleExport` abaixo.
+- `frontend/lib/api/hooks/__tests__/use-bills.test.tsx` — estender (EXISTE): garantir que `useBills({ competence_month })` repassa o param (ja existe um teste "forwards filters as query params" na linha 74-97 cobrindo `competence_month: '2026-06-01'`; manter e usar como ancora de regressao).
+- `frontend/app/(dashboard)/finances/bills/__tests__/bills-page.test.tsx` — estender (EXISTE, 187 linhas): default envia `competence_month` do mes corrente; alternar para "Todas as competencias" remove o param; chevrons navegam o mes e o param muda. **Atenção:** o helper `setBillsResponse` (linhas 30-34) NAO captura query params — para assertar `competence_month` adicionar um handler `http.get` que capture os searchParams (espelhar `use-bills.test.tsx:76-86`); reusar o helper `mockGenerate` (linhas 43-53) para o caso "gerar usa o mes selecionado". Manter o sibling `bills-page-import.test.tsx` verde.
 
 ## TDD — cenários de teste
 
@@ -73,25 +76,28 @@ Passos (na ordem):
 - `exportToExcel resolve uma Promise e dispara o download` — chamar `await exportToExcel(data, columns)` e afirmar `{ success: true, filename }` com sufixo `.xlsx`; mock de `XLSX.writeFile` na fronteira (spy sobre o modulo `xlsx` dinamico) para nao escrever arquivo real no jsdom.
 - `exportToCSV resolve uma Promise e cria um Blob CSV` — `await exportToCSV(...)`; afirmar retorno `.csv` e que `document.createElement('a').click()` foi chamado (spy em `URL.createObjectURL` / `link.click`).
 - `isExporting volta a false apos resolver (finally)` — apos `await`, `isExporting === false`.
-- `propaga erro como "Erro ao exportar arquivo" quando o xlsx falha` (edge) — forcar rejeicao no caminho de geracao e afirmar `rejects.toThrow('Erro ao exportar arquivo')`.
+- `propaga erro como "Erro ao exportar arquivo" quando o xlsx falha` (edge, Excel) — forcar rejeicao no caminho de geracao e afirmar `rejects.toThrow('Erro ao exportar arquivo')`. **Nota:** o caminho CSV lanca a mensagem ESPECIFICA `'Erro ao exportar arquivo CSV'` (use-export.ts:142-144) — o teste do CSV deve assertar essa string, nao a generica.
 - **Regressao (lazy import):** `o modulo xlsx nao e avaliado ate o handler ser chamado` — afirmar que apenas apos `await exportToExcel(...)` o `import('xlsx')` resolve (ou, alternativa pragmatica em jsdom: que `exportToExcel` e uma funcao `async` cujo `.constructor.name === 'AsyncFunction'`, provando que o caminho assincrono existe). A prova canonica de "xlsx fora do chunk inicial" e o `next build` (ver gate).
 
-### `use-crud-page` (via `__tests__` existente, estender)
+### `use-crud-page` (CRIAR `lib/hooks/__tests__/use-crud-page.test.tsx` — diretorio e arquivo novos)
 - `handleExport excel chama exportToExcel e mostra toast de sucesso apos await` — mockar `useExport` (fronteira do hook) com `exportToExcel` retornando Promise resolvida; afirmar `toast.success('Arquivo Excel exportado com sucesso!')` apos `await`.
-- `handleExport csv com erro mostra toast de erro` (edge) — `exportToCSV` rejeita; afirmar `toast.error('Erro ao exportar arquivo')` (prova que o `await` mantem o erro dentro do `try/catch`).
-- `handleExport avisa quando nao ha dados` (edge) — `data: []` ⇒ `toast.warning('Não há dados para exportar')`, sem chamar export.
+- `handleExport csv com erro mostra toast de erro` (edge) — `exportToCSV` rejeita; afirmar `toast.error('Erro ao exportar arquivo')` — a mensagem do toast no `catch` de `use-crud-page.ts:269-272` é a generica, independente do path (prova que o `await` mantem o erro dentro do `try/catch`).
+- `handleExport avisa quando nao ha dados` (edge) — passar `data: []` (o guard usa `data?.length === 0`, não `!data?.length`) ⇒ `toast.warning('Não há dados para exportar')`, sem chamar export.
 - `handleExport avisa quando export nao configurado` (edge) — sem `exportColumns`/`exportFilename` ⇒ `toast.warning('Exportação não configurada')`.
 
 ### `use-bills.test.tsx` (vitest + MSW)
 - **(ja existe — regressao)** `forwards filters as query params` cobre `competence_month: '2026-06-01'`; manter passando apos as mudancas.
 
 ### `bills-page.test.tsx` (vitest + MSW + userEvent)
+
+> Para capturar `competence_month` é preciso um handler `http.get` que leia `new URL(request.url).searchParams` (espelhar `use-bills.test.tsx:76-86`); o helper `setBillsResponse` (30-34) ignora query params. As queries de chevron usam `getByRole('button', { name: 'Mês anterior' | 'Próximo mês' })` (aria-labels acentuados).
+
 - `por padrao busca a competencia do mes corrente` (regressao do bug) — capturar o query param da requisicao GET `/finances/bills/` e afirmar `competence_month === <YYYY>-<MM>-01` do mes atual (derivar do `new Date()` no teste com `vi.setSystemTime` para determinismo).
-- `alternar para "Todas as competencias" remove o filtro de competencia` — selecionar a opcao "Todas as competencias"; afirmar que a nova requisicao GET nao contem `competence_month`.
-- `chevron "Mes anterior" muda o competence_month para o mes anterior` — clicar `ChevronLeft`; afirmar param vira o mes anterior (testar virada de ano com `vi.setSystemTime(new Date('2026-01-15'))` ⇒ `2025-12-01`).
-- `chevron "Proximo mes" avanca o competence_month` — clicar `ChevronRight`; afirmar param do proximo mes.
-- `chevrons ficam desabilitados em modo "Todas as competencias"` (edge) — selecionar "all"; afirmar `ChevronLeft`/`ChevronRight` `disabled`.
-- `"Gerar contas do mes" usa o mes selecionado` — navegar com chevron e clicar "Gerar contas do mes"; afirmar que `useGenerateMonthBills().mutate` recebeu o `{ year, month }` navegado (estender o mock `mockGenerate` ja existente).
+- `alternar para "Todas as competências" remove o filtro de competencia` — selecionar a opcao "Todas as competências"; afirmar que a nova requisicao GET nao contem `competence_month`.
+- `chevron "Mês anterior" muda o competence_month para o mes anterior` — clicar `ChevronLeft` (aria-label "Mês anterior"); afirmar param vira o mes anterior (testar virada de ano com `vi.setSystemTime(new Date('2026-01-15'))` ⇒ `2025-12-01`).
+- `chevron "Próximo mês" avanca o competence_month` — clicar `ChevronRight` (aria-label "Próximo mês"); afirmar param do proximo mes.
+- `chevrons ficam desabilitados em modo "Todas as competências"` (edge) — selecionar "all"; afirmar `ChevronLeft`/`ChevronRight` `disabled`.
+- `"Gerar contas do mês" usa o mes selecionado` — navegar com chevron e clicar "Gerar contas do mês"; afirmar que `useGenerateMonthBills().mutate` recebeu o `{ year, month }` navegado (reusar o helper `mockGenerate` ja existente, linhas 43-53).
 - **(manter)** os testes existentes de agrupamento/lifecycle/empty-state continuam verdes (a resposta MSW e mockada, independente do param).
 
 ## Migrations / dados

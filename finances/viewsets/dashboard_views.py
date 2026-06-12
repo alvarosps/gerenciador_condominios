@@ -228,9 +228,8 @@ class FinanceDashboardViewSet(viewsets.ViewSet):
         overdue_lookup: dict[str, object] = {"is_overdue": True}
         bills_qs = (
             Bill.objects.with_amounts(today_sp())
+            .with_list_relations()
             .filter(**overdue_lookup)
-            .select_related("building", "category", "billing_account", "condominium")
-            .prefetch_related("line_items", "allocations")
             .order_by("due_date")
         )
         if building_id is not None:

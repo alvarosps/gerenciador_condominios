@@ -31,6 +31,7 @@ from core.services.rent_schedule_service import RentScheduleService
 from core.services.timezone import current_month_sp
 from finances.models import (
     BillingAccount,
+    BillSkip,
     CondoMonthClose,
     CondoMonthCloseStatus,
     Employee,
@@ -62,6 +63,18 @@ class CondoProjectionService:
         closed month; net/cash are never re-derived for closed or current months (DRY).
         """
         current = current_month_sp()
+        # Preload every BillSkip across the projected horizon once, so each future month's
+        # eligibility checks read an in-memory set instead of a BillSkip.exists() per account
+        # per month (N*months queries -> 1 — P5.1).
+        last_month = current
+        for _ in range(max(months - 1, 0)):
+            last_month = _next_month(last_month)
+        skip_index: set[tuple[int, date]] = {
+            (ba_id, ref_month)
+            for ba_id, ref_month in BillSkip.objects.filter(
+                reference_month__gte=current, reference_month__lte=last_month
+            ).values_list("billing_account_id", "reference_month")
+        }
         running = CondoBalanceService.cash_balance(current, building_id)
         rows: list[dict[str, Any]] = []
         cursor = current
@@ -92,7 +105,7 @@ class CondoProjectionService:
                     cursor.year, cursor.month, building_id
                 )
                 expense = CondoProjectionService._projected_expenses(
-                    cursor.year, cursor.month, building_id
+                    cursor.year, cursor.month, building_id, skip_index=skip_index
                 )
                 net = quantize_money(revenue - expense)
                 running = quantize_money(running + net)
@@ -156,7 +169,13 @@ class CondoProjectionService:
         return rent + income
 
     @staticmethod
-    def _projected_expenses(year: int, month: int, building_id: int | None = None) -> Decimal:
+    def _projected_expenses(
+        year: int,
+        month: int,
+        building_id: int | None = None,
+        *,
+        skip_index: "set[tuple[int, date]] | None" = None,
+    ) -> Decimal:
         """Projected expenses (raw Decimal) of a future month (design §3.2/§7/§8 — embedded dedup).
 
         Σ expected_amount of eligible recurring accounts (the SAME eligibility predicate as
@@ -165,6 +184,9 @@ class CondoProjectionService:
         standalone — the embedded parcela rides on top of the account's consumo, never doubled) +
         projected payroll (condo level — only in the condo-wide view). ``building_id`` scopes to a
         building; the condo-level (building=null) items enter only when ``building_id`` is None.
+
+        ``skip_index`` (preloaded by :meth:`project` over the whole horizon) lets both eligibility
+        loops check skips in memory instead of one BillSkip.exists() per (account, month) — P5.1.
         """
         reference_month = date(year, month, 1)
         total = ZERO
@@ -176,7 +198,9 @@ class CondoProjectionService:
         if building_id is not None:
             accounts = accounts.filter(building_id=building_id)
         for account in accounts:
-            if BillGenerationService.is_account_eligible(account, reference_month):
+            if BillGenerationService.is_account_eligible(
+                account, reference_month, skip_index=skip_index
+            ):
                 total += account.expected_amount
 
         # Standalone parcelas always count when active+due; embedded parcelas count ONLY when their
@@ -206,7 +230,7 @@ class CondoProjectionService:
         for installment in embedded:
             host_account = installment.plan.billing_account
             if host_account is not None and BillGenerationService.is_account_eligible(
-                host_account, reference_month
+                host_account, reference_month, skip_index=skip_index
             ):
                 total += installment.amount
 

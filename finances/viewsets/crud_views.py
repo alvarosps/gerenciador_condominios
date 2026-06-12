@@ -316,19 +316,7 @@ class BillViewSet(viewsets.ModelViewSet):
     pagination_class = LargePageNumberPagination
 
     def get_queryset(self) -> QuerySet[Bill]:
-        queryset = (
-            Bill.objects.with_amounts(today_sp())
-            .select_related(
-                "building",
-                "category",
-                "billing_account",
-                "condominium",
-                "water_statement",
-                "electricity_statement",
-                "installment__plan__billing_account",
-            )
-            .prefetch_related("line_items", "allocations")
-        )
+        queryset = Bill.objects.with_amounts(today_sp()).with_list_relations()
         return self._apply_filters(queryset, self.request.query_params)
 
     def _apply_filters(self, queryset: QuerySet[Bill], params: QueryDict) -> QuerySet[Bill]:

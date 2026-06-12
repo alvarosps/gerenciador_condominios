@@ -37,6 +37,7 @@ from .models import (
     FinancialSettings,
     Furniture,
     Income,
+    Landlord,
     Lease,
     MonthSnapshot,
     Person,
@@ -77,8 +78,12 @@ _PROPERTY_CACHE_PREFIXES = (
     "dashboard-building-stats",
     "dashboard-tenant-stats",
     "dashboard-late-payment",
+    "dashboard-rent-adjustment-alerts",
     "cash-flow-projection",
 )
+# The rent-adjustment alert payload depends on Lease, RentAdjustment and the Landlord
+# fallback percentage, so each of those writes must drop "dashboard-rent-adjustment-alerts".
+_RENT_ADJUSTMENT_ALERTS_PREFIXES = ("dashboard-rent-adjustment-alerts",)
 _CORE_MODEL_CACHE_PREFIXES: dict[str, tuple[str, ...]] = {
     "Building": _PROPERTY_CACHE_PREFIXES,
     "Apartment": _PROPERTY_CACHE_PREFIXES,
@@ -91,6 +96,8 @@ _CORE_MODEL_CACHE_PREFIXES: dict[str, tuple[str, ...]] = {
     ),
     "Furniture": ("dashboard-financial-summary", "dashboard-lease-metrics"),
     "Dependent": ("dashboard-tenant-stats",),
+    "RentAdjustment": _RENT_ADJUSTMENT_ALERTS_PREFIXES,
+    "Landlord": _RENT_ADJUSTMENT_ALERTS_PREFIXES,
 }
 
 
@@ -470,8 +477,9 @@ def invalidate_rent_adjustment_finance_cache_on_save(
     sender: type[RentAdjustment], instance: RentAdjustment, **kwargs: Any
 ) -> None:
     """A rent adjustment changes effective_rental_value, hence the condominium
-    projection — invalidate finance-* (design §11)."""
+    projection — invalidate finance-* (design §11) and the rent-adjustment alerts."""
     _invalidate_finance_module_caches()
+    _invalidate_core_model_caches("RentAdjustment")
 
 
 @receiver(post_delete, sender=RentAdjustment)
@@ -479,6 +487,23 @@ def invalidate_rent_adjustment_finance_cache_on_delete(
     sender: type[RentAdjustment], instance: RentAdjustment, **kwargs: Any
 ) -> None:
     _invalidate_finance_module_caches()
+    _invalidate_core_model_caches("RentAdjustment")
+
+
+@receiver(post_save, sender=Landlord)
+def invalidate_landlord_cache_on_save(
+    sender: type[Landlord], instance: Landlord, **kwargs: Any
+) -> None:
+    """The active Landlord's rent_adjustment_percentage feeds the alert fallback, so a
+    Landlord write must drop the rent-adjustment alerts cache."""
+    _invalidate_core_model_caches("Landlord")
+
+
+@receiver(post_delete, sender=Landlord)
+def invalidate_landlord_cache_on_delete(
+    sender: type[Landlord], instance: Landlord, **kwargs: Any
+) -> None:
+    _invalidate_core_model_caches("Landlord")
 
 
 @receiver(post_save, sender=MonthSnapshot)

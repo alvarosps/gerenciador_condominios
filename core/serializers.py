@@ -3,7 +3,6 @@ from decimal import Decimal
 from typing import Any
 
 from django.contrib.auth import get_user_model
-from django.db.models import Sum
 from django.utils import timezone
 from rest_framework import serializers
 
@@ -931,15 +930,15 @@ class ExpenseSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "created_at", "updated_at"]
 
     def get_remaining_installments(self, obj: Expense) -> int:
-        return obj.installments.filter(is_paid=False).count()
+        # Iterate the prefetched installments (ExpenseViewSet prefetches them) instead of a
+        # per-row .count()/.aggregate() that would ignore the prefetch and N+1 (P5.1).
+        return sum(1 for i in obj.installments.all() if not i.is_paid)
 
     def get_total_paid(self, obj: Expense) -> str:
-        result = obj.installments.filter(is_paid=True).aggregate(total=Sum("amount"))
-        return str(result["total"] or Decimal(0))
+        return str(sum((i.amount for i in obj.installments.all() if i.is_paid), Decimal(0)))
 
     def get_total_remaining(self, obj: Expense) -> str:
-        result = obj.installments.filter(is_paid=False).aggregate(total=Sum("amount"))
-        return str(result["total"] or Decimal(0))
+        return str(sum((i.amount for i in obj.installments.all() if not i.is_paid), Decimal(0)))
 
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         attrs = super().validate(attrs)
@@ -1101,26 +1100,15 @@ class IncomeSerializer(serializers.ModelSerializer):
         return value
 
 
-class RentPaymentSerializer(FinalizedMonthProtectionMixin, serializers.ModelSerializer):
-    lease = LeaseSerializer(read_only=True)
+class RentPaymentValidationMixin(serializers.Serializer):
+    """Shared rent-payment write path — ``lease_id`` write field, amount > 0 and reference month
+    pinned to the 1st of the month. Lets the full-lease and slim-lease serializers share the
+    write behaviour without one redeclaring the other's ``lease`` field type.
+    """
+
     lease_id = serializers.PrimaryKeyRelatedField(
         queryset=Lease.objects.all(), source="lease", write_only=True
     )
-
-    class Meta:
-        model = RentPayment
-        fields = [
-            "id",
-            "lease",
-            "lease_id",
-            "reference_month",
-            "amount_paid",
-            "payment_date",
-            "notes",
-            "created_at",
-            "updated_at",
-        ]
-        read_only_fields = ["id", "created_at", "updated_at"]
 
     def validate_amount_paid(self, value: Decimal) -> Decimal:
         # Mirrors the DB CheckConstraint rent_payment_amount_positive (a clean 400 vs a 500).
@@ -1138,6 +1126,74 @@ class RentPaymentSerializer(FinalizedMonthProtectionMixin, serializers.ModelSeri
         if reference_month:
             return date(reference_month.year, reference_month.month, 1)
         return None
+
+
+class RentPaymentSerializer(
+    FinalizedMonthProtectionMixin, RentPaymentValidationMixin, serializers.ModelSerializer
+):
+    lease = LeaseSerializer(read_only=True)
+
+    class Meta:
+        model = RentPayment
+        fields = [
+            "id",
+            "lease",
+            "lease_id",
+            "reference_month",
+            "amount_paid",
+            "payment_date",
+            "notes",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "created_at", "updated_at"]
+
+
+class RentPaymentBuildingSerializer(serializers.ModelSerializer):
+    """id + name only — the building reference the rent-payments admin screen shows."""
+
+    class Meta:
+        model = Building
+        fields = ["id", "name"]
+        read_only_fields = fields
+
+
+class RentPaymentApartmentSerializer(serializers.ModelSerializer):
+    """Slim apartment for rent payments: no owner PII, no furnitures/active_lease."""
+
+    building = RentPaymentBuildingSerializer(read_only=True)
+
+    class Meta:
+        model = Apartment
+        fields = ["id", "number", "building"]
+        read_only_fields = fields
+
+
+class RentPaymentLeaseSerializer(serializers.ModelSerializer):
+    """Lightweight lease reference for rent payments (no heavy LeaseSerializer nesting)."""
+
+    apartment = RentPaymentApartmentSerializer(read_only=True)
+    responsible_tenant = TenantSimpleSerializer(read_only=True)
+
+    class Meta:
+        model = Lease
+        fields = ["id", "apartment", "responsible_tenant"]
+        read_only_fields = fields
+
+
+class RentPaymentSlimSerializer(
+    FinalizedMonthProtectionMixin, RentPaymentValidationMixin, serializers.ModelSerializer
+):
+    """Read with a lightweight lease reference — used by the deprecated /api/rent-payments/
+    list+detail to kill the per-row N+1 the full ``LeaseSerializer`` caused (apartment
+    owner/furnitures/active_lease/tenants). The write path (``lease_id`` + amount/reference-month
+    validation) matches :class:`RentPaymentSerializer` via the shared mixin.
+    """
+
+    lease = RentPaymentLeaseSerializer(read_only=True)
+
+    class Meta(RentPaymentSerializer.Meta):
+        pass
 
 
 class EmployeePaymentSerializer(FinalizedMonthProtectionMixin, serializers.ModelSerializer):

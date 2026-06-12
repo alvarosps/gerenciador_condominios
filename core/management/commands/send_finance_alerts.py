@@ -20,6 +20,7 @@ from django.core.management.base import BaseCommand
 from finances.services.iptu_alert_service import IptuAlertService, IptuRiskRow
 
 from core.models import Notification
+from core.services.ipca_service import IPCAService
 from core.services.notification_service import create_notification, is_notification_sent_on
 from core.services.timezone import today_sp
 
@@ -53,6 +54,13 @@ class Command(BaseCommand):
 
     def handle(self, *args: str, **options: str) -> None:
         today = today_sp()
+
+        # Pull the latest IPCA index here (daily cron) instead of in the request path.
+        # IPCAService.fetch_latest short-circuits when the DB already covers the month.
+        latest_ipca = IPCAService.fetch_latest()
+        if latest_ipca is not None:
+            logger.info("Fetched IPCA up to %s", latest_ipca.reference_month)
+
         rows = IptuAlertService.evaluate(today)
         warnings = [r for r in rows if r.level == IptuAlertService.LEVEL_WARNING]
         criticals = [r for r in rows if r.level == IptuAlertService.LEVEL_CRITICAL]
