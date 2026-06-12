@@ -18,10 +18,10 @@ from datetime import date
 from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand
 from finances.services.iptu_alert_service import IptuAlertService, IptuRiskRow
-from finances.services.timezone import today_sp
 
 from core.models import Notification
 from core.services.notification_service import create_notification, is_notification_sent_on
+from core.services.timezone import today_sp
 
 logger = logging.getLogger(__name__)
 

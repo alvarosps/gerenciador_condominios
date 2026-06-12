@@ -14,7 +14,7 @@ Rules (design §4):
 - Reserve is the deposit/withdrawal ledger; transfers are zero-sum on the total balance.
 - Internal sums are raw Decimals; the figure is quantized once at the output boundary
   (quantize_money), so the dashboard and the frozen CondoMonthClose never differ by a cent.
-- "today / current month" only via finances.services.timezone (settings is UTC).
+- "today / current month" only via core.services.timezone (settings is UTC).
 """
 
 from datetime import date
@@ -25,6 +25,7 @@ from django.db.models import QuerySet, Sum
 
 from core.models import FinancialSettings, RentPayment
 from core.services.rent_schedule_service import RentScheduleService
+from core.services.timezone import current_month_sp, today_sp
 from finances.models import (
     Bill,
     BillLifecycleState,
@@ -37,7 +38,6 @@ from finances.models import (
     ReserveMovementKind,
 )
 from finances.money import quantize_money
-from finances.services.timezone import current_month_sp, today_sp
 
 ZERO = Decimal(0)
 ZERO_MONEY = Decimal("0.00")

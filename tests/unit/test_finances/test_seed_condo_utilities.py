@@ -35,10 +35,10 @@ from finances.services.bill_generation_service import BillGenerationService
 from finances.services.condo_balance_service import CondoBalanceService
 from finances.services.installment_plan_service import InstallmentPlanService
 from finances.services.iptu_alert_service import IptuAlertService
-from finances.services.timezone import today_sp
 from freezegun import freeze_time
 
 from core.models import FinancialSettings
+from core.services.timezone import today_sp
 from tests.factories import make_building
 
 pytestmark = pytest.mark.django_db

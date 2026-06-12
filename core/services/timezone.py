@@ -1,9 +1,13 @@
 """Single source of truth for "today / current month" in São Paulo local time.
 
 Django's ``settings.TIME_ZONE`` is ``"UTC"``, so ``timezone.now().date()`` yields
-the UTC date and is wrong around the month boundary in São Paulo (UTC-3). Every
-finances service routes "today / current month" through these helpers (DRY) so the
-month boundary is computed once, consistently.
+the UTC date and is wrong around the day/month boundary in São Paulo (UTC-3). Every
+service that needs "today / current month" routes through these helpers (DRY) so the
+boundary is computed once, consistently.
+
+This helper is a pure timezone utility with no domain dependencies, so both ``core``
+and ``finances`` import it from here without inverting the ``finances → core``
+dependency direction (``core`` must never import ``finances``).
 """
 
 from datetime import date, datetime

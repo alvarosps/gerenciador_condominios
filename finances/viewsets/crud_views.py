@@ -27,6 +27,7 @@ from rest_framework.serializers import BaseSerializer
 
 from core.pagination import CustomPageNumberPagination, LargePageNumberPagination
 from core.permissions import IsAdminUser
+from core.services.timezone import today_sp
 from finances.models import (
     Bill,
     BillingAccount,
@@ -66,7 +67,6 @@ from finances.services.condo_month_close_service import CondoMonthCloseService
 from finances.services.invoice_draft_service import InvoiceDraftService
 from finances.services.invoice_parsing.registry import detect_and_parse
 from finances.services.reserve_service import ReserveService
-from finances.services.timezone import today_sp
 from finances.viewsets.query_params import int_param
 
 MONTHS_IN_YEAR = 12

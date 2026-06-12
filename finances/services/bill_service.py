@@ -26,6 +26,7 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 
 from core.models import Building, Condominium
+from core.services.timezone import today_sp
 from finances.models import (
     Bill,
     BillingAccount,
@@ -38,7 +39,6 @@ from finances.models import (
     WaterBillStatement,
 )
 from finances.services.condo_month_close_service import CondoMonthCloseService
-from finances.services.timezone import today_sp
 
 logger = logging.getLogger(__name__)
 

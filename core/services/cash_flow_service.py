@@ -11,7 +11,6 @@ from typing import Any
 
 from django.db.models import Avg, Max, Q, Sum
 from django.db.models.functions import Coalesce
-from django.utils import timezone
 
 from core.cache import cache_result
 from core.models import (
@@ -33,6 +32,7 @@ from core.models import (
 )
 from core.services.date_calculator import DateCalculatorService
 from core.services.rent_schedule_service import RentScheduleService
+from core.services.timezone import today_sp
 
 MONTHS_IN_YEAR = 12
 UTILITY_LOOKBACK_MONTHS = 3
@@ -69,7 +69,8 @@ class CashFlowService:
         rent_details = []
 
         for lease in leases:
-            rent_income += lease.rental_value
+            effective_value = RentScheduleService.effective_rental_value(lease, reference_date)
+            rent_income += effective_value
             payment = rent_payments.get(lease.id)
             rent_details.append(
                 {
@@ -77,7 +78,7 @@ class CashFlowService:
                     "apartment_number": str(lease.apartment.number),
                     "building_name": lease.apartment.building.street_number,
                     "tenant_name": lease.responsible_tenant.name,
-                    "rental_value": lease.rental_value,
+                    "rental_value": effective_value,
                     "is_paid": payment is not None,
                     "payment_date": payment.payment_date if payment else None,
                 }
@@ -311,7 +312,7 @@ class CashFlowService:
         return CashFlowService._collect_installments(
             month_start,
             next_month,
-            Q(expense__is_debt_installment=True),
+            Q(expense__is_debt_installment=True, expense__is_offset=False),
             skipped_expense_ids,
         )
 
@@ -323,7 +324,7 @@ class CashFlowService:
         return CashFlowService._collect_installments(
             month_start,
             next_month,
-            Q(expense__expense_type=ExpenseType.PROPERTY_TAX),
+            Q(expense__expense_type=ExpenseType.PROPERTY_TAX, expense__is_offset=False),
             skipped_expense_ids,
         )
 
@@ -524,7 +525,7 @@ class CashFlowService:
         - full_occupancy_current: assume all apartments are rented in current month too
         - extra_monthly_expenses: add a fixed amount to monthly expenses (groceries, etc.)
         """
-        today = timezone.now().date()
+        today = today_sp()
         current_year = today.year
         current_month = today.month
         current_month_date = date(current_year, current_month, 1)
@@ -643,9 +644,10 @@ class CashFlowService:
     def _get_projected_income(year: int, month: int) -> Decimal:
         """Calculate projected income for a future month."""
         # Collectible condo rent (single source of truth — same set as get_monthly_income).
+        reference_date = date(year, month, 1)
         rent_income = Decimal("0.00")
-        for lease in RentScheduleService.collectible_leases(date(year, month, 1)):
-            rent_income += lease.rental_value
+        for lease in RentScheduleService.collectible_leases(reference_date):
+            rent_income += RentScheduleService.effective_rental_value(lease, reference_date)
 
         # Recurring extra income
         recurring_income: Decimal = Income.objects.filter(

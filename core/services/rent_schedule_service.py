@@ -27,10 +27,10 @@ from typing import Any, Literal, NamedTuple
 from django.contrib.auth.models import User
 from django.db import transaction
 from django.db.models import Count, QuerySet, Sum
-from django.utils import timezone
 
 from core.models import Apartment, FinancialSettings, Lease, MonthSnapshot, RentPayment
 from core.services.fee_calculator import FeeCalculatorService
+from core.services.timezone import today_sp
 
 logger = logging.getLogger(__name__)
 
@@ -249,7 +249,7 @@ class RentScheduleService:
         its payload on the same day; it defaults to the server date for the legacy rent calendar.
         """
         reference_month = date(year, month, 1)
-        today = as_of if as_of is not None else timezone.now().date()
+        today = as_of if as_of is not None else today_sp()
         context = _MonthContext(
             reference_month=reference_month,
             today=today,
@@ -322,7 +322,7 @@ class RentScheduleService:
         sub-totals match the bill half); it defaults to the server date for the legacy calendar.
         """
         reference_month = date(year, month, 1)
-        today = as_of if as_of is not None else timezone.now().date()
+        today = as_of if as_of is not None else today_sp()
         is_current_month = (year, month) == (today.year, today.month)
         is_current_or_past = (year, month) <= (today.year, today.month)
 
@@ -410,7 +410,7 @@ class RentScheduleService:
         (already paid AND due day passed). Returns ``{status, is_paid, message}``.
         """
         reference_month = reference_month.replace(day=1)
-        today = timezone.now().date()
+        today = today_sp()
         is_paid = RentPayment.objects.filter(
             lease_id=lease_id, reference_month=reference_month
         ).exists()

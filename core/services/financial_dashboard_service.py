@@ -34,6 +34,7 @@ from core.models import (
 
 from .cash_flow_service import MONTHS_IN_YEAR, CashFlowService
 from .date_calculator import DateCalculatorService
+from .rent_schedule_service import RentScheduleService
 
 MAX_BREAK_EVEN_MONTHS = 60
 
@@ -697,6 +698,7 @@ class FinancialDashboardService:
         unpaid_iptu = (
             ExpenseInstallment.objects.filter(
                 expense__expense_type=ExpenseType.PROPERTY_TAX,
+                expense__is_offset=False,
                 due_date__lt=current_month_start,
                 is_paid=False,
             )
@@ -743,7 +745,7 @@ class FinancialDashboardService:
             if lease is None:
                 continue
 
-            rental_value = lease.rental_value
+            rental_value = RentScheduleService.effective_rental_value(lease, month_start)
 
             # Salary offset apartments: rent is compensation, not real income
             if lease.is_salary_offset:
@@ -878,31 +880,6 @@ class FinancialDashboardService:
         return extra_income_total, extra_incomes
 
     @staticmethod
-    def _ensure_employee_payments(month_start: date) -> None:
-        """Auto-create EmployeePayment for employees missing one this month.
-
-        Uses the most recent payment's base_salary as default.
-        Only creates with base_salary; variable_amount stays 0 for manual adjustment.
-        """
-        employees = Person.objects.filter(is_employee=True)
-        for employee in employees:
-            if EmployeePayment.objects.filter(
-                person=employee, reference_month=month_start
-            ).exists():
-                continue
-            last_payment = (
-                EmployeePayment.objects.filter(person=employee).order_by("-reference_month").first()
-            )
-            if last_payment is None:
-                continue
-            EmployeePayment.objects.create(
-                person=employee,
-                reference_month=month_start,
-                base_salary=last_payment.base_salary,
-                variable_amount=Decimal("0.00"),
-            )
-
-    @staticmethod
     def _build_expense_summary(
         month_start: date,
         next_month: date,
@@ -945,6 +922,7 @@ class FinancialDashboardService:
                 due_date__gte=month_start,
                 due_date__lt=next_month,
                 expense__expense_type=ExpenseType.PROPERTY_TAX,
+                expense__is_offset=False,
             )
             .exclude(expense_id__in=skipped_expense_ids)
             .select_related("expense", "expense__building")
@@ -987,9 +965,9 @@ class FinancialDashboardService:
             month_start, skipped_expense_ids
         )
 
-        # Employee salary payments for this month + salary offset rents
-        # Auto-create missing payments for employees based on previous month
-        FinancialDashboardService._ensure_employee_payments(month_start)
+        # Employee salary payments for this month + salary offset rents. Only existing
+        # payments are reported; the carry-forward of missing employees is the month-close
+        # responsibility (MonthAdvanceService), never a side effect of this cached read.
         employee_payments = EmployeePayment.objects.filter(
             reference_month=month_start,
         ).select_related("person")
@@ -1154,6 +1132,7 @@ class FinancialDashboardService:
             due_date__lt=next_month,
             expense__expense_type=expense_type,
             expense__is_debt_installment=True,
+            expense__is_offset=False,
         ).select_related("expense", "expense__building")
 
         # Index debt installments by building name
@@ -1908,6 +1887,7 @@ class FinancialDashboardService:
             due_date__gte=month_start,
             due_date__lt=next_month,
             expense__expense_type=ExpenseType.PROPERTY_TAX,
+            expense__is_offset=False,
         ).select_related(
             "expense",
             "expense__building",
@@ -1957,9 +1937,11 @@ class FinancialDashboardService:
 
     @staticmethod
     def _detail_employee(month_start: date) -> dict[str, Any]:
-        """Return employee salary payment detail + salary offset rents for the month."""
-        FinancialDashboardService._ensure_employee_payments(month_start)
+        """Return employee salary payment detail + salary offset rents for the month.
 
+        Reports only the EmployeePayment rows that exist; it never creates them — the
+        carry-forward belongs to MonthAdvanceService at month close, not to this read path.
+        """
         employee_total = Decimal("0.00")
         employee_details: list[dict[str, Any]] = []
 

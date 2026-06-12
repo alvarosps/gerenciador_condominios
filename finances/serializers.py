@@ -15,6 +15,7 @@ from rest_framework import serializers
 
 from core.models import Building, Condominium, Lease, Person
 from core.serializers import BuildingSerializer, LeaseSerializer, PersonSimpleSerializer
+from core.services.timezone import today_sp
 from finances.models import (
     _CONSUMPTION_TYPES,
     _EMBEDDED_NEEDS_CONSUMPTION_MSG,
@@ -41,7 +42,6 @@ from finances.models import (
     WaterBillStatement,
 )
 from finances.money import money_str
-from finances.services.timezone import today_sp
 
 _ERR_DUPLICATE_BILLING_ACCOUNT = "Já existe uma conta ativa com este prédio, tipo e inscrição/UC."
 

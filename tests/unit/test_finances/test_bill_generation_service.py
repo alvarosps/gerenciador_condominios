@@ -6,9 +6,9 @@ from decimal import Decimal
 import pytest
 from finances.models import Bill, BillBehavior, BillingAccountState
 from finances.services.bill_generation_service import BillGenerationService
-from finances.services.timezone import today_sp
 from freezegun import freeze_time
 
+from core.services.timezone import today_sp
 from tests.factories import make_bill_skip, make_billing_account, make_condominium
 
 pytestmark = pytest.mark.django_db

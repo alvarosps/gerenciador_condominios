@@ -29,7 +29,7 @@ describe('useDailyControl', () => {
       server.use(
         http.get(`${API_BASE}/daily-control/breakdown/`, () => {
           return HttpResponse.json([]);
-        }),
+        })
       );
 
       const { result } = renderHook(() => useDailyBreakdown(2026, 1), {
@@ -45,7 +45,7 @@ describe('useDailyControl', () => {
       server.use(
         http.get(`${API_BASE}/daily-control/breakdown/`, () => {
           return new HttpResponse(null, { status: 500 });
-        }),
+        })
       );
 
       const { result } = renderHook(() => useDailyBreakdown(2026, 3), {
@@ -74,7 +74,7 @@ describe('useDailyControl', () => {
       server.use(
         http.get(`${API_BASE}/daily-control/summary/`, () => {
           return new HttpResponse(null, { status: 500 });
-        }),
+        })
       );
 
       const { result } = renderHook(() => useDailySummary(2026, 3), {
@@ -127,6 +127,59 @@ describe('useDailyControl', () => {
       await waitFor(() => expect(result.current.isSuccess).toBe(true), { timeout: 5000 });
 
       expect(result.current.data?.success).toBe(true);
+    });
+
+    it('should send year/month in the credit_card payload (displayed month)', async () => {
+      let capturedBody: Record<string, unknown> | null = null;
+      server.use(
+        http.post(`${API_BASE}/daily-control/mark_paid/`, async ({ request }) => {
+          capturedBody = (await request.json()) as Record<string, unknown>;
+          return HttpResponse.json({ success: true });
+        })
+      );
+
+      const { result } = renderHook(() => useMarkItemPaid(), {
+        wrapper: createWrapper(),
+      });
+
+      result.current.mutate({
+        item_type: 'credit_card',
+        item_id: 7,
+        payment_date: '2026-06-02',
+        year: 2026,
+        month: 5,
+      });
+
+      await waitFor(() => expect(result.current.isSuccess).toBe(true), { timeout: 5000 });
+
+      expect(capturedBody).toMatchObject({
+        item_type: 'credit_card',
+        item_id: 7,
+        year: 2026,
+        month: 5,
+      });
+    });
+
+    it('should not send year/month for a plain installment payload', async () => {
+      let capturedBody: Record<string, unknown> | null = null;
+      server.use(
+        http.post(`${API_BASE}/daily-control/mark_paid/`, async ({ request }) => {
+          capturedBody = (await request.json()) as Record<string, unknown>;
+          return HttpResponse.json({ success: true });
+        })
+      );
+
+      const { result } = renderHook(() => useMarkItemPaid(), {
+        wrapper: createWrapper(),
+      });
+
+      result.current.mutate({ item_type: 'installment', item_id: 1, payment_date: '2026-03-24' });
+
+      await waitFor(() => expect(result.current.isSuccess).toBe(true), { timeout: 5000 });
+
+      expect(capturedBody).not.toBeNull();
+      expect(capturedBody).not.toHaveProperty('year');
+      expect(capturedBody).not.toHaveProperty('month');
     });
   });
 });

@@ -8,13 +8,14 @@ helper returns the São Paulo date/month, not the UTC one.
 from datetime import date, datetime
 
 from django.utils import timezone
-from finances.services.timezone import (
+from freezegun import freeze_time
+
+from core.services.timezone import (
     SAO_PAULO_TZ,
     current_month_sp,
     now_sp,
     today_sp,
 )
-from freezegun import freeze_time
 
 
 @freeze_time("2026-06-15 12:00:00")
