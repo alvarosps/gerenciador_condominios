@@ -1,26 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { http, HttpResponse } from 'msw';
 import { screen, fireEvent, waitFor } from '@testing-library/react';
 import { renderWithProviders } from '@/tests/test-utils';
+import { server } from '@/tests/mocks/server';
 import { WithdrawDialog } from '../_components/withdraw-dialog';
 import { createMockReserve } from '@/tests/mocks/data/finances';
-import type * as reserveHooks from '@/lib/api/hooks/use-reserves';
-
-type WithdrawResult = ReturnType<typeof reserveHooks.useWithdrawReserve>;
-
-const { mockUseWithdrawReserve, mockMutateAsync } = vi.hoisted(() => ({
-  mockUseWithdrawReserve: vi.fn<() => WithdrawResult>(),
-  mockMutateAsync: vi.fn(),
-}));
-
-vi.mock('@/lib/api/hooks/use-reserves', () => ({
-  useWithdrawReserve: mockUseWithdrawReserve,
-}));
-
-vi.mock('sonner', () => ({
-  toast: { success: vi.fn(), error: vi.fn() },
-}));
-
+import { reserveSchema } from '@/lib/schemas/finances/reserve.schema';
 import { toast } from 'sonner';
+
+const API_BASE = 'http://localhost:8008/api';
+
+// The withdraw goes through the real useWithdrawReserve mutation hitting MSW — no hook is mocked.
+// `toast` is the global sonner mock from tests/setup.ts.
+function reserve(id = 5, balance = '1000.00') {
+  return reserveSchema.parse(createMockReserve({ id, balance }));
+}
 
 function submitDialogForm() {
   const formEl = screen.getByRole('dialog').querySelector('form');
@@ -28,53 +22,58 @@ function submitDialogForm() {
   fireEvent.submit(formEl);
 }
 
-const idle = { isPending: false } as const;
+function spyWithdraw(reserveId: number) {
+  const bodies: Record<string, unknown>[] = [];
+  server.use(
+    http.post(`${API_BASE}/finances/reserves/${reserveId}/withdraw/`, async ({ request }) => {
+      bodies.push((await request.json()) as Record<string, unknown>);
+      return HttpResponse.json(createMockReserve({ id: reserveId, balance: '700.00' }));
+    })
+  );
+  return bodies;
+}
 
 describe('WithdrawDialog', () => {
   beforeEach(() => {
-    mockMutateAsync.mockReset().mockResolvedValue(createMockReserve());
-    mockUseWithdrawReserve.mockReturnValue({
-      ...idle,
-      mutateAsync: mockMutateAsync,
-    } as unknown as WithdrawResult);
     vi.mocked(toast.success).mockReset();
     vi.mocked(toast.error).mockReset();
   });
 
-  it('submits a valid amount and calls withdraw with { reserveId, payload }, then closes', async () => {
+  it('posts the withdraw to /reserves/:id/withdraw/ with the amount, then closes', async () => {
+    const bodies = spyWithdraw(5);
     const onClose = vi.fn();
-    renderWithProviders(
-      <WithdrawDialog open reserve={createMockReserve({ id: 5, balance: 1000 })} onClose={onClose} />,
-    );
+    renderWithProviders(<WithdrawDialog open reserve={reserve(5)} onClose={onClose} />);
+
     fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '300' } });
     submitDialogForm();
-    await waitFor(() => expect(mockMutateAsync).toHaveBeenCalled());
-    expect(mockMutateAsync).toHaveBeenCalledWith(
-      expect.objectContaining({ reserveId: 5, payload: expect.objectContaining({ amount: 300 }) }),
-    );
+
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect(bodies[0]).toMatchObject({ amount: 300 });
     await waitFor(() => expect(onClose).toHaveBeenCalled());
     expect(toast.success).toHaveBeenCalled();
   });
 
-  it('blocks submission when amount <= 0 (Zod, PT) — mutation not called', async () => {
-    renderWithProviders(<WithdrawDialog open reserve={createMockReserve()} onClose={vi.fn()} />);
+  it('blocks submission when amount <= 0 (Zod, PT) — nothing is posted', async () => {
+    const bodies = spyWithdraw(5);
+    renderWithProviders(<WithdrawDialog open reserve={reserve(5)} onClose={vi.fn()} />);
+
     submitDialogForm();
+
     expect(await screen.findByText(/maior que zero/i)).toBeInTheDocument();
-    expect(mockMutateAsync).not.toHaveBeenCalled();
+    expect(bodies).toHaveLength(0);
   });
 
   it('shows the backend insufficient-balance PT error — the front never simulates the balance', async () => {
-    mockMutateAsync.mockRejectedValueOnce(
-      Object.assign(new Error('request failed'), {
-        isAxiosError: true,
-        response: { status: 400, data: { error: 'Saldo da reserva insuficiente.' } },
-      }),
+    server.use(
+      http.post(`${API_BASE}/finances/reserves/5/withdraw/`, () =>
+        HttpResponse.json({ error: 'Saldo da reserva insuficiente.' }, { status: 400 })
+      )
     );
-    renderWithProviders(
-      <WithdrawDialog open reserve={createMockReserve({ id: 5, balance: 100 })} onClose={vi.fn()} />,
-    );
+    renderWithProviders(<WithdrawDialog open reserve={reserve(5, '100.00')} onClose={vi.fn()} />);
+
     fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '999' } });
     submitDialogForm();
+
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Saldo da reserva insuficiente.'));
   });
 });

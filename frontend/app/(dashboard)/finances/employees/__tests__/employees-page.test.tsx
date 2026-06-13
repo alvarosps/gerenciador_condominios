@@ -1,43 +1,19 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { http, HttpResponse } from 'msw';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { renderWithProviders } from '@/tests/test-utils';
+import { renderWithProviders, waitForQueriesToSettle } from '@/tests/test-utils';
+import { server } from '@/tests/mocks/server';
 import { useAuthStore } from '@/store/auth-store';
-import type { Employee } from '@/lib/schemas/finances/employee.schema';
+import { createMockEmployee } from '@/tests/mocks/data/finances';
 import EmployeesPage from '../page';
 
-const deleteMutateAsync = vi.fn().mockResolvedValue(undefined);
-let employeesData: Employee[] = [];
+const API_BASE = 'http://localhost:8008/api';
 
-vi.mock('@/lib/api/hooks/use-employees', () => ({
-  useEmployees: () => ({ data: employeesData, isLoading: false }),
-  useDeleteEmployee: () => ({
-    mutate: vi.fn(),
-    mutateAsync: deleteMutateAsync,
-    isPending: false,
-  }),
-}));
-
-vi.mock('../_components/employee-form-modal', () => ({
-  EmployeeFormModal: () => null,
-}));
-
-function makeEmployee(overrides: Partial<Employee> = {}): Employee {
-  return {
-    id: 1,
-    name: 'Adriana',
-    role: 'Faxineira',
-    payment_type: 'fixed',
-    base_salary: 1320,
-    default_due_day: 5,
-    is_active: true,
-    notes: '',
-    person: null,
-    person_id: null,
-    lease: null,
-    lease_id: null,
-    ...overrides,
-  };
+// Real hooks (useEmployees / useDeleteEmployee) hit MSW (the HTTP boundary); the real auth store
+// drives admin gating. Employee rows come from raw DRF payloads the hook parses with employeeSchema.
+function setEmployees(employees: unknown[]) {
+  server.use(http.get(`${API_BASE}/finances/employees/`, () => HttpResponse.json(employees)));
 }
 
 function setAdmin(isStaff: boolean) {
@@ -47,11 +23,17 @@ function setAdmin(isStaff: boolean) {
   });
 }
 
-beforeEach(() => {
-  deleteMutateAsync.mockClear();
-  employeesData = [makeEmployee()];
-  useAuthStore.setState({ user: null, isAuthenticated: false });
-});
+/** Spy the soft-delete DELETE; records the deleted id parsed from the request path. */
+function spyDelete() {
+  const ids: number[] = [];
+  server.use(
+    http.delete(`${API_BASE}/finances/employees/:id/`, ({ params }) => {
+      ids.push(Number(params.id));
+      return new HttpResponse(null, { status: 204 });
+    })
+  );
+  return ids;
+}
 
 /** Returns the first row-actions trigger (the responsive DataTable renders one per view). */
 function getFirstMenu(): HTMLElement {
@@ -60,31 +42,42 @@ function getFirstMenu(): HTMLElement {
   return menu;
 }
 
+beforeEach(() => {
+  setEmployees([createMockEmployee()]);
+  useAuthStore.setState({ user: null, isAuthenticated: false });
+});
+
 describe('EmployeesPage', () => {
   it('renders the payment type label, salary as currency and link', async () => {
     setAdmin(false);
-    renderWithProviders(<EmployeesPage />);
+    const { queryClient } = renderWithProviders(<EmployeesPage />);
 
     await waitFor(() => expect(screen.getByText('Folha de Pagamento')).toBeInTheDocument());
-    expect(screen.getAllByText('Fixo').length).toBeGreaterThan(0);
+    await waitFor(() => expect(screen.getAllByText('Fixo').length).toBeGreaterThan(0));
     expect(screen.getAllByText('R$ 1.320,00').length).toBeGreaterThan(0);
+
+    await waitForQueriesToSettle(queryClient);
   });
 
   it('shows "—" for a variable-only employee with no base salary (Raymel)', async () => {
     setAdmin(false);
-    employeesData = [makeEmployee({ name: 'Raymel', payment_type: 'variable', base_salary: null })];
-    renderWithProviders(<EmployeesPage />);
+    setEmployees([
+      createMockEmployee({ name: 'Raymel', payment_type: 'variable', base_salary: null }),
+    ]);
+    const { queryClient } = renderWithProviders(<EmployeesPage />);
 
     await waitFor(() => expect(screen.getByText('Folha de Pagamento')).toBeInTheDocument());
-    expect(screen.getAllByText('Variável').length).toBeGreaterThan(0);
+    await waitFor(() => expect(screen.getAllByText('Variável').length).toBeGreaterThan(0));
     // The base-salary cell and the (empty) link cell both render the em dash.
     expect(screen.getAllByText('—').length).toBeGreaterThan(0);
+
+    await waitForQueriesToSettle(queryClient);
   });
 
   it('renders the linked person name when present (Rosa-like)', async () => {
     setAdmin(false);
-    employeesData = [
-      makeEmployee({
+    setEmployees([
+      createMockEmployee({
         name: 'Rosa',
         payment_type: 'mixed',
         person: {
@@ -98,40 +91,53 @@ describe('EmployeesPage', () => {
           notes: '',
         },
       }),
-    ];
-    renderWithProviders(<EmployeesPage />);
+    ]);
+    const { queryClient } = renderWithProviders(<EmployeesPage />);
 
     await waitFor(() => expect(screen.getByText('Folha de Pagamento')).toBeInTheDocument());
-    expect(screen.getAllByText('Rosa Maria').length).toBeGreaterThan(0);
+    await waitFor(() => expect(screen.getAllByText('Rosa Maria').length).toBeGreaterThan(0));
+
+    await waitForQueriesToSettle(queryClient);
   });
 
   it('hides write actions for non-admins', async () => {
     setAdmin(false);
-    renderWithProviders(<EmployeesPage />);
+    const { queryClient } = renderWithProviders(<EmployeesPage />);
 
     await waitFor(() => expect(screen.getByText('Folha de Pagamento')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getAllByText('Fixo').length).toBeGreaterThan(0));
     expect(screen.queryByRole('button', { name: /novo funcionário/i })).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole('button', { name: /ações do funcionário/i }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /ações do funcionário/i })).not.toBeInTheDocument();
+
+    await waitForQueriesToSettle(queryClient);
   });
 
   it('shows write actions for admins', async () => {
     setAdmin(true);
-    renderWithProviders(<EmployeesPage />);
+    const { queryClient } = renderWithProviders(<EmployeesPage />);
 
     await waitFor(() => expect(screen.getByText('Folha de Pagamento')).toBeInTheDocument());
     expect(screen.getByRole('button', { name: /novo funcionário/i })).toBeInTheDocument();
-    expect(
-      screen.getAllByRole('button', { name: /ações do funcionário/i }).length,
-    ).toBeGreaterThan(0);
+    await waitFor(() =>
+      expect(
+        screen.getAllByRole('button', { name: /ações do funcionário/i }).length
+      ).toBeGreaterThan(0)
+    );
+
+    await waitForQueriesToSettle(queryClient);
   });
 
   it('soft-deletes via the AlertDialog confirmation', async () => {
     const user = userEvent.setup();
     setAdmin(true);
-    renderWithProviders(<EmployeesPage />);
+    const deletedIds = spyDelete();
+    const { queryClient } = renderWithProviders(<EmployeesPage />);
     await waitFor(() => expect(screen.getByText('Folha de Pagamento')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(
+        screen.getAllByRole('button', { name: /ações do funcionário/i }).length
+      ).toBeGreaterThan(0)
+    );
 
     await user.click(getFirstMenu());
     await user.click(await screen.findByText('Excluir'));
@@ -139,15 +145,19 @@ describe('EmployeesPage', () => {
     const confirm = await screen.findByRole('button', { name: 'Excluir' });
     await user.click(confirm);
 
-    await waitFor(() => expect(deleteMutateAsync).toHaveBeenCalledWith(1));
+    await waitFor(() => expect(deletedIds).toContain(1));
+
+    await waitForQueriesToSettle(queryClient);
   });
 
   it('shows a PT empty state when there are no employees', async () => {
     setAdmin(true);
-    employeesData = [];
-    renderWithProviders(<EmployeesPage />);
+    setEmployees([]);
+    const { queryClient } = renderWithProviders(<EmployeesPage />);
     await waitFor(() =>
-      expect(screen.getByText('Nenhum funcionário cadastrado')).toBeInTheDocument(),
+      expect(screen.getByText('Nenhum funcionário cadastrado')).toBeInTheDocument()
     );
+
+    await waitForQueriesToSettle(queryClient);
   });
 });

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
-import { renderWithProviders } from '@/tests/test-utils';
+import { renderWithProviders, waitForQueriesToSettle } from '@/tests/test-utils';
 import { useAuthStore } from '@/store/auth-store';
 import DailyControlPage from '../page';
 
@@ -44,7 +44,7 @@ describe('DailyControlPage admin gating', () => {
       isAuthenticated: true,
     });
 
-    renderWithProviders(<DailyControlPage />);
+    const { queryClient } = renderWithProviders(<DailyControlPage />);
 
     await waitFor(() => {
       expect(screen.getByText('Controle Diário')).toBeInTheDocument();
@@ -52,6 +52,8 @@ describe('DailyControlPage admin gating', () => {
 
     // Non-admin users should not see "Nova Despesa" buttons
     expect(screen.queryByText(/nova despesa/i)).not.toBeInTheDocument();
+
+    await waitForQueriesToSettle(queryClient);
   });
 
   it('shows add expense buttons for admin users', async () => {
@@ -66,7 +68,7 @@ describe('DailyControlPage admin gating', () => {
       isAuthenticated: true,
     });
 
-    renderWithProviders(<DailyControlPage />);
+    const { queryClient } = renderWithProviders(<DailyControlPage />);
 
     await waitFor(() => {
       expect(screen.getByText('Controle Diário')).toBeInTheDocument();
@@ -75,6 +77,8 @@ describe('DailyControlPage admin gating', () => {
     // Admin users should see both "Nova Despesa" buttons (current month + next month)
     const addButtons = screen.getAllByText(/nova despesa/i);
     expect(addButtons.length).toBeGreaterThanOrEqual(1);
+
+    await waitForQueriesToSettle(queryClient);
   });
 
   it('renders navigation controls for all users', async () => {
@@ -89,7 +93,7 @@ describe('DailyControlPage admin gating', () => {
       isAuthenticated: true,
     });
 
-    renderWithProviders(<DailyControlPage />);
+    const { queryClient } = renderWithProviders(<DailyControlPage />);
 
     await waitFor(() => {
       expect(screen.getByText('Controle Diário')).toBeInTheDocument();
@@ -98,5 +102,7 @@ describe('DailyControlPage admin gating', () => {
     // Month navigation buttons are always visible
     expect(screen.getByRole('button', { name: /mês anterior/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /próximo mês/i })).toBeInTheDocument();
+
+    await waitForQueriesToSettle(queryClient);
   });
 });

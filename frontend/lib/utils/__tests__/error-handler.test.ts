@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import axios from 'axios';
+import { http, HttpResponse } from 'msw';
+import { server } from '@/tests/mocks/server';
 import {
   isAxiosError,
   isNetworkError,
@@ -53,7 +55,9 @@ describe('isAxiosError', () => {
   });
 
   it('returns false for a real axios error if axios throws', async () => {
-    // Verify against a real AxiosError from axios itself
+    // Verify against a real AxiosError from axios itself. MSW serves a network-level error for
+    // this URL so the assertion runs without an actual outbound request (strict onUnhandledRequest).
+    server.use(http.get('http://definitely-not-real.invalid/', () => HttpResponse.error()));
     try {
       await axios.get('http://definitely-not-real.invalid/');
     } catch (err) {

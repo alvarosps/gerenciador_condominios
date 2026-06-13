@@ -4,7 +4,7 @@ import { server, resetMockData } from './mocks/server';
 
 // Start MSW server before all tests
 beforeAll(() => {
-  server.listen({ onUnhandledRequest: 'warn' });
+  server.listen({ onUnhandledRequest: 'error' });
 });
 
 // Reset handlers and mock data after each test
