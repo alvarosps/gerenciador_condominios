@@ -35,5 +35,5 @@ paths:
 - Dashboard queries in `dashboard_service.py` use aggregation — keep them efficient
 
 ## M2M Relationships
-- LeaseTenant: `db_table='core_lease_tenant_details'` — never change this table name
+- `Lease.tenants` is a plain auto M2M (no `through`/`db_table`); `Lease.responsible_tenant` is the responsible tenant (FK). The old `LeaseTenant`/`core_lease_tenant_details` model was deleted in migration 0004 — it no longer exists.
 - Furniture ↔ Apartment and Furniture ↔ Tenant are standard M2M

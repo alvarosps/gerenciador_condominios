@@ -4,6 +4,13 @@
 
 ```
 app/(dashboard)/              # Rotas protegidas (Dashboard, Buildings, Apartments, Tenants, Leases, Furniture, Contract Template)
+app/(dashboard)/finances/     # CONDOMÍNIO (sidebar "Condomínio"): bills, categories, distribution, employees,
+                              #   income-entries, installment-plans, month-close, projection, reserve — consome /api/finances/
+app/(dashboard)/financial/    # Financeiro PESSOAL — DEPRECATED (sidebar "Finanças"; remoção em P7)
+app/(dashboard)/admin/        # Admin (proofs/notifications/users)
+app/(tenant)/                 # Portal do inquilino (login OTP, payments, contract, notifications)
+app/api/[...route]/route.ts   # Proxy same-origin para o backend (prod: NEXT_PUBLIC_API_URL=/api)
+app/sw.ts, app/manifest.*     # PWA: service worker (Serwist) + manifest + offline
 app/login/                    # Auth page
 components/layouts/           # MainLayout, Sidebar, Header, MobileNav
 components/shared/            # ConfirmDialog, DeleteConfirmDialog, Loading

@@ -140,7 +140,12 @@ npm run dev
 # Required
 SECRET_KEY=your-secret-key-here
 DEBUG=True
-DATABASE_URL=postgres://postgres:postgres@localhost:5432/condominio
+DB_ENGINE=django.db.backends.postgresql
+DB_NAME=condominio
+DB_USER=postgres
+DB_PASSWORD=postgres
+DB_HOST=localhost
+DB_PORT=5433
 ALLOWED_HOSTS=localhost,127.0.0.1
 
 # Optional - Google OAuth
@@ -225,13 +230,13 @@ pytest -v --tb=short
 cd frontend
 
 # Run all tests
-npm run test
+npm run test:unit
 
 # Run in watch mode
 npm run test:watch
 
 # Run with coverage
-npm run test:coverage
+npm run test:unit -- --coverage
 ```
 
 ## Code Quality
@@ -251,9 +256,9 @@ pre-commit run --all-files
 
 ```bash
 # Backend
-flake8 core/
-black core/ --check
-isort core/ --check
+ruff check core/ condominios_manager/ finances/
+ruff format --check core/ condominios_manager/ finances/
+mypy core/ condominios_manager/ finances/  && pyright
 
 # Frontend
 cd frontend
@@ -267,7 +272,7 @@ npm run type-check
 
 ```bash
 # Login (get tokens)
-POST /api/token/
+POST /api/auth/token/
 {
   "username": "admin",
   "password": "password"
@@ -280,7 +285,7 @@ POST /api/token/
 }
 
 # Refresh token
-POST /api/token/refresh/
+POST /api/auth/token/refresh/
 {
   "refresh": "eyJ0eXAi..."
 }

@@ -1,7 +1,7 @@
 # Security Rules
 
 ## Authentication
-- All API endpoints require JWT auth except: `/api/token/`, `/api/token/refresh/`, `/api/auth/google/`
+- All API endpoints require JWT auth except: `/api/auth/token/`, `/api/auth/token/refresh/`, `/api/auth/register/`, `/api/auth/oauth/google/callback/`, `/api/auth/oauth/exchange/`, `/api/auth/whatsapp/{request,verify}/`, and allauth `/accounts/`
 - Token blacklisting on logout via `rest_framework_simplejwt.token_blacklist`
 - Never log tokens, passwords, or secrets
 

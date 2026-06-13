@@ -32,8 +32,8 @@ IMPORTANT: Mock APENAS external boundaries. NUNCA fazer mock de métodos interno
 
 - Markers: `@pytest.mark.unit`, `@pytest.mark.integration`, `@pytest.mark.slow`, `@pytest.mark.pdf`
 - Fixtures: usar `factory-boy` e `model-bakery` — NÃO criar objetos manualmente
-- Config: `pytest.ini` com `--reuse-db`, `-n auto` (parallel), `--cov-fail-under=60`
-- Coverage: manter acima de 60%
+- Config: `pytest.ini` com `--reuse-db`, `-n 2 --dist=loadscope` (parallel), `--cov=core --cov=finances --cov-fail-under=90`, `filterwarnings = error` (zero-warnings — warning do nosso código é erro)
+- Coverage: meta do projeto **90%** (o `--cov-fail-under` do `pytest.ini` é o piso de CI)
 - Timeout: 300s para testes lentos (PDF generation)
 
 ## Fixtures (conftest.py)

@@ -13,6 +13,9 @@ core/signals.py          # Django signals — invalidação automática de cache
 core/validators/         # Validação CPF/CNPJ
 core/middleware/         # Request/response logging, slow request warnings (>1s)
 core/templates/          # Contract template HTML + backups/
+finances/                # App do CONDOMÍNIO (outflow/saldo/reserva/distribuição) — substitui o
+                         #   financeiro pessoal legado do core. Ver docs/FINANCES.md. finances → core (unidirecional)
+mobile/                  # App Expo (React Native) separado que consome /api/ (ver project memory)
 contracts/               # PDFs gerados por prédio
 frontend/                # Next.js 14 App Router (ver frontend/CLAUDE.md)
 tests/                   # pytest test suite (ver tests/CLAUDE.md)
@@ -24,11 +27,18 @@ condominios_manager/     # Django settings
 
 ```
 Building (street_number unique) → Apartment (number unique per building)
-Apartment → Lease (OneToOne) → Tenant (responsible + M2M via LeaseTenant)
+Apartment → Lease (OneToOne) → Tenant (responsible FK + tenants M2M auto — Lease.tenants)
 Tenant (cpf_cnpj unique) → Dependent (FK)
 Furniture ↔ Apartment (M2M), Furniture ↔ Tenant (M2M)
 
---- Módulo Financeiro (ver docs/LESSONS_LEARNED.md para detalhes completos) ---
+--- Módulo Condomínio (`finances/`) — ATUAL. Ver docs/FINANCES.md ---
+Condominium (tenancy-root, core/models.py) → Building.condominium (FK)
+BillingAccount (tipada: water/electricity/iptu/internet/generic) → Bill → BillLineItem (is_offset POSITIVO, subtraído)
+Payment → PaymentAllocation; InstallmentPlan → Installment; Employee; Reserve → ReserveMovement
+IncomeEntry; CondoMonthClose (snapshot mensal congelado); Water/ElectricityBillStatement (1:1 c/ Bill, só leituras); BillSkip
+Dinheiro via Bill.objects.with_amounts(today) (nunca property Python); today_sp() (timezone SP)
+
+--- Módulo Financeiro PESSOAL (LEGADO/DEPRECATED — só corrigir bugs de dinheiro; remoção em P7; ver docs/LESSONS_LEARNED.md) ---
 Person → CreditCard (1:N), PersonIncome (1:N), PersonPayment (1:N), EmployeePayment (1:N)
 Expense → ExpenseInstallment (1:N), vinculado opcionalmente a Person, CreditCard, Building, ExpenseCategory
 ExpenseCategory → subcategorias (self FK via parent)
@@ -50,7 +60,7 @@ Lease → PaymentProof (1:N) — comprovante PIX do inquilino (status pending/ap
 Notification, DeviceToken (Expo push), WhatsAppVerification, OAuthExchangeCode (TTL 60s) — app mobile + auth
 ```
 
-**Mixins (maioria dos models):** `AuditMixin` (created/updated_at/by), `SoftDeleteMixin` (is_deleted, deleted_at/by). Sem SoftDelete: `IPCAIndex`, `MonthSnapshot`, `FinancialSettings`, `Notification`, `DeviceToken`, `WhatsAppVerification`, `OAuthExchangeCode`, `ExpenseMonthSkip`.
+**Mixins (maioria dos models):** `AuditMixin` (created/updated_at/by), `SoftDeleteMixin` (is_deleted, deleted_at/by). Sem SoftDelete: `IPCAIndex`, `MonthSnapshot`, `FinancialSettings`, `Notification`, `DeviceToken`, `WhatsAppVerification`, `OAuthExchangeCode`, `ExpenseMonthSkip`, `CondoMonthClose`, `BillSkip`.
 - `Model.objects.all()` exclui deletados; `.with_deleted()` inclui; `.deleted_only()` só deletados
 
 ## Comandos
@@ -76,7 +86,7 @@ npm run lint && npm run type-check            # ESLint + TypeScript
 
 - IMPORTANT: Serializers usam padrão dual — FK read com nested (`building = BuildingSerializer(read_only=True)`), write com `_id` (`building_id = PrimaryKeyRelatedField(write_only=True, source='building')`)
 - IMPORTANT: M2M segue mesmo padrão — read com nested list, write com `_ids`
-- IMPORTANT: `LeaseTenant` usa `db_table='core_lease_tenant_details'` — NÃO renomear
+- IMPORTANT: `Lease.tenants` é M2M auto (sem `through`/`db_table`); `Lease.responsible_tenant` é o inquilino responsável (FK). O antigo model `LeaseTenant`/`core_lease_tenant_details` foi DELETADO na migration 0004 — não existe mais.
 - IMPORTANT: PDF generation requer Chrome instalado — path detection Windows-specific em `contract_service.py`
 - CRITICAL: Default querysets excluem soft-deleted records — usar `with_deleted()` quando necessário
 - IMPORTANT: Redis cache com invalidação automática via signals — ao mudar models/signals, verificar impacto no cache
@@ -101,20 +111,18 @@ npm run lint && npm run type-check            # ESLint + TypeScript
 
 ## API Base: `/api/`
 
-- CRUD para: `buildings`, `apartments`, `tenants`, `leases`, `furnitures`, `dependents`
-- Auth: `/api/token/` (login), `/api/token/refresh/`, `/api/auth/me/`, `/api/auth/google/`
+- CRUD para: `buildings`, `apartments`, `tenants`, `leases`, `furnitures`, `rent-adjustments` (dependentes são geridos via payload aninhado do `TenantSerializer` — NÃO há recurso `dependents`)
+- Auth: `/api/auth/token/` (login), `/api/auth/token/refresh/`, `/api/auth/me/`, `/api/auth/register/`, `/api/auth/logout/`, `/api/auth/oauth/google/callback/`, `/api/auth/oauth/exchange/`, `/api/auth/oauth/status/`; WhatsApp OTP `/api/auth/whatsapp/{request,verify}/`; allauth em `/accounts/`
 - Lease actions: `generate_contract/`, `calculate_late_fee/`, `change_due_date/`
 - Templates: `/api/templates/current/`, `save/`, `backups/`, `restore/`, `preview/`
 - Dashboard: `financial_summary/`, `late_payment_summary/`, `lease_metrics/`, `tenant_statistics/`, `building_statistics/`
 - Export: `/api/{resource}/export/excel/`, `/api/{resource}/export/csv/`
-- Financeiro CRUD: `persons`, `credit-cards`, `expense-categories`, `expenses`, `expense-installments`, `incomes`, `rent-payments`, `employee-payments`, `person-incomes`, `person-payments`, `financial-settings`
-- Financeiro Dashboard: `financial-dashboard/{overview,debt_by_person,debt_by_type,upcoming_installments,overdue_installments,category_breakdown}`
-- Financeiro Cash Flow: `cash-flow/{monthly,projection,person_summary,simulate}`
-- Financeiro Controle Diário: `daily-control/{breakdown,summary,mark_paid}`
+- **Condomínio (`finances/`) — `/api/finances/` (ATUAL):** `finance-categories`, `billing-accounts`, `bills`, `bill-skips`, `payments`, `installment-plans`, `installments`, `employees`, `reserves`, `reserve-movements`, `income-entries`, `condo-month-closes`, `finance-dashboard`, `finance-cash-flow`. Actions: `bills/{id}/{pay,suspend}/`, `bills/{bulk_pay,generate_month,create_with_lines,parse_invoice}/`, `condo-month-closes/{id}/{close,reopen}/`, `finance-dashboard/{overview,monthly_balance,iptu_alerts,overdue,combined_calendar}`, `finance-cash-flow/projection`.
+- Financeiro PESSOAL (LEGADO/DEPRECATED — remoção em P7): `persons`, `credit-cards`, `expense-categories`, `expenses`, `expense-installments`, `incomes`, `rent-payments`, `employee-payments`, `person-incomes`, `person-payments`, `financial-settings`; `financial-dashboard/*`; `cash-flow/*`; `daily-control/*`.
 
 ## Migrations
 
-Sequenciais. Rode `python manage.py showmigrations core` para o estado atual — NÃO fixar números aqui (apodrecem). `LeaseTenant` usa `db_table='core_lease_tenant_details'` — NÃO renomear. Hooks bloqueiam edição de migrations existentes; crie novas via `makemigrations`. **Backup antes de qualquer migrate destrutivo:** `python scripts/backup_db.py`.
+Sequenciais. Rode `python manage.py showmigrations core` para o estado atual — NÃO fixar números aqui (apodrecem). Hooks bloqueiam edição de migrations existentes; crie novas via `makemigrations`. **Backup antes de qualquer migrate destrutivo:** `python scripts/backup_db.py`.
 
 ## Env Vars
 
@@ -142,7 +150,8 @@ Sequenciais. Rode `python manage.py showmigrations core` para o estado atual —
 
 ## Documentação do Módulo Financeiro
 
-- **LEIA PRIMEIRO**: `docs/LESSONS_LEARNED.md` — contexto completo do negócio, todas as regras, armadilhas, e decisões arquiteturais
+- **Condomínio (ATUAL):** `docs/FINANCES.md` — modelo de dados, invariantes monetários, fechamento, RLS, permissões e API do app `finances/`
+- **Pessoal (LEGADO/DEPRECATED):** `docs/LESSONS_LEARNED.md` — contexto completo do negócio, todas as regras, armadilhas, e decisões arquiteturais do módulo legado do `core`
 - Design doc: `docs/plans/2026-03-21-financial-module-design.md`
 - Prompts de sessão: arquivos numerados em `prompts/` (ver `SESSION_STATE.md` para o intervalo/estado atual)
 - Estado das sessões: `prompts/SESSION_STATE.md`

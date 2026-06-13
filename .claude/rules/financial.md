@@ -11,9 +11,10 @@ paths:
 # Financial Module Rules
 
 ## Business Logic Constants
-- Tag fee: R$50 for 1 tenant, R$80 for 2+ — logic in `fee_calculator.py`
+- Tag fee: R$20 for 1 tenant, R$40 for 2+ (defaults `DEFAULT_TAG_FEE_SINGLE/MULTIPLE` in settings.py) — logic in `fee_calculator.py`
 - Late fee: 5% daily x (rental_value / 30) x days_late — logic in `fee_calculator.py`
-- All monetary values use `DecimalField(max_digits=10, decimal_places=2)`
+- Monetary values use `DecimalField(decimal_places=2)`; `max_digits` varies (10 in the legacy patrimonial models, 12 in the financial / `finances` models)
+- NOTE: this file documents the LEGACY personal-financial module (`core` Person/Expense/RentPayment); the condominium money rules live in docs/FINANCES.md
 - Currency display: R$ 1.500,00 (Brazilian format)
 - Date display: DD/MM/YYYY
 
