@@ -1,7 +1,13 @@
 # Plano P6.3 — CI, gates e higiene de build/deploy
 
 > **Estado:** PLANEJADO — nao executado
-> **Prioridade:** FASE P6 · **Branch sugerida:** `chore/ci-and-build-hygiene` · **Depende de:** P0.1 (remove o stack Docker/nginx/deploy.sh morto e os scripts `generate_metrics`/`import_caixa_abril`; este plano referencia, NAO duplica essa remocao)
+> **Prioridade:** FASE P6 · **Branch:** `perf/p5-p6` (combinado P5+P6, 1 PR) · **Depende de:** P0.1 (remove o stack Docker/nginx/deploy.sh morto; referencia, NAO duplica)
+>
+> **Revisão 2026-06-13 (verificação pós-P5, workflow de 4 agentes):** anchors re-verificados contra o `master` atual.
+> - **Premissa "finances já passa ruff/mypy" — CONFIRMADA:** `ruff check .` = "All checks passed!", `ruff format --check .` = "300 files already formatted", `mypy core/ condominios_manager/ finances/` = "no issues found in 126 source files". O reagrupamento de imports (Parte 1) é **puramente cosmético** (finances/tests do bloco third-party→first-party); **zero** correção de código para ruff/mypy.
+> - **Premissa "pyright passa" — FALSA (gap crítico):** `pyright` (strict, inclui `tests/` via pyrightconfig) reporta **12 erros pré-existentes**, TODOS em `tests/{unit,integration}/test_finances/`: `test_invoice_draft_service.py` (7, "object is not iterable"), `test_finance_crud_api.py` (2), `test_installment_models.py` (2), `test_seed_condo_utilities.py` (1, reportOptionalMemberAccess). Não são do P5 (commit ef8dfb2). **NOVO item de trabalho obrigatório: corrigir esses 12 erros de tipo nos testes ANTES de cabear o step pyright** (sem `# type: ignore`), senão o job `code-quality` fica vermelho. Ver Parte 0 abaixo.
+> - **Python 3.14 é o alvo canônico** (runtime confirmado cpython-3.14.3; pyrightconfig já 3.14). A descoberta de P6.2 ("alinhar coding-standards.md para 3.12") está **ERRADA** e foi anulada na revisão do P6.2 — o defeito é o `requires-python>=3.12` stale do pyproject, corrigido AQUI.
+> - **Anchors corrigidos:** ruff `src` em pyproject **:124** (a tabela dizia :122 = target-version); isort header **:210**, known-first-party **:211**, known-third-party :212, section-order :213 (plano dizia 208-211, +2); ruff target-version `py313` em **:122**; setup-python@v4 do job security em **:172** (não 171; 171 = nome do step); `render_build.sh` tem **4 comandos** efetivos (não 8); `test_app_infra.py` import mal-agrupado em **:14** (first-party block em :16). Demais anchors de ci.yml/pyproject exatos.
 
 ## Objetivo
 
@@ -23,6 +29,16 @@ Alinhar o pipeline de CI (`.github/workflows/ci.yml`) ao gate canonico de qualid
 ## Abordagem técnica
 
 Executar em DUAS metades, na ordem abaixo. A metade 1 (config ruff + reagrupamento mecanico) precisa vir ANTES de qualquer aperto do CI, senao o novo `ruff check .` quebra no proprio commit de config.
+
+### Parte 0 — Corrigir os 12 erros de pyright pré-existentes (BLOQUEADOR do gate pyright)
+
+`pyright` (strict, incluindo `tests/` via `pyrightconfig.json` include) acusa **12 erros HOJE**, todos em testes de `finances` (nenhum no app `finances/`):
+- `tests/unit/test_finances/test_invoice_draft_service.py` — 7× `reportGeneralTypeIssues` ("object is not iterable").
+- `tests/integration/test_finances/test_finance_crud_api.py` — 2×.
+- `tests/unit/test_finances/test_installment_models.py` — 2×.
+- `tests/unit/test_finances/test_seed_condo_utilities.py` — 1× `reportOptionalMemberAccess` ("amount is not a known attribute of None").
+
+Corrigir cada um na RAIZ (anotar o tipo correto, dar narrow no Optional, tipar o retorno iterável) — **sem `# type: ignore`** (constraint). Rodar `pyright` até `0 errors`. Isso vem ANTES de adicionar o step pyright ao CI (Parte 2 passo 8), senão o job `code-quality` nasce vermelho. Sem esse passo o critério de aceite "pyright passa sem erros" é inatingível.
 
 ### Parte 1 — Config ruff first-party + commit mecanico de reagrupamento
 
