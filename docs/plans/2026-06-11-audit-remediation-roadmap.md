@@ -74,6 +74,12 @@ N+1 nos serializers e dashboards, chamada síncrona ao IBGE no request, memoiza�
 ### P6 — Testes, docs, CI e higiene
 Remover supressões de warning, migrar testes para a fronteira HTTP (mock policy), corrigir flakiness das factories, sincronizar toda a documentação com a realidade, e alinhar o CI ao gate canônico (incluir `finances/` e pyright).
 
+> **STATUS (2026-06-13, branch `perf/p5-p6` — combinado P5+P6, 1 PR):** revisados os 3 planos com workflow de 4 agentes (commit e772b98; conflito Python resolvido p/ 3.14; escopo frontend = 18 arquivos, não 25/26).
+> - **P6.3 EXECUTADO** (b282b89): CI alinhado ao gate canônico (ruff `.` + mypy `+finances` + **novo step pyright** + bandit hard-gate sobre `finances/` + security gate no build-status + postgres:17 + checkout@v4/setup-python@v5); **Python 3.14 único** (pyproject requires-python/mypy/ruff-target + `.python-version`); ruff first-party (finances/tests) + regroup mecânico; **12 erros pyright pré-existentes corrigidos** em tests/test_finances (TypedDict no build_draft + narrows de Optional, sem type:ignore); `ruff-pre-commit` v0.11.6→v0.15.11 (suporta py314); `tests/unit/test_ci_config_consistency.py` (11 testes). Gate verde.
+> - **P6.1 BACKEND EXECUTADO** (37847b3): `filterwarnings=error` (suite 2593 passed sob warning-as-error — os ignores em bloco não mascaravam nada); fábrica de CPF determinística por contador (reusa CPFValidator, mata flakiness de ordem); Twilio mockado na fronteira real (`whatsapp_service.Client`) + override settings; fixture de invoice só em memória (+ untrack dos .pdf); 403 p/ close/reopen/unpay. Item 10 (late-fee) já satisfeito; sem testes vazios.
+> - **P6.2 DOCS EXECUTADO** (a96e319): CLAUDE.md + rules + tests/frontend CLAUDE + README + `.env*.example` + **novo docs/FINANCES.md** + header anti-re-seed. (STATUS.md/SESSION_STATE.md/ROADMAP.md de prompts: pendente — polish.)
+> - **P6.1 FRONTEND PENDENTE** (o maior item): migrar 18 testes de componente de `finances/` de `vi.mock(@/lib/api/hooks)` p/ MSW (fronteira HTTP) + fix do shape bruto em `tests/mocks/data/finances.ts` (decimais string, sem `*_id` no read) + virar `onUnhandledRequest:'error'` SÓ após cobertura MSW completa. Esforço em 3 tiers (multi-sessão) — não rushar. Ordem na revisão do plano P6.1.
+
 ### P7 — Remoção do legado
 Desacoplar os 2 pontos `use-persons` (refactor explicit-owner), depois deletar em bloco ~18k LOC do frontend legado + models/services/viewsets do backend legado. **Só após o `finances/` cobrir 100% e com backup.**
 
