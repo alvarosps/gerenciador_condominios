@@ -70,7 +70,7 @@ class CondoBalanceService:
         month: int,
         building_id: int | None = None,
         *,
-        components: "_Components | None" = None,
+        components: _Components | None = None,
     ) -> Decimal:
         """Competence result = competence revenue - competence expense (design §4.2/§4.5).
 
@@ -94,7 +94,7 @@ class CondoBalanceService:
         month: int,
         building_id: int | None = None,
         *,
-        components: "_Components | None" = None,
+        components: _Components | None = None,
     ) -> tuple[Decimal, Decimal]:
         """(revenue, expense) competence pontas of the month (raw Decimals), from one source.
 
@@ -113,7 +113,7 @@ class CondoBalanceService:
         month: int,
         building_id: int | None = None,
         *,
-        components: "_Components | None" = None,
+        components: _Components | None = None,
     ) -> Decimal:
         """Cash change (by payment date) = cash in - cash out (design §4.2/§4.3).
 
@@ -382,7 +382,7 @@ class CondoBalanceService:
         month: int,
         building_id: int | None = None,
         *,
-        components: "_Components | None" = None,
+        components: _Components | None = None,
     ) -> Decimal:
         """Reconcile the two PUBLIC KPIs against an INDEPENDENT component delta (design §4.2):
 

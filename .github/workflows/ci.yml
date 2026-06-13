@@ -13,7 +13,7 @@ jobs:
 
     services:
       postgres:
-        image: postgres:15
+        image: postgres:17
         env:
           POSTGRES_DB: condominio_test
           POSTGRES_USER: postgres
@@ -27,12 +27,12 @@ jobs:
           - 5432:5432
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
-    - name: Set up Python 3.12
-      uses: actions/setup-python@v4
+    - name: Set up Python 3.14
+      uses: actions/setup-python@v5
       with:
-        python-version: '3.12'
+        python-version: '3.14'
         cache: 'pip'
 
     - name: Install dependencies
@@ -77,12 +77,12 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
-    - name: Set up Python 3.12
-      uses: actions/setup-python@v4
+    - name: Set up Python 3.14
+      uses: actions/setup-python@v5
       with:
-        python-version: '3.12'
+        python-version: '3.14'
         cache: 'pip'
 
     - name: Install dependencies
@@ -100,12 +100,18 @@ jobs:
 
     - name: Lint and format with Ruff
       run: |
-        ruff check core/ condominios_manager/
-        ruff format --check core/ condominios_manager/
+        ruff check .
+        ruff format --check .
 
     - name: Type check with mypy
       run: |
-        mypy core/ condominios_manager/
+        mypy core/ condominios_manager/ finances/
+
+    - name: Install pyright
+      run: pip install pyright
+
+    - name: Type check with pyright
+      run: pyright
 
   frontend-test:
     name: Frontend Tests
@@ -115,7 +121,7 @@ jobs:
         working-directory: frontend
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: Set up Node.js
       uses: actions/setup-node@v4
@@ -144,7 +150,7 @@ jobs:
         working-directory: frontend
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: Set up Node.js
       uses: actions/setup-node@v4
@@ -166,12 +172,12 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
-    - name: Set up Python 3.12
-      uses: actions/setup-python@v4
+    - name: Set up Python 3.14
+      uses: actions/setup-python@v5
       with:
-        python-version: '3.12'
+        python-version: '3.14'
         cache: 'pip'
 
     - name: Install dependencies
@@ -182,12 +188,13 @@ jobs:
 
     - name: Run Bandit security linter
       run: |
-        bandit -r core/ condominios_manager/ -ll -f json -o bandit-report.json
-      continue-on-error: true
+        bandit -r core/ condominios_manager/ finances/ -c pyproject.toml -ll -f json -o bandit-report.json
 
     - name: Check for known security vulnerabilities
+      # safety scan needs a SAFETY_API_KEY secret to be a hard gate; kept informational
+      # (continue-on-error) until that secret is provisioned. Bandit above is the hard gate.
       run: |
-        safety check --json
+        safety scan --ci
       continue-on-error: true
 
     - name: Upload security reports
@@ -230,6 +237,11 @@ jobs:
 
         if [ "${{ needs.frontend-test.result }}" != "success" ]; then
           echo "::error::Frontend tests failed!"
+          exit 1
+        fi
+
+        if [ "${{ needs.security.result }}" != "success" ]; then
+          echo "::error::Security audit failed!"
           exit 1
         fi
 

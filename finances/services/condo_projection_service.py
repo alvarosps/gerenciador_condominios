@@ -174,7 +174,7 @@ class CondoProjectionService:
         month: int,
         building_id: int | None = None,
         *,
-        skip_index: "set[tuple[int, date]] | None" = None,
+        skip_index: set[tuple[int, date]] | None = None,
     ) -> Decimal:
         """Projected expenses (raw Decimal) of a future month (design §3.2/§7/§8 — embedded dedup).
 

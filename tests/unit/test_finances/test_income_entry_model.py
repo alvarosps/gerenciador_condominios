@@ -11,8 +11,8 @@ from decimal import Decimal
 import pytest
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
-from finances.models import IncomeEntry
 
+from finances.models import IncomeEntry
 from tests.factories import (
     make_building,
     make_condominium,

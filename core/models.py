@@ -243,7 +243,7 @@ class Condominium(AuditMixin, SoftDeleteMixin, models.Model):
         return self.name
 
     @classmethod
-    def get_default(cls) -> "Condominium | None":
+    def get_default(cls) -> Condominium | None:
         """Resolve the singleton condominium (lowest id), or None if none exists yet.
 
         The system runs with one invisible default condominium (design §6/§15). Callers
@@ -1013,7 +1013,7 @@ class Landlord(AuditMixin, SoftDeleteMixin, models.Model):
         return ", ".join(parts)
 
     @classmethod
-    def get_active(cls) -> "Landlord | None":
+    def get_active(cls) -> Landlord | None:
         """Get the currently active landlord."""
         return cls.objects.filter(is_active=True).first()
 
@@ -1164,7 +1164,7 @@ class ContractTemplate(AuditMixin, models.Model):
         return cls.objects.only("content").get(is_active=True).content
 
     @classmethod
-    def list_versions(cls) -> "list[ContractTemplate]":
+    def list_versions(cls) -> list[ContractTemplate]:
         """Return all versions: the DEFAULT first, then the rest newest-first."""
         default: list[ContractTemplate] = list(cls.objects.filter(is_default=True))
         others: list[ContractTemplate] = list(
@@ -1173,7 +1173,7 @@ class ContractTemplate(AuditMixin, models.Model):
         return default + others
 
     @classmethod
-    def save_version(cls, content: str, user: Any = None) -> "ContractTemplate":
+    def save_version(cls, content: str, user: Any = None) -> ContractTemplate:
         """Validate ``content``, persist it as the new active version, and rotate backups.
 
         Atomic: deactivates every other version, creates the new active row, then
@@ -1226,7 +1226,7 @@ class ContractTemplate(AuditMixin, models.Model):
         cls.objects.filter(is_default=False, is_active=False).exclude(pk__in=retained_ids).delete()
 
     @classmethod
-    def restore_version(cls, version_id: int, user: Any = None) -> "ContractTemplate":
+    def restore_version(cls, version_id: int, user: Any = None) -> ContractTemplate:
         """Make the version with ``version_id`` the active one (deactivate the others).
 
         Args:

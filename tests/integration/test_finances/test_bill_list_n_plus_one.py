@@ -13,10 +13,10 @@ from decimal import Decimal
 import pytest
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
-from finances.models import BillingAccountType
 from freezegun import freeze_time
 from model_bakery import baker
 
+from finances.models import BillingAccountType
 from tests.factories import (
     make_bill,
     make_bill_line_item,

@@ -12,7 +12,6 @@ import pytest
 from django.apps import apps
 from django.conf import settings
 from django.db import connection, models
-from finances.apps import FinancesConfig
 
 from core.models import (
     DEFAULT_CONDOMINIUM_NAME,
@@ -21,6 +20,7 @@ from core.models import (
     SoftDeleteManager,
     SoftDeleteMixin,
 )
+from finances.apps import FinancesConfig
 
 
 def test_finances_app_installed() -> None:

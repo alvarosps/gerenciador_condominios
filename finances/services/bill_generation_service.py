@@ -52,7 +52,7 @@ class BillGenerationService:
         account: BillingAccount,
         month_start: date,
         *,
-        skip_index: "set[tuple[int, date]] | None" = None,
+        skip_index: set[tuple[int, date]] | None = None,
     ) -> bool:
         """Active, within tracking_start_month..end_date, and not skipped for the month.
 

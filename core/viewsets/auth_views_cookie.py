@@ -57,7 +57,7 @@ def _role_from_access(access: str) -> str:
     """
     try:
         user = User.objects.get(pk=AccessToken(cast(Token, access))["user_id"])
-    except (TokenError, User.DoesNotExist, KeyError):
+    except TokenError, User.DoesNotExist, KeyError:
         return "tenant"
     return role_for_user(user)
 

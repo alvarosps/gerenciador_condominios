@@ -94,7 +94,7 @@ class InstallmentPlanViewSet(viewsets.ModelViewSet):
                 category=category,
                 user=cast(User, request.user),
             )
-        except (ValueError, InvalidOperation):
+        except ValueError, InvalidOperation:
             return Response({"error": "Parâmetros inválidos."}, status=status.HTTP_400_BAD_REQUEST)
         except Bill.DoesNotExist:
             return Response(

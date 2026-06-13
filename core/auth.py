@@ -148,7 +148,7 @@ def exchange_oauth_code(request: Request) -> Response:
     with transaction.atomic():
         try:
             exchange = OAuthExchangeCode.objects.select_for_update().get(code=code)
-        except (OAuthExchangeCode.DoesNotExist, ValueError):
+        except OAuthExchangeCode.DoesNotExist, ValueError:
             return Response({"error": "Invalid or expired code"}, status=400)
 
         if not exchange.is_valid():

@@ -12,13 +12,13 @@ from decimal import Decimal
 
 import pytest
 from django.core.exceptions import ValidationError
+from freezegun import freeze_time
+
 from finances.models import BillLifecycleState, Reserve
 from finances.services.bill_lifecycle_service import BillLifecycleService
 from finances.services.bill_service import BillDraft, BillService
 from finances.services.condo_month_close_service import CondoMonthCloseService
 from finances.services.reserve_service import ReserveService
-from freezegun import freeze_time
-
 from tests.factories import (
     make_bill,
     make_bill_line_item,

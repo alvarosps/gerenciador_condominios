@@ -8,8 +8,8 @@ from datetime import date
 from decimal import Decimal
 
 import pytest
-from finances.models import Bill, BillLifecycleState
 
+from finances.models import Bill, BillLifecycleState
 from tests.factories import (
     make_bill,
     make_bill_line_item,

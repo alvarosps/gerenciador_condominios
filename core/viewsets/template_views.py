@@ -191,7 +191,7 @@ class ContractTemplateViewSet(viewsets.ViewSet):
 
         try:
             version_id = int(version_id)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return Response(
                 {"error": "O campo 'version_id' deve ser um número inteiro."},
                 status=status.HTTP_400_BAD_REQUEST,

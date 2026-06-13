@@ -75,7 +75,7 @@ class IPCAService:
                 month = int(period_code[4:6])
                 ref_month = date(year, month, 1)
                 value = Decimal(value_str)
-            except (ValueError, InvalidOperation):
+            except ValueError, InvalidOperation:
                 logger.warning("Invalid IPCA data: period=%s value=%s", period_code, value_str)
                 continue
 

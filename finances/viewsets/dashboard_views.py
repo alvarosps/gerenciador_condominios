@@ -378,7 +378,7 @@ class FinanceCashFlowViewSet(viewsets.ViewSet):
         try:
             months = _validated_months(request.data.get("months"))
             building_id = _coerce_building_id(request.data.get("building_id"))
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             return Response(
                 {
                     "error": f"Parâmetros 'months' (1 a {MAX_PROJECTION_MONTHS}) / 'building_id' inválidos."

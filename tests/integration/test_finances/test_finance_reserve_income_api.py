@@ -4,11 +4,11 @@ from datetime import date
 from decimal import Decimal
 
 import pytest
-from finances.services.condo_balance_service import CondoBalanceService
 from freezegun import freeze_time
 from rest_framework import status
 
 from core.models import Condominium, FinancialSettings
+from finances.services.condo_balance_service import CondoBalanceService
 from tests.factories import (
     make_condominium,
     make_reserve,

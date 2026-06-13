@@ -11,13 +11,13 @@ from decimal import Decimal
 
 import pytest
 from django.core.exceptions import ValidationError
+from freezegun import freeze_time
+
+from core.models import FinancialSettings
 from finances.models import BillLifecycleState, CondoMonthCloseStatus, FundedFrom
 from finances.services.bill_payment_service import BillPaymentService
 from finances.services.condo_balance_service import CondoBalanceService
 from finances.services.condo_month_close_service import CondoMonthCloseService
-from freezegun import freeze_time
-
-from core.models import FinancialSettings
 from tests.factories import (
     make_apartment,
     make_bill,

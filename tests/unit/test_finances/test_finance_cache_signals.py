@@ -10,16 +10,16 @@ from decimal import Decimal
 
 import pytest
 from django.core.cache import cache
+from model_bakery import baker
+
+from core.models import FinancialSettings
+from core.signals import _FINANCE_CACHE_PREFIXES as CORE_PREFIXES
 from finances.cache import (
     FINANCE_CACHE_PREFIXES,
     FINANCE_DASHBOARD_PREFIX,
     FINANCE_PROJECTION_PREFIX,
     invalidate_finance_caches,
 )
-from model_bakery import baker
-
-from core.models import FinancialSettings
-from core.signals import _FINANCE_CACHE_PREFIXES as CORE_PREFIXES
 from tests.factories import (
     make_apartment,
     make_bill,

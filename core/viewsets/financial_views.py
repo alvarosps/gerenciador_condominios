@@ -600,7 +600,7 @@ class PersonPaymentScheduleViewSet(viewsets.ModelViewSet):
         try:
             person_id = int(person_id_val)
             reference_month = date.fromisoformat(str(reference_month_str))
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             return Response(
                 {
                     "error": (
@@ -650,7 +650,7 @@ class PersonPaymentScheduleViewSet(viewsets.ModelViewSet):
         try:
             person_id = int(person_id_str)
             reference_month = date.fromisoformat(reference_month_str)
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             return Response(
                 {
                     "error": (

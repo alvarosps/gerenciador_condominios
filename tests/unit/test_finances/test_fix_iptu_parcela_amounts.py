@@ -17,6 +17,8 @@ from pathlib import Path
 
 import pytest
 from django.core.management import call_command
+from freezegun import freeze_time
+
 from finances.models import (
     Bill,
     Installment,
@@ -24,8 +26,6 @@ from finances.models import (
     Payment,
     PaymentAllocation,
 )
-from freezegun import freeze_time
-
 from tests.factories import make_building
 
 pytestmark = pytest.mark.django_db

@@ -4,14 +4,14 @@ from datetime import date, timedelta
 from decimal import Decimal
 
 import pytest
+
+from core.services.timezone import today_sp
 from finances.models import (
     BillingAccountType,
     BillLifecycleState,
     InstallmentPlan,
     InstallmentPlanState,
 )
-
-from core.services.timezone import today_sp
 from tests.factories import (
     make_bill,
     make_bill_line_item,
@@ -345,6 +345,7 @@ def test_plan_write_invalidates_finance_cache(authenticated_api_client) -> None:
     # LocMem cache: invalidation is asserted by a probe key disappearing after the write
     # (same pattern as test_finance_cache_signals; no internal mocking).
     from django.core.cache import cache
+
     from finances.cache import FINANCE_CACHE_PREFIXES
 
     condo = make_condominium()

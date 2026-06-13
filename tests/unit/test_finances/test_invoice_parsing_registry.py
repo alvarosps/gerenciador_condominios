@@ -3,6 +3,7 @@
 from collections.abc import Callable
 
 import pytest
+
 from finances.models import BillingAccountType
 from finances.services.invoice_parsing.registry import (
     CEEE_CNPJ,

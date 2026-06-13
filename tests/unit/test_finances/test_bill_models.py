@@ -10,8 +10,8 @@ from decimal import Decimal
 import pytest
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
-from finances.models import Bill, BillSkip
 
+from finances.models import Bill, BillSkip
 from tests.factories import (
     make_bill,
     make_bill_line_item,

@@ -21,10 +21,10 @@ import requests as http_requests
 import responses as responses_lib
 from django.contrib.auth.models import User
 from django.core.management import call_command
-from finances.models import BillingAccountType, InstallmentPlanState
 from freezegun import freeze_time
 
 from core.models import IPCAIndex, Notification
+from finances.models import BillingAccountType, InstallmentPlanState
 from tests.constants import TEST_PASSWORD
 from tests.factories import (
     make_bill,

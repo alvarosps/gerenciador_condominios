@@ -4,6 +4,7 @@ from datetime import date
 from decimal import Decimal
 
 import pytest
+
 from finances.services.invoice_parsing.base import (
     PositionedRow,
     Word,

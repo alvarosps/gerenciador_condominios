@@ -435,7 +435,7 @@ class TenantViewSet(viewsets.ViewSet):
 
         try:
             new_due_day = int(new_due_day_raw)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return Response(
                 {"detail": "new_due_day deve ser um número inteiro."},
                 status=status.HTTP_400_BAD_REQUEST,

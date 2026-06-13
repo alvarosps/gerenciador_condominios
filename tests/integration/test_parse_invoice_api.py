@@ -15,6 +15,8 @@ from decimal import Decimal
 
 import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
+from rest_framework import status
+
 from finances.models import (
     Bill,
     BillingAccountType,
@@ -22,8 +24,6 @@ from finances.models import (
     BillLineItem,
     InstallmentPlanState,
 )
-from rest_framework import status
-
 from tests.factories import make_bill, make_billing_account, make_installment, make_installment_plan
 from tests.unit.test_finances.conftest import invoice_pdf_bytes
 

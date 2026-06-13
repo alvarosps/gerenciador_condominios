@@ -582,7 +582,7 @@ class LeaseViewSet(viewsets.ModelViewSet):
             )
         except ValidationError as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        except (DatabaseError, IntegrityError):
+        except DatabaseError, IntegrityError:
             logger.exception("Database error during due date change")
             return Response(
                 {"error": "Erro ao salvar alteração de vencimento"},
@@ -642,7 +642,7 @@ class LeaseViewSet(viewsets.ModelViewSet):
 
         try:
             percentage = Decimal(str(percentage))
-        except (InvalidOperation, ValueError):
+        except InvalidOperation, ValueError:
             return Response({"error": "Percentual inválido."}, status=status.HTTP_400_BAD_REQUEST)
 
         renewal_date = None
@@ -821,7 +821,7 @@ class DashboardViewSet(viewsets.ViewSet):
         try:
             year = int(request.query_params["year"])
             month = int(request.query_params["month"])
-        except (KeyError, TypeError, ValueError):
+        except KeyError, TypeError, ValueError:
             return Response(
                 {"error": "Parâmetros 'year' e 'month' são obrigatórios e numéricos."},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -842,7 +842,7 @@ class DashboardViewSet(viewsets.ViewSet):
         building_id_raw = request.query_params.get("building_id")
         try:
             building_id = int(building_id_raw) if building_id_raw is not None else None
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return Response(
                 {"error": "O parâmetro 'building_id' deve ser numérico."},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -876,7 +876,7 @@ class DashboardViewSet(viewsets.ViewSet):
             )
         try:
             lease_id = int(lease_id)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return Response(
                 {"error": "lease_id deve ser numérico."},
                 status=status.HTTP_400_BAD_REQUEST,

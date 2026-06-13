@@ -13,11 +13,11 @@ import pytest
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.test import override_settings
-from finances.models import BillingAccountType, InstallmentPlanState
 from freezegun import freeze_time
 from rest_framework import status
 from rest_framework.test import APIClient
 
+from finances.models import BillingAccountType, InstallmentPlanState
 from tests.constants import TEST_PASSWORD
 from tests.factories import (
     make_bill,

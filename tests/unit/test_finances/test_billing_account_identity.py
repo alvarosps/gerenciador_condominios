@@ -12,8 +12,8 @@ from decimal import Decimal
 import pytest
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
-from finances.models import BillingAccount, BillingAccountType, SupplyStatus
 
+from finances.models import BillingAccount, BillingAccountType, SupplyStatus
 from tests.factories import make_billing_account, make_building, make_condominium
 
 pytestmark = pytest.mark.django_db

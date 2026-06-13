@@ -5,9 +5,9 @@ from decimal import Decimal
 import pytest
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
-from finances.models import Employee, EmployeePaymentType
 
 from core.models import Lease
+from finances.models import Employee, EmployeePaymentType
 from tests.factories import make_employee, make_lease, make_person
 
 pytestmark = pytest.mark.django_db

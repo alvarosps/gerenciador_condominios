@@ -195,7 +195,7 @@ class CashFlowViewSet(viewsets.ViewSet):
         extra_monthly_str = request.query_params.get("extra_monthly_expenses", "0")
         try:
             extra_monthly = Decimal(extra_monthly_str)
-        except (ValueError, InvalidOperation):
+        except ValueError, InvalidOperation:
             extra_monthly = Decimal("0.00")
 
         result = CashFlowService.get_cash_flow_projection(
@@ -369,7 +369,7 @@ class DailyControlViewSet(viewsets.ViewSet):
 
         try:
             item_id_int = int(item_id)
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             return Response(
                 {"error": "O campo 'item_id' deve ser um inteiro."},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -377,7 +377,7 @@ class DailyControlViewSet(viewsets.ViewSet):
 
         try:
             year, month = self._parse_optional_year_month(request)
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             return Response(
                 {"error": "Os campos 'year' e 'month' devem ser inteiros válidos."},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -426,7 +426,7 @@ class DailyControlViewSet(viewsets.ViewSet):
             year = int(year_val)
             month = int(month_val)
             amount = Decimal(str(amount_val))
-        except (ValueError, TypeError, InvalidOperation):
+        except ValueError, TypeError, InvalidOperation:
             return Response(
                 {
                     "error": "Parâmetros inválidos: 'person_id', 'year' e 'month' devem ser inteiros e 'amount' decimal."

@@ -10,10 +10,10 @@ from datetime import date
 from decimal import Decimal
 
 import pytest
+
 from finances.models import Bill, BillingAccountType, BillLineItem
 from finances.services.bill_generation_service import BillGenerationService
 from finances.services.condo_projection_service import CondoProjectionService
-
 from tests.factories import (
     make_billing_account,
     make_installment,

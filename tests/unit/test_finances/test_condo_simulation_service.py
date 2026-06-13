@@ -11,11 +11,11 @@ from typing import Any
 
 import pytest
 from django.utils import timezone
+from freezegun import freeze_time
+
 from finances.models import Bill
 from finances.services.condo_projection_service import CondoProjectionService
 from finances.services.condo_simulation_service import CondoSimulationService
-from freezegun import freeze_time
-
 from tests.factories import make_billing_account, make_condo_month_close, make_lease
 
 pytestmark = pytest.mark.django_db

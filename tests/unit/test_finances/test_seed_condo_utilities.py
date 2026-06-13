@@ -20,6 +20,10 @@ from pathlib import Path
 import pytest
 from django.core.management import call_command
 from django.core.management.base import CommandError
+from freezegun import freeze_time
+
+from core.models import FinancialSettings
+from core.services.timezone import today_sp
 from finances.models import (
     Bill,
     BillingAccount,
@@ -35,10 +39,6 @@ from finances.services.bill_generation_service import BillGenerationService
 from finances.services.condo_balance_service import CondoBalanceService
 from finances.services.installment_plan_service import InstallmentPlanService
 from finances.services.iptu_alert_service import IptuAlertService
-from freezegun import freeze_time
-
-from core.models import FinancialSettings
-from core.services.timezone import today_sp
 from tests.factories import make_building
 
 pytestmark = pytest.mark.django_db
@@ -292,7 +292,9 @@ def test_seed_embedded_parcela_lands_on_generated_bill(tmp_path: Path) -> None:
     bill = Bill.objects.get(billing_account=account, competence_month=OPENING_COMPETENCE)
     parcela_lines = BillLineItem.objects.filter(bill=bill, installment=current)
     assert parcela_lines.count() == 1
-    assert parcela_lines.first().amount == Decimal("94.48")
+    parcela_line = parcela_lines.first()
+    assert parcela_line is not None
+    assert parcela_line.amount == Decimal("94.48")
 
 
 @freeze_time(FROZEN)

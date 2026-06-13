@@ -4,10 +4,10 @@ from datetime import date
 from decimal import Decimal
 
 import pytest
-from finances.models import BillingAccount
 from freezegun import freeze_time
 from rest_framework import status
 
+from finances.models import BillingAccount
 from tests.factories import make_billing_account, make_lease
 
 pytestmark = [pytest.mark.integration, pytest.mark.django_db]
