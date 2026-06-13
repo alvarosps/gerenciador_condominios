@@ -16,6 +16,9 @@ WRITE_ENDPOINTS = [
     ("post", "/api/finances/bills/create_with_lines/"),
     ("post", "/api/finances/bills/1/pay/"),
     ("post", "/api/finances/bills/1/suspend/"),
+    ("post", "/api/finances/condo-month-closes/close/"),
+    ("post", "/api/finances/condo-month-closes/reopen/"),
+    ("delete", "/api/finances/payments/1/"),
 ]
 
 READ_ENDPOINTS = [

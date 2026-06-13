@@ -5,8 +5,11 @@ Tests cover:
 - POST /api/auth/whatsapp/request/  — request a verification code
 - POST /api/auth/whatsapp/verify/   — verify the code and receive JWT tokens
 
-Mock policy: send_verification_code is mocked because it is an external boundary
-(Twilio HTTP API). Django ORM and all internal services run against the real test DB.
+Mock policy: only the EXTERNAL Twilio boundary is mocked — ``core.services.whatsapp_service.Client``
+(the Twilio SDK). The real ``send_verification_code`` / ``send_whatsapp_message`` run end-to-end
+(exercising the ``content_variables=json.dumps(...)`` contract), and ``@override_settings`` supplies
+the TWILIO_* credentials the guard requires. Django ORM and all internal services run against the
+real test DB — never patched.
 """
 
 from datetime import timedelta
@@ -18,19 +21,31 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from core.models import Apartment, Building, Lease, Tenant, WhatsAppVerification
+from tests.factories import CPF_VALID_PRIMARY
 
 REQUEST_URL = "/api/auth/whatsapp/request/"
 VERIFY_URL = "/api/auth/whatsapp/verify/"
 
-_CPF = "529.982.247-25"
 # Tenant.cpf_cnpj is normalized to digits on save and the auth view normalizes the request
 # input, so verifications are persisted/looked-up by the digits-only form.
-_CPF_DIGITS = "52998224725"
+_CPF_DIGITS = CPF_VALID_PRIMARY
+_CPF = "529.982.247-25"  # CPF_VALID_PRIMARY in the formatted form the API accepts
 _PHONE = "(11) 98765-4321"
 
 # Generic, identical responses that must not reveal whether a CPF/CNPJ is a tenant.
 _GENERIC_REQUEST_DETAIL = "Se o CPF/CNPJ estiver cadastrado, um código foi enviado via WhatsApp."
 _GENERIC_VERIFY_ERROR = "Código inválido."
+
+
+@pytest.fixture(autouse=True)
+def _twilio_credentials(settings):
+    """send_whatsapp_message raises RuntimeError when TWILIO_ACCOUNT_SID is empty (the test env
+    leaves it unset), so the real send path needs these credentials present. The Twilio Client
+    itself is mocked per-test, so the values are inert."""
+    settings.TWILIO_ACCOUNT_SID = "ACtest00000000000000000000000000"
+    settings.TWILIO_AUTH_TOKEN = "test-auth-token"
+    settings.TWILIO_TEMPLATE_VERIFICATION = "HXtest00000000000000000000000000"
+    settings.TWILIO_WHATSAPP_FROM = "+15551230000"
 
 
 def _make_tenant(admin_user, cpf_cnpj=_CPF, phone=_PHONE):
@@ -83,24 +98,26 @@ class TestRequestCode:
         _make_tenant(admin_user)
         client = APIClient()
 
-        with patch("core.viewsets.auth_views.send_verification_code") as mock_send:
+        with patch("core.services.whatsapp_service.Client") as mock_client:
             response = client.post(REQUEST_URL, {"cpf_cnpj": _CPF}, format="json")
 
         assert response.status_code == status.HTTP_200_OK
         assert response.data["detail"] == _GENERIC_REQUEST_DETAIL
-        mock_send.assert_called_once()
+        # The real send_verification_code ran end-to-end and hit the Twilio Client once.
+        mock_client.return_value.messages.create.assert_called_once()
         assert WhatsAppVerification.objects.filter(cpf_cnpj=_CPF_DIGITS).count() == 1
 
     def test_request_code_unknown_cpf_returns_same_generic_200(self):
         """Unknown CPF must NOT enumerate: same generic 200, no verification, no send."""
         client = APIClient()
 
-        with patch("core.viewsets.auth_views.send_verification_code") as mock_send:
+        with patch("core.services.whatsapp_service.Client") as mock_client:
             response = client.post(REQUEST_URL, {"cpf_cnpj": "000.000.000-00"}, format="json")
 
         assert response.status_code == status.HTTP_200_OK
         assert response.data["detail"] == _GENERIC_REQUEST_DETAIL
-        mock_send.assert_not_called()
+        # Unknown CPF must not send — the Twilio Client is never even constructed.
+        mock_client.assert_not_called()
         assert WhatsAppVerification.objects.filter(cpf_cnpj="000.000.000-00").count() == 0
 
     def test_request_code_missing_cpf(self):
@@ -114,7 +131,7 @@ class TestRequestCode:
         _make_tenant(admin_user)
         client = APIClient()
 
-        with patch("core.viewsets.auth_views.send_verification_code"):
+        with patch("core.services.whatsapp_service.Client"):
             for _ in range(3):
                 response = client.post(REQUEST_URL, {"cpf_cnpj": _CPF}, format="json")
                 assert response.status_code == status.HTTP_200_OK
@@ -133,7 +150,7 @@ class TestVerifyCode:
         tenant = _make_tenant(admin_user)
         client = APIClient()
 
-        with patch("core.viewsets.auth_views.send_verification_code"):
+        with patch("core.services.whatsapp_service.Client"):
             client.post(REQUEST_URL, {"cpf_cnpj": _CPF}, format="json")
 
         verification = WhatsAppVerification.objects.filter(cpf_cnpj=_CPF_DIGITS).latest(
@@ -159,7 +176,7 @@ class TestVerifyCode:
         _make_tenant(admin_user)
         client = APIClient()
 
-        with patch("core.viewsets.auth_views.send_verification_code"):
+        with patch("core.services.whatsapp_service.Client"):
             client.post(REQUEST_URL, {"cpf_cnpj": _CPF}, format="json")
 
         verification = WhatsAppVerification.objects.filter(cpf_cnpj=_CPF_DIGITS).latest(
@@ -226,7 +243,7 @@ class TestVerifyCode:
         _make_tenant(admin_user)
         client = APIClient()
 
-        with patch("core.viewsets.auth_views.send_verification_code"):
+        with patch("core.services.whatsapp_service.Client"):
             client.post(REQUEST_URL, {"cpf_cnpj": _CPF}, format="json")
 
         # Three wrong attempts exhaust the counter
@@ -255,7 +272,7 @@ class TestVerifyCode:
         client = APIClient()
 
         # First login — creates the user
-        with patch("core.viewsets.auth_views.send_verification_code"):
+        with patch("core.services.whatsapp_service.Client"):
             client.post(REQUEST_URL, {"cpf_cnpj": _CPF}, format="json")
         verification = WhatsAppVerification.objects.filter(cpf_cnpj=_CPF_DIGITS).latest(
             "created_at"
@@ -266,7 +283,7 @@ class TestVerifyCode:
         first_user_pk = tenant.user.pk
 
         # Second login — must reuse the same user
-        with patch("core.viewsets.auth_views.send_verification_code"):
+        with patch("core.services.whatsapp_service.Client"):
             client.post(REQUEST_URL, {"cpf_cnpj": _CPF}, format="json")
         verification2 = WhatsAppVerification.objects.filter(cpf_cnpj=_CPF_DIGITS).latest(
             "created_at"
