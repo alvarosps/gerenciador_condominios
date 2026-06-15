@@ -6,6 +6,8 @@ billing_account=None), else generic for an avulsa bill. ORM is real (no internal
 """
 
 import pytest
+from model_bakery import baker
+
 from finances.models import (
     Bill,
     BillingAccount,
@@ -14,7 +16,6 @@ from finances.models import (
     InstallmentPlan,
 )
 from finances.serializers import BillSerializer
-from model_bakery import baker
 
 pytestmark = pytest.mark.django_db
 

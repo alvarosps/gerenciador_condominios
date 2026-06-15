@@ -10,6 +10,7 @@ boundary are mocked — IptuAlertService / create_notification / ORM are real.
 """
 
 import contextlib
+import re
 from collections.abc import Iterator
 from datetime import date
 from decimal import Decimal
@@ -17,12 +18,13 @@ from unittest.mock import patch
 
 import pytest
 import requests as http_requests
+import responses as responses_lib
 from django.contrib.auth.models import User
 from django.core.management import call_command
-from finances.models import BillingAccountType, InstallmentPlanState
 from freezegun import freeze_time
 
-from core.models import Notification
+from core.models import IPCAIndex, Notification
+from finances.models import BillingAccountType, InstallmentPlanState
 from tests.constants import TEST_PASSWORD
 from tests.factories import (
     make_bill,
@@ -35,6 +37,9 @@ from tests.factories import (
 pytestmark = pytest.mark.django_db
 
 FROZEN = "2026-07-15 12:00:00"
+
+# Match any URL that hits the IBGE SIDRA endpoint regardless of the period param
+_SIDRA_URL_PATTERN = re.compile(r"https://apisidra\.ibge\.gov\.br/values/t/1737/.*")
 
 
 @contextlib.contextmanager
@@ -279,6 +284,26 @@ def test_no_device_token_still_creates_notification() -> None:
         ).count()
         == 1
     )
+
+
+@freeze_time(FROZEN)
+@responses_lib.activate
+def test_command_fetches_ipca() -> None:
+    """P5.1: the daily cron pulls the latest IPCA into the DB (the request path no longer
+    does it). With a stale/empty index, running the command persists the fetched month."""
+    responses_lib.add(
+        responses_lib.GET,
+        _SIDRA_URL_PATTERN,
+        json=[{"D3C": "Período", "V": "Valor"}, {"D3C": "202606", "V": "7100.00"}],
+        status=200,
+    )
+    IPCAIndex.objects.all().delete()
+
+    with _no_push():
+        call_command("send_finance_alerts")
+
+    assert len(responses_lib.calls) == 1
+    assert IPCAIndex.objects.filter(reference_month=date(2026, 6, 1)).exists()
 
 
 @freeze_time(FROZEN)

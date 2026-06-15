@@ -13,6 +13,8 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.utils import timezone
+from freezegun import freeze_time
+
 from finances.models import (
     Bill,
     BillBehavior,
@@ -25,8 +27,6 @@ from finances.models import (
 from finances.serializers import BillSerializer
 from finances.services.bill_payment_service import BillPaymentService
 from finances.services.bill_service import BillDraft, BillService
-from freezegun import freeze_time
-
 from tests.factories import (
     make_billing_account,
     make_condo_month_close,

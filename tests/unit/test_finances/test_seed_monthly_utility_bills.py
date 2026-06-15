@@ -11,9 +11,9 @@ from pathlib import Path
 
 import pytest
 from django.core.management import call_command
-from finances.models import Bill, Installment, InstallmentPlan, WaterBillStatement
 from freezegun import freeze_time
 
+from finances.models import Bill, Installment, InstallmentPlan, WaterBillStatement
 from tests.factories import make_building
 
 pytestmark = pytest.mark.django_db

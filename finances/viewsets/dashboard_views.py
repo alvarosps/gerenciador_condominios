@@ -228,9 +228,8 @@ class FinanceDashboardViewSet(viewsets.ViewSet):
         overdue_lookup: dict[str, object] = {"is_overdue": True}
         bills_qs = (
             Bill.objects.with_amounts(today_sp())
+            .with_list_relations()
             .filter(**overdue_lookup)
-            .select_related("building", "category", "billing_account", "condominium")
-            .prefetch_related("line_items", "allocations")
             .order_by("due_date")
         )
         if building_id is not None:
@@ -379,7 +378,7 @@ class FinanceCashFlowViewSet(viewsets.ViewSet):
         try:
             months = _validated_months(request.data.get("months"))
             building_id = _coerce_building_id(request.data.get("building_id"))
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             return Response(
                 {
                     "error": f"Parâmetros 'months' (1 a {MAX_PROJECTION_MONTHS}) / 'building_id' inválidos."

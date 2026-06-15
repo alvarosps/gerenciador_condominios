@@ -1,7 +1,14 @@
 # Plano P6.2 — Sincronização de documentação com a realidade
 
 > **Estado:** PLANEJADO — nao executado
-> **Prioridade:** FASE P6 · **Branch sugerida:** `docs/sync-with-reality` · **Depende de:** idealmente apos P2–P5 (a doc deve refletir o estado final pos-fixes); pode rodar em paralelo com P6.1 e P6.3
+> **Prioridade:** FASE P6 · **Branch:** `perf/p5-p6` (combinado P5+P6, 1 PR) · **Depende de:** apos P2–P5 (doc reflete o estado final); rodar DEPOIS de P6.1/P6.3 nesta execução (para citar o Python 3.14 e o gate de CI já corrigidos)
+>
+> **Revisão 2026-06-13 (verificação pós-P5):** "Fatos verificados" re-checados contra o `master` atual — **todos os fatos de fundo continuam VERDADEIROS** (auth routes urls.py:56-66; LeaseTenant deletado na migration 0004:137; dependents não é router e rent-adjustments é, core/urls.py:82; 14 routers + 16 models de finances; env vars; tag fee 20/40). Correções da revisão:
+> - **CONFLITO Python RESOLVIDO — descoberta de versão ANULADA.** O runtime é cpython-**3.14.3** e o `pyrightconfig` já é 3.14; o `from __future__ import annotations` é proibido por causa do PEP 649 nativo do 3.14 — a doc `coding-standards.md:13` está **CORRETA**. O defeito real é `pyproject requires-python>=3.12` (stale), corrigido em **P6.3** (bump p/ 3.14). Portanto: **NÃO** rebaixar a doc para 3.12; o passo 2.4 de `coding-standards.md` vira **no-op** (no máximo suavizar para "3.14+ (PEP 649)"); **remover** o gate `docs_python_version_consistent` (linha 140) e o critério de aceite que exige zero "3.14" (linha 168) — codificavam a direção errada.
+> - **GAP: CLAUDE.md:27** também tem "M2M via LeaseTenant" (na árvore do modelo de dados). O Passo 1.3 só mira 79/117 → o próprio gate `rg LeaseTenant CLAUDE.md = 0` falharia. **Incluir CLAUDE.md:27** na remoção (trocar por "M2M via Lease.tenants").
+> - **ENV nuance:** `USE_S3`/`AWS_*`/`SENTRY_*` **NÃO são órfãs** — são lidas por `condominios_manager/settings_production.py` (USE_S3:83, AWS_*:86-94, SENTRY_DSN:223). **Manter** no `.env.production.example` (vars reais de prod). Só `BACKUP_*`/`HEALTH_*`/`EMAIL_*` parecem realmente não-lidas (verificar EMAIL_* antes de remover).
+> - **Passo 6.3 (headers "EM REVISÃO"):** apenas **1** plano mergeado carrega o marcador — `2026-06-09-condo-bills-fixes-and-utility-faturas-plan.md:5` (e contém o aviso real anti-re-seed: `create_with_lines` não-idempotente). Os outros 2 citados (`2026-06-08-parser-iptu-design`, `2026-06-09-contract-pdf-prod-fix`) **não têm** esse header → a ação para eles é "adicionar header EXECUTADO/Data-mergeado", não "trocar EM REVISÃO".
+> - **Anchors driftados (usar grep, não confiar nos números):** core/models.py Lease.tenants **703-705** (era 640-642), lease_tenant_date_idx **792** (728); settings.py tag fee **507-508** (501-502); BillSkip **468**/CondoMonthClose **831** (439/784); README lint **254-256** (271-280), auth **270/283** (288/301), resources **302** (320-329). `Condominium` mora em **core/models.py:210** (não em finances) — deixar claro no FINANCES.md.
 
 ## Objetivo
 

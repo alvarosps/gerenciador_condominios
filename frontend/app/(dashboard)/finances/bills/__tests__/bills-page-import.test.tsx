@@ -1,8 +1,8 @@
-import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { renderWithProviders, createTestQueryClient } from '@/tests/test-utils';
+import { renderWithProviders, waitForQueriesToSettle } from '@/tests/test-utils';
 import { server } from '@/tests/mocks/server';
 import { useAuthStore } from '@/store/auth-store';
 import {
@@ -11,26 +11,13 @@ import {
   createMockParsedInvoice,
 } from '@/tests/mocks/data/finances';
 import BillsPage from '../page';
-import * as billHooks from '@/lib/api/hooks/use-bills';
-import type { ParsedInvoice } from '@/lib/schemas/finances/invoice-parse.schema';
+import { type z } from 'zod';
+import { billingAccountSchema } from '@/lib/schemas/finances/billing-account.schema';
+import { type parsedInvoiceSchema } from '@/lib/schemas/finances/invoice-parse.schema';
 
-vi.mock('@/lib/api/hooks/use-bills', async (importOriginal) => {
-  const actual = await importOriginal<typeof billHooks>();
-  return {
-    ...actual,
-    useGenerateMonthBills: vi.fn(),
-    useParseInvoice: vi.fn(),
-    useCreateBillWithLines: vi.fn(),
-    useUpdateBillWithLines: vi.fn(),
-    useUpdateBill: vi.fn(),
-  };
-});
-
-vi.mock('@/lib/api/hooks/use-buildings', () => ({ useBuildings: () => ({ data: [] }) }));
-vi.mock('@/lib/api/hooks/use-finance-categories', () => ({
-  useFinanceCategories: () => ({ data: [] }),
-}));
-
+// Real hooks (useParseInvoice / useCreateBillWithLines / useUpdateBillWithLines / …) hit MSW. The
+// parse → create/update flow is exercised end-to-end; each mutation is spied via an MSW
+// request-body capture (the point: it exercises the form's real write serialization).
 const API_BASE = 'http://localhost:8008/api';
 
 beforeAll(() => {
@@ -49,16 +36,14 @@ function setBillsResponse(bills: unknown[]) {
 }
 
 function setBillingAccounts(accounts: unknown[]) {
-  server.use(
-    http.get(`${API_BASE}/finances/billing-accounts/`, () => HttpResponse.json(accounts)),
-  );
+  server.use(http.get(`${API_BASE}/finances/billing-accounts/`, () => HttpResponse.json(accounts)));
 }
 
 function setIptuAlerts() {
   server.use(
     http.get(`${API_BASE}/finances/finance-dashboard/iptu_alerts/`, () =>
-      HttpResponse.json({ alerts: [], warning_count: 0, critical_count: 0 }),
-    ),
+      HttpResponse.json({ alerts: [], warning_count: 0, critical_count: 0 })
+    )
   );
 }
 
@@ -69,57 +54,48 @@ function setAdmin(isStaff: boolean) {
   });
 }
 
-interface MutationStub<P> {
-  mutate: ReturnType<typeof vi.fn>;
-  calls: P[];
+interface CreateBody {
+  bill: Record<string, unknown>;
+  line_items: unknown[];
+  statement: unknown;
 }
 
-function makeMutation<P>(): MutationStub<P> {
-  const calls: P[] = [];
-  const mutate = vi.fn((payload: P, options?: { onSuccess?: (data?: unknown) => void }) => {
-    calls.push(payload);
-    options?.onSuccess?.(createMockBill({ id: 99 }));
-  });
-  return { mutate, calls };
+interface UpdateBody {
+  bill: Record<string, unknown>;
+  line_items: unknown[];
+  statement: unknown;
 }
 
-interface MountResult {
-  parseCalls: File[];
-  createStub: MutationStub<billHooks.CreateBillWithLines>;
-  updateStub: MutationStub<billHooks.UpdateBillWithLines>;
+// Make parse_invoice resolve to a specific draft so the modal opens prefilled from it.
+function setParseInvoice(draft: z.input<typeof parsedInvoiceSchema>) {
+  server.use(
+    http.post(`${API_BASE}/finances/bills/parse_invoice/`, () => HttpResponse.json(draft))
+  );
 }
 
-function mountHooks(draft: ParsedInvoice | null): MountResult {
-  const parseCalls: File[] = [];
-  const parseMutate = vi.fn((file: File, options?: { onSuccess?: (d: ParsedInvoice) => void }) => {
-    parseCalls.push(file);
-    if (draft) options?.onSuccess?.(draft);
-  });
-  vi.mocked(billHooks.useParseInvoice).mockReturnValue({
-    mutate: parseMutate,
-    isPending: false,
-  } as never);
+// Spy create_with_lines via an MSW request-body capture.
+function spyCreateWithLines() {
+  const bodies: CreateBody[] = [];
+  server.use(
+    http.post(`${API_BASE}/finances/bills/create_with_lines/`, async ({ request }) => {
+      bodies.push((await request.json()) as CreateBody);
+      return HttpResponse.json(createMockBill({ id: 99 }), { status: 201 });
+    })
+  );
+  return bodies;
+}
 
-  const createStub = makeMutation<billHooks.CreateBillWithLines>();
-  const updateStub = makeMutation<billHooks.UpdateBillWithLines>();
-  vi.mocked(billHooks.useCreateBillWithLines).mockReturnValue({
-    mutate: createStub.mutate,
-    isPending: false,
-  } as never);
-  vi.mocked(billHooks.useUpdateBillWithLines).mockReturnValue({
-    mutate: updateStub.mutate,
-    isPending: false,
-  } as never);
-  vi.mocked(billHooks.useUpdateBill).mockReturnValue({
-    mutate: vi.fn(),
-    isPending: false,
-  } as never);
-  vi.mocked(billHooks.useGenerateMonthBills).mockReturnValue({
-    mutate: vi.fn(),
-    isPending: false,
-  } as never);
-
-  return { parseCalls, createStub, updateStub };
+// Spy update_with_lines via an MSW request-body capture (captures the path :id too).
+function spyUpdateWithLines() {
+  const bodies: (UpdateBody & { bill_id: number })[] = [];
+  server.use(
+    http.post(`${API_BASE}/finances/bills/:id/update_with_lines/`, async ({ params, request }) => {
+      const body = (await request.json()) as UpdateBody;
+      bodies.push({ ...body, bill_id: Number(params.id) });
+      return HttpResponse.json(createMockBill({ id: Number(params.id) }));
+    })
+  );
+  return bodies;
 }
 
 function uploadPdf() {
@@ -131,36 +107,33 @@ function uploadPdf() {
 
 describe('BillsPage — import fatura + disambiguated accounts', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     setIptuAlerts();
     setBillingAccounts([]);
   });
 
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
   it('hides "Importar fatura" and "Nova Conta" for non-admin users', async () => {
     setAdmin(false);
-    mountHooks(null);
     setBillsResponse([createMockBill({ id: 1, description: 'Conta de Luz' })]);
 
-    renderWithProviders(<BillsPage />, { queryClient: createTestQueryClient() });
+    const { queryClient } = renderWithProviders(<BillsPage />);
 
     expect((await screen.findAllByText('Conta de Luz')).length).toBeGreaterThan(0);
     expect(screen.queryByRole('button', { name: /importar fatura/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /nova conta/i })).not.toBeInTheDocument();
+
+    await waitForQueriesToSettle(queryClient);
   });
 
   it('shows "Importar fatura" for admin users', async () => {
     setAdmin(true);
-    mountHooks(null);
     setBillsResponse([createMockBill({ id: 1, description: 'Conta de Luz' })]);
 
-    renderWithProviders(<BillsPage />, { queryClient: createTestQueryClient() });
+    const { queryClient } = renderWithProviders(<BillsPage />);
 
     expect(await screen.findByRole('button', { name: /importar fatura/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /nova conta/i })).toBeInTheDocument();
+
+    await waitForQueriesToSettle(queryClient);
   });
 
   it('parsing a PDF opens the bill modal prefilled from the draft (header + lines + locked installment line)', async () => {
@@ -177,8 +150,20 @@ describe('BillsPage — import fatura + disambiguated accounts', () => {
         category_id: null,
       },
       line_items: [
-        { description: 'Consumo de água', amount: 80, is_offset: false, category_id: null, installment_id: null },
-        { description: 'PARCELA 3/59', amount: 12, is_offset: false, category_id: null, installment_id: 42 },
+        {
+          description: 'Consumo de água',
+          amount: 80,
+          is_offset: false,
+          category_id: null,
+          installment_id: null,
+        },
+        {
+          description: 'PARCELA 3/59',
+          amount: 12,
+          is_offset: false,
+          category_id: null,
+          installment_id: 42,
+        },
       ],
       statement: {
         consumo_m3: 12,
@@ -192,10 +177,10 @@ describe('BillsPage — import fatura + disambiguated accounts', () => {
       existing_bill_id: null,
       warnings: ['Aviso de teste'],
     });
-    mountHooks(draft);
+    setParseInvoice(draft);
     setBillsResponse([createMockBill({ id: 1, description: 'Conta de Luz' })]);
 
-    renderWithProviders(<BillsPage />, { queryClient: createTestQueryClient() });
+    const { queryClient } = renderWithProviders(<BillsPage />);
 
     await screen.findByRole('button', { name: /importar fatura/i });
     uploadPdf();
@@ -210,11 +195,12 @@ describe('BillsPage — import fatura + disambiguated accounts', () => {
     expect(screen.getByLabelText('Consumo (m³)')).toHaveValue('12');
     // Warning shown.
     expect(screen.getByText(/Aviso de teste/)).toBeInTheDocument();
+
+    await waitForQueriesToSettle(queryClient);
   });
 
   it('renders two same-type accounts with distinct disambiguated labels "name — tipo · external_identifier"', async () => {
     setAdmin(true);
-    mountHooks(null);
     setBillsResponse([createMockBill({ id: 1, description: 'Conta de Luz' })]);
     setBillingAccounts([
       createMockBillingAccount({
@@ -231,7 +217,7 @@ describe('BillsPage — import fatura + disambiguated accounts', () => {
       }),
     ]);
 
-    renderWithProviders(<BillsPage />, { queryClient: createTestQueryClient() });
+    const { queryClient } = renderWithProviders(<BillsPage />);
 
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     await user.click(await screen.findByRole('button', { name: /nova conta/i }));
@@ -240,23 +226,31 @@ describe('BillsPage — import fatura + disambiguated accounts', () => {
     await user.click(await screen.findByRole('option', { name: 'Recorrente' }));
     await user.click(await screen.findByText('Conta recorrente'));
 
-    const opt1 = await screen.findByRole('option', { name: /Conta de Luz - 836 — Luz · 1\.273\.798\.010-05/ });
-    const opt2 = await screen.findByRole('option', { name: /Conta de Luz - 850 — Luz · 9\.999\.999\.999-99/ });
+    const opt1 = await screen.findByRole('option', {
+      name: /Conta de Luz - 836 — Luz · 1\.273\.798\.010-05/,
+    });
+    const opt2 = await screen.findByRole('option', {
+      name: /Conta de Luz - 850 — Luz · 9\.999\.999\.999-99/,
+    });
     expect(opt1).toBeInTheDocument();
     expect(opt2).toBeInTheDocument();
     expect(opt1.textContent).not.toBe(opt2.textContent);
+
+    await waitForQueriesToSettle(queryClient);
   });
 
   it('saves via update_with_lines when the draft carries existing_bill_id (routes on existing_bill_id, not matched_account)', async () => {
     setAdmin(true);
     const draft = createMockParsedInvoice({
       existing_bill_id: 7,
-      matched_account: createMockBillingAccount({ id: 3 }),
+      matched_account: billingAccountSchema.parse(createMockBillingAccount({ id: 3 })),
     });
-    const { createStub, updateStub } = mountHooks(draft);
+    setParseInvoice(draft);
+    const createBodies = spyCreateWithLines();
+    const updateBodies = spyUpdateWithLines();
     setBillsResponse([createMockBill({ id: 1 })]);
 
-    renderWithProviders(<BillsPage />, { queryClient: createTestQueryClient() });
+    const { queryClient } = renderWithProviders(<BillsPage />);
 
     await screen.findByRole('button', { name: /importar fatura/i });
     uploadPdf();
@@ -265,22 +259,26 @@ describe('BillsPage — import fatura + disambiguated accounts', () => {
     await userEvent.click(screen.getByRole('button', { name: /^atualizar$/i }));
 
     await waitFor(() => {
-      expect(updateStub.calls).toHaveLength(1);
+      expect(updateBodies).toHaveLength(1);
     });
-    expect(updateStub.calls[0]?.bill_id).toBe(7);
-    expect(createStub.calls).toHaveLength(0);
+    expect(updateBodies[0]?.bill_id).toBe(7);
+    expect(createBodies).toHaveLength(0);
+
+    await waitForQueriesToSettle(queryClient);
   });
 
   it('saves via create_with_lines when existing_bill_id is null (even with a matched_account)', async () => {
     setAdmin(true);
     const draft = createMockParsedInvoice({
       existing_bill_id: null,
-      matched_account: createMockBillingAccount({ id: 3 }),
+      matched_account: billingAccountSchema.parse(createMockBillingAccount({ id: 3 })),
     });
-    const { createStub, updateStub } = mountHooks(draft);
+    setParseInvoice(draft);
+    const createBodies = spyCreateWithLines();
+    const updateBodies = spyUpdateWithLines();
     setBillsResponse([createMockBill({ id: 1 })]);
 
-    renderWithProviders(<BillsPage />, { queryClient: createTestQueryClient() });
+    const { queryClient } = renderWithProviders(<BillsPage />);
 
     await screen.findByRole('button', { name: /importar fatura/i });
     uploadPdf();
@@ -289,8 +287,10 @@ describe('BillsPage — import fatura + disambiguated accounts', () => {
     await userEvent.click(screen.getByRole('button', { name: /^criar$/i }));
 
     await waitFor(() => {
-      expect(createStub.calls).toHaveLength(1);
+      expect(createBodies).toHaveLength(1);
     });
-    expect(updateStub.calls).toHaveLength(0);
+    expect(updateBodies).toHaveLength(0);
+
+    await waitForQueriesToSettle(queryClient);
   });
 });

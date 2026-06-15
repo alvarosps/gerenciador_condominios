@@ -5,13 +5,13 @@ from decimal import Decimal
 import pytest
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, models, transaction
+
 from finances.models import (
     BillingAccountType,
     Installment,
     InstallmentPlan,
     InstallmentPlanState,
 )
-
 from tests.factories import make_billing_account, make_installment, make_installment_plan
 
 pytestmark = pytest.mark.django_db
@@ -135,8 +135,10 @@ def test_billing_account_field_keeps_protect_and_related_name() -> None:
     field = InstallmentPlan._meta.get_field("billing_account")
     assert field.null is True
     assert field.blank is True
-    assert field.remote_field.on_delete is models.PROTECT
-    assert field.remote_field.related_name == "installment_plans"
+    remote_field = field.remote_field
+    assert remote_field is not None
+    assert remote_field.on_delete is models.PROTECT
+    assert remote_field.related_name == "installment_plans"
 
 
 def test_installment_is_cascade_child_on_hard_delete() -> None:

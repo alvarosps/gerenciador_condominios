@@ -1,48 +1,63 @@
-import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
+import { http, HttpResponse } from 'msw';
 import { screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { renderWithProviders } from '@/tests/test-utils';
+import { renderWithProviders, waitForQueriesToSettle } from '@/tests/test-utils';
+import { server } from '@/tests/mocks/server';
 import {
   createMockBill,
   createMockBillingAccount,
   createMockParsedInvoice,
 } from '@/tests/mocks/data/finances';
+import { billSchema } from '@/lib/schemas/finances/bill.schema';
+import { billingAccountSchema } from '@/lib/schemas/finances/billing-account.schema';
+import { parsedInvoiceSchema } from '@/lib/schemas/finances/invoice-parse.schema';
 import { BillFormModal } from '../bill-form-modal';
-import * as billHooks from '@/lib/api/hooks/use-bills';
 
-vi.mock('@/lib/api/hooks/use-bills', async (importOriginal) => {
-  const actual = await importOriginal<typeof billHooks>();
-  return {
-    ...actual,
-    useCreateBillWithLines: vi.fn(),
-    useUpdateBill: vi.fn(),
-    useUpdateBillWithLines: vi.fn(),
-  };
-});
+// Real hooks (useCreateBillWithLines / useUpdateBill / useUpdateBillWithLines) hit MSW; the
+// select-source hooks (buildings / finance-categories / billing-accounts) hit MSW too. The default
+// handlers return data; per-test `server.use` overrides them. Each mutation is spied via an MSW
+// request-body capture, which exercises the form's real write serialization (line_items + *_id).
+const API_BASE = 'http://localhost:8008/api';
 
-// Stub the select-source hooks so the modal renders without firing real XHRs (which would
-// leak into teardown). The form only reads `.data`; empty lists are enough for these tests.
-vi.mock('@/lib/api/hooks/use-buildings', () => ({ useBuildings: () => ({ data: [] }) }));
-vi.mock('@/lib/api/hooks/use-finance-categories', () => ({
-  useFinanceCategories: () => ({ data: [] }),
-}));
-vi.mock('@/lib/api/hooks/use-billing-accounts', () => ({
-  useBillingAccounts: () => ({ data: [] }),
-}));
-
-interface CreateCall {
-  payload: billHooks.CreateBillWithLines;
-}
-interface UpdateCall {
-  payload: Record<string, unknown>;
+interface CreateBody {
+  bill: Record<string, unknown>;
+  line_items: { description: string; amount: number; is_offset?: boolean }[];
+  statement: Record<string, unknown> | null;
 }
 
-function makeMutation<T>(store: T[], key: 'payload') {
-  const mutate = vi.fn((payload: unknown, options?: { onSuccess?: () => void }) => {
-    store.push({ [key]: payload } as T);
-    options?.onSuccess?.();
-  });
-  return { mutate, isPending: false };
+// Keep the source-select hooks deterministic: empty lists (the form only reads `.data`).
+function setSourcesEmpty() {
+  server.use(
+    http.get(`${API_BASE}/buildings/`, () => HttpResponse.json([])),
+    http.get(`${API_BASE}/finances/finance-categories/`, () => HttpResponse.json([])),
+    http.get(`${API_BASE}/finances/billing-accounts/`, () => HttpResponse.json([]))
+  );
+}
+
+// Spy create_with_lines via an MSW request-body capture.
+function spyCreate() {
+  const bodies: CreateBody[] = [];
+  server.use(
+    http.post(`${API_BASE}/finances/bills/create_with_lines/`, async ({ request }) => {
+      bodies.push((await request.json()) as CreateBody);
+      return HttpResponse.json(createMockBill({ id: 99 }), { status: 201 });
+    })
+  );
+  return bodies;
+}
+
+// Spy the edit-mode PUT (useUpdateBill) via an MSW request-body capture.
+function spyUpdate() {
+  const bodies: (Record<string, unknown> & { id: number })[] = [];
+  server.use(
+    http.put(`${API_BASE}/finances/bills/:id/`, async ({ params, request }) => {
+      const body = (await request.json()) as Record<string, unknown>;
+      bodies.push({ ...body, id: Number(params.id) });
+      return HttpResponse.json(createMockBill({ id: Number(params.id) }));
+    })
+  );
+  return bodies;
 }
 
 beforeAll(() => {
@@ -57,33 +72,10 @@ beforeAll(() => {
 });
 
 describe('BillFormModal', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  function mountCreate() {
-    const creates: CreateCall[] = [];
-    const updates: UpdateCall[] = [];
-    const updateWithLines: UpdateCall[] = [];
-    vi.mocked(billHooks.useCreateBillWithLines).mockReturnValue(
-      makeMutation<CreateCall>(creates, 'payload') as never
-    );
-    vi.mocked(billHooks.useUpdateBill).mockReturnValue(
-      makeMutation<UpdateCall>(updates, 'payload') as never
-    );
-    vi.mocked(billHooks.useUpdateBillWithLines).mockReturnValue(
-      makeMutation<UpdateCall>(updateWithLines, 'payload') as never
-    );
-    return { creates, updates, updateWithLines };
-  }
-
   it('creates a bill via useCreateBillWithLines with the expected fields and lines', async () => {
-    const { creates } = mountCreate();
-    renderWithProviders(<BillFormModal open onClose={vi.fn()} />);
+    setSourcesEmpty();
+    const creates = spyCreate();
+    const { queryClient } = renderWithProviders(<BillFormModal open onClose={() => undefined} />);
 
     fireEvent.change(screen.getByPlaceholderText('Descrição da conta'), {
       target: { value: 'Conta de Luz' },
@@ -102,20 +94,21 @@ describe('BillFormModal', () => {
     await waitFor(() => {
       expect(creates).toHaveLength(1);
     });
-    const payload = creates[0]?.payload;
-    expect(payload?.bill).toMatchObject({
+    expect(creates[0]?.bill).toMatchObject({
       description: 'Conta de Luz',
       competence_month: '2026-06-01',
       due_date: '2026-06-10',
       behavior: 'one_time',
     });
-    expect(payload?.line_items[0]).toMatchObject({ description: 'Energia', amount: 350 });
+    expect(creates[0]?.line_items[0]).toMatchObject({ description: 'Energia', amount: 350 });
+
+    await waitForQueriesToSettle(queryClient);
   });
 
   it('shows the billing_account select for recurring and hides it for one_time', async () => {
-    mountCreate();
+    setSourcesEmpty();
     const user = userEvent.setup({ pointerEventsCheck: 0 });
-    renderWithProviders(<BillFormModal open onClose={vi.fn()} />);
+    const { queryClient } = renderWithProviders(<BillFormModal open onClose={() => undefined} />);
 
     expect(screen.queryByText('Conta recorrente')).not.toBeInTheDocument();
 
@@ -123,14 +116,17 @@ describe('BillFormModal', () => {
     await user.click(await screen.findByRole('option', { name: 'Recorrente' }));
 
     expect(await screen.findByText('Conta recorrente')).toBeInTheDocument();
+
+    await waitForQueriesToSettle(queryClient);
   });
 
   it('links installment behavior to Planos de Parcelamento and blocks submission', async () => {
     // The stale "Fase 3" copy is replaced by a real link to the Installment Plans
     // screen; selecting "Parcelada" must still block create (handled elsewhere).
-    const { creates } = mountCreate();
+    setSourcesEmpty();
+    const creates = spyCreate();
     const user = userEvent.setup({ pointerEventsCheck: 0 });
-    renderWithProviders(<BillFormModal open onClose={vi.fn()} />);
+    const { queryClient } = renderWithProviders(<BillFormModal open onClose={() => undefined} />);
 
     await user.click(screen.getByLabelText('Tipo'));
     await user.click(await screen.findByRole('option', { name: 'Parcelada' }));
@@ -140,13 +136,16 @@ describe('BillFormModal', () => {
 
     await userEvent.click(screen.getByRole('button', { name: /^criar$/i }));
     expect(creates).toHaveLength(0);
+
+    await waitForQueriesToSettle(queryClient);
   });
 
   it('renders Inscrição/UC and Emissão inputs and includes them in the create payload', async () => {
     // external_identifier + issue_date are already in the schema/payload; this
     // session only renders the inputs — assert they round-trip into the mutation.
-    const { creates } = mountCreate();
-    renderWithProviders(<BillFormModal open onClose={vi.fn()} />);
+    setSourcesEmpty();
+    const creates = spyCreate();
+    const { queryClient } = renderWithProviders(<BillFormModal open onClose={() => undefined} />);
 
     fireEvent.change(screen.getByPlaceholderText('Descrição da conta'), {
       target: { value: 'Conta de Água' },
@@ -169,28 +168,32 @@ describe('BillFormModal', () => {
     await waitFor(() => {
       expect(creates).toHaveLength(1);
     });
-    expect(creates[0]?.payload.bill).toMatchObject({
+    expect(creates[0]?.bill).toMatchObject({
       external_identifier: 'UC-12345',
       issue_date: '2026-06-02',
     });
+
+    await waitForQueriesToSettle(queryClient);
   });
 
-  it('keeps the submit footer rendered (fixed) outside the scrolling body', () => {
+  it('keeps the submit footer rendered (fixed) outside the scrolling body', async () => {
     // Footer lives as a sibling of DialogBody (not inside the overflow region),
     // so the action buttons are always present regardless of body length.
-    mountCreate();
-    renderWithProviders(<BillFormModal open onClose={vi.fn()} />);
+    setSourcesEmpty();
+    const { queryClient } = renderWithProviders(<BillFormModal open onClose={() => undefined} />);
     expect(screen.getByRole('button', { name: /^criar$/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^cancelar$/i })).toBeInTheDocument();
+
+    await waitForQueriesToSettle(queryClient);
   });
 
   it('hides the statement block on the manual create flow even for water/electricity', async () => {
     // Readings have no leg on the manual create/update payload — they would be silently dropped.
     // So the statement block is gated on the parser-draft flow (isDraft) and never renders on a
     // manual "Nova Conta", regardless of the selected account_type.
-    mountCreate();
+    setSourcesEmpty();
     const user = userEvent.setup({ pointerEventsCheck: 0 });
-    renderWithProviders(<BillFormModal open onClose={vi.fn()} />);
+    const { queryClient } = renderWithProviders(<BillFormModal open onClose={() => undefined} />);
 
     expect(screen.queryByLabelText('Consumo (m³)')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Consumo (kWh)')).not.toBeInTheDocument();
@@ -202,15 +205,24 @@ describe('BillFormModal', () => {
     await user.click(screen.getByLabelText('Tipo de conta'));
     await user.click(await screen.findByRole('option', { name: /Luz/i }));
     expect(screen.queryByLabelText('Consumo (kWh)')).not.toBeInTheDocument();
+
+    await waitForQueriesToSettle(queryClient);
   });
 
   it('shows the statement block on an imported electricity draft and sends the reading', async () => {
-    const { creates } = mountCreate();
-    const draft = createMockParsedInvoice({
-      matched_account: createMockBillingAccount({ id: 7, account_type: 'electricity' }),
-      statement: { consumo_kwh: 320, classe: 'Residencial', bandeira: 'Verde' },
-    });
-    renderWithProviders(<BillFormModal open draft={draft} onClose={vi.fn()} />);
+    setSourcesEmpty();
+    const creates = spyCreate();
+    const draft = parsedInvoiceSchema.parse(
+      createMockParsedInvoice({
+        matched_account: billingAccountSchema.parse(
+          createMockBillingAccount({ id: 7, account_type: 'electricity' })
+        ),
+        statement: { consumo_kwh: 320, classe: 'Residencial', bandeira: 'Verde' },
+      })
+    );
+    const { queryClient } = renderWithProviders(
+      <BillFormModal open draft={draft} onClose={() => undefined} />
+    );
 
     // The draft (account_type electricity) renders the readings block, prefilled from the draft.
     expect(await screen.findByLabelText('Consumo (kWh)')).toBeInTheDocument();
@@ -222,17 +234,24 @@ describe('BillFormModal', () => {
       expect(creates).toHaveLength(1);
     });
     // A matched account is bound, so the statement IS sent (kind=electricity, consumo_kwh=320).
-    expect(creates[0]?.payload.statement).toMatchObject({ kind: 'electricity', consumo_kwh: 320 });
+    expect(creates[0]?.statement).toMatchObject({ kind: 'electricity', consumo_kwh: 320 });
+
+    await waitForQueriesToSettle(queryClient);
   });
 
   it('drops the statement on a no-match draft (billing_account_id null) but still creates', async () => {
-    const { creates } = mountCreate();
-    const draft = createMockParsedInvoice({
-      matched_account: null, // no-match: billing_account_id resolves to null
-      statement: { consumo_kwh: 99, classe: 'Residencial', bandeira: 'Verde' },
-      warnings: ['Nenhuma conta encontrada.'],
-    });
-    renderWithProviders(<BillFormModal open draft={draft} onClose={vi.fn()} />);
+    setSourcesEmpty();
+    const creates = spyCreate();
+    const draft = parsedInvoiceSchema.parse(
+      createMockParsedInvoice({
+        matched_account: null, // no-match: billing_account_id resolves to null
+        statement: { consumo_kwh: 99, classe: 'Residencial', bandeira: 'Verde' },
+        warnings: ['Nenhuma conta encontrada.'],
+      })
+    );
+    const { queryClient } = renderWithProviders(
+      <BillFormModal open draft={draft} onClose={() => undefined} />
+    );
 
     await userEvent.click(screen.getByRole('button', { name: /^criar$/i }));
 
@@ -240,13 +259,16 @@ describe('BillFormModal', () => {
       expect(creates).toHaveLength(1);
     });
     // No account to type the statement → it must NOT be sent (backend would 400 on a null account).
-    expect(creates[0]?.payload.statement).toBeNull();
-    expect(creates[0]?.payload.bill).toMatchObject({ billing_account_id: null });
+    expect(creates[0]?.statement).toBeNull();
+    expect(creates[0]?.bill).toMatchObject({ billing_account_id: null });
+
+    await waitForQueriesToSettle(queryClient);
   });
 
   it('blocks submission with validation messages when required fields are empty', async () => {
-    const { creates } = mountCreate();
-    renderWithProviders(<BillFormModal open onClose={vi.fn()} />);
+    setSourcesEmpty();
+    const creates = spyCreate();
+    const { queryClient } = renderWithProviders(<BillFormModal open onClose={() => undefined} />);
 
     await userEvent.click(screen.getByRole('button', { name: /^criar$/i }));
 
@@ -254,12 +276,17 @@ describe('BillFormModal', () => {
       expect(screen.getAllByText('Descrição é obrigatória').length).toBeGreaterThan(0);
     });
     expect(creates).toHaveLength(0);
+
+    await waitForQueriesToSettle(queryClient);
   });
 
   it('prefills fields and updates via useUpdateBill in edit mode (lines locked with PT note)', async () => {
-    const { updates } = mountCreate();
-    const bill = createMockBill({ id: 5, description: 'Conta Antiga' });
-    renderWithProviders(<BillFormModal open bill={bill} onClose={vi.fn()} />);
+    setSourcesEmpty();
+    const updates = spyUpdate();
+    const bill = billSchema.parse(createMockBill({ id: 5, description: 'Conta Antiga' }));
+    const { queryClient } = renderWithProviders(
+      <BillFormModal open bill={bill} onClose={() => undefined} />
+    );
 
     expect(screen.getByText('Editar Conta')).toBeInTheDocument();
     expect(screen.getByDisplayValue('Conta Antiga')).toBeInTheDocument();
@@ -270,6 +297,8 @@ describe('BillFormModal', () => {
     await waitFor(() => {
       expect(updates).toHaveLength(1);
     });
-    expect(updates[0]?.payload).toMatchObject({ id: 5, description: 'Conta Antiga' });
+    expect(updates[0]).toMatchObject({ id: 5, description: 'Conta Antiga' });
+
+    await waitForQueriesToSettle(queryClient);
   });
 });

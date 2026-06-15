@@ -9,6 +9,13 @@ Idempotency: at most one summary per admin per type per São Paulo day, enforced
 is_notification_sent_on(today_sp()) — SP-aware so the window tracks the São Paulo
 midnight, not UTC. Push is best-effort inside create_notification (a push failure never
 drops the in-app Notification / banner).
+
+OPS REQUIREMENT (P5.1): this command also refreshes the IPCAIndex (IPCAService.fetch_latest is
+the ONLY remaining caller now that the synchronous SIDRA fetch was removed from the request path).
+It MUST be scheduled to run daily in production — configure a Render Cron Job running
+``python manage.py send_finance_alerts``. If the cron is not running, the IPCA index silently
+stops advancing; RentAdjustmentService.get_eligible_leases logs a WARNING when it detects a stale
+index so the broken cron is observable rather than silently drifting onto the Landlord fallback.
 """
 
 import logging
@@ -17,11 +24,12 @@ from datetime import date
 
 from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand
-from finances.services.iptu_alert_service import IptuAlertService, IptuRiskRow
 
 from core.models import Notification
+from core.services.ipca_service import IPCAService
 from core.services.notification_service import create_notification, is_notification_sent_on
 from core.services.timezone import today_sp
+from finances.services.iptu_alert_service import IptuAlertService, IptuRiskRow
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +61,13 @@ class Command(BaseCommand):
 
     def handle(self, *args: str, **options: str) -> None:
         today = today_sp()
+
+        # Pull the latest IPCA index here (daily cron) instead of in the request path.
+        # IPCAService.fetch_latest short-circuits when the DB already covers the month.
+        latest_ipca = IPCAService.fetch_latest()
+        if latest_ipca is not None:
+            logger.info("Fetched IPCA up to %s", latest_ipca.reference_month)
+
         rows = IptuAlertService.evaluate(today)
         warnings = [r for r in rows if r.level == IptuAlertService.LEVEL_WARNING]
         criticals = [r for r in rows if r.level == IptuAlertService.LEVEL_CRITICAL]

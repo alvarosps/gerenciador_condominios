@@ -9,10 +9,10 @@ from pathlib import Path
 
 import pytest
 from django.core.management import call_command
-from finances.models import Category
-from finances.serializers import CategorySerializer
 
 from core.models import Condominium
+from finances.models import Category
+from finances.serializers import CategorySerializer
 from tests.factories import make_condominium
 
 pytestmark = pytest.mark.django_db

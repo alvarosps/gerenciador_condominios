@@ -11,13 +11,13 @@ from decimal import Decimal
 
 import pytest
 from django.utils import timezone
+from freezegun import freeze_time
+
+from core.models import FinancialSettings
 from finances.models import BillLifecycleState
 from finances.services.condo_balance_service import CondoBalanceService
 from finances.services.condo_month_close_service import CondoMonthCloseService
 from finances.services.owner_distribution_service import OwnerDistributionService
-from freezegun import freeze_time
-
-from core.models import FinancialSettings
 from tests.factories import (
     make_apartment,
     make_bill,

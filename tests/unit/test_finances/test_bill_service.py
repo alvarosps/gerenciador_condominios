@@ -6,9 +6,9 @@ from decimal import Decimal
 import pytest
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
+
 from finances.models import Bill, BillBehavior
 from finances.services.bill_service import BillDraft, BillService
-
 from tests.factories import make_condominium
 
 pytestmark = pytest.mark.django_db

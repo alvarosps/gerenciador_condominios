@@ -54,7 +54,7 @@ def _decimal_or_none(value: object) -> Decimal | None:
         return None
     try:
         result = Decimal(str(value))
-    except (InvalidOperation, ValueError, TypeError):
+    except InvalidOperation, ValueError, TypeError:
         return None
     if not result.is_finite() or abs(result) >= _MAX_MONEY_MAGNITUDE:
         return None

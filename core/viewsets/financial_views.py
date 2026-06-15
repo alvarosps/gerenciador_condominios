@@ -45,7 +45,7 @@ from core.serializers import (
     PersonPaymentScheduleSerializer,
     PersonPaymentSerializer,
     PersonSerializer,
-    RentPaymentSerializer,
+    RentPaymentSlimSerializer,
 )
 from core.services.expense_service import ExpenseService
 from core.services.person_payment_schedule_service import PersonPaymentScheduleService
@@ -91,7 +91,11 @@ class CreditCardViewSet(viewsets.ModelViewSet):
 
 
 class ExpenseCategoryViewSet(viewsets.ModelViewSet):
-    queryset = ExpenseCategory.objects.all()
+    # ExpenseCategorySerializer.get_subcategories recurses; prefetch two levels (the practical
+    # max depth: category → subcategory) so the tree serializes without a query per node (P5.1).
+    queryset = ExpenseCategory.objects.prefetch_related(
+        "subcategories", "subcategories__subcategories"
+    )
     serializer_class = ExpenseCategorySerializer
     permission_classes = [IsAdminUser]
 
@@ -419,10 +423,12 @@ class IncomeViewSet(viewsets.ModelViewSet):
 
 
 class RentPaymentViewSet(viewsets.ModelViewSet):
-    serializer_class = RentPaymentSerializer
+    serializer_class = RentPaymentSlimSerializer
     permission_classes = [IsAdminUser]
 
     def get_queryset(self) -> QuerySet[RentPayment]:
+        # The slim serializer reads only lease → apartment → building and the responsible
+        # tenant, so this minimal select_related fully covers it (no per-row N+1).
         queryset = RentPayment.objects.select_related(
             "lease", "lease__apartment", "lease__apartment__building", "lease__responsible_tenant"
         )
@@ -594,7 +600,7 @@ class PersonPaymentScheduleViewSet(viewsets.ModelViewSet):
         try:
             person_id = int(person_id_val)
             reference_month = date.fromisoformat(str(reference_month_str))
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             return Response(
                 {
                     "error": (
@@ -644,7 +650,7 @@ class PersonPaymentScheduleViewSet(viewsets.ModelViewSet):
         try:
             person_id = int(person_id_str)
             reference_month = date.fromisoformat(reference_month_str)
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             return Response(
                 {
                     "error": (

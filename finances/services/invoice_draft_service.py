@@ -10,6 +10,8 @@ updates or deletes a record — the draft is persisted later by ``create_with_li
 ``finances.services.invoice_parsing.base`` only — never views/serializers reach back here.
 """
 
+from typing import TypedDict
+
 from finances.models import (
     Bill,
     BillingAccount,
@@ -20,6 +22,18 @@ from finances.models import (
 from finances.money import money_str
 from finances.serializers import BillingAccountSerializer
 from finances.services.invoice_parsing.base import ParsedInvoice, ParsedLine
+
+
+class InvoiceDraft(TypedDict):
+    """Serialized draft shape returned by ``build_draft`` (persists nothing)."""
+
+    bill: dict[str, object]
+    line_items: list[dict[str, object]]
+    statement: object
+    matched_account: object
+    existing_bill_id: int | None
+    warnings: list[str]
+
 
 # PT labels per account type for the draft's user-facing text (warning + fallback description).
 # Literal here (not BillingAccountType.label, whose lazy-promise type the checkers disagree on);
@@ -48,7 +62,7 @@ _WARN_INSTALLMENT_NO_PLAN = (
 
 class InvoiceDraftService:
     @staticmethod
-    def build_draft(parsed: ParsedInvoice) -> dict[str, object]:
+    def build_draft(parsed: ParsedInvoice) -> InvoiceDraft:
         """Enriquece um ParsedInvoice (S59) com casamento de conta + reconciliação de parcela +
         idempotência, e devolve o RASCUNHO serializado (grava NADA)."""
         warnings = list(parsed.warnings)

@@ -1,166 +1,135 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { http, HttpResponse } from 'msw';
 import { screen, waitFor, fireEvent } from '@testing-library/react';
-import { renderWithProviders, createTestQueryClient } from '@/tests/test-utils';
+import { renderWithProviders, waitForQueriesToSettle } from '@/tests/test-utils';
+import { server } from '@/tests/mocks/server';
+import { useAuthStore } from '@/store/auth-store';
 import IncomeEntriesPage from '../page';
 import { createMockIncomeEntry } from '@/tests/mocks/data/finances';
-import type * as incomeHooks from '@/lib/api/hooks/use-income-entries';
-import type * as buildingHooks from '@/lib/api/hooks/use-buildings';
-import type * as categoryHooks from '@/lib/api/hooks/use-finance-categories';
-import type * as authStore from '@/store/auth-store';
 
-type IncomeEntriesResult = ReturnType<typeof incomeHooks.useIncomeEntries>;
-type DeleteResult = ReturnType<typeof incomeHooks.useDeleteIncomeEntry>;
-type BuildingsResult = ReturnType<typeof buildingHooks.useBuildings>;
-type CategoriesResult = ReturnType<typeof categoryHooks.useFinanceCategories>;
-type AuthStoreResult = ReturnType<typeof authStore.useAuthStore>;
+const API_BASE = 'http://localhost:8008/api';
 
-// Use vi.hoisted so mock variables are available when vi.mock factories run
-const {
-  mockUseIncomeEntries,
-  mockUseDeleteIncomeEntry,
-  mockUseBuildings,
-  mockUseFinanceCategories,
-  mockUseAuthStore,
-} = vi.hoisted(() => ({
-  mockUseIncomeEntries: vi.fn<typeof incomeHooks.useIncomeEntries>(),
-  mockUseDeleteIncomeEntry: vi.fn<() => DeleteResult>(),
-  mockUseBuildings: vi.fn<() => BuildingsResult>(),
-  mockUseFinanceCategories: vi.fn<() => CategoriesResult>(),
-  mockUseAuthStore: vi.fn<() => AuthStoreResult>(),
-}));
+// Real hooks (useIncomeEntries / useDeleteIncomeEntry / useBuildings / useFinanceCategories) hit
+// MSW; the real auth store drives staff gating. Entry rows come from raw DRF payloads the hook
+// parses with incomeEntrySchema.
+function setStaff(isStaff: boolean) {
+  useAuthStore.setState({
+    user: { id: 1, email: 'a@b.c', first_name: 'A', last_name: 'B', is_staff: isStaff },
+    isAuthenticated: true,
+  });
+}
 
-// Mock the form modal to avoid dynamic import complications in vitest
-vi.mock('@/app/(dashboard)/finances/income-entries/_components/income-entry-form-modal', () => ({
-  IncomeEntryFormModal: () => null,
-}));
+function setEntries(entries: unknown[]) {
+  server.use(http.get(`${API_BASE}/finances/income-entries/`, () => HttpResponse.json(entries)));
+}
 
-vi.mock('@/lib/api/hooks/use-income-entries', () => ({
-  useIncomeEntries: mockUseIncomeEntries,
-  useDeleteIncomeEntry: mockUseDeleteIncomeEntry,
-  useCreateIncomeEntry: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useUpdateIncomeEntry: () => ({ mutateAsync: vi.fn(), isPending: false }),
-}));
-vi.mock('@/lib/api/hooks/use-buildings', () => ({
-  useBuildings: mockUseBuildings,
-}));
-vi.mock('@/lib/api/hooks/use-finance-categories', () => ({
-  useFinanceCategories: mockUseFinanceCategories,
-}));
-vi.mock('@/store/auth-store', () => ({
-  useAuthStore: mockUseAuthStore,
-}));
-
-const idleMutation = {
-  mutateAsync: vi.fn(),
-  isPending: false,
-  isError: false,
-  isSuccess: false,
-  mutate: vi.fn(),
-} as const;
+/** Spy the list GET; records the request URL so query params can be asserted. */
+function spyList(entries: unknown[]) {
+  const urls: string[] = [];
+  server.use(
+    http.get(`${API_BASE}/finances/income-entries/`, ({ request }) => {
+      urls.push(request.url);
+      return HttpResponse.json(entries);
+    })
+  );
+  return urls;
+}
 
 describe('IncomeEntriesPage', () => {
   beforeEach(() => {
-    mockUseIncomeEntries.mockReset();
-    mockUseDeleteIncomeEntry.mockReturnValue({ ...idleMutation } as unknown as DeleteResult);
-    mockUseBuildings.mockReturnValue({ data: [], isLoading: false } as unknown as BuildingsResult);
-    mockUseFinanceCategories.mockReturnValue({ data: [], isLoading: false } as unknown as CategoriesResult);
+    setStaff(false);
+    setEntries([]);
   });
 
   it('shows "Nova Receita" button for staff', async () => {
-    mockUseAuthStore.mockReturnValue({ user: { is_staff: true } } as unknown);
-    mockUseIncomeEntries.mockReturnValue({ isLoading: false, error: null, data: [] } as unknown as IncomeEntriesResult);
+    setStaff(true);
+    setEntries([]);
 
-    renderWithProviders(<IncomeEntriesPage />, { queryClient: createTestQueryClient() });
+    const { queryClient } = renderWithProviders(<IncomeEntriesPage />);
 
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /Nova Receita/i })).toBeInTheDocument();
     });
+
+    await waitForQueriesToSettle(queryClient);
   });
 
   it('hides "Nova Receita" button for non-staff', async () => {
-    mockUseAuthStore.mockReturnValue({ user: { is_staff: false } } as unknown);
-    mockUseIncomeEntries.mockReturnValue({ isLoading: false, error: null, data: [] } as unknown as IncomeEntriesResult);
+    setStaff(false);
+    setEntries([]);
 
-    renderWithProviders(<IncomeEntriesPage />, { queryClient: createTestQueryClient() });
+    const { queryClient } = renderWithProviders(<IncomeEntriesPage />);
 
     await waitFor(() => {
-      expect(screen.queryByRole('button', { name: /Nova Receita/i })).not.toBeInTheDocument();
+      expect(screen.getByText('Receitas do Condomínio')).toBeInTheDocument();
     });
+    expect(screen.queryByRole('button', { name: /Nova Receita/i })).not.toBeInTheDocument();
+
+    await waitForQueriesToSettle(queryClient);
   });
 
-  it('forwards the date filter to useIncomeEntries when it changes', async () => {
-    mockUseAuthStore.mockReturnValue({ user: { is_staff: false } } as unknown);
-    mockUseIncomeEntries.mockReturnValue({
-      isLoading: false,
-      error: null,
-      data: [],
-    } as unknown as IncomeEntriesResult);
+  it('forwards the date filter to the list request when it changes', async () => {
+    setStaff(false);
+    const urls = spyList([]);
 
-    const { container } = renderWithProviders(<IncomeEntriesPage />, {
-      queryClient: createTestQueryClient(),
-    });
+    const { container, queryClient } = renderWithProviders(<IncomeEntriesPage />);
 
-    // The two filter date inputs are plain <input type="date"> (the form modal is stubbed).
+    await waitFor(() => expect(urls.length).toBeGreaterThan(0));
+
+    // The two filter date inputs are plain <input type="date">.
     const dateFrom = container.querySelectorAll('input[type="date"]')[0];
     if (!dateFrom) throw new Error('date filter input not found');
     fireEvent.change(dateFrom, { target: { value: '2026-06-01' } });
 
-    await waitFor(() =>
-      expect(mockUseIncomeEntries).toHaveBeenLastCalledWith(
-        expect.objectContaining({ date_from: '2026-06-01' }),
-      ),
-    );
+    await waitFor(() => expect(urls.some((u) => u.includes('date_from=2026-06-01'))).toBe(true));
+
+    await waitForQueriesToSettle(queryClient);
   });
 
   it('renders income entries in the table', async () => {
-    mockUseAuthStore.mockReturnValue({ user: { is_staff: false } } as unknown);
-    mockUseIncomeEntries.mockReturnValue({
-      isLoading: false,
-      error: null,
-      data: [
-        createMockIncomeEntry({ id: 1, description: 'Taxa condominial' }),
-        createMockIncomeEntry({ id: 2, description: 'Multa por atraso', is_received: true }),
-      ],
-    } as unknown as IncomeEntriesResult);
+    setStaff(false);
+    setEntries([
+      createMockIncomeEntry({ id: 1, description: 'Taxa condominial' }),
+      createMockIncomeEntry({ id: 2, description: 'Multa por atraso', is_received: true }),
+    ]);
 
-    renderWithProviders(<IncomeEntriesPage />, { queryClient: createTestQueryClient() });
+    const { queryClient } = renderWithProviders(<IncomeEntriesPage />);
 
     // DataTable renders both a desktop table and a mobile cards view in DOM
     await waitFor(() => {
       expect(screen.getAllByText('Taxa condominial').length).toBeGreaterThan(0);
       expect(screen.getAllByText('Multa por atraso').length).toBeGreaterThan(0);
     });
+
+    await waitForQueriesToSettle(queryClient);
   });
 
   it('shows "Condomínio" for entries without a building', async () => {
-    mockUseAuthStore.mockReturnValue({ user: { is_staff: false } } as unknown);
-    mockUseIncomeEntries.mockReturnValue({
-      isLoading: false,
-      error: null,
-      data: [createMockIncomeEntry({ id: 1, building: null })],
-    } as unknown as IncomeEntriesResult);
+    setStaff(false);
+    setEntries([createMockIncomeEntry({ id: 1, building: null })]);
 
-    renderWithProviders(<IncomeEntriesPage />, { queryClient: createTestQueryClient() });
+    const { queryClient } = renderWithProviders(<IncomeEntriesPage />);
 
     await waitFor(() => {
       // Rendered in both desktop table and mobile cards — use getAllByText
       expect(screen.getAllByText('Condomínio').length).toBeGreaterThan(0);
     });
+
+    await waitForQueriesToSettle(queryClient);
   });
 
   it('hides edit/delete actions for non-staff', async () => {
-    mockUseAuthStore.mockReturnValue({ user: { is_staff: false } } as unknown);
-    mockUseIncomeEntries.mockReturnValue({
-      isLoading: false,
-      error: null,
-      data: [createMockIncomeEntry()],
-    } as unknown as IncomeEntriesResult);
+    setStaff(false);
+    setEntries([createMockIncomeEntry()]);
 
-    renderWithProviders(<IncomeEntriesPage />, { queryClient: createTestQueryClient() });
+    const { queryClient } = renderWithProviders(<IncomeEntriesPage />);
 
     await waitFor(() => {
-      expect(screen.queryByRole('button', { name: /Editar/i })).not.toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: /Excluir/i })).not.toBeInTheDocument();
+      expect(screen.getAllByText('Receita extra').length).toBeGreaterThan(0);
     });
+    expect(screen.queryByRole('button', { name: /Editar/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Excluir/i })).not.toBeInTheDocument();
+
+    await waitForQueriesToSettle(queryClient);
   });
 });

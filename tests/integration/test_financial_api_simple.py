@@ -4,6 +4,8 @@ from datetime import date
 from decimal import Decimal
 
 import pytest
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from rest_framework import status
 
 from core.models import CreditCard, ExpenseCategory, FinancialSettings, Person
@@ -242,6 +244,38 @@ class TestExpenseCategoryAPI:
         assert response.status_code == status.HTTP_204_NO_CONTENT
         assert ExpenseCategory.objects.count() == 0
         assert ExpenseCategory.all_objects.count() == 1
+
+    def test_subcategories_no_n_plus_one(self, authenticated_api_client, admin_user):
+        # P5.1: get_subcategories recurses; without a prefetch each node costs one query.
+        # The query count must not grow with the number of category trees.
+        def _make_tree(index: int) -> None:
+            top = ExpenseCategory.objects.create(
+                name=f"Top {index}", color="#111111", created_by=admin_user, updated_by=admin_user
+            )
+            for s in range(2):
+                ExpenseCategory.objects.create(
+                    name=f"Sub {index}-{s}",
+                    color="#222222",
+                    parent=top,
+                    created_by=admin_user,
+                    updated_by=admin_user,
+                )
+
+        for i in range(2):
+            _make_tree(i)
+        with CaptureQueriesContext(connection) as ctx_small:
+            r1 = authenticated_api_client.get(self.url)
+        assert r1.status_code == status.HTTP_200_OK
+        small = len(ctx_small)
+
+        for i in range(2, 6):
+            _make_tree(i)
+        with CaptureQueriesContext(connection) as ctx_large:
+            r2 = authenticated_api_client.get(self.url)
+        assert r2.status_code == status.HTTP_200_OK
+        large = len(ctx_large)
+
+        assert small == large, f"category subtree scales with N: {small} -> {large} queries"
 
 
 @pytest.mark.integration

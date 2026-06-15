@@ -11,14 +11,16 @@ from decimal import Decimal
 
 import pytest
 from django.core.exceptions import ValidationError
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
+from freezegun import freeze_time
+
+from core.models import FinancialSettings, Person
 from finances.models import BillLifecycleState, FundedFrom
 from finances.services.bill_payment_service import BillPaymentService
 from finances.services.condo_balance_service import CondoBalanceService
 from finances.services.condo_month_close_service import CondoMonthCloseService
 from finances.services.reserve_service import ReserveService
-from freezegun import freeze_time
-
-from core.models import FinancialSettings, Person
 from tests.factories import (
     make_apartment,
     make_bill,
@@ -179,7 +181,6 @@ def test_cash_balance_baseline_from_financial_settings() -> None:
 
 @freeze_time("2026-06-15")
 def test_cash_balance_anchored_on_last_close() -> None:
-
     FinancialSettings.objects.create(
         pk=1, initial_balance=Decimal("0.00"), initial_balance_date=date(2026, 5, 1)
     )
@@ -360,3 +361,40 @@ def test_reserve_service_rejects_non_positive_amounts() -> None:
         ReserveService.deposit(reserve, Decimal("0.00"), JUNE)
     with pytest.raises(ValidationError):
         ReserveService.withdraw(reserve, Decimal("-1.00"), JUNE)
+
+
+@freeze_time("2026-06-15")
+def test_wedge_residual_computes_components_once() -> None:
+    # P5.1: _wedge_residual shares one _Components across result_of_month + cash_change_of_month
+    # instead of recomputing it 3x. Compare its query count to a single _components computation.
+    _collectible_lease("1000.00", paid=True)
+    _collectible_lease("1000.00", paid=False)
+    make_income_entry(amount=Decimal("500.00"), income_date=date(2026, 6, 10))
+    _active_bill_with_amount("800.00")
+
+    with CaptureQueriesContext(connection) as ctx_components:
+        CondoBalanceService._components(2026, 6, None)
+    one_components = len(ctx_components)
+    assert one_components > 0
+
+    with CaptureQueriesContext(connection) as ctx_wedge:
+        CondoBalanceService._wedge_residual(2026, 6)
+    wedge_queries = len(ctx_wedge)
+
+    # Un-shared, the wedge would recompute _components 3x (~3 * one_components). Shared, it is ~1x.
+    assert wedge_queries < 2 * one_components
+
+
+@freeze_time("2026-06-15")
+def test_overview_values_match_standalone_kpis() -> None:
+    # Sharing _components must not change any figure: overview's KPIs equal the standalone calls.
+    _collectible_lease("1000.00", paid=True)
+    _collectible_lease("1000.00", paid=False)
+    make_income_entry(amount=Decimal("500.00"), income_date=date(2026, 6, 10))
+    _active_bill_with_amount("800.00")
+
+    ov = CondoBalanceService.overview(2026, 6)
+
+    assert ov["result_of_month"] == str(CondoBalanceService.result_of_month(2026, 6))
+    assert ov["cash_change_of_month"] == str(CondoBalanceService.cash_change_of_month(2026, 6))
+    assert ov["wedge_ok"] is True

@@ -36,13 +36,11 @@ def _render_layout_pdf(layout_text: str) -> bytes:
 def invoice_pdf_bytes(fixture_name: str) -> bytes:
     """Return the rendered PDF bytes for a sanitized ``.txt`` invoice fixture.
 
-    Also writes the ``.pdf`` artifact next to the ``.txt`` so the rendered fixture
-    is versioned alongside its sanitized source.
+    In-memory only: nothing is written to disk. The parser (``pdfplumber``) consumes the
+    bytes directly, and the real ``.pdf`` carries personal data so it must never be versioned.
     """
     txt_path = FIXTURES_DIR / f"{fixture_name}.txt"
-    pdf_bytes = _render_layout_pdf(txt_path.read_text(encoding="utf-8"))
-    (FIXTURES_DIR / f"{fixture_name}.pdf").write_bytes(pdf_bytes)
-    return pdf_bytes
+    return _render_layout_pdf(txt_path.read_text(encoding="utf-8"))
 
 
 @pytest.fixture

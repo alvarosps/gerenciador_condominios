@@ -17,6 +17,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 
+from .cache import cache_result
 from .models import Apartment, Building, Furniture, Lease, RentPayment, Tenant
 from .permissions import (
     CanGenerateContract,
@@ -48,6 +49,15 @@ MIN_MONTH = 1
 MAX_MONTH = 12
 MIN_YEAR = 2000
 MAX_YEAR = 2100
+
+_RENT_ADJUSTMENT_ALERTS_PREFIX = "dashboard-rent-adjustment-alerts"
+
+
+@cache_result(key_prefix=_RENT_ADJUSTMENT_ALERTS_PREFIX)
+def _cached_rent_adjustment_alerts(alert_months: int = 2) -> dict[str, Any]:
+    """Cache the rent-adjustment alert payload (invalidated by Lease/RentAdjustment/Landlord
+    writes via signals). Reads only the DB — the IPCA fetch happens in the daily cron."""
+    return RentAdjustmentService.get_eligible_leases(alert_months)
 
 
 @api_view(["GET"])
@@ -145,9 +155,13 @@ class ApartmentViewSet(viewsets.ModelViewSet):
         queryset = super().get_queryset()
 
         if self.action in ["list", "retrieve"]:
-            queryset = queryset.select_related("building").prefetch_related(
+            queryset = queryset.select_related(
+                "building",  # ForeignKey: Apartment -> Building
+                "owner",  # ForeignKey: Apartment -> Person (ApartmentSerializer.owner)
+            ).prefetch_related(
                 "furnitures",  # ManyToMany: Apartment -> Furnitures
-                "leases",  # Reverse FK: Apartment -> Leases (for active_lease)
+                # active_lease -> obj.leases.all() -> LeaseNestedForApartmentSerializer.responsible_tenant
+                "leases__responsible_tenant",
             )
 
         if self.action == "list":
@@ -292,9 +306,15 @@ class LeaseViewSet(viewsets.ModelViewSet):
         serializer.instance = LeaseCreationService.create(validated_data=validated, tenants=tenants)
 
     def perform_update(self, serializer: serializers.BaseSerializer[Lease]) -> None:
-        """Apply the update, then sync the apartment's last_rent_increase_date via the service."""
+        """Apply the update, then sync the apartment's last_rent_increase_date — but ONLY when the
+        update actually carries that date (mirrors the old serializer's ``"last_rent_increase_date"
+        in validated_data`` guard). An unrelated edit (e.g. contract_signed) must leave an
+        intentionally-stale apartment date — one set by a RentAdjustment with
+        update_apartment_prices=False — untouched."""
+        rent_date_in_payload = "last_rent_increase_date" in serializer.validated_data
         lease = serializer.save()
-        LeaseCreationService.sync_apartment_last_rent_increase_date(lease)
+        if rent_date_in_payload:
+            LeaseCreationService.sync_apartment_last_rent_increase_date(lease)
 
     def _apply_lease_status_filters(
         self, queryset: QuerySet[Lease], params: Any
@@ -348,6 +368,7 @@ class LeaseViewSet(viewsets.ModelViewSet):
         queryset = queryset.select_related(
             "apartment",  # ForeignKey: Lease -> Apartment
             "apartment__building",  # ForeignKey: Apartment -> Building
+            "apartment__owner",  # ForeignKey: Apartment -> Person (ApartmentSerializer.owner)
             "responsible_tenant",  # ForeignKey: Lease -> Tenant (responsible)
             "resident_dependent",  # ForeignKey: Lease -> Dependent (second occupant)
         )
@@ -362,9 +383,10 @@ class LeaseViewSet(viewsets.ModelViewSet):
 
         if self.action in ["list", "retrieve"]:
             queryset = queryset.prefetch_related(
-                "tenants",  # ManyToMany: Lease -> Tenants (all tenants)
-                "tenants__dependents",  # Reverse FK: Tenant -> Dependents
-                "tenants__furnitures",  # ManyToMany: Tenant -> Furnitures (tenant's own)
+                "tenants",  # ManyToMany: Lease -> Tenants (TenantSummarySerializer)
+                # ApartmentSerializer.get_active_lease reads obj.leases.all() ->
+                # LeaseNestedForApartmentSerializer.responsible_tenant.
+                "apartment__leases__responsible_tenant",
                 "apartment__furnitures",  # ManyToMany: Apartment -> Furnitures (apartment's)
                 "rent_adjustments",  # Reverse FK: Lease -> RentAdjustments
             )
@@ -566,7 +588,7 @@ class LeaseViewSet(viewsets.ModelViewSet):
             )
         except ValidationError as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        except (DatabaseError, IntegrityError):
+        except DatabaseError, IntegrityError:
             logger.exception("Database error during due date change")
             return Response(
                 {"error": "Erro ao salvar alteração de vencimento"},
@@ -626,7 +648,7 @@ class LeaseViewSet(viewsets.ModelViewSet):
 
         try:
             percentage = Decimal(str(percentage))
-        except (InvalidOperation, ValueError):
+        except InvalidOperation, ValueError:
             return Response({"error": "Percentual inválido."}, status=status.HTTP_400_BAD_REQUEST)
 
         renewal_date = None
@@ -805,7 +827,7 @@ class DashboardViewSet(viewsets.ViewSet):
         try:
             year = int(request.query_params["year"])
             month = int(request.query_params["month"])
-        except (KeyError, TypeError, ValueError):
+        except KeyError, TypeError, ValueError:
             return Response(
                 {"error": "Parâmetros 'year' e 'month' são obrigatórios e numéricos."},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -826,7 +848,7 @@ class DashboardViewSet(viewsets.ViewSet):
         building_id_raw = request.query_params.get("building_id")
         try:
             building_id = int(building_id_raw) if building_id_raw is not None else None
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return Response(
                 {"error": "O parâmetro 'building_id' deve ser numérico."},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -860,7 +882,7 @@ class DashboardViewSet(viewsets.ViewSet):
             )
         try:
             lease_id = int(lease_id)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return Response(
                 {"error": "lease_id deve ser numérico."},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -925,7 +947,7 @@ class DashboardViewSet(viewsets.ViewSet):
         Returns leases whose 12-month adjustment window falls within the next
         2 months or is already overdue.
         """
-        data = RentAdjustmentService.get_eligible_leases()
+        data = _cached_rent_adjustment_alerts()
         return Response(
             data,
             status=status.HTTP_200_OK,

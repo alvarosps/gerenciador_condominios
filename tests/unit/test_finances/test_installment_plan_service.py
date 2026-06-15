@@ -5,6 +5,8 @@ from decimal import Decimal
 
 import pytest
 from django.core.exceptions import ValidationError
+from freezegun import freeze_time
+
 from finances.models import (
     Bill,
     BillingAccount,
@@ -14,8 +16,6 @@ from finances.models import (
     InstallmentPlanState,
 )
 from finances.services.installment_plan_service import InstallmentPlanService, _split_amount
-from freezegun import freeze_time
-
 from tests.factories import make_bill, make_bill_line_item, make_billing_account
 
 pytestmark = pytest.mark.django_db

@@ -10,6 +10,7 @@ from decimal import Decimal
 
 import pytest
 from django.core.exceptions import ValidationError
+
 from finances.models import (
     Bill,
     BillLifecycleState,
@@ -19,7 +20,6 @@ from finances.models import (
 )
 from finances.services.bill_payment_service import BillPaymentService
 from finances.services.condo_balance_service import CondoBalanceService
-
 from tests.factories import make_bill, make_bill_line_item, make_reserve, make_reserve_movement
 
 pytestmark = pytest.mark.django_db

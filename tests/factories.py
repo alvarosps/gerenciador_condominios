@@ -7,33 +7,34 @@ from decimal import Decimal
 from django.contrib.auth import get_user_model
 from model_bakery import baker
 
+from core.validators.brazilian import CPFValidator
+
 User = get_user_model()
 
-TEST_CPFS = [
-    "52998224725",
-    "11144477735",
-    "12345678909",
-    "98765432100",
-    # The remaining entries are valid CPFs (correct check digits) — the previous values had
-    # invalid check digits, which intermittently failed core.Tenant.save()'s full_clean once
-    # the module-global cycle reached them under the full suite (cross-test pollution).
-    "20000000027",
-    "30000000035",
-    "40000000043",
-    "50000000051",
-    "60000000060",
-    "70000000078",
-    "81000000001",
-    "91000000001",
-]
+# A few CPFs that specific tests pin (auth login, uniqueness lookups). Everything else just needs
+# "any valid, unique CPF" and uses make_tenant() with the counter-based generator below.
+CPF_VALID_PRIMARY = "52998224725"
 
-_cpf_cycle = itertools.cycle(TEST_CPFS)
-
+_cpf_seq = itertools.count(1)
 _condominium_seq = itertools.count(1)
 
 
+def _generate_valid_cpf(seed: int) -> str:
+    """Build a CPF with correct check digits from ``seed`` — always valid, never repeats.
+
+    Replaces the old module-global ``itertools.cycle`` over a finite ``TEST_CPFS`` list, whose
+    position depended on import/execution order and intermittently recycled values into
+    ``Tenant.full_clean`` under the parallel suite (cross-test order flakiness). Reuses the
+    official check-digit math from ``core.validators.brazilian`` (DRY).
+    """
+    base = f"{seed:09d}"
+    first = CPFValidator.calculate_checksum_digit(base, 10)
+    second = CPFValidator.calculate_checksum_digit(f"{base}{first}", 11)
+    return f"{base}{first}{second}"
+
+
 def _next_cpf() -> str:
-    return next(_cpf_cycle)
+    return _generate_valid_cpf(next(_cpf_seq))
 
 
 def make_condominium(user=None, **kwargs):

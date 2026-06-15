@@ -1,61 +1,22 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { http, HttpResponse } from 'msw';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { renderWithProviders } from '@/tests/test-utils';
+import { toast } from 'sonner';
+import { renderWithProviders, waitForQueriesToSettle } from '@/tests/test-utils';
+import { server } from '@/tests/mocks/server';
 import { useAuthStore } from '@/store/auth-store';
-import type { InstallmentPlan } from '@/lib/schemas/finances/installment-plan.schema';
+import { createMockInstallmentPlan } from '@/tests/mocks/data/finances';
 import InstallmentPlansPage from '../page';
 
-const deleteMutate = vi.fn();
-const deleteMutateAsync = vi.fn().mockResolvedValue(undefined);
-let plansData: InstallmentPlan[] | undefined = [];
-let hookIsError = false;
-let hookError: Error | null = null;
+type InstallmentPlanRaw = ReturnType<typeof createMockInstallmentPlan>;
 
-vi.mock('@/lib/api/hooks/use-installment-plans', () => ({
-  useInstallmentPlans: () => ({
-    data: plansData,
-    isLoading: false,
-    isError: hookIsError,
-    error: hookError,
-  }),
-  useDeleteInstallmentPlan: () => ({
-    mutate: deleteMutate,
-    mutateAsync: deleteMutateAsync,
-    isPending: false,
-  }),
-}));
+const API_BASE = 'http://localhost:8008/api';
 
-// The form modal and convert dialog fire their own read hooks; stub them to isolate the page.
-vi.mock('../_components/installment-plan-form-modal', () => ({
-  InstallmentPlanFormModal: () => null,
-}));
-vi.mock('../_components/convert-deferred-dialog', () => ({
-  ConvertDeferredDialog: () => null,
-}));
-
-function makePlan(overrides: Partial<InstallmentPlan> = {}): InstallmentPlan {
-  return {
-    id: 1,
-    description: 'IPTU 2026',
-    total_amount: 1500,
-    installment_count: 3,
-    start_due_date: '2026-07-10',
-    default_due_day: 10,
-    lifecycle_state: 'active',
-    embedded: false,
-    category: null,
-    category_id: null,
-    building: null,
-    building_id: null,
-    billing_account: null,
-    billing_account_id: null,
-    installments: [],
-    notes: '',
-    ...overrides,
-  };
-}
-
+// Real hooks (useInstallmentPlans / useDeleteInstallmentPlan) hit MSW; the real auth store drives
+// the admin gating. The page mounts the form modal + convert dialog (closed), which fire their own
+// read hooks (buildings / categories / billing-accounts) against the default handlers — every test
+// ends with waitForQueriesToSettle so those background GETs are never aborted by teardown.
 function setAdmin(isStaff: boolean) {
   useAuthStore.setState({
     user: { id: 1, email: 'u@e.com', first_name: 'U', last_name: 'T', is_staff: isStaff },
@@ -63,14 +24,28 @@ function setAdmin(isStaff: boolean) {
   });
 }
 
-beforeEach(() => {
-  deleteMutate.mockClear();
-  deleteMutateAsync.mockClear();
-  plansData = [makePlan()];
-  hookIsError = false;
-  hookError = null;
-  useAuthStore.setState({ user: null, isAuthenticated: false });
-});
+function setPlans(plans: InstallmentPlanRaw[]) {
+  server.use(http.get(`${API_BASE}/finances/installment-plans/`, () => HttpResponse.json(plans)));
+}
+
+function failPlans() {
+  server.use(
+    http.get(`${API_BASE}/finances/installment-plans/`, () =>
+      HttpResponse.json({ error: 'boom' }, { status: 500 })
+    )
+  );
+}
+
+function spyDelete(planId: number) {
+  const calls: number[] = [];
+  server.use(
+    http.delete(`${API_BASE}/finances/installment-plans/${planId}/`, () => {
+      calls.push(planId);
+      return new HttpResponse(null, { status: 204 });
+    })
+  );
+  return calls;
+}
 
 /** Returns the first row-actions trigger (the responsive DataTable renders one per view). */
 function getFirstMenu(): HTMLElement {
@@ -79,65 +54,99 @@ function getFirstMenu(): HTMLElement {
   return menu;
 }
 
+beforeEach(() => {
+  vi.mocked(toast.success).mockReset();
+  vi.mocked(toast.error).mockReset();
+  useAuthStore.setState({ user: null, isAuthenticated: false });
+});
+
 describe('InstallmentPlansPage', () => {
   it('renders the total as currency and "Condomínio" when no building', async () => {
     setAdmin(false);
-    renderWithProviders(<InstallmentPlansPage />);
+    setPlans([createMockInstallmentPlan({ id: 1, total_amount: '1500.00', building: null })]);
+    const { queryClient } = renderWithProviders(<InstallmentPlansPage />);
 
     await waitFor(() => expect(screen.getByText('Planos de Parcelas')).toBeInTheDocument());
-    expect(screen.getAllByText('R$ 1.500,00').length).toBeGreaterThan(0);
+    await waitFor(() => expect(screen.getAllByText('R$ 1.500,00').length).toBeGreaterThan(0));
     expect(screen.getAllByText('Condomínio').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Ativo').length).toBeGreaterThan(0);
+
+    await waitForQueriesToSettle(queryClient);
   });
 
   it('hides write actions for non-admins (only the read-only schedule action remains)', async () => {
     const user = userEvent.setup();
     setAdmin(false);
-    renderWithProviders(<InstallmentPlansPage />);
+    setPlans([createMockInstallmentPlan({ id: 1 })]);
+    const { queryClient } = renderWithProviders(<InstallmentPlansPage />);
 
     await waitFor(() => expect(screen.getByText('Planos de Parcelas')).toBeInTheDocument());
     expect(screen.queryByRole('button', { name: /novo plano/i })).not.toBeInTheDocument();
 
     // The actions menu still exists so read users can view the schedule, but no write items.
+    await waitFor(() =>
+      expect(screen.getAllByRole('button', { name: /ações do plano/i }).length).toBeGreaterThan(0)
+    );
     await user.click(getFirstMenu());
     expect(await screen.findByText('Cronograma')).toBeInTheDocument();
     expect(screen.queryByText('Editar')).not.toBeInTheDocument();
     expect(screen.queryByText('Excluir')).not.toBeInTheDocument();
     expect(screen.queryByText('Converter adiado')).not.toBeInTheDocument();
+
+    await waitForQueriesToSettle(queryClient);
   });
 
   it('shows write actions for admins', async () => {
     setAdmin(true);
-    renderWithProviders(<InstallmentPlansPage />);
+    setPlans([createMockInstallmentPlan({ id: 1 })]);
+    const { queryClient } = renderWithProviders(<InstallmentPlansPage />);
 
     await waitFor(() => expect(screen.getByText('Planos de Parcelas')).toBeInTheDocument());
     expect(screen.getByRole('button', { name: /novo plano/i })).toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: /ações do plano/i }).length).toBeGreaterThan(0);
+    await waitFor(() =>
+      expect(screen.getAllByRole('button', { name: /ações do plano/i }).length).toBeGreaterThan(0)
+    );
+
+    await waitForQueriesToSettle(queryClient);
   });
 
   it('offers "Converter adiado" only for deferred plans', async () => {
     const user = userEvent.setup();
     setAdmin(true);
-    plansData = [makePlan({ lifecycle_state: 'active' })];
-    const { unmount } = renderWithProviders(<InstallmentPlansPage />);
+    setPlans([createMockInstallmentPlan({ id: 1, lifecycle_state: 'active' })]);
+    const { unmount, queryClient } = renderWithProviders(<InstallmentPlansPage />);
     await waitFor(() => expect(screen.getByText('Planos de Parcelas')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getAllByRole('button', { name: /ações do plano/i }).length).toBeGreaterThan(0)
+    );
 
     await user.click(getFirstMenu());
     expect(screen.queryByText('Converter adiado')).not.toBeInTheDocument();
+    await waitForQueriesToSettle(queryClient);
     unmount();
 
-    plansData = [makePlan({ lifecycle_state: 'deferred' })];
-    renderWithProviders(<InstallmentPlansPage />);
+    setPlans([createMockInstallmentPlan({ id: 1, lifecycle_state: 'deferred' })]);
+    const second = renderWithProviders(<InstallmentPlansPage />);
     await waitFor(() => expect(screen.getByText('Planos de Parcelas')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getAllByRole('button', { name: /ações do plano/i }).length).toBeGreaterThan(0)
+    );
     await user.click(getFirstMenu());
     expect(await screen.findByText('Converter adiado')).toBeInTheDocument();
+
+    await waitForQueriesToSettle(second.queryClient);
   });
 
   it('soft-deletes via the AlertDialog confirmation', async () => {
     const user = userEvent.setup();
     setAdmin(true);
-    renderWithProviders(<InstallmentPlansPage />);
+    setPlans([createMockInstallmentPlan({ id: 1 })]);
+    const deleteCalls = spyDelete(1);
+    const { queryClient } = renderWithProviders(<InstallmentPlansPage />);
     await waitFor(() => expect(screen.getByText('Planos de Parcelas')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getAllByRole('button', { name: /ações do plano/i }).length).toBeGreaterThan(0)
+    );
 
     await user.click(getFirstMenu());
     await user.click(await screen.findByText('Excluir'));
@@ -145,28 +154,32 @@ describe('InstallmentPlansPage', () => {
     const confirm = await screen.findByRole('button', { name: 'Excluir' });
     await user.click(confirm);
 
-    await waitFor(() => expect(deleteMutateAsync).toHaveBeenCalledWith(1));
+    await waitFor(() => expect(deleteCalls).toEqual([1]));
+
+    await waitForQueriesToSettle(queryClient);
   });
 
   it('shows a PT empty state when there are no plans', async () => {
     setAdmin(true);
-    plansData = [];
-    renderWithProviders(<InstallmentPlansPage />);
+    setPlans([]);
+    const { queryClient } = renderWithProviders(<InstallmentPlansPage />);
     await waitFor(() =>
-      expect(screen.getByText('Nenhum plano de parcelas cadastrado')).toBeInTheDocument(),
+      expect(screen.getByText('Nenhum plano de parcelas cadastrado')).toBeInTheDocument()
     );
+
+    await waitForQueriesToSettle(queryClient);
   });
 
   it('shows an error state (not the empty state) when the query fails', async () => {
     setAdmin(true);
-    plansData = undefined;
-    hookIsError = true;
-    hookError = new Error('boom');
-    renderWithProviders(<InstallmentPlansPage />);
+    failPlans();
+    const { queryClient } = renderWithProviders(<InstallmentPlansPage />);
     await waitFor(() =>
-      expect(screen.getByText(/Erro ao carregar planos de parcelas/)).toBeInTheDocument(),
+      expect(screen.getByText(/Erro ao carregar planos de parcelas/)).toBeInTheDocument()
     );
     // A failed request must NOT masquerade as "no data".
     expect(screen.queryByText('Nenhum plano de parcelas cadastrado')).not.toBeInTheDocument();
+
+    await waitForQueriesToSettle(queryClient);
   });
 });

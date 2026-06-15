@@ -4,10 +4,10 @@ from datetime import date
 from decimal import Decimal
 
 import pytest
-from finances.models import BillLifecycleState, BillLineItem
 from freezegun import freeze_time
 from rest_framework import status
 
+from finances.models import BillLifecycleState, BillLineItem
 from tests.factories import (
     make_apartment,
     make_bill,

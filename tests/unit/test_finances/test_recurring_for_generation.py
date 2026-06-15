@@ -12,6 +12,8 @@ from datetime import date
 from decimal import Decimal
 
 import pytest
+from freezegun import freeze_time
+
 from finances.models import (
     Bill,
     BillingAccount,
@@ -22,8 +24,6 @@ from finances.money import money_str
 from finances.services.bill_generation_service import BillGenerationService
 from finances.services.condo_calendar_service import CondoCalendarService
 from finances.services.condo_projection_service import CondoProjectionService
-from freezegun import freeze_time
-
 from tests.factories import (
     make_billing_account,
     make_condominium,

@@ -6,8 +6,8 @@ update); the viewset filters ?account_type=. Real DRF stack, real DB.
 """
 
 import pytest
-from finances.models import BillingAccountType
 
+from finances.models import BillingAccountType
 from tests.factories import make_billing_account, make_building, make_condominium
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]

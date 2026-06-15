@@ -6,6 +6,7 @@ from decimal import Decimal
 
 import pytest
 import responses as responses_lib
+from freezegun import freeze_time
 
 from core.models import IPCAIndex
 from core.services.ipca_service import IPCAService
@@ -75,6 +76,42 @@ class TestIPCAServiceFetchLatest:
 
         # No crash — returns whatever is in the DB (may be None)
         assert result is None or isinstance(result, IPCAIndex)
+
+    @responses_lib.activate
+    @freeze_time("2026-06-12")
+    def test_fetch_latest_short_circuits_when_index_covers_month(self):
+        # The IPCA for month M is published in M+1, so on 2026-06-12 the most recent
+        # publishable month is 2026-05. If the DB already holds it, fetch_latest must
+        # NOT hit the external API.
+        responses_lib.add(responses_lib.GET, _SIDRA_URL_PATTERN, json=[], status=200)
+
+        IPCAIndex.objects.all().delete()
+        IPCAIndex.objects.create(reference_month=date(2026, 5, 1), value=Decimal("7000.00"))
+
+        result = IPCAService.fetch_latest()
+
+        assert len(responses_lib.calls) == 0
+        assert result is not None
+        assert result.reference_month == date(2026, 5, 1)
+
+    @responses_lib.activate
+    @freeze_time("2026-06-12")
+    def test_fetch_latest_calls_api_when_month_missing(self):
+        # DB is stale (latest is 2026-01), so the expected 2026-05 month is missing →
+        # fetch_latest must hit the external API exactly once.
+        responses_lib.add(
+            responses_lib.GET,
+            _SIDRA_URL_PATTERN,
+            json=_make_sidra_response([{"D3C": "202605", "V": "7000.00"}]),
+            status=200,
+        )
+
+        IPCAIndex.objects.all().delete()
+        IPCAIndex.objects.create(reference_month=date(2026, 1, 1), value=Decimal("6800.00"))
+
+        IPCAService.fetch_latest()
+
+        assert len(responses_lib.calls) == 1
 
     @responses_lib.activate
     def test_fetch_skips_invalid_rows(self):

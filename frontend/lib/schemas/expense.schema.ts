@@ -126,10 +126,11 @@ export function validateExpenseRules(data: ExpenseValidationData, ctx: z.Refinem
 }
 
 // Read schema: the API read shape omits the write-only *_id fields, so applying
-// validateExpenseRules (which requires them) on read throws a ZodError that empties the
-// whole list. Read hooks use this; only the form resolver uses expenseSchema.
+// validateExpenseRules (which requires them) on read throws a ZodError that empties the whole
+// list. Read hooks use this. The expense form applies validateExpenseRules to its OWN
+// form-shaped schema (expense-form-modal.tsx), so there is intentionally no full read+refine
+// schema exported here that a future read path could be accidentally wired to.
 export const expenseReadSchema = expenseBaseSchema;
 
-export const expenseSchema = expenseBaseSchema.superRefine(validateExpenseRules);
-
-export type Expense = z.infer<typeof expenseSchema>;
+// superRefine does not change the output type, so Expense derives from the base read schema.
+export type Expense = z.infer<typeof expenseBaseSchema>;

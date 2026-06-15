@@ -10,11 +10,11 @@ from datetime import date
 from decimal import Decimal
 
 import pytest
-from finances.models import Bill, Payment, PaymentAllocation
-from finances.services.condo_balance_service import CondoBalanceService
 from freezegun import freeze_time
 from rest_framework import status
 
+from finances.models import Bill, Payment, PaymentAllocation
+from finances.services.condo_balance_service import CondoBalanceService
 from tests.factories import make_bill, make_bill_line_item, make_reserve, make_reserve_movement
 
 pytestmark = [pytest.mark.integration, pytest.mark.django_db]

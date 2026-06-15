@@ -137,7 +137,7 @@ A permission `IsTenantUser` verifica: `request.user.is_staff == False` e `hasatt
 
 **Como determinar lease ativa:** Lease não tem `end_date`. Uma lease é "ativa" se não foi soft-deleted (`is_deleted=False`). A data de fim do contrato é calculada como `start_date + validity_months`. Lease soft-deleted = contrato encerrado.
 
-**Qual lease retornar:** `/api/tenant/me/` retorna a lease ativa (não-deletada) mais recente do tenant via `LeaseTenant`. Se houver múltiplas (improvável), usa a com `start_date` mais recente.
+**Qual lease retornar:** `/api/tenant/me/` retorna a lease ativa (não-deletada) mais recente do tenant via o M2M `Lease.tenants` (e `Lease.responsible_tenant` quando o inquilino é o responsável). Se houver múltiplas (improvável), usa a com `start_date` mais recente.
 
 Um inquilino cujo contrato (Lease) foi encerrado (soft-deleted) **ainda pode fazer login** no app, mas com funcionalidade limitada:
 

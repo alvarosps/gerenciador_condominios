@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { expenseReadSchema, expenseSchema } from '@/lib/schemas/expense.schema';
+import { expenseReadSchema, validateExpenseRules } from '@/lib/schemas/expense.schema';
+
+// The form applies validateExpenseRules on top of the (read) base shape; build that here to
+// exercise the write-validation rules (the form modal composes the same refinement on its own
+// form-shaped schema).
+const expenseFormValidationSchema = expenseReadSchema.superRefine(validateExpenseRules);
 
 // A read payload from the API: write-only person_id/credit_card_id/building_id are absent
 // (the serializer exposes them only nested). validateExpenseRules requires the *_id fields,
@@ -29,9 +34,9 @@ describe('expenseReadSchema', () => {
   });
 });
 
-describe('expenseSchema (form)', () => {
+describe('expense form validation rules (validateExpenseRules)', () => {
   it('still requires person_id/credit_card_id for a card_purchase form', () => {
-    const result = expenseSchema.safeParse(cardPurchaseRead);
+    const result = expenseFormValidationSchema.safeParse(cardPurchaseRead);
     expect(result.success).toBe(false);
     const paths = result.success ? [] : result.error.issues.map((i) => i.path.join('.'));
     expect(paths).toContain('person_id');
@@ -39,7 +44,7 @@ describe('expenseSchema (form)', () => {
   });
 
   it('does not require a person for fixed_expense (PERSON_REQUIRED_TYPES fix)', () => {
-    const result = expenseSchema.safeParse({
+    const result = expenseFormValidationSchema.safeParse({
       ...cardPurchaseRead,
       expense_type: 'fixed_expense',
       description: 'Internet',
@@ -48,7 +53,7 @@ describe('expenseSchema (form)', () => {
   });
 
   it('requires a building for water_bill but not for fixed_expense (BUILDING_REQUIRED_TYPES fix)', () => {
-    const waterNoBuilding = expenseSchema.safeParse({
+    const waterNoBuilding = expenseFormValidationSchema.safeParse({
       ...cardPurchaseRead,
       expense_type: 'water_bill',
       description: 'Conta de água',
@@ -59,7 +64,7 @@ describe('expenseSchema (form)', () => {
       : waterNoBuilding.error.issues.map((i) => i.path.join('.'));
     expect(paths).toContain('building_id');
 
-    const fixedNoBuilding = expenseSchema.safeParse({
+    const fixedNoBuilding = expenseFormValidationSchema.safeParse({
       ...cardPurchaseRead,
       expense_type: 'fixed_expense',
       description: 'Internet',

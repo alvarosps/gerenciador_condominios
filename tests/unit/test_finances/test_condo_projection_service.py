@@ -16,7 +16,12 @@ from datetime import date
 from decimal import Decimal
 
 import pytest
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
+from freezegun import freeze_time
+
+from core.models import FinancialSettings
 from finances.models import (
     Bill,
     BillingAccountState,
@@ -27,9 +32,6 @@ from finances.services.bill_generation_service import BillGenerationService
 from finances.services.condo_balance_service import CondoBalanceService
 from finances.services.condo_month_close_service import CondoMonthCloseService
 from finances.services.condo_projection_service import CondoProjectionService
-from freezegun import freeze_time
-
-from core.models import FinancialSettings
 from tests.factories import (
     make_apartment,
     make_bill,
@@ -407,3 +409,37 @@ def test_project_uses_sao_paulo_month_boundary() -> None:
     # UTC is already July 1 (02:00); in São Paulo it is still June 30 23:00 → current month = June.
     rows = CondoProjectionService.project(months=1)
     assert (rows[0]["year"], rows[0]["month"]) == (2026, 6)
+
+
+@freeze_time("2026-06-15")
+def test_project_batches_bill_skip_queries() -> None:
+    # P5.1: future-month eligibility must read a single preloaded BillSkip set, not run one
+    # BillSkip.exists() per (account, month). With several accounts over 11 future months an
+    # un-batched projection would issue dozens of BillSkip queries.
+    for i in range(3):
+        make_billing_account(
+            expected_amount=Decimal("100.00"), default_due_day=10, name=f"Conta {i}"
+        )
+
+    with CaptureQueriesContext(connection) as ctx:
+        CondoProjectionService.project(months=12)
+
+    billskip_queries = sum(1 for q in ctx.captured_queries if "finances_billskip" in q["sql"])
+    assert billskip_queries <= 1, f"BillSkip not batched: {billskip_queries} queries"
+
+
+def test_is_account_eligible_skip_index_matches_db() -> None:
+    # Parity: the in-memory skip_index path returns the SAME boolean as the .exists() path.
+    account = make_billing_account(expected_amount=Decimal("100.00"))
+    month = date(2026, 8, 1)
+
+    assert BillGenerationService.is_account_eligible(
+        account, month, skip_index=set()
+    ) == BillGenerationService.is_account_eligible(account, month)
+
+    make_bill_skip(billing_account=account, reference_month=month)
+    skip_index = {(account.pk, month)}
+    assert BillGenerationService.is_account_eligible(
+        account, month, skip_index=skip_index
+    ) == BillGenerationService.is_account_eligible(account, month)
+    assert BillGenerationService.is_account_eligible(account, month, skip_index=skip_index) is False

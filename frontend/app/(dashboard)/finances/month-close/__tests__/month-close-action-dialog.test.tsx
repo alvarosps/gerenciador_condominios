@@ -3,9 +3,16 @@ import { screen, fireEvent } from '@testing-library/react';
 import { renderWithProviders } from '@/tests/test-utils';
 import { MonthCloseActionDialog } from '../_components/month-close-action-dialog';
 import { createMockCondoMonthClose } from '@/tests/mocks/data/finances';
+import { condoMonthCloseSchema } from '@/lib/schemas/finances/condo-month-close.schema';
+
+// The dialog takes an onConfirm/onCancel callback pair (no hook) — it owns no mutation. The raw
+// mock is parsed to the typed CondoMonthClose the prop expects (money strings → numbers).
+function close(overrides: Parameters<typeof createMockCondoMonthClose>[0] = {}) {
+  return condoMonthCloseSchema.parse(createMockCondoMonthClose(overrides));
+}
 
 describe('MonthCloseActionDialog', () => {
-  const may = createMockCondoMonthClose({ reference_month: '2026-05-01', status: 'open' });
+  const may = close({ reference_month: '2026-05-01', status: 'open' });
 
   it('renders the close title with the competência via formatMonthYear and confirms', () => {
     const onConfirm = vi.fn();
@@ -17,7 +24,7 @@ describe('MonthCloseActionDialog', () => {
         isPending={false}
         onConfirm={onConfirm}
         onCancel={vi.fn()}
-      />,
+      />
     );
     expect(screen.getByText(/Fechar mês: Maio de 2026/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Fechar mês' }));
@@ -29,12 +36,12 @@ describe('MonthCloseActionDialog', () => {
     renderWithProviders(
       <MonthCloseActionDialog
         open
-        close={createMockCondoMonthClose({ reference_month: '2026-05-01', status: 'closed' })}
+        close={close({ reference_month: '2026-05-01', status: 'closed' })}
         action="reopen"
         isPending={false}
         onConfirm={onConfirm}
         onCancel={vi.fn()}
-      />,
+      />
     );
     expect(screen.getByText(/Reabrir mês: Maio de 2026/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Reabrir mês' }));
@@ -50,7 +57,7 @@ describe('MonthCloseActionDialog', () => {
         isPending
         onConfirm={vi.fn()}
         onCancel={vi.fn()}
-      />,
+      />
     );
     expect(screen.getByRole('button', { name: 'Aguarde...' })).toBeDisabled();
   });

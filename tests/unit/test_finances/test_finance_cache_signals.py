@@ -10,16 +10,18 @@ from decimal import Decimal
 
 import pytest
 from django.core.cache import cache
+from model_bakery import baker
+
+from core.cache import _LEGACY_FINANCIAL_CACHE_PREFIXES, FINANCE_MODULE_CACHE_PREFIXES
+from core.models import FinancialSettings
+from core.signals import _CORE_MODEL_CACHE_PREFIXES, _PROPERTY_CACHE_PREFIXES
+from core.signals import _FINANCE_CACHE_PREFIXES as CORE_PREFIXES
 from finances.cache import (
     FINANCE_CACHE_PREFIXES,
     FINANCE_DASHBOARD_PREFIX,
     FINANCE_PROJECTION_PREFIX,
     invalidate_finance_caches,
 )
-from model_bakery import baker
-
-from core.models import FinancialSettings
-from core.signals import _FINANCE_CACHE_PREFIXES as CORE_PREFIXES
 from tests.factories import (
     make_apartment,
     make_bill,
@@ -51,11 +53,29 @@ def test_prefix_literals_match_and_invalidate() -> None:
     assert FINANCE_PROJECTION_PREFIX == "finance-projection"
     # Only prefixes a @cache_result actually keys on (no dead finance-cash-flow* namespace).
     assert set(FINANCE_CACHE_PREFIXES) == {"finance-dashboard", "finance-projection"}
-    # core/signals.py keeps a matching literal copy (no finances import) — locked here.
+    # core/signals.py keeps a matching literal copy (no finances import) — locked here. It now
+    # reuses the single core-side constant core.cache.FINANCE_MODULE_CACHE_PREFIXES, and
+    # _LEGACY_FINANCIAL_CACHE_PREFIXES derives its finance subset from that same constant (no third
+    # hardcoded copy that could silently drift). Lock all three to finances.FINANCE_CACHE_PREFIXES.
     assert set(CORE_PREFIXES) == set(FINANCE_CACHE_PREFIXES)
+    assert set(FINANCE_MODULE_CACHE_PREFIXES) == set(FINANCE_CACHE_PREFIXES)
+    assert set(FINANCE_CACHE_PREFIXES).issubset(set(_LEGACY_FINANCIAL_CACHE_PREFIXES))
+    assert {p for p in _LEGACY_FINANCIAL_CACHE_PREFIXES if p.startswith("finance-")} == set(
+        FINANCE_MODULE_CACHE_PREFIXES
+    )
     _set_finance_probes()
     invalidate_finance_caches()
     assert _finance_probes_cleared()
+
+
+def test_property_writes_invalidate_legacy_financial_dashboard() -> None:
+    # The legacy financial-dashboard overview/summary derive rent income from Lease via
+    # CashFlowService, so a Building/Apartment/Lease write must drop "financial-dashboard*". On the
+    # LocMem test cache invalidate_pattern clears everything (a property write already clears every
+    # key via its other prefixes), so assert map membership directly — this is the regression guard.
+    assert "financial-dashboard" in _PROPERTY_CACHE_PREFIXES
+    for model_name in ("Building", "Apartment", "Lease"):
+        assert "financial-dashboard" in _CORE_MODEL_CACHE_PREFIXES[model_name]
 
 
 def test_person_rename_invalidates_finance() -> None:

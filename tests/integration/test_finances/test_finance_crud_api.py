@@ -4,11 +4,11 @@ from datetime import date
 from decimal import Decimal
 
 import pytest
-from finances.models import Bill
 from freezegun import freeze_time
 from rest_framework import status
 
 from core.models import Condominium
+from finances.models import Bill
 from tests.factories import (
     make_bill,
     make_bill_line_item,
@@ -198,7 +198,9 @@ def test_employee_create_without_condominium_id_defaults(authenticated_api_clien
         format="json",
     )
     assert resp.status_code == status.HTTP_201_CREATED, resp.data
-    assert resp.data["condominium"]["id"] == Condominium.get_default().id
+    default_condo = Condominium.get_default()
+    assert default_condo is not None
+    assert resp.data["condominium"]["id"] == default_condo.id
 
 
 def test_installment_plan_create_without_condominium_id_defaults(authenticated_api_client):
@@ -215,7 +217,9 @@ def test_installment_plan_create_without_condominium_id_defaults(authenticated_a
         format="json",
     )
     assert resp.status_code == status.HTTP_201_CREATED, resp.data
-    assert resp.data["condominium"]["id"] == Condominium.get_default().id
+    default_condo = Condominium.get_default()
+    assert default_condo is not None
+    assert resp.data["condominium"]["id"] == default_condo.id
 
 
 def test_employee_variable_with_base_salary_returns_400(authenticated_api_client):

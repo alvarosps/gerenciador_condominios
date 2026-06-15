@@ -9,6 +9,7 @@ from datetime import date
 from decimal import Decimal
 
 import pytest
+
 from finances.models import (
     Bill,
     BillingAccount,
@@ -22,7 +23,6 @@ from finances.models import (
 )
 from finances.services.invoice_draft_service import InvoiceDraftService
 from finances.services.invoice_parsing.base import ParsedInvoice, ParsedLine
-
 from tests.factories import (
     make_bill,
     make_billing_account,
@@ -45,7 +45,7 @@ def _water_invoice(**overrides: object) -> ParsedInvoice:
         "line_items": [ParsedLine(description="AGUA", amount=Decimal("100.00"))],
     }
     kwargs.update(overrides)
-    return ParsedInvoice(**kwargs)  # type: ignore[arg-type]
+    return ParsedInvoice(**kwargs)
 
 
 def test_build_draft_matches_account_by_type_and_identifier(admin_user):

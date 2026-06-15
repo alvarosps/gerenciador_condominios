@@ -298,13 +298,19 @@ class CacheManager:
             }
 
 
+# Canonical condominium-finance (`finances` app) cache prefixes, defined ONCE core-side. core must
+# NOT import finances (that would invert the finances -> core dependency), so these literals are
+# duplicated from finances.cache.FINANCE_CACHE_PREFIXES; the match is locked by
+# tests/unit/test_finances/test_finance_cache_signals.py. core.signals reuses this same tuple, and
+# _LEGACY_FINANCIAL_CACHE_PREFIXES derives from it (no third hardcoded copy).
+FINANCE_MODULE_CACHE_PREFIXES = ("finance-dashboard", "finance-projection")
+
 # Legacy personal-finance prefixes (cash-flow / financial-dashboard) plus the condominium-finance
 # prefixes that legacy money changes also affect. Keys are hyphenated -> glob "<prefix>*".
 _LEGACY_FINANCIAL_CACHE_PREFIXES = (
     "cash-flow",
     "financial-dashboard",
-    "finance-dashboard",
-    "finance-projection",
+    *FINANCE_MODULE_CACHE_PREFIXES,
 )
 
 

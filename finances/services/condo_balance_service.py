@@ -65,7 +65,13 @@ class CondoBalanceService:
     """Stateless condominium balance/result/cash/reserve service."""
 
     @staticmethod
-    def result_of_month(year: int, month: int, building_id: int | None = None) -> Decimal:
+    def result_of_month(
+        year: int,
+        month: int,
+        building_id: int | None = None,
+        *,
+        components: _Components | None = None,
+    ) -> Decimal:
         """Competence result = competence revenue - competence expense (design §4.2/§4.5).
 
         Revenue = received_collectible_total + Σ effective_rental_value of collectible leases
@@ -73,36 +79,50 @@ class CondoBalanceService:
         Expense = Σ Bill.amount_total of bills with competence_month == M and lifecycle_state
         == 'active' (suspended/deferred/canceled excluded). Reserve transfers do NOT enter
         (cash movement, not competence — design §4.7).
+
+        ``components`` lets a caller (overview/_wedge_residual) pass the already-computed
+        :class:`_Components` for (year, month, building_id) so the figures are not re-queried
+        within one computation — explicit and request-scoped, never a process-global cache (P5.1).
         """
-        comp = CondoBalanceService._components(year, month, building_id)
+        comp = components or CondoBalanceService._components(year, month, building_id)
         revenue = comp.received_collectible + comp.expected_unpaid + comp.income_competence
         return quantize_money(revenue - comp.expense_competence)
 
     @staticmethod
     def competence_pontas(
-        year: int, month: int, building_id: int | None = None
+        year: int,
+        month: int,
+        building_id: int | None = None,
+        *,
+        components: _Components | None = None,
     ) -> tuple[Decimal, Decimal]:
         """(revenue, expense) competence pontas of the month (raw Decimals), from one source.
 
         Surfaces the same component split that feeds result_of_month, so a consumer can show the
         income/expense halves without re-deriving them: ``revenue - expense`` equals
         result_of_month by construction. Used by CondoProjectionService for the current/closed
-        month display pontas (DRY — design §8).
+        month display pontas (DRY — design §8). ``components`` shares an already-computed split.
         """
-        comp = CondoBalanceService._components(year, month, building_id)
+        comp = components or CondoBalanceService._components(year, month, building_id)
         revenue = comp.received_collectible + comp.expected_unpaid + comp.income_competence
         return revenue, comp.expense_competence
 
     @staticmethod
-    def cash_change_of_month(year: int, month: int, building_id: int | None = None) -> Decimal:
+    def cash_change_of_month(
+        year: int,
+        month: int,
+        building_id: int | None = None,
+        *,
+        components: _Components | None = None,
+    ) -> Decimal:
         """Cash change (by payment date) = cash in - cash out (design §4.2/§4.3).
 
         In = received_collectible_total + IncomeEntry received in the month + reserve->cash
         withdrawals (bill=null). Out = caixa-funded PaymentAllocation in the month + cash->reserve
         deposits. A funded_from='reserve' payment is NOT a cash outflow (it debits only the
-        reserve — design §4.3).
+        reserve — design §4.3). ``components`` shares an already-computed split (P5.1).
         """
-        comp = CondoBalanceService._components(year, month, building_id)
+        comp = components or CondoBalanceService._components(year, month, building_id)
         cash_in = comp.received_collectible + comp.income_cash + comp.reserve_to_cash
         cash_out = comp.caixa_outflow + comp.deposit_out
         return quantize_money(cash_in - cash_out)
@@ -192,8 +212,13 @@ class CondoBalanceService:
         the whole-condo reserve into a meaningless total.
         """
         reference_month = date(year, month, 1)
-        result = CondoBalanceService.result_of_month(year, month, building_id)
-        cash_change = CondoBalanceService.cash_change_of_month(year, month, building_id)
+        # Compute the month's components ONCE and share them across result/cash_change/wedge for
+        # the reference month (cash_balance still walks its own months) — P5.1 memoization.
+        comp = CondoBalanceService._components(year, month, building_id)
+        result = CondoBalanceService.result_of_month(year, month, building_id, components=comp)
+        cash_change = CondoBalanceService.cash_change_of_month(
+            year, month, building_id, components=comp
+        )
         cash = CondoBalanceService.cash_balance(_next_month(reference_month), building_id)
         condo_wide = building_id is None
         reserve = CondoBalanceService.reserve_balance() if condo_wide else None
@@ -201,7 +226,7 @@ class CondoBalanceService:
         # as_of=today_sp(): the rent overdue/late-fee sub-block stays on SP's date, like every other
         # finances "today" — never the UTC server date.
         rent_stats = RentScheduleService.get_month_stats(year, month, building_id, as_of=today_sp())
-        residual = CondoBalanceService._wedge_residual(year, month, building_id)
+        residual = CondoBalanceService._wedge_residual(year, month, building_id, components=comp)
         return {
             "year": year,
             "month": month,
@@ -352,7 +377,13 @@ class CondoBalanceService:
         return ZERO_MONEY, as_of_month
 
     @staticmethod
-    def _wedge_residual(year: int, month: int, building_id: int | None = None) -> Decimal:
+    def _wedge_residual(
+        year: int,
+        month: int,
+        building_id: int | None = None,
+        *,
+        components: _Components | None = None,
+    ) -> Decimal:
         """Reconcile the two PUBLIC KPIs against an INDEPENDENT component delta (design §4.2):
 
             result_of_month - cash_change_of_month == Δreceivables - Δpayables - reserve_net, where
@@ -365,9 +396,11 @@ class CondoBalanceService:
         yields a non-zero residual. overview.wedge_ok therefore reports a genuine reconciliation,
         not an algebraic tautology that can never fail.
         """
-        result = CondoBalanceService.result_of_month(year, month, building_id)
-        cash_change = CondoBalanceService.cash_change_of_month(year, month, building_id)
-        comp = CondoBalanceService._components(year, month, building_id)
+        comp = components or CondoBalanceService._components(year, month, building_id)
+        result = CondoBalanceService.result_of_month(year, month, building_id, components=comp)
+        cash_change = CondoBalanceService.cash_change_of_month(
+            year, month, building_id, components=comp
+        )
         delta_receivables = comp.expected_unpaid + (comp.income_competence - comp.income_cash)
         delta_payables = comp.expense_competence - comp.caixa_outflow
         reserve_net = comp.reserve_to_cash - comp.deposit_out

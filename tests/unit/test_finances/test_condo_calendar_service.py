@@ -4,10 +4,10 @@ from datetime import date
 from decimal import Decimal
 
 import pytest
-from finances.services.condo_calendar_service import CondoCalendarService
 from freezegun import freeze_time
 
 from core.services.rent_schedule_service import RentScheduleService
+from finances.services.condo_calendar_service import CondoCalendarService
 from tests.factories import make_apartment, make_bill, make_bill_line_item, make_lease, make_tenant
 
 pytestmark = pytest.mark.django_db

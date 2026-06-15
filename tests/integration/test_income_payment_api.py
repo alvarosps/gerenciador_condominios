@@ -4,6 +4,8 @@ from datetime import date
 from decimal import Decimal
 
 import pytest
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from rest_framework import status
 
 from tests.factories import (
@@ -328,6 +330,60 @@ class TestRentPaymentAPI:
         lease_data = response.data["lease"]
         assert "apartment" in lease_data
         assert "responsible_tenant" in lease_data
+
+    def _make_payment_on_own_lease(self, index: int) -> None:
+        building = make_building(street_number=7300 + index)
+        owner = make_person(name=f"Owner {index}")
+        apartment = make_apartment(building=building, number=400 + index, owner=owner)
+        lease = make_lease(apartment=apartment)
+        make_rent_payment(
+            lease=lease,
+            reference_month=date(2026, 3, 1),
+            amount_paid=Decimal("1300.00"),
+            payment_date=date(2026, 3, 10),
+        )
+
+    def test_list_no_n_plus_one(self, authenticated_api_client):
+        # P5.1: the slim serializer must keep the rent-payments list query count constant
+        # regardless of how many payments exist (the full LeaseSerializer N+1'd on
+        # apartment owner/furnitures/active_lease/tenants per row).
+        for i in range(2):
+            self._make_payment_on_own_lease(i)
+        with CaptureQueriesContext(connection) as ctx_small:
+            r1 = authenticated_api_client.get(self.url)
+        assert r1.status_code == status.HTTP_200_OK
+        small = len(ctx_small)
+
+        for i in range(2, 6):
+            self._make_payment_on_own_lease(i)
+        with CaptureQueriesContext(connection) as ctx_large:
+            r2 = authenticated_api_client.get(self.url)
+        assert r2.status_code == status.HTTP_200_OK
+        large = len(ctx_large)
+
+        assert small == large, f"rent-payments list scales with N: {small} -> {large} queries"
+
+    def test_slim_lease_omits_owner_pii(self, authenticated_api_client):
+        building = make_building(street_number=7399)
+        apartment = make_apartment(building=building, number=499, owner=make_person(name="Dono"))
+        lease = make_lease(apartment=apartment)
+        make_rent_payment(
+            lease=lease,
+            reference_month=date(2026, 3, 1),
+            amount_paid=Decimal("1300.00"),
+            payment_date=date(2026, 3, 10),
+        )
+
+        response = authenticated_api_client.get(self.url, {"lease_id": lease.pk})
+        assert response.status_code == status.HTTP_200_OK
+        lease_data = response.data["results"][0]["lease"]
+        # Slim lease: only id + apartment + responsible_tenant (no rental_value/tag_fee/tenants…).
+        assert set(lease_data.keys()) == {"id", "apartment", "responsible_tenant"}
+        # Slim apartment: no owner PII, no furnitures/active_lease.
+        assert set(lease_data["apartment"].keys()) == {"id", "number", "building"}
+        assert set(lease_data["apartment"]["building"].keys()) == {"id", "name"}
+        # Responsible tenant exposes only id + name (no cpf_cnpj/phone).
+        assert set(lease_data["responsible_tenant"].keys()) == {"id", "name"}
 
     def test_filter_by_lease(self, authenticated_api_client, rent_payment_obj):
         response = authenticated_api_client.get(self.url, {"lease_id": rent_payment_obj.lease_id})

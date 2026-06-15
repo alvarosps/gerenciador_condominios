@@ -5,8 +5,8 @@
  * and re-exports from @testing-library/react for convenience.
  */
 
-import React, { ReactNode } from 'react';
-import { render, RenderOptions } from '@testing-library/react';
+import React, { type ReactNode } from 'react';
+import { render, type RenderOptions, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 /**
@@ -36,13 +36,9 @@ interface TestWrapperProps {
 }
 
 function TestWrapper({ children, queryClient }: TestWrapperProps) {
-  const client = queryClient || createTestQueryClient();
+  const client = queryClient ?? createTestQueryClient();
 
-  return (
-    <QueryClientProvider client={client}>
-      {children}
-    </QueryClientProvider>
-  );
+  return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
 }
 
 /**
@@ -56,18 +52,30 @@ export function renderWithProviders(
   ui: React.ReactElement,
   { queryClient, ...options }: CustomRenderOptions = {}
 ) {
+  const client = queryClient ?? createTestQueryClient();
   const Wrapper = ({ children }: { children: ReactNode }) => (
-    <TestWrapper queryClient={queryClient}>{children}</TestWrapper>
+    <TestWrapper queryClient={client}>{children}</TestWrapper>
   );
 
-  return render(ui, { wrapper: Wrapper, ...options });
+  return { ...render(ui, { wrapper: Wrapper, ...options }), queryClient: client };
+}
+
+/**
+ * Wait until every background query started by a render has settled, so an in-flight request is
+ * never aborted by test teardown (that abort surfaces as an MSW "request already handled" unhandled
+ * rejection). Call at the end of any test whose component fires a query it does not otherwise await.
+ */
+export async function waitForQueriesToSettle(queryClient: QueryClient) {
+  await waitFor(() => {
+    if (queryClient.isFetching() > 0) throw new Error('queries still fetching');
+  });
 }
 
 /**
  * Create wrapper for testing hooks with renderHook
  */
 export function createWrapper(queryClient?: QueryClient) {
-  const client = queryClient || createTestQueryClient();
+  const client = queryClient ?? createTestQueryClient();
   return function Wrapper({ children }: { children: ReactNode }) {
     return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
   };

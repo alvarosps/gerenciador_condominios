@@ -32,6 +32,13 @@ class IPCAService:
         """
         latest = IPCAIndex.objects.order_by("-reference_month").first()
 
+        # Short-circuit: the IPCA for month M is published in M+1, so the most recent
+        # index IBGE could have is for (current_month - 1). When the DB already covers
+        # that month, skip the external request entirely — the common case on every load.
+        expected_latest = timezone.now().date().replace(day=1) - relativedelta(months=1)
+        if latest is not None and latest.reference_month >= expected_latest:
+            return latest
+
         if latest:
             start = latest.reference_month + relativedelta(months=1)
             period = f"{start.strftime('%Y%m')}-{timezone.now().date().strftime('%Y%m')}"
@@ -68,7 +75,7 @@ class IPCAService:
                 month = int(period_code[4:6])
                 ref_month = date(year, month, 1)
                 value = Decimal(value_str)
-            except (ValueError, InvalidOperation):
+            except ValueError, InvalidOperation:
                 logger.warning("Invalid IPCA data: period=%s value=%s", period_code, value_str)
                 continue
 

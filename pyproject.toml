@@ -6,7 +6,7 @@ name = "condominios-manager"
 version = "0.1.0"
 description = "Property management system for rental properties in Brazil"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.14"
 license = {text = "MIT"}
 authors = [
     {name = "Alvaro Souza"}
@@ -14,8 +14,6 @@ authors = [
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Framework :: Django :: 5.2",
-    "Programming Language :: Python :: 3.12",
-    "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
 ]
 
@@ -76,13 +74,15 @@ dependencies = [
 # Dev/test dependencies — must stay in sync with requirements-dev.txt
 dev = [
     # Linting & Formatting
-    "ruff>=0.11.0,<1.0",
+    "ruff>=0.15.0,<1.0",
     # Type Checking
     "mypy>=1.16.0,<2.0",
     "django-stubs[compatible-mypy]>=5.2.0,<6.0",
     "djangorestframework-stubs[compatible-mypy]>=3.15.0,<4.0",
     "types-python-dateutil>=2.9.0,<3.0",
     "types-requests>=2.31.0,<3.0",
+    # Exact pin: pyright strict-mode rules shift between minor releases (see requirements-dev.txt).
+    "pyright==1.1.408",
     # Security
     "bandit>=1.9.0,<2.0",
     "safety>=3.0.0,<4.0",
@@ -119,9 +119,9 @@ build-backend = "setuptools.build_meta"
 # =============================================================================
 
 [tool.ruff]
-target-version = "py313"
+target-version = "py314"
 line-length = 100
-src = ["core", "condominios_manager"]
+src = ["core", "condominios_manager", "finances", "tests"]
 extend-exclude = [
     "migrations",
     ".venv",
@@ -208,7 +208,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["core", "condominios_manager"]
+known-first-party = ["core", "condominios_manager", "finances", "tests"]
 known-third-party = ["django", "rest_framework"]
 section-order = ["future", "standard-library", "third-party", "first-party", "local-folder"]
 
@@ -282,7 +282,7 @@ docstring-code-format = true
 # =============================================================================
 
 [tool.mypy]
-python_version = "3.12"
+python_version = "3.14"
 plugins = [
     "mypy_django_plugin.main",
     "mypy_drf_plugin.main",

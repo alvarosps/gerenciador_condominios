@@ -2,7 +2,7 @@
 
 **Data:** 2026-06-09
 **Escopo:** corrigir os valores de parcela do IPTU em prod+local, resolver a página "Parcelas" vazia + edição de parcela, redesenhar a lista de "Contas" (por prédio, sem paginação, coluna "Tipo"), popular/permitir criar Categorias, e inserir as faturas mensais reais de água (DMAE) e luz (CEEE).
-**Estado:** EM REVISÃO — não executar antes da aprovação. Toda alteração em prod segue backup-first (URI em `db.txt`, apagar após).
+**Estado:** **EXECUTADO** (mergeado; seed aplicado local+PROD em 2026-06-09). ⚠️ **NÃO re-rodar os seeds cegamente:** `create_with_lines` NÃO é idempotente (re-executar duplicaria linhas/parcelas) — as faturas água/luz e parcelas IPTU já foram inseridas. Toda alteração em prod seguiu backup-first.
 **Investigação base:** workflow de 4 lentes (parcelas-empty / value-fix / contas-redesign / categoria) + subagent água/luz (relatórios no transcript da sessão).
 
 ---

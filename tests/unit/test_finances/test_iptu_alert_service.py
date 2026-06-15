@@ -14,11 +14,11 @@ from datetime import date
 from decimal import Decimal
 
 import pytest
+from freezegun import freeze_time
+
 from finances.models import Bill, BillingAccountType, InstallmentPlanState
 from finances.services.bill_payment_service import BillPaymentService
 from finances.services.iptu_alert_service import IptuAlertService, IptuRiskRow
-from freezegun import freeze_time
-
 from tests.factories import (
     make_bill,
     make_bill_line_item,

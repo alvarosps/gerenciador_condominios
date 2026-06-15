@@ -140,7 +140,12 @@ npm run dev
 # Required
 SECRET_KEY=your-secret-key-here
 DEBUG=True
-DATABASE_URL=postgres://postgres:postgres@localhost:5432/condominio
+DB_ENGINE=django.db.backends.postgresql
+DB_NAME=condominio
+DB_USER=postgres
+DB_PASSWORD=postgres
+DB_HOST=localhost
+DB_PORT=5433
 ALLOWED_HOSTS=localhost,127.0.0.1
 
 # Optional - Google OAuth
@@ -165,27 +170,27 @@ NEXT_PUBLIC_API_URL=http://localhost:8008/api
 # Using the backup script
 python scripts/backup_db.py
 
-# Output: backups/backup_condominio_20250113_120000.backup
+# Output: backups/backup_condominio_20250113_120000.sql
 ```
 
 ### Restoring from Backup
 
 ```bash
 # Using the restore script
-python scripts/restore_db.py backups/backup_condominio_20250113_120000.backup
+python scripts/restore_db.py backups/backup_condominio_20250113_120000.sql
 
-# Or manually with pg_restore
-pg_restore -d condominio -c backups/backup_condominio_20250113_120000.backup
+# Or manually with psql
+psql -h localhost -U postgres -d condominio < backups/backup_condominio_20250113_120000.sql
 ```
 
 ### Manual PostgreSQL Commands
 
 ```bash
-# Create backup
-pg_dump -Fc condominio > backup.backup
+# Create backup (plain SQL format)
+pg_dump -F p --no-owner --no-acl condominio > backup.sql
 
 # Restore backup
-pg_restore -d condominio -c backup.backup
+psql -d condominio < backup.sql
 
 # Create database from scratch
 createdb condominio
@@ -225,13 +230,13 @@ pytest -v --tb=short
 cd frontend
 
 # Run all tests
-npm run test
+npm run test:unit
 
 # Run in watch mode
 npm run test:watch
 
 # Run with coverage
-npm run test:coverage
+npm run test:unit -- --coverage
 ```
 
 ## Code Quality
@@ -251,9 +256,9 @@ pre-commit run --all-files
 
 ```bash
 # Backend
-flake8 core/
-black core/ --check
-isort core/ --check
+ruff check core/ condominios_manager/ finances/
+ruff format --check core/ condominios_manager/ finances/
+mypy core/ condominios_manager/ finances/  && pyright
 
 # Frontend
 cd frontend
@@ -267,7 +272,7 @@ npm run type-check
 
 ```bash
 # Login (get tokens)
-POST /api/token/
+POST /api/auth/token/
 {
   "username": "admin",
   "password": "password"
@@ -280,7 +285,7 @@ POST /api/token/
 }
 
 # Refresh token
-POST /api/token/refresh/
+POST /api/auth/token/refresh/
 {
   "refresh": "eyJ0eXAi..."
 }
@@ -299,7 +304,7 @@ All resources support standard REST operations:
 | PATCH | `/api/{resource}/{id}/` | Partial update |
 | DELETE | `/api/{resource}/{id}/` | Delete |
 
-**Available Resources**: `buildings`, `apartments`, `tenants`, `leases`, `furnitures`, `dependents`
+**Available Resources**: `buildings`, `apartments`, `tenants`, `leases`, `furnitures`, `rent-adjustments`
 
 ### Special Endpoints
 

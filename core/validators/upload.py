@@ -32,7 +32,7 @@ def _detect_image_format(uploaded_file: Any) -> str | None:
     try:
         with Image.open(uploaded_file) as img:
             return img.format
-    except (UnidentifiedImageError, OSError):
+    except UnidentifiedImageError, OSError:
         return None
     finally:
         uploaded_file.seek(0)

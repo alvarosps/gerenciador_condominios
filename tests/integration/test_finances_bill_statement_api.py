@@ -9,6 +9,9 @@ from decimal import Decimal
 
 import pytest
 from django.utils import timezone
+from freezegun import freeze_time
+from rest_framework import status
+
 from finances.models import (
     Bill,
     BillBehavior,
@@ -18,9 +21,6 @@ from finances.models import (
     WaterBillStatement,
 )
 from finances.services.bill_payment_service import BillPaymentService
-from freezegun import freeze_time
-from rest_framework import status
-
 from tests.factories import (
     make_bill,
     make_bill_line_item,

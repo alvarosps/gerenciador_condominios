@@ -316,19 +316,7 @@ class BillViewSet(viewsets.ModelViewSet):
     pagination_class = LargePageNumberPagination
 
     def get_queryset(self) -> QuerySet[Bill]:
-        queryset = (
-            Bill.objects.with_amounts(today_sp())
-            .select_related(
-                "building",
-                "category",
-                "billing_account",
-                "condominium",
-                "water_statement",
-                "electricity_statement",
-                "installment__plan__billing_account",
-            )
-            .prefetch_related("line_items", "allocations")
-        )
+        queryset = Bill.objects.with_amounts(today_sp()).with_list_relations()
         return self._apply_filters(queryset, self.request.query_params)
 
     def _apply_filters(self, queryset: QuerySet[Bill], params: QueryDict) -> QuerySet[Bill]:
@@ -381,7 +369,7 @@ class BillViewSet(viewsets.ModelViewSet):
             BillPaymentService.pay(
                 bill, payment_date, amount, funded_from, user=cast(User, request.user)
             )
-        except (ValueError, InvalidOperation):
+        except ValueError, InvalidOperation:
             return Response(
                 {"error": "Valor, data ou forma de pagamento inválido."},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -402,7 +390,7 @@ class BillViewSet(viewsets.ModelViewSet):
         try:
             funded_from = _validated_funded_from(request.data.get("funded_from", "caixa"))
             payment_date = date.fromisoformat(str(payment_date_raw))
-        except (ValueError, InvalidOperation):
+        except ValueError, InvalidOperation:
             return Response(
                 {"error": "Data ou forma de pagamento inválida."},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -453,7 +441,7 @@ class BillViewSet(viewsets.ModelViewSet):
     def generate_month(self, request: Request) -> Response:
         try:
             year, month = _parse_year_month(request.data)
-        except (KeyError, ValueError, TypeError):
+        except KeyError, ValueError, TypeError:
             return Response(
                 {"error": "Parâmetros year/month inválidos (mês entre 1 e 12)."},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -568,7 +556,7 @@ class BillViewSet(viewsets.ModelViewSet):
         try:
             with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
                 has_pages = bool(pdf.pages)
-        except (PdfminerException, ValueError, OSError):
+        except PdfminerException, ValueError, OSError:
             return Response({"error": _ERR_NOT_PDF}, status=status.HTTP_400_BAD_REQUEST)
         if not has_pages:
             return Response({"error": _ERR_NOT_PDF}, status=status.HTTP_400_BAD_REQUEST)
@@ -674,7 +662,7 @@ class ReserveViewSet(viewsets.ModelViewSet):
                 notes=str(request.data.get("notes", "")),
                 user=cast(User, request.user),
             )
-        except (ValueError, InvalidOperation):
+        except ValueError, InvalidOperation:
             return Response(
                 {"error": "Valor ou data inválido."}, status=status.HTTP_400_BAD_REQUEST
             )
@@ -779,7 +767,7 @@ class CondoMonthCloseViewSet(viewsets.ReadOnlyModelViewSet):
     ) -> Response:
         try:
             year, month = _parse_year_month(request.data)
-        except (KeyError, ValueError, TypeError):
+        except KeyError, ValueError, TypeError:
             return Response(
                 {"error": "Parâmetros year/month inválidos (mês entre 1 e 12)."},
                 status=status.HTTP_400_BAD_REQUEST,

@@ -11,13 +11,13 @@ import pytest
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.db.models import Manager
+
 from finances.models import (
     ElectricityBillStatement,
     SoftDeleteManager,
     SupplyStatus,
     WaterBillStatement,
 )
-
 from tests.factories import make_bill, make_electricity_statement, make_water_statement
 
 pytestmark = [pytest.mark.unit, pytest.mark.django_db]

@@ -13,8 +13,8 @@ import pytest
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.utils import timezone
-from finances.models import CondoMonthClose
 
+from finances.models import CondoMonthClose
 from tests.factories import make_condo_month_close, make_condominium
 
 pytestmark = pytest.mark.django_db

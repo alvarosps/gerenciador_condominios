@@ -1,39 +1,61 @@
+import { type z } from 'zod';
 import type {
   CombinedCalendar,
   CombinedCalendarBillExit,
 } from '@/lib/api/hooks/use-combined-calendar';
-import type { BillingAccount } from '@/lib/schemas/finances/billing-account.schema';
-import type { Bill, BillLineItem } from '@/lib/schemas/finances/bill.schema';
-import type { ParsedInvoice } from '@/lib/schemas/finances/invoice-parse.schema';
+import { type billingAccountSchema } from '@/lib/schemas/finances/billing-account.schema';
+import { type billLineItemSchema, type billSchema } from '@/lib/schemas/finances/bill.schema';
+import { type parsedInvoiceSchema } from '@/lib/schemas/finances/invoice-parse.schema';
 import type { IptuAlertRow } from '@/lib/api/hooks/use-iptu-alerts';
 import type { BillSkip } from '@/lib/schemas/finances/bill-skip.schema';
-import type { FinanceCategory } from '@/lib/schemas/finances/category.schema';
-import type {
-  Employee,
-} from '@/lib/schemas/finances/employee.schema';
-import type {
-  Installment,
-  InstallmentPlan,
+import { type financeCategorySchema } from '@/lib/schemas/finances/category.schema';
+import { type employeeSchema } from '@/lib/schemas/finances/employee.schema';
+import {
+  type installmentPlanSchema,
+  type installmentSchema,
 } from '@/lib/schemas/finances/installment-plan.schema';
-import type { Payment, PaymentAllocation } from '@/lib/schemas/finances/payment.schema';
-import type { Reserve } from '@/lib/schemas/finances/reserve.schema';
-import type { ReserveMovement } from '@/lib/schemas/finances/reserve-movement.schema';
-import type { IncomeEntry } from '@/lib/schemas/finances/income-entry.schema';
-import type { CondoMonthClose } from '@/lib/schemas/finances/condo-month-close.schema';
+import {
+  type paymentAllocationSchema,
+  type paymentSchema,
+} from '@/lib/schemas/finances/payment.schema';
+import { type reserveSchema } from '@/lib/schemas/finances/reserve.schema';
+import { type reserveMovementSchema } from '@/lib/schemas/finances/reserve-movement.schema';
+import { type incomeEntrySchema } from '@/lib/schemas/finances/income-entry.schema';
+import { type condoMonthCloseSchema } from '@/lib/schemas/finances/condo-month-close.schema';
 import type {
   CondoProjectionMonth,
   CondoSimulationResult,
 } from '@/lib/api/hooks/use-condo-projection';
 import type { OwnerDistribution } from '@/lib/api/hooks/use-owner-distribution';
 
+// These generators emit the RAW DRF read shape the hooks actually receive: monetary fields as
+// STRINGS ("350.00", not 350) and NO write-only *_id fields (PrimaryKeyRelatedField(write_only)
+// never appears in a read). Typed via z.input<schema> so the raw shape is type-checked. The hook's
+// Zod schema coerces strings→numbers, so this is exactly what hits the schema in production.
+type FinanceCategoryRaw = z.input<typeof financeCategorySchema>;
+type BillingAccountRaw = z.input<typeof billingAccountSchema>;
+type BillLineItemRaw = z.input<typeof billLineItemSchema>;
+type BillRaw = z.input<typeof billSchema>;
+type PaymentAllocationRaw = z.input<typeof paymentAllocationSchema>;
+type PaymentRaw = z.input<typeof paymentSchema>;
+type InstallmentRaw = z.input<typeof installmentSchema>;
+type InstallmentPlanRaw = z.input<typeof installmentPlanSchema>;
+type EmployeeRaw = z.input<typeof employeeSchema>;
+type ReserveRaw = z.input<typeof reserveSchema>;
+type ReserveMovementRaw = z.input<typeof reserveMovementSchema>;
+type IncomeEntryRaw = z.input<typeof incomeEntrySchema>;
+type CondoMonthCloseRaw = z.input<typeof condoMonthCloseSchema>;
+// The parse_invoice DRAFT (write prefill, not a read) — bill.building_id/category_id are inherited
+// from the matched account (S60) and belong here; the line amount is money_str -> a string.
+type ParsedInvoiceRaw = z.input<typeof parsedInvoiceSchema>;
+
 export function createMockFinanceCategory(
-  overrides: Partial<FinanceCategory> = {},
-): FinanceCategory {
+  overrides: Partial<FinanceCategoryRaw> = {}
+): FinanceCategoryRaw {
   return {
     id: 1,
     condominium: { id: 1, name: 'Condomínio' },
     parent: null,
-    parent_id: null,
     name: 'Energia',
     color: '#f59e0b',
     sort_order: 0,
@@ -43,14 +65,14 @@ export function createMockFinanceCategory(
   };
 }
 
-export function createMockBillingAccount(overrides: Partial<BillingAccount> = {}): BillingAccount {
+export function createMockBillingAccount(
+  overrides: Partial<BillingAccountRaw> = {}
+): BillingAccountRaw {
   return {
     id: 1,
     condominium: { id: 1, name: 'Condomínio' },
     building: null,
-    building_id: null,
     category: null,
-    category_id: null,
     name: 'Conta de Luz - Prédio 836',
     external_identifier: '',
     account_type: 'generic',
@@ -60,7 +82,7 @@ export function createMockBillingAccount(overrides: Partial<BillingAccount> = {}
     supply_status: 'active',
     description: '',
     default_due_day: 10,
-    expected_amount: 350,
+    expected_amount: '350.00',
     lifecycle_state: 'active',
     tracking_start_month: '2026-06-01',
     end_date: null,
@@ -71,25 +93,23 @@ export function createMockBillingAccount(overrides: Partial<BillingAccount> = {}
   };
 }
 
-export function createMockBillLineItem(overrides: Partial<BillLineItem> = {}): BillLineItem {
+export function createMockBillLineItem(overrides: Partial<BillLineItemRaw> = {}): BillLineItemRaw {
   return {
     id: 1,
     category: null,
     description: 'Consumo de energia',
-    amount: 350,
+    amount: '350.00',
     is_offset: false,
     ...overrides,
   };
 }
 
-export function createMockBill(overrides: Partial<Bill> = {}): Bill {
+export function createMockBill(overrides: Partial<BillRaw> = {}): BillRaw {
   return {
     id: 1,
     condominium: { id: 1, name: 'Condomínio' },
     building: null,
-    building_id: null,
     category: null,
-    category_id: null,
     competence_month: '2026-06-01',
     due_date: '2026-06-10',
     issue_date: null,
@@ -97,13 +117,12 @@ export function createMockBill(overrides: Partial<Bill> = {}): Bill {
     external_identifier: '',
     behavior: 'recurring',
     billing_account: null,
-    billing_account_id: null,
     lifecycle_state: 'active',
     notes: '',
     line_items: [createMockBillLineItem()],
-    amount_total: 350,
-    amount_paid: 0,
-    amount_remaining: 350,
+    amount_total: '350.00',
+    amount_paid: '0.00',
+    amount_remaining: '350.00',
     payment_status: 'open',
     is_overdue: false,
     created_at: '2026-06-01T00:00:00Z',
@@ -112,7 +131,9 @@ export function createMockBill(overrides: Partial<Bill> = {}): Bill {
   };
 }
 
-export function createMockParsedInvoice(overrides: Partial<ParsedInvoice> = {}): ParsedInvoice {
+export function createMockParsedInvoice(
+  overrides: Partial<ParsedInvoiceRaw> = {}
+): ParsedInvoiceRaw {
   return {
     bill: {
       competence_month: '2026-06-01',
@@ -127,7 +148,7 @@ export function createMockParsedInvoice(overrides: Partial<ParsedInvoice> = {}):
     line_items: [
       {
         description: 'Consumo de energia',
-        amount: 350,
+        amount: '350.00',
         is_offset: false,
         category_id: null,
         installment_id: null,
@@ -156,17 +177,17 @@ export function createMockIptuAlertRow(overrides: Partial<IptuAlertRow> = {}): I
 }
 
 export function createMockPaymentAllocation(
-  overrides: Partial<PaymentAllocation> = {},
-): PaymentAllocation {
-  return { id: 1, bill: 1, amount: 350, ...overrides };
+  overrides: Partial<PaymentAllocationRaw> = {}
+): PaymentAllocationRaw {
+  return { id: 1, bill: 1, amount: '350.00', ...overrides };
 }
 
-export function createMockPayment(overrides: Partial<Payment> = {}): Payment {
+export function createMockPayment(overrides: Partial<PaymentRaw> = {}): PaymentRaw {
   return {
     id: 1,
     condominium: { id: 1, name: 'Condomínio' },
     payment_date: '2026-06-10',
-    amount: 350,
+    amount: '350.00',
     method: '',
     funded_from: 'caixa',
     reference: '',
@@ -188,7 +209,7 @@ export function createMockBillSkip(overrides: Partial<BillSkip> = {}): BillSkip 
 }
 
 export function createMockBillExit(
-  overrides: Partial<CombinedCalendarBillExit> = {},
+  overrides: Partial<CombinedCalendarBillExit> = {}
 ): CombinedCalendarBillExit {
   return {
     bill_id: 1,
@@ -206,7 +227,7 @@ export function createMockBillExit(
 }
 
 export function createMockCombinedCalendar(
-  overrides: Partial<CombinedCalendar> = {},
+  overrides: Partial<CombinedCalendar> = {}
 ): CombinedCalendar {
   return {
     year: 2026,
@@ -226,14 +247,14 @@ export function createMockCombinedCalendar(
 }
 
 export interface MockOverdueResponse {
-  bills: Bill[];
+  bills: BillRaw[];
   overdue_bills_total: string;
   overdue_bills_count: number;
   rent_overdue: { count: number; total_fee: string };
 }
 
 export function createMockOverdueResponse(
-  overrides: Partial<MockOverdueResponse> = {},
+  overrides: Partial<MockOverdueResponse> = {}
 ): MockOverdueResponse {
   return {
     bills: [createMockBill({ is_overdue: true, payment_status: 'open' })],
@@ -244,42 +265,38 @@ export function createMockOverdueResponse(
   };
 }
 
-
-export function createMockInstallment(overrides: Partial<Installment> = {}): Installment {
+export function createMockInstallment(overrides: Partial<InstallmentRaw> = {}): InstallmentRaw {
   return {
     id: 1,
     plan: 1,
     number: 1,
     due_date: '2026-07-10',
-    amount: 500,
+    amount: '500.00',
     is_overdue: false,
     ...overrides,
   };
 }
 
 export function createMockInstallmentPlan(
-  overrides: Partial<InstallmentPlan> = {},
-): InstallmentPlan {
+  overrides: Partial<InstallmentPlanRaw> = {}
+): InstallmentPlanRaw {
   return {
     id: 1,
     condominium: { id: 1, name: 'Condomínio' },
     description: 'IPTU 2026 - Prédio 836',
-    total_amount: 1500,
+    total_amount: '1500.00',
     installment_count: 3,
     start_due_date: '2026-07-10',
     default_due_day: 10,
     lifecycle_state: 'active',
     embedded: false,
     category: null,
-    category_id: null,
     building: null,
-    building_id: null,
     billing_account: null,
-    billing_account_id: null,
     installments: [
-      createMockInstallment({ id: 1, number: 1, amount: 500, due_date: '2026-07-10' }),
-      createMockInstallment({ id: 2, number: 2, amount: 500, due_date: '2026-08-10' }),
-      createMockInstallment({ id: 3, number: 3, amount: 500, due_date: '2026-09-10' }),
+      createMockInstallment({ id: 1, number: 1, amount: '500.00', due_date: '2026-07-10' }),
+      createMockInstallment({ id: 2, number: 2, amount: '500.00', due_date: '2026-08-10' }),
+      createMockInstallment({ id: 3, number: 3, amount: '500.00', due_date: '2026-09-10' }),
     ],
     notes: '',
     created_at: '2026-06-01T00:00:00Z',
@@ -288,21 +305,19 @@ export function createMockInstallmentPlan(
   };
 }
 
-export function createMockEmployee(overrides: Partial<Employee> = {}): Employee {
+export function createMockEmployee(overrides: Partial<EmployeeRaw> = {}): EmployeeRaw {
   return {
     id: 1,
     condominium: { id: 1, name: 'Condomínio' },
     name: 'Adriana',
     role: 'Faxineira',
     payment_type: 'fixed',
-    base_salary: 1320,
+    base_salary: '1320.00',
     default_due_day: 5,
     is_active: true,
     notes: '',
     person: null,
-    person_id: null,
     lease: null,
-    lease_id: null,
     created_at: '2026-06-01T00:00:00Z',
     updated_at: '2026-06-01T00:00:00Z',
     ...overrides,
@@ -313,13 +328,13 @@ export function createMockEmployee(overrides: Partial<Employee> = {}): Employee 
 
 const MOCK_CONDO = { id: 1, name: 'Condomínio Central' };
 
-export function createMockReserve(overrides: Partial<Reserve> = {}): Reserve {
+export function createMockReserve(overrides: Partial<ReserveRaw> = {}): ReserveRaw {
   return {
     id: 1,
     condominium: MOCK_CONDO,
     name: 'Reserva de Emergência',
     notes: '',
-    balance: 5000,
+    balance: '5000.00',
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-01-01T00:00:00Z',
     ...overrides,
@@ -327,13 +342,13 @@ export function createMockReserve(overrides: Partial<Reserve> = {}): Reserve {
 }
 
 export function createMockReserveMovement(
-  overrides: Partial<ReserveMovement> = {},
-): ReserveMovement {
+  overrides: Partial<ReserveMovementRaw> = {}
+): ReserveMovementRaw {
   return {
     id: 1,
     reserve: { id: 1, name: 'Reserva de Emergência' },
     kind: 'deposit',
-    amount: 1000,
+    amount: '1000.00',
     movement_date: '2026-06-01',
     bill: null,
     reference: null,
@@ -344,14 +359,14 @@ export function createMockReserveMovement(
   };
 }
 
-export function createMockIncomeEntry(overrides: Partial<IncomeEntry> = {}): IncomeEntry {
+export function createMockIncomeEntry(overrides: Partial<IncomeEntryRaw> = {}): IncomeEntryRaw {
   return {
     id: 1,
     condominium: MOCK_CONDO,
     building: null,
     category: null,
     description: 'Receita extra',
-    amount: 500,
+    amount: '500.00',
     income_date: '2026-06-05',
     is_received: false,
     received_date: null,
@@ -363,18 +378,18 @@ export function createMockIncomeEntry(overrides: Partial<IncomeEntry> = {}): Inc
 }
 
 export function createMockCondoMonthClose(
-  overrides: Partial<CondoMonthClose> = {},
-): CondoMonthClose {
+  overrides: Partial<CondoMonthCloseRaw> = {}
+): CondoMonthCloseRaw {
   return {
     id: 1,
     condominium: MOCK_CONDO,
     reference_month: '2026-05-01',
     status: 'closed',
     closed_at: '2026-06-01T00:00:00Z',
-    net_result: 2000,
-    cash_balance_end: 15000,
-    reserve_balance_end: 5000,
-    carry_forward_out: 0,
+    net_result: '2000.00',
+    cash_balance_end: '15000.00',
+    reserve_balance_end: '5000.00',
+    carry_forward_out: '0.00',
     breakdown: {},
     created_at: '2026-06-01T00:00:00Z',
     updated_at: '2026-06-01T00:00:00Z',
@@ -452,7 +467,7 @@ export function createMockCondoProjection(months = 12): CondoProjectionMonth[] {
 }
 
 export function createMockOwnerDistribution(
-  overrides: Partial<OwnerDistribution> = {},
+  overrides: Partial<OwnerDistribution> = {}
 ): OwnerDistribution {
   return {
     year: 2026,

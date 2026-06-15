@@ -130,7 +130,7 @@ _ERR_IDENTIFIER_REQUIRED = "Informe a inscrição/UC para contas de água, luz o
 
 
 class BillingAccountQuerySet(models.QuerySet["BillingAccount"]):
-    def recurring_for_generation(self) -> "BillingAccountQuerySet":
+    def recurring_for_generation(self) -> BillingAccountQuerySet:
         """Active accounts that generate a recurring Bill — IPTU is registry-only (design §10.3).
 
         Single shared predicate used by BillGenerationService.ensure_month_bills,
@@ -220,7 +220,7 @@ class BillingAccount(AuditMixin, SoftDeleteMixin, models.Model):
 
 
 class BillQuerySet(models.QuerySet["Bill"]):
-    def with_amounts(self, today: date) -> "BillQuerySet":
+    def with_amounts(self, today: date) -> BillQuerySet:
         """Annotate amount_total / amount_paid / amount_remaining / payment_status / is_overdue.
 
         Each figure is a scalar correlated Subquery (no cartesian join between line
@@ -267,6 +267,29 @@ class BillQuerySet(models.QuerySet["Bill"]):
                     output_field=BooleanField(),
                 ),
             )
+        )
+
+    def with_list_relations(self) -> BillQuerySet:
+        """Eager-load every relation the Bill serializer reads, so list/overdue do not N+1.
+
+        Covers the line-item category (BillLineItemSerializer nests CategorySerializer), the
+        installment→plan→billing_account chain (get_account_type) and the directly-linked FKs.
+        Shared by BillViewSet.get_queryset and the dashboard ``overdue`` queryset (design §4).
+        """
+        return self.select_related(
+            "building",
+            "category",
+            "billing_account",
+            "condominium",
+            "water_statement",
+            "electricity_statement",
+            "installment__plan__billing_account",
+        ).prefetch_related(
+            # BillLineItemSerializer nests CategorySerializer, which itself nests the
+            # category's condominium (and parent), so the category prefetch must reach both.
+            "line_items__category__condominium",
+            "line_items__category__parent",
+            "allocations",
         )
 
 
