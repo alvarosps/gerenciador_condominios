@@ -219,6 +219,44 @@ class TestLeaseUpdate:
         assert response.data["tag_fee"] == "80.00"
         assert response.data["contract_signed"] is True
 
+    def test_partial_update_does_not_overwrite_stale_apartment_rent_date(
+        self, authenticated_api_client, lease, apartment
+    ):
+        # A RentAdjustment with update_apartment_prices=False advances the LEASE's rent-increase
+        # date but intentionally leaves the APARTMENT's date stale. An unrelated PATCH
+        # (contract_signed) must NOT sync the apartment to the lease's date — regression for
+        # perform_update, which used to sync unconditionally on every lease edit.
+        apartment.last_rent_increase_date = date(2026, 1, 1)
+        apartment.save(update_fields=["last_rent_increase_date"])
+        lease.last_rent_increase_date = date(2026, 6, 1)
+        lease.save(update_fields=["last_rent_increase_date"])
+
+        response = authenticated_api_client.patch(
+            f"/api/leases/{lease.id}/", {"contract_signed": True}, format="json"
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        apartment.refresh_from_db()
+        assert apartment.last_rent_increase_date == date(2026, 1, 1)
+
+    def test_partial_update_carrying_rent_date_syncs_apartment(
+        self, authenticated_api_client, lease, apartment
+    ):
+        # Complementary case: when the PATCH DOES carry last_rent_increase_date, the apartment IS
+        # synced (the gate only suppresses the sync for edits that don't touch that field).
+        apartment.last_rent_increase_date = date(2026, 1, 1)
+        apartment.save(update_fields=["last_rent_increase_date"])
+
+        response = authenticated_api_client.patch(
+            f"/api/leases/{lease.id}/",
+            {"last_rent_increase_date": "2026-06-01"},
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        apartment.refresh_from_db()
+        assert apartment.last_rent_increase_date == date(2026, 6, 1)
+
     def test_update_lease_changes_tenants_m2m(
         self, authenticated_api_client, lease, tenant, tenant2, apartment
     ):

@@ -306,9 +306,15 @@ class LeaseViewSet(viewsets.ModelViewSet):
         serializer.instance = LeaseCreationService.create(validated_data=validated, tenants=tenants)
 
     def perform_update(self, serializer: serializers.BaseSerializer[Lease]) -> None:
-        """Apply the update, then sync the apartment's last_rent_increase_date via the service."""
+        """Apply the update, then sync the apartment's last_rent_increase_date — but ONLY when the
+        update actually carries that date (mirrors the old serializer's ``"last_rent_increase_date"
+        in validated_data`` guard). An unrelated edit (e.g. contract_signed) must leave an
+        intentionally-stale apartment date — one set by a RentAdjustment with
+        update_apartment_prices=False — untouched."""
+        rent_date_in_payload = "last_rent_increase_date" in serializer.validated_data
         lease = serializer.save()
-        LeaseCreationService.sync_apartment_last_rent_increase_date(lease)
+        if rent_date_in_payload:
+            LeaseCreationService.sync_apartment_last_rent_increase_date(lease)
 
     def _apply_lease_status_filters(
         self, queryset: QuerySet[Lease], params: Any

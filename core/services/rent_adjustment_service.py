@@ -4,6 +4,7 @@ Handles applying rent adjustments to leases and querying leases eligible
 for their next annual adjustment.
 """
 
+import logging
 from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
@@ -15,6 +16,8 @@ from django.utils import timezone
 
 from core.models import Landlord, Lease, RentAdjustment
 from core.services.ipca_service import IPCAService
+
+logger = logging.getLogger(__name__)
 
 _ADJUSTMENT_INTERVAL_MONTHS = 12
 _RECENT_ADJUSTMENT_WARNING_MONTHS = 10
@@ -218,6 +221,20 @@ class RentAdjustmentService:
         if latest_ipca_month:
             twelve_months_ago = latest_ipca_month - relativedelta(months=11)
             ipca_12m = IPCAService.get_adjustment_percentage(twelve_months_ago, latest_ipca_month)
+
+        # Observability: P5.1 moved the IPCA fetch out of the request path into the daily
+        # send_finance_alerts cron. If that cron stops running the index silently stops advancing
+        # and the alerts quietly drift onto the Landlord fallback. A stale (but present) index is
+        # the discriminating signal — log it loudly so the broken cron is visible (an absent index
+        # may be an intentional fallback-only setup, so it is not flagged here).
+        expected_latest_month = timezone.now().date().replace(day=1) - relativedelta(months=1)
+        if latest_ipca_month is not None and latest_ipca_month < expected_latest_month:
+            logger.warning(
+                "IPCA index is stale (latest=%s, expected >= %s) — the daily send_finance_alerts "
+                "cron may not be running; rent-adjustment alerts are using an outdated index.",
+                latest_ipca_month,
+                expected_latest_month,
+            )
 
         # Fallback percentage from Landlord settings
         landlord = Landlord.objects.filter(is_active=True).first()

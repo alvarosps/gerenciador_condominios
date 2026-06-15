@@ -81,6 +81,8 @@ dev = [
     "djangorestframework-stubs[compatible-mypy]>=3.15.0,<4.0",
     "types-python-dateutil>=2.9.0,<3.0",
     "types-requests>=2.31.0,<3.0",
+    # Exact pin: pyright strict-mode rules shift between minor releases (see requirements-dev.txt).
+    "pyright==1.1.408",
     # Security
     "bandit>=1.9.0,<2.0",
     "safety>=3.0.0,<4.0",

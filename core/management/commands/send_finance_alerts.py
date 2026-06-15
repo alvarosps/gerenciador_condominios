@@ -9,6 +9,13 @@ Idempotency: at most one summary per admin per type per São Paulo day, enforced
 is_notification_sent_on(today_sp()) — SP-aware so the window tracks the São Paulo
 midnight, not UTC. Push is best-effort inside create_notification (a push failure never
 drops the in-app Notification / banner).
+
+OPS REQUIREMENT (P5.1): this command also refreshes the IPCAIndex (IPCAService.fetch_latest is
+the ONLY remaining caller now that the synchronous SIDRA fetch was removed from the request path).
+It MUST be scheduled to run daily in production — configure a Render Cron Job running
+``python manage.py send_finance_alerts``. If the cron is not running, the IPCA index silently
+stops advancing; RentAdjustmentService.get_eligible_leases logs a WARNING when it detects a stale
+index so the broken cron is observable rather than silently drifting onto the Landlord fallback.
 """
 
 import logging

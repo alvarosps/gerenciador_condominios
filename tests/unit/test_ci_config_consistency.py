@@ -14,6 +14,9 @@ _CI = _ROOT / ".github" / "workflows" / "ci.yml"
 _PYPROJECT = _ROOT / "pyproject.toml"
 _PYRIGHT = _ROOT / "pyrightconfig.json"
 _PYTHON_VERSION = _ROOT / ".python-version"
+_REQ_DEV = _ROOT / "requirements-dev.txt"
+
+_PYRIGHT_PIN = "pyright==1.1.408"
 
 pytestmark = pytest.mark.unit
 
@@ -41,6 +44,17 @@ def test_ci_runs_pyright() -> None:
     text = _ci_text()
     assert "Type check with pyright" in text
     assert "run: pyright" in text
+    # pyright must come from the pinned requirements-dev.txt, not an unpinned ad-hoc install.
+    assert "pip install pyright" not in text
+
+
+def test_pyright_is_pinned_in_manifests() -> None:
+    # Every gate tool must be declared (pinned) in BOTH requirements-dev.txt and the pyproject dev
+    # extras (coding-standards.md). pyright strict-mode rules drift between minor releases, so the
+    # version is locked exactly and asserted here so a future edit that unpins it turns this RED.
+    assert _PYRIGHT_PIN in _REQ_DEV.read_text(encoding="utf-8")
+    dev_deps = _pyproject()["project"]["optional-dependencies"]["dev"]
+    assert _PYRIGHT_PIN in dev_deps
 
 
 def test_ci_bandit_includes_finances() -> None:

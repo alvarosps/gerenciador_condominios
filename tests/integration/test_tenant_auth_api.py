@@ -7,8 +7,8 @@ Tests cover:
 
 Mock policy: only the EXTERNAL Twilio boundary is mocked — ``core.services.whatsapp_service.Client``
 (the Twilio SDK). The real ``send_verification_code`` / ``send_whatsapp_message`` run end-to-end
-(exercising the ``content_variables=json.dumps(...)`` contract), and ``@override_settings`` supplies
-the TWILIO_* credentials the guard requires. Django ORM and all internal services run against the
+(exercising the ``content_variables=json.dumps(...)`` contract), and an autouse ``settings``
+fixture supplies the TWILIO_* credentials the guard requires. Django ORM and all internal services run against the
 real test DB — never patched.
 """
 

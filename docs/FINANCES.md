@@ -43,10 +43,10 @@ Statements (água/luz) são 1:1 com a Bill e **só leituras**. O parser DMAE/CEE
 ## Permissões e RLS
 
 - Todo o módulo é **admin-only** (`IsAdminUser` — `is_staff`/`is_superuser`); inquilino recebe 403 (P1.2).
-- **RLS habilitado em toda tabela `public` nova na mesma migration** (padrão `core/migrations/0047`; migrations `finances/0004–0006`). RLS sem policy é o estado correto (o backend conecta como `postgres`, bypass).
+- **RLS habilitado em toda tabela `public` nova na mesma migration** (padrão `core/migrations/0047`; em `finances/`, toda migration que cria uma tabela `public` habilita RLS — `finances/0001-0003, 0006`). RLS sem policy é o estado correto (o backend conecta como `postgres`, bypass).
 
 ## API — `/api/finances/` (14 routers)
 
 `finance-categories`, `billing-accounts`, `bills`, `bill-skips`, `payments`, `installment-plans`, `installments`, `employees`, `reserves`, `reserve-movements`, `income-entries`, `condo-month-closes`, `finance-dashboard`, `finance-cash-flow`.
 
-**Actions:** `bills/{id}/{pay,suspend}/`, `bills/{bulk_pay,generate_month,create_with_lines,parse_invoice}/`, `bills/{id}/update_with_lines/`, `condo-month-closes/{id}/{close,reopen}/`, `finance-dashboard/{overview,monthly_balance,iptu_alerts,overdue,combined_calendar,by_category,by_owner}`, `finance-cash-flow/projection`.
+**Actions:** `bills/{id}/{pay,suspend}/`, `bills/{bulk_pay,generate_month,create_with_lines,parse_invoice}/`, `bills/{id}/update_with_lines/`, `condo-month-closes/{close,reopen}/`, `finance-dashboard/{overview,monthly_balance,iptu_alerts,overdue,combined_calendar,by_category,by_owner}`, `finance-cash-flow/projection`.

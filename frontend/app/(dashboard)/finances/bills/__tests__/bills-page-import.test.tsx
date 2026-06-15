@@ -11,8 +11,9 @@ import {
   createMockParsedInvoice,
 } from '@/tests/mocks/data/finances';
 import BillsPage from '../page';
+import { type z } from 'zod';
 import { billingAccountSchema } from '@/lib/schemas/finances/billing-account.schema';
-import type { ParsedInvoice } from '@/lib/schemas/finances/invoice-parse.schema';
+import { type parsedInvoiceSchema } from '@/lib/schemas/finances/invoice-parse.schema';
 
 // Real hooks (useParseInvoice / useCreateBillWithLines / useUpdateBillWithLines / …) hit MSW. The
 // parse → create/update flow is exercised end-to-end; each mutation is spied via an MSW
@@ -66,7 +67,7 @@ interface UpdateBody {
 }
 
 // Make parse_invoice resolve to a specific draft so the modal opens prefilled from it.
-function setParseInvoice(draft: ParsedInvoice) {
+function setParseInvoice(draft: z.input<typeof parsedInvoiceSchema>) {
   server.use(
     http.post(`${API_BASE}/finances/bills/parse_invoice/`, () => HttpResponse.json(draft))
   );

@@ -16,7 +16,7 @@ from model_bakery import baker
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from core.models import Landlord
+from core.models import IPCAIndex, Landlord
 from core.signals import _CORE_MODEL_CACHE_PREFIXES, _PROPERTY_CACHE_PREFIXES
 
 _ALERTS_KEY = "dashboard-rent-adjustment-alerts"
@@ -51,10 +51,25 @@ class TestRentAdjustmentAlertsCache:
 
         assert cache.get(_ALERTS_KEY) is None
 
+    def test_ipca_index_save_invalidates_cache(self) -> None:
+        # Discriminating: IPCAIndex had NO signal receiver at all before this fix, so without the
+        # new receiver persisting a new index month (what the daily cron's fetch_latest does) would
+        # leave the stale alert percentages cached until the 300s TTL. The alert payload derives
+        # ipca_12m / suggested values from the latest IPCAIndex, so a new index must drop it.
+        self.client.get(_ALERTS_URL)
+        assert cache.get(_ALERTS_KEY) is not None
+
+        baker.make(IPCAIndex)
+
+        assert cache.get(_ALERTS_KEY) is None
+
     def test_alerts_prefix_wired_in_cache_maps(self) -> None:
         # The invalidation must be wired through the P4.2 model->prefix map, not a hand-rolled
         # invalidate_pattern call. On the LocMem test cache invalidate_pattern clears everything,
-        # so a behavioural test alone can't prove the prefix is registered — assert it directly.
+        # so a behavioural test alone can't prove the prefix is registered (a Tenant write already
+        # clears every key via its other prefixes) — assert membership directly. Tenant carries the
+        # prefix because the alert card embeds lease.responsible_tenant.name; IPCAIndex because the
+        # suggested percentage derives from the latest index.
         assert _ALERTS_KEY in _PROPERTY_CACHE_PREFIXES
-        for model_name in ("Lease", "RentAdjustment", "Landlord"):
+        for model_name in ("Lease", "RentAdjustment", "Landlord", "Tenant", "IPCAIndex"):
             assert _ALERTS_KEY in _CORE_MODEL_CACHE_PREFIXES[model_name]

@@ -170,27 +170,27 @@ NEXT_PUBLIC_API_URL=http://localhost:8008/api
 # Using the backup script
 python scripts/backup_db.py
 
-# Output: backups/backup_condominio_20250113_120000.backup
+# Output: backups/backup_condominio_20250113_120000.sql
 ```
 
 ### Restoring from Backup
 
 ```bash
 # Using the restore script
-python scripts/restore_db.py backups/backup_condominio_20250113_120000.backup
+python scripts/restore_db.py backups/backup_condominio_20250113_120000.sql
 
-# Or manually with pg_restore
-pg_restore -d condominio -c backups/backup_condominio_20250113_120000.backup
+# Or manually with psql
+psql -h localhost -U postgres -d condominio < backups/backup_condominio_20250113_120000.sql
 ```
 
 ### Manual PostgreSQL Commands
 
 ```bash
-# Create backup
-pg_dump -Fc condominio > backup.backup
+# Create backup (plain SQL format)
+pg_dump -F p --no-owner --no-acl condominio > backup.sql
 
 # Restore backup
-pg_restore -d condominio -c backup.backup
+psql -d condominio < backup.sql
 
 # Create database from scratch
 createdb condominio
@@ -304,7 +304,7 @@ All resources support standard REST operations:
 | PATCH | `/api/{resource}/{id}/` | Partial update |
 | DELETE | `/api/{resource}/{id}/` | Delete |
 
-**Available Resources**: `buildings`, `apartments`, `tenants`, `leases`, `furnitures`, `dependents`
+**Available Resources**: `buildings`, `apartments`, `tenants`, `leases`, `furnitures`, `rent-adjustments`
 
 ### Special Endpoints
 

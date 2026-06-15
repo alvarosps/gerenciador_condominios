@@ -107,9 +107,7 @@ jobs:
       run: |
         mypy core/ condominios_manager/ finances/
 
-    - name: Install pyright
-      run: pip install pyright
-
+    # pyright is installed from requirements-dev.txt (pinned exact), not an ad-hoc unpinned install.
     - name: Type check with pyright
       run: pyright
 

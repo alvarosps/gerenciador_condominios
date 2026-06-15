@@ -11,6 +11,7 @@ import {
 } from '@/tests/mocks/data/finances';
 import { billSchema } from '@/lib/schemas/finances/bill.schema';
 import { billingAccountSchema } from '@/lib/schemas/finances/billing-account.schema';
+import { parsedInvoiceSchema } from '@/lib/schemas/finances/invoice-parse.schema';
 import { BillFormModal } from '../bill-form-modal';
 
 // Real hooks (useCreateBillWithLines / useUpdateBill / useUpdateBillWithLines) hit MSW; the
@@ -211,12 +212,14 @@ describe('BillFormModal', () => {
   it('shows the statement block on an imported electricity draft and sends the reading', async () => {
     setSourcesEmpty();
     const creates = spyCreate();
-    const draft = createMockParsedInvoice({
-      matched_account: billingAccountSchema.parse(
-        createMockBillingAccount({ id: 7, account_type: 'electricity' })
-      ),
-      statement: { consumo_kwh: 320, classe: 'Residencial', bandeira: 'Verde' },
-    });
+    const draft = parsedInvoiceSchema.parse(
+      createMockParsedInvoice({
+        matched_account: billingAccountSchema.parse(
+          createMockBillingAccount({ id: 7, account_type: 'electricity' })
+        ),
+        statement: { consumo_kwh: 320, classe: 'Residencial', bandeira: 'Verde' },
+      })
+    );
     const { queryClient } = renderWithProviders(
       <BillFormModal open draft={draft} onClose={() => undefined} />
     );
@@ -239,11 +242,13 @@ describe('BillFormModal', () => {
   it('drops the statement on a no-match draft (billing_account_id null) but still creates', async () => {
     setSourcesEmpty();
     const creates = spyCreate();
-    const draft = createMockParsedInvoice({
-      matched_account: null, // no-match: billing_account_id resolves to null
-      statement: { consumo_kwh: 99, classe: 'Residencial', bandeira: 'Verde' },
-      warnings: ['Nenhuma conta encontrada.'],
-    });
+    const draft = parsedInvoiceSchema.parse(
+      createMockParsedInvoice({
+        matched_account: null, // no-match: billing_account_id resolves to null
+        statement: { consumo_kwh: 99, classe: 'Residencial', bandeira: 'Verde' },
+        warnings: ['Nenhuma conta encontrada.'],
+      })
+    );
     const { queryClient } = renderWithProviders(
       <BillFormModal open draft={draft} onClose={() => undefined} />
     );

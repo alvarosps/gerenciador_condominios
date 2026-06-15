@@ -5,7 +5,7 @@ import type {
 } from '@/lib/api/hooks/use-combined-calendar';
 import { type billingAccountSchema } from '@/lib/schemas/finances/billing-account.schema';
 import { type billLineItemSchema, type billSchema } from '@/lib/schemas/finances/bill.schema';
-import type { ParsedInvoice } from '@/lib/schemas/finances/invoice-parse.schema';
+import { type parsedInvoiceSchema } from '@/lib/schemas/finances/invoice-parse.schema';
 import type { IptuAlertRow } from '@/lib/api/hooks/use-iptu-alerts';
 import type { BillSkip } from '@/lib/schemas/finances/bill-skip.schema';
 import { type financeCategorySchema } from '@/lib/schemas/finances/category.schema';
@@ -45,6 +45,9 @@ type ReserveRaw = z.input<typeof reserveSchema>;
 type ReserveMovementRaw = z.input<typeof reserveMovementSchema>;
 type IncomeEntryRaw = z.input<typeof incomeEntrySchema>;
 type CondoMonthCloseRaw = z.input<typeof condoMonthCloseSchema>;
+// The parse_invoice DRAFT (write prefill, not a read) — bill.building_id/category_id are inherited
+// from the matched account (S60) and belong here; the line amount is money_str -> a string.
+type ParsedInvoiceRaw = z.input<typeof parsedInvoiceSchema>;
 
 export function createMockFinanceCategory(
   overrides: Partial<FinanceCategoryRaw> = {}
@@ -128,7 +131,9 @@ export function createMockBill(overrides: Partial<BillRaw> = {}): BillRaw {
   };
 }
 
-export function createMockParsedInvoice(overrides: Partial<ParsedInvoice> = {}): ParsedInvoice {
+export function createMockParsedInvoice(
+  overrides: Partial<ParsedInvoiceRaw> = {}
+): ParsedInvoiceRaw {
   return {
     bill: {
       competence_month: '2026-06-01',
@@ -143,7 +148,7 @@ export function createMockParsedInvoice(overrides: Partial<ParsedInvoice> = {}):
     line_items: [
       {
         description: 'Consumo de energia',
-        amount: 350,
+        amount: '350.00',
         is_offset: false,
         category_id: null,
         installment_id: null,

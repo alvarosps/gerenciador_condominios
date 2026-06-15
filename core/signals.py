@@ -23,7 +23,11 @@ from django.db.models import Exists, OuterRef
 from django.db.models.signals import m2m_changed, post_delete, post_save
 from django.dispatch import receiver
 
-from .cache import CacheManager, invalidate_legacy_financial_caches
+from .cache import (
+    FINANCE_MODULE_CACHE_PREFIXES,
+    CacheManager,
+    invalidate_legacy_financial_caches,
+)
 from .models import (
     Apartment,
     Building,
@@ -37,6 +41,7 @@ from .models import (
     FinancialSettings,
     Furniture,
     Income,
+    IPCAIndex,
     Landlord,
     Lease,
     MonthSnapshot,
@@ -57,7 +62,7 @@ logger = logging.getLogger(__name__)
 # locked by tests/unit/test_finances/test_finance_cache_signals.py. Writes to
 # Apartment / Lease / RentAdjustment / MonthSnapshot / RentPayment / FinancialSettings
 # change condominium revenue, projection or close state, so they invalidate finance-*.
-_FINANCE_CACHE_PREFIXES = ("finance-dashboard", "finance-projection")
+_FINANCE_CACHE_PREFIXES = FINANCE_MODULE_CACHE_PREFIXES
 
 
 def _invalidate_finance_module_caches() -> None:
@@ -80,9 +85,13 @@ _PROPERTY_CACHE_PREFIXES = (
     "dashboard-late-payment",
     "dashboard-rent-adjustment-alerts",
     "cash-flow-projection",
+    # The legacy financial-dashboard overview/summary derive rent income from Lease via
+    # CashFlowService, so a property/rent write (Building/Apartment/Lease) must drop it too.
+    "financial-dashboard",
 )
-# The rent-adjustment alert payload depends on Lease, RentAdjustment and the Landlord
-# fallback percentage, so each of those writes must drop "dashboard-rent-adjustment-alerts".
+# The rent-adjustment alert payload depends on Lease, RentAdjustment, the Landlord fallback
+# percentage, and the latest IPCAIndex, so each of those writes must drop
+# "dashboard-rent-adjustment-alerts".
 _RENT_ADJUSTMENT_ALERTS_PREFIXES = ("dashboard-rent-adjustment-alerts",)
 _CORE_MODEL_CACHE_PREFIXES: dict[str, tuple[str, ...]] = {
     "Building": _PROPERTY_CACHE_PREFIXES,
@@ -93,11 +102,15 @@ _CORE_MODEL_CACHE_PREFIXES: dict[str, tuple[str, ...]] = {
         "dashboard-lease-metrics",
         "dashboard-tenant-stats",
         "dashboard-late-payment",
+        # The rent-adjustment alert card embeds lease.responsible_tenant.name, so a tenant
+        # rename must drop it.
+        "dashboard-rent-adjustment-alerts",
     ),
     "Furniture": ("dashboard-financial-summary", "dashboard-lease-metrics"),
     "Dependent": ("dashboard-tenant-stats",),
     "RentAdjustment": _RENT_ADJUSTMENT_ALERTS_PREFIXES,
     "Landlord": _RENT_ADJUSTMENT_ALERTS_PREFIXES,
+    "IPCAIndex": _RENT_ADJUSTMENT_ALERTS_PREFIXES,
 }
 
 
@@ -504,6 +517,23 @@ def invalidate_landlord_cache_on_delete(
     sender: type[Landlord], instance: Landlord, **kwargs: Any
 ) -> None:
     _invalidate_core_model_caches("Landlord")
+
+
+@receiver(post_save, sender=IPCAIndex)
+def invalidate_ipca_index_cache_on_save(
+    sender: type[IPCAIndex], instance: IPCAIndex, **kwargs: Any
+) -> None:
+    """The rent-adjustment alert payload derives ipca_12m / suggested values from the latest
+    IPCAIndex, so the daily cron persisting a new index month must drop the alerts cache (it is
+    otherwise stale until the 300s TTL or an unrelated Lease/RentAdjustment/Landlord write)."""
+    _invalidate_core_model_caches("IPCAIndex")
+
+
+@receiver(post_delete, sender=IPCAIndex)
+def invalidate_ipca_index_cache_on_delete(
+    sender: type[IPCAIndex], instance: IPCAIndex, **kwargs: Any
+) -> None:
+    _invalidate_core_model_caches("IPCAIndex")
 
 
 @receiver(post_save, sender=MonthSnapshot)

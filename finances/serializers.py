@@ -8,6 +8,7 @@ value is defensive and mypy/ruff stay clean) — never recomputed in Python (des
 
 from datetime import date
 from decimal import Decimal
+from typing import cast
 
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Sum
@@ -130,7 +131,7 @@ class CategorySerializer(serializers.ModelSerializer):
 class BillingAccountSerializer(serializers.ModelSerializer):
     condominium = CondominiumSimpleSerializer(read_only=True)
     condominium_id = serializers.PrimaryKeyRelatedField(
-        queryset=Condominium.objects.all(), source="condominium", write_only=True
+        queryset=Condominium.objects.all(), source="condominium", write_only=True, required=False
     )
     building = BuildingSerializer(read_only=True)
     building_id = serializers.PrimaryKeyRelatedField(
@@ -186,6 +187,9 @@ class BillingAccountSerializer(serializers.ModelSerializer):
         """Mirror BillingAccount.clean(): a typed account (water/power/IPTU) needs an
         inscrição/UC. Resolve account_type/external_identifier from the payload with a fallback
         to the existing instance (so a PATCH that only sets account_type is also caught)."""
+        # The billing-account form never sends condominium_id (singleton), so default it on create
+        # — consistent with the other condo-scoped serializers (Category/Bill/Reserve/...).
+        _apply_default_condominium(self.instance, attrs)
         account_type = attrs.get("account_type")
         if account_type is None and self.instance is not None:
             account_type = self.instance.account_type
@@ -437,7 +441,7 @@ class PaymentAllocationSerializer(serializers.ModelSerializer):
 class PaymentSerializer(serializers.ModelSerializer):
     condominium = CondominiumSimpleSerializer(read_only=True)
     condominium_id = serializers.PrimaryKeyRelatedField(
-        queryset=Condominium.objects.all(), source="condominium", write_only=True
+        queryset=Condominium.objects.all(), source="condominium", write_only=True, required=False
     )
     allocations = PaymentAllocationSerializer(many=True, read_only=True)
 
@@ -462,6 +466,13 @@ class PaymentSerializer(serializers.ModelSerializer):
         # Σ(allocation) from amount and create a reserve ghost (§4.8), so they are read-only — a
         # payment's value/funding only changes via unpay() + pay().
         read_only_fields = ["id", "amount", "funded_from", "created_at", "updated_at"]
+
+    def validate(self, attrs: dict[str, object]) -> dict[str, object]:
+        # The singleton condominium has no client-side selector, so an edit that omits
+        # condominium_id keeps the existing one (on the never-reached create path it would default
+        # to the singleton) — consistent with the other condo-scoped serializers.
+        _apply_default_condominium(self.instance, attrs)
+        return attrs
 
 
 class InstallmentSerializer(serializers.ModelSerializer):
@@ -616,8 +627,13 @@ class EmployeeSerializer(serializers.ModelSerializer):
         # returns a clean 400 instead of accepting an invalid record (or a 500 on the
         # negative-salary CheckConstraint). Single source of the rules is the model.
         payment_type = attrs.get("payment_type", getattr(self.instance, "payment_type", None))
-        raw_salary = attrs.get("base_salary", getattr(self.instance, "base_salary", None))
-        base_salary = raw_salary if isinstance(raw_salary, Decimal) else None
+        # DRF's DecimalField has already coerced base_salary to Decimal | None by validate(); the
+        # attrs dict is typed object, so narrow explicitly rather than via a lossy isinstance-else-
+        # None fallback (which would silently reclassify any unexpected value as "no salary").
+        base_salary = cast(
+            "Decimal | None",
+            attrs.get("base_salary", getattr(self.instance, "base_salary", None)),
+        )
         if base_salary is not None and base_salary < 0:
             raise serializers.ValidationError({"base_salary": _ERR_BASE_SALARY_NEGATIVE})
         needs_base = payment_type in (EmployeePaymentType.FIXED, EmployeePaymentType.MIXED)
