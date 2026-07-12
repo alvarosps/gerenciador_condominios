@@ -4,14 +4,27 @@ from datetime import date
 from decimal import Decimal
 
 import pytest
+from django.core.exceptions import ValidationError
 from freezegun import freeze_time
 
 from core.services.timezone import today_sp
 from finances.models import Bill, BillBehavior, BillingAccountState
 from finances.services.bill_generation_service import BillGenerationService
+from finances.services.condo_month_close_service import CondoMonthCloseService
 from tests.factories import make_bill_skip, make_billing_account, make_condominium
 
 pytestmark = pytest.mark.django_db
+
+
+# --- B8c: generation must refuse a closed competence month ---
+
+
+def test_ensure_month_bills_rejects_closed_competence_month() -> None:
+    make_billing_account(expected_amount=Decimal("600.00"))
+    CondoMonthCloseService.close(2026, 6)
+    with pytest.raises(ValidationError):
+        BillGenerationService.ensure_month_bills(2026, 6)
+    assert Bill.objects.filter(competence_month=date(2026, 6, 1)).count() == 0
 
 
 def test_due_date_for_clamps() -> None:

@@ -20,6 +20,7 @@ from finances.models import (
 )
 from finances.services.bill_payment_service import BillPaymentService
 from finances.services.condo_balance_service import CondoBalanceService
+from finances.services.condo_month_close_service import CondoMonthCloseService
 from tests.factories import make_bill, make_bill_line_item, make_reserve, make_reserve_movement
 
 pytestmark = pytest.mark.django_db
@@ -183,6 +184,36 @@ def test_pay_accepts_active_bill() -> None:
     payment = BillPaymentService.pay(bill, PAY_DATE)
     assert payment.amount == Decimal("300.00")
     assert _amounts(bill).payment_status == "paid"
+
+
+# --- B3: the CASH month (payment_date) must also be open, not just competence_month ---
+
+
+def test_pay_rejects_closed_cash_month_even_when_competence_open() -> None:
+    """Bill.competence_month=2026-06 (open); payment_date=2026-05 (closed) must still be rejected."""
+    bill = _bill_with_total("300.00")  # competence_month defaults to 2026-06-01, open
+    CondoMonthCloseService.close(2026, 5)
+    before = Payment.objects.count()
+    with pytest.raises(ValidationError):
+        BillPaymentService.pay(bill, date(2026, 5, 20))
+    assert Payment.objects.count() == before
+
+
+def test_unpay_rejects_closed_cash_month_even_when_competence_open() -> None:
+    """A payment made in an open cash month, later closed, cannot be reversed anymore."""
+    bill = _bill_with_total("300.00")
+    payment = BillPaymentService.pay(bill, date(2026, 5, 20))
+    CondoMonthCloseService.close(2026, 5)
+    with pytest.raises(ValidationError):
+        BillPaymentService.unpay(payment)
+    assert Payment.objects.filter(pk=payment.pk).exists()
+
+
+def test_bulk_pay_rejects_closed_cash_month() -> None:
+    bill = _bill_with_total("300.00")
+    CondoMonthCloseService.close(2026, 5)
+    with pytest.raises(ValidationError):
+        BillPaymentService.pay(bill, date(2026, 5, 20))
 
 
 # --- ReserveMovement.payment FK: deterministic link (P2.3 step 10) ---

@@ -131,16 +131,30 @@ class CondoBalanceService:
     def cash_balance(as_of_month: date | None = None, building_id: int | None = None) -> Decimal:
         """Condo-scoped cash at the first instant of ``as_of_month`` (= end of the prior month).
 
-        baseline = cash_balance_end of the last 'closed' CondoMonthClose before as_of_month, else
-        FinancialSettings.initial_balance (if initial_balance_date <= as_of_month), else 0.00.
-        Only the open tail [month after the last closed .. as_of_month) is re-walked, summing
-        cash_change_of_month (mirrors DailyControlService._get_starting_balance but condo-scoped).
+        Condo-wide (``building_id`` None): baseline = cash_balance_end of the last 'closed'
+        CondoMonthClose before as_of_month, else FinancialSettings.initial_balance (if
+        initial_balance_date <= as_of_month), else 0.00. Only the open tail [month after the
+        last closed .. as_of_month) is re-walked, summing cash_change_of_month (mirrors
+        DailyControlService._get_starting_balance but condo-scoped).
+
+        Per-building (``building_id`` set, B10c): CondoMonthClose/FinancialSettings are
+        CONDO-WIDE baselines that were never attributable to one building — anchoring on them
+        here would mix a condo-wide figure into a building-filtered one. Instead the whole
+        balance is computed LIVE, walking every month from the building's earliest activity
+        (its earliest Bill.competence_month or IncomeEntry date) up to as_of_month, baseline 0.00.
+
         as_of_month None = current SP month. Cash MAY go negative (informational, not blocked).
         """
         if as_of_month is None:
             as_of_month = current_month_sp()
         as_of_month = as_of_month.replace(day=1)
-        baseline, walk_from = CondoBalanceService._cash_baseline(as_of_month)
+        if building_id is not None:
+            baseline, walk_from = (
+                ZERO_MONEY,
+                CondoBalanceService._earliest_activity_month(building_id, as_of_month),
+            )
+        else:
+            baseline, walk_from = CondoBalanceService._cash_baseline(as_of_month)
         total = baseline
         cursor = walk_from
         while cursor < as_of_month:
@@ -375,6 +389,32 @@ class CondoBalanceService:
         ):
             return settings.initial_balance, settings.initial_balance_date.replace(day=1)
         return ZERO_MONEY, as_of_month
+
+    @staticmethod
+    def _earliest_activity_month(building_id: int, as_of_month: date) -> date:
+        """First month to walk for a building-filtered live cash_balance (B10c, baseline 0.00).
+
+        min(earliest Bill.competence_month, earliest IncomeEntry.income_date/received_date) of
+        this building, capped at as_of_month. No activity at all -> as_of_month (no walk, 0.00).
+        """
+        earliest_bill = (
+            Bill.objects.filter(building_id=building_id)
+            .order_by("competence_month")
+            .values_list("competence_month", flat=True)
+            .first()
+        )
+        earliest_income = (
+            IncomeEntry.objects.filter(building_id=building_id)
+            .order_by("income_date")
+            .values_list("income_date", flat=True)
+            .first()
+        )
+        candidates = [
+            month.replace(day=1) for month in (earliest_bill, earliest_income) if month is not None
+        ]
+        if not candidates:
+            return as_of_month
+        return min(*candidates, as_of_month)
 
     @staticmethod
     def _wedge_residual(

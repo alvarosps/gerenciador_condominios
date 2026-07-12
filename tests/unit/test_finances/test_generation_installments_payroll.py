@@ -9,6 +9,7 @@ from freezegun import freeze_time
 from core.services.rent_schedule_service import RentScheduleService
 from finances.models import Bill, BillBehavior, BillingAccountState, InstallmentPlanState
 from finances.services.bill_generation_service import BillGenerationService
+from finances.services.bill_service import BillService
 from tests.factories import (
     make_bill_skip,
     make_billing_account,
@@ -191,6 +192,38 @@ def test_materialized_plan_does_not_regenerate_installment_bills() -> None:
 
     BillGenerationService.ensure_month_bills(2026, 2)  # second run must not duplicate
     assert Bill.all_objects.filter(installment__plan=plan).count() == first_count
+
+
+# --- B8d: deleting the Bill hosting a materialized embedded parcela reverts the plan ---
+
+
+def test_delete_bill_with_embedded_parcela_reverts_plan_and_allows_regeneration() -> None:
+    account = make_billing_account(expected_amount=Decimal("600.00"))
+    plan = make_installment_plan(
+        condominium=account.condominium,
+        embedded=True,
+        billing_account=account,
+        installment_count=1,
+    )
+    inst = make_installment(
+        plan=plan, number=1, due_date=date(2026, 6, 10), amount=Decimal("400.00")
+    )
+
+    BillGenerationService.ensure_month_bills(2026, 6)
+    plan.refresh_from_db()
+    assert plan.lifecycle_state == InstallmentPlanState.MATERIALIZED
+    bill = Bill.objects.get(billing_account=account, competence_month=date(2026, 6, 1))
+
+    BillService.delete(bill)
+
+    plan.refresh_from_db()
+    assert plan.lifecycle_state == InstallmentPlanState.ACTIVE
+    assert not bill.line_items.filter(installment=inst).exists()
+
+    # generation can now recreate the parcela line for the same month
+    BillGenerationService.ensure_month_bills(2026, 6)
+    regenerated = Bill.objects.get(billing_account=account, competence_month=date(2026, 6, 1))
+    assert regenerated.line_items.filter(installment=inst).exists()
 
 
 # --- payroll ---

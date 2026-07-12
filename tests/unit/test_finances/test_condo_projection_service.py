@@ -184,6 +184,50 @@ def test_projected_expenses_matches_generated_bill_totals() -> None:
     assert projected == generated == Decimal("1250.00")
 
 
+# --- B10d: a future month with a REAL materialized Bill must use that Bill's total, not the
+# recurring account's expected_amount (which may have since drifted from what was actually billed)
+
+
+def test_projected_expenses_uses_real_bill_total_over_expected_amount() -> None:
+    account = make_billing_account(expected_amount=Decimal("600.00"), default_due_day=10)
+    # A real invoice for July already exists (e.g. imported ahead of time) at a DIFFERENT amount
+    # than the account's current expected_amount — the real figure must win.
+    bill = make_bill(
+        condominium=account.condominium,
+        billing_account=account,
+        competence_month=date(2026, 7, 1),
+        due_date=date(2026, 7, 10),
+        behavior="recurring",
+        lifecycle_state=BillLifecycleState.ACTIVE,
+    )
+    make_bill_line_item(bill=bill, amount=Decimal("725.50"))
+    assert CondoProjectionService._projected_expenses(2026, 7) == Decimal("725.50")
+
+
+def test_projected_expenses_uses_expected_amount_when_no_real_bill_yet() -> None:
+    make_billing_account(expected_amount=Decimal("600.00"), default_due_day=10)
+    # No real Bill materialized yet for July -> falls back to the recurring expected_amount.
+    assert CondoProjectionService._projected_expenses(2026, 7) == Decimal("600.00")
+
+
+def test_projected_expenses_standalone_installment_uses_real_bill_total() -> None:
+    plan = make_installment_plan(embedded=False, installment_count=1)
+    installment = make_installment(
+        plan=plan, number=1, due_date=date(2026, 7, 15), amount=Decimal("250.00")
+    )
+    # The real materialized Bill's line was edited to 300.00 after generation (e.g. a correction).
+    bill = make_bill(
+        condominium=plan.condominium,
+        installment=installment,
+        competence_month=date(2026, 7, 1),
+        due_date=date(2026, 7, 15),
+        behavior="installment",
+        lifecycle_state=BillLifecycleState.ACTIVE,
+    )
+    make_bill_line_item(bill=bill, amount=Decimal("300.00"))
+    assert CondoProjectionService._projected_expenses(2026, 7) == Decimal("300.00")
+
+
 def test_projected_expenses_respects_end_date() -> None:
     make_billing_account(expected_amount=Decimal("100.00"), end_date=date(2026, 6, 30))  # ended
     make_billing_account(

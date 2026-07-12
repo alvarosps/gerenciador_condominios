@@ -36,6 +36,8 @@ from finances.models import (
     Category,
     ElectricityBillStatement,
     Installment,
+    InstallmentPlan,
+    InstallmentPlanState,
     WaterBillStatement,
 )
 from finances.services.condo_month_close_service import CondoMonthCloseService
@@ -56,6 +58,20 @@ _STATEMENT_MODEL_BY_TYPE: dict[str, type[WaterBillStatement | ElectricityBillSta
     BillingAccountType.WATER: WaterBillStatement,
     BillingAccountType.ELECTRICITY: ElectricityBillStatement,
 }
+
+
+def assert_not_paid(bill: Bill) -> None:
+    """Reject (PT) when the bill has a live payment (total OR partial).
+
+    payment_status is read from with_amounts (never summed in Python) — 'open' is the only
+    state with no live PaymentAllocation. Shared by update_with_lines, delete (B4) and
+    BillLifecycleService.set_state (B4): a paid Bill mutated/deleted/suspended/canceled would
+    leave its Payment/allocation/ReserveMovement live in the cash flow with no expense behind
+    them — unpay is required first (design §4.4).
+    """
+    annotated = Bill.objects.with_amounts(today_sp()).get(pk=bill.pk)
+    if str(getattr(annotated, "payment_status", "open")) != "open":
+        raise ValidationError(_ERR_BILL_PAID)
 
 
 class BillLineInput(TypedDict):
@@ -279,9 +295,7 @@ class BillService:
         are soft-deleted (audit history kept); with_amounts ignores soft-deleted lines. Raises (PT)
         when paid or month closed.
         """
-        annotated = Bill.objects.with_amounts(today_sp()).get(pk=bill.pk)
-        if str(getattr(annotated, "payment_status", "open")) != "open":
-            raise ValidationError(_ERR_BILL_PAID)
+        assert_not_paid(bill)
         CondoMonthCloseService.assert_open(bill.competence_month)
         with transaction.atomic():
             if header is not None:
@@ -312,12 +326,40 @@ class BillService:
 
         SoftDeleteMixin.delete() only touches the record itself (it does not walk the reverse
         OneToOne), so the statement is soft-deleted explicitly here (design §7.3). Rejected
-        (PT 400) when the competence month is closed — deleting a frozen-month bill would change
-        that month's frozen result (design §4.7).
+        (PT 400) when the bill has a live payment (B4 — unpay first) or the competence month is
+        closed — deleting a frozen-month bill would change that month's frozen result (design §4.7).
+
+        B8d: a Bill materialized from an Installment (standalone: bill.installment; embedded: a
+        BillLineItem.installment on this bill) orphans that parcela forever otherwise — generation
+        never revisits an installment whose plan is MATERIALIZED. Deleting the bill therefore also
+        soft-deletes the embedded line(s) and reverts the plan to ACTIVE, so ensure_month_bills can
+        materialize the parcela again.
         """
+        assert_not_paid(bill)
         CondoMonthCloseService.assert_open(bill.competence_month)
         with transaction.atomic():
             for live_model in (WaterBillStatement, ElectricityBillStatement):
                 for statement in live_model.objects.filter(bill=bill):
                     statement.delete(deleted_by=user)
+            BillService._revert_installment_materialization(bill, user)
             bill.delete(deleted_by=user)
+
+    @staticmethod
+    def _revert_installment_materialization(bill: Bill, user: User | None) -> None:
+        """Soft-delete embedded parcela line(s) + revert their plan(s) MATERIALIZED -> ACTIVE."""
+        plan_ids: set[int] = set()
+        if bill.installment is not None:
+            plan_ids.add(bill.installment.plan_id)
+        embedded_lines = BillLineItem.objects.filter(bill=bill, installment__isnull=False)
+        for line in embedded_lines:
+            installment = line.installment
+            if installment is not None:
+                plan_ids.add(installment.plan_id)
+            line.delete(deleted_by=user)
+        for plan in InstallmentPlan.objects.filter(
+            pk__in=plan_ids, lifecycle_state=InstallmentPlanState.MATERIALIZED
+        ):
+            plan.lifecycle_state = InstallmentPlanState.ACTIVE
+            plan.updated_by = user
+            # AuditMixin.save appends updated_at to update_fields automatically.
+            plan.save(update_fields=["lifecycle_state", "updated_by"])

@@ -236,8 +236,11 @@ class BillQuerySet(models.QuerySet["Bill"]):
             ).values("total"),
             output_field=_MONEY,
         )
+        # payment__is_deleted=False: a soft-deleted Payment's allocation must not count (the
+        # forward FK join does not apply Payment's default manager) — symmetric to
+        # CondoBalanceService._caixa_outflow (B10b).
         paid_subquery = Subquery(
-            PaymentAllocation.objects.filter(bill=OuterRef("pk"))
+            PaymentAllocation.objects.filter(bill=OuterRef("pk"), payment__is_deleted=False)
             .values("bill")
             .annotate(paid=Coalesce(Sum("amount"), _ZERO_MONEY))
             .values("paid"),

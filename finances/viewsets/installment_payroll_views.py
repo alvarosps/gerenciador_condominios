@@ -16,6 +16,7 @@ from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.request import Request
 from rest_framework.response import Response
+from rest_framework.serializers import BaseSerializer
 
 from core.pagination import CustomPageNumberPagination
 from core.permissions import IsAdminUser
@@ -33,6 +34,14 @@ class InstallmentPlanViewSet(viewsets.ModelViewSet):
     serializer_class = InstallmentPlanSerializer
     permission_classes = [IsAdminUser]
     pagination_class = CustomPageNumberPagination
+
+    def perform_create(self, serializer: BaseSerializer[InstallmentPlan]) -> None:
+        # Business logic (materializing the schedule) lives in the service, never the viewset —
+        # every other creation path (convert_deferred, seed) materializes installments too (B5).
+        serializer.save()
+        plan = serializer.instance
+        if isinstance(plan, InstallmentPlan):
+            InstallmentPlanService.materialize_schedule(plan, user=cast(User, self.request.user))
 
     def get_queryset(self) -> QuerySet[InstallmentPlan]:
         queryset = InstallmentPlan.objects.select_related(

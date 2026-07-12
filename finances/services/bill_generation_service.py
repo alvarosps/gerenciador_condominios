@@ -33,6 +33,7 @@ from finances.models import (
     InstallmentPlan,
     InstallmentPlanState,
 )
+from finances.services.condo_month_close_service import CondoMonthCloseService
 
 logger = logging.getLogger(__name__)
 
@@ -84,8 +85,12 @@ class BillGenerationService:
         tolerance). Deterministic order: (1) recurring + seed, (2) embedded installments
         (a line on the recurring Bill from step 1), (3) standalone installments (own Bill),
         (4) payroll. Then mark fully-materialized plans as MATERIALIZED. Returns the ensured bills.
+
+        Rejected (PT 400) when the target competence month is closed (B8c) — generating bills
+        into a frozen month would change that month's frozen expense_competence (design §4.7).
         """
         month_start = date(year, month, 1)
+        CondoMonthCloseService.assert_open(month_start)
         bills: list[Bill] = []
         # (1) recurring accounts + seed line (S37). recurring_for_generation() applies the
         # ACTIVE filter and excludes IPTU (registry-only — design §10.3); is_account_eligible

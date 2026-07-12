@@ -28,9 +28,11 @@ from typing import Any
 from django.db.models import Sum
 
 from core.services.rent_schedule_service import RentScheduleService
-from core.services.timezone import current_month_sp
+from core.services.timezone import current_month_sp, today_sp
 from finances.models import (
+    Bill,
     BillingAccount,
+    BillLifecycleState,
     BillSkip,
     CondoMonthClose,
     CondoMonthCloseStatus,
@@ -178,12 +180,16 @@ class CondoProjectionService:
     ) -> Decimal:
         """Projected expenses (raw Decimal) of a future month (design §3.2/§7/§8 — embedded dedup).
 
-        Σ expected_amount of eligible recurring accounts (the SAME eligibility predicate as
-        BillGenerationService — active, within tracking_start_month..end_date, not skipped) +
-        Σ Installment.amount of every active plan's installment due in the month (embedded AND
-        standalone — the embedded parcela rides on top of the account's consumo, never doubled) +
-        projected payroll (condo level — only in the condo-wide view). ``building_id`` scopes to a
-        building; the condo-level (building=null) items enter only when ``building_id`` is None.
+        For each eligible recurring account (the SAME predicate as BillGenerationService — active,
+        within tracking_start_month..end_date, not skipped): the REAL materialized Bill's
+        amount_total when one already exists for (account, month) — it already carries any
+        embedded parcela line, so nothing is added on top — else the projected expected_amount +
+        the projected embedded parcela (Installment.amount) added separately (B10d — a future
+        month can already have a real Bill, e.g. imported ahead of time or edited after
+        generation; using expected_amount then would silently diverge from what will actually be
+        billed). Standalone parcelas mirror the same real-Bill-wins rule. Plus projected payroll
+        (condo level — only in the condo-wide view). ``building_id`` scopes to a building; the
+        condo-level (building=null) items enter only when ``building_id`` is None.
 
         ``skip_index`` (preloaded by :meth:`project` over the whole horizon) lets both eligibility
         loops check skips in memory instead of one BillSkip.exists() per (account, month) — P5.1.
@@ -197,16 +203,25 @@ class CondoProjectionService:
         accounts = BillingAccount.objects.recurring_for_generation()
         if building_id is not None:
             accounts = accounts.filter(building_id=building_id)
+        real_totals_by_account = CondoProjectionService._real_bill_totals(
+            year, month, "billing_account_id", building_id=building_id
+        )
         for account in accounts:
-            if BillGenerationService.is_account_eligible(
+            if not BillGenerationService.is_account_eligible(
                 account, reference_month, skip_index=skip_index
             ):
-                total += account.expected_amount
+                continue
+            real_total = real_totals_by_account.get(account.pk)
+            # The real Bill already carries any embedded parcela line — use it whole, on its own
+            # (the embedded loop below skips any installment whose host Bill already materialized).
+            total += real_total if real_total is not None else account.expected_amount
 
         # Standalone parcelas always count when active+due; embedded parcelas count ONLY when their
         # host recurring account is eligible that month (they ride on its bill — design §7/§8/§18),
         # mirroring BillGenerationService._generate_embedded_lines so projection never diverges from
-        # generation.
+        # generation. Real-Bill-wins (B10d): an installment whose Bill/line is already materialized
+        # contributes via the real total above (standalone: its own Bill; embedded: the host
+        # account's Bill) instead of the projected schedule amount.
         standalone = Installment.objects.filter(
             due_date__year=year,
             due_date__month=month,
@@ -216,7 +231,17 @@ class CondoProjectionService:
         )
         if building_id is not None:
             standalone = standalone.filter(plan__building_id=building_id)
-        total += standalone.aggregate(total=Sum("amount"))["total"] or ZERO
+        materialized_standalone_ids = set(
+            Bill.objects.filter(installment__in=standalone).values_list("installment_id", flat=True)
+        )
+        real_totals_by_installment = CondoProjectionService._real_bill_totals(
+            year, month, "installment_id", building_id=building_id
+        )
+        for installment in standalone:
+            if installment.pk in materialized_standalone_ids:
+                total += real_totals_by_installment.get(installment.pk, ZERO)
+            else:
+                total += installment.amount
 
         embedded = Installment.objects.filter(
             due_date__year=year,
@@ -229,14 +254,42 @@ class CondoProjectionService:
             embedded = embedded.filter(plan__building_id=building_id)
         for installment in embedded:
             host_account = installment.plan.billing_account
-            if host_account is not None and BillGenerationService.is_account_eligible(
+            if host_account is None or not BillGenerationService.is_account_eligible(
                 host_account, reference_month, skip_index=skip_index
             ):
-                total += installment.amount
+                continue
+            # Already counted via the host account's real Bill total above — skip to avoid
+            # double-counting (the real Bill's amount_total already includes this line).
+            if host_account.pk in real_totals_by_account:
+                continue
+            total += installment.amount
 
         if building_id is None:
             total += CondoProjectionService._projected_payroll(reference_month)
         return total
+
+    @staticmethod
+    def _real_bill_totals(
+        year: int, month: int, source_fk: str, *, building_id: int | None
+    ) -> dict[int, Decimal]:
+        """{source_fk value: amount_total} of every real, active Bill in (year, month) — B10d.
+
+        ``source_fk`` is 'billing_account_id' or 'installment_id' (the Bill FK that ties it back
+        to its projected source). Only ACTIVE bills count (a canceled/suspended/deferred one is
+        excluded from every other sum too — design §4.4), read via with_amounts (never summed in
+        Python).
+        """
+        month_start = date(year, month, 1)
+        lookup: dict[str, object] = {f"{source_fk}__isnull": False}
+        queryset = Bill.objects.with_amounts(today_sp()).filter(
+            competence_month=month_start, lifecycle_state=BillLifecycleState.ACTIVE, **lookup
+        )
+        if building_id is not None:
+            queryset = queryset.filter(building_id=building_id)
+        return {
+            row[source_fk]: row["amount_total"]
+            for row in queryset.values(source_fk, "amount_total")
+        }
 
     @staticmethod
     def _projected_payroll(reference_month: date) -> Decimal:

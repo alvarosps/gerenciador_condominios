@@ -169,6 +169,27 @@ def test_reserve_balance_never_negative_via_guard() -> None:
     assert CondoBalanceService.reserve_balance() == Decimal("100.00")  # unchanged
 
 
+# --- B10a: withdraw must guard the TARGET reserve's own balance, not the condo-wide aggregate ---
+
+
+@freeze_time("2026-06-15")
+def test_withdraw_guards_target_reserve_balance_with_two_reserves() -> None:
+    reserve_a = make_reserve(name="Reserva A")
+    condo = reserve_a.condominium
+    reserve_b = make_reserve(name="Reserva B", condominium=condo)
+    # A has 1000, B has 50 — the condo-wide aggregate is 1050, enough to mask B going negative.
+    make_reserve_movement(
+        reserve=reserve_a, kind="deposit", amount=Decimal("1000.00"), movement_date=JUNE
+    )
+    make_reserve_movement(
+        reserve=reserve_b, kind="deposit", amount=Decimal("50.00"), movement_date=JUNE
+    )
+    with pytest.raises(ValidationError):
+        ReserveService.withdraw(reserve_b, Decimal("100.00"), JUNE)  # B only has 50
+    # Reserve A's balance must be untouched and the withdrawal must not have persisted.
+    assert CondoBalanceService.reserve_balance(condo.id) == Decimal("1050.00")
+
+
 @freeze_time("2026-06-15")
 def test_cash_balance_baseline_from_financial_settings() -> None:
     FinancialSettings.objects.create(
@@ -320,6 +341,38 @@ def test_building_scoped_figures() -> None:
     assert overview["reserve_balance"] is None
     assert overview["total_balance"] is None
     assert overview["cash_change_of_month"] == "-80.00"  # building-scoped figures still present
+
+
+# --- B10c: a per-building view must compute cash LIVE from filtered transactions only —
+# never anchored on the condo-wide CondoMonthClose/FinancialSettings baseline ---
+
+
+@freeze_time("2026-06-15")
+def test_building_scoped_cash_balance_ignores_condo_wide_baseline() -> None:
+    # A condo-wide initial balance (e.g. from a shared bank account) must NOT leak into a
+    # per-building view — that baseline was never attributable to this specific building.
+    FinancialSettings.objects.create(
+        pk=1, initial_balance=Decimal("50000.00"), initial_balance_date=date(2026, 1, 1)
+    )
+    building = make_building(street_number=next(_street_numbers))
+    bill = _active_bill_with_amount("80.00", building=building)
+    BillPaymentService.pay(bill, date(2026, 6, 7), Decimal("80.00"), FundedFrom.CAIXA)
+    # This building's own cash change is -80; the condo-wide 50000 baseline must be excluded.
+    assert CondoBalanceService.cash_balance(date(2026, 7, 1), building.id) == Decimal("-80.00")
+
+
+@freeze_time("2026-06-15")
+def test_building_scoped_cash_balance_walks_only_filtered_months() -> None:
+    FinancialSettings.objects.create(
+        pk=1, initial_balance=Decimal("5000.00"), initial_balance_date=date(2026, 5, 1)
+    )
+    building = make_building(street_number=next(_street_numbers))
+    CondoMonthCloseService.close(2026, 5)  # condo-wide close freezes cash_balance_end = 5000
+    bill = _active_bill_with_amount("100.00", building=building)
+    BillPaymentService.pay(bill, date(2026, 6, 7), Decimal("100.00"), FundedFrom.CAIXA)
+    # The building has no activity before June — its live-filtered balance is -100, not
+    # 5000 (condo-wide close baseline) - 100.
+    assert CondoBalanceService.cash_balance(date(2026, 7, 1), building.id) == Decimal("-100.00")
 
 
 @freeze_time("2026-06-15")

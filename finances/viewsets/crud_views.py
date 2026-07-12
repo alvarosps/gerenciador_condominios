@@ -730,20 +730,57 @@ class IncomeEntryViewSet(viewsets.ModelViewSet):
         serializer.save()
 
     def perform_update(self, serializer: BaseSerializer[IncomeEntry]) -> None:
+        # B8b: guard BOTH the new AND the old dates — moving an income OUT of a closed month
+        # (competence or cash) corrupts that month's frozen close exactly like moving one in.
+        self._assert_income_month_open(serializer, instance=serializer.instance)
         self._assert_income_month_open(serializer)
         serializer.save()
 
-    @staticmethod
-    def _assert_income_month_open(serializer: BaseSerializer[IncomeEntry]) -> None:
-        """Reject the write when the income's competence month (income_date) is closed.
+    def perform_destroy(self, instance: IncomeEntry) -> None:
+        # B8a: deleting an income in a closed competence OR cash month changes that month's
+        # frozen income_competence/income_cash — the default ModelViewSet.destroy had no guard.
+        CondoMonthCloseService.assert_open(instance.income_date.replace(day=1))
+        if instance.is_received and instance.received_date is not None:
+            CondoMonthCloseService.assert_open(instance.received_date.replace(day=1))
+        instance.delete()
 
-        On a PATCH that omits income_date, the existing instance's date is the competence to guard.
+    @staticmethod
+    def _assert_income_month_open(
+        serializer: BaseSerializer[IncomeEntry], *, instance: IncomeEntry | None = None
+    ) -> None:
+        """Reject the write when the income's competence (income_date) OR cash (received_date,
+        when is_received) month is closed.
+
+        ``instance=None`` (the default) reads the NEW values (validated_data, falling back to the
+        existing instance for an omitted PATCH field) — the create/update-in path. Passing the
+        existing instance explicitly (B8b) reads the OLD values instead, so perform_update can
+        guard the record's current dates too, before they are overwritten.
         """
-        instance = serializer.instance
-        existing = instance.income_date if isinstance(instance, IncomeEntry) else None
-        income_date = cast("date | None", serializer.validated_data.get("income_date", existing))
+        existing = instance if instance is not None else serializer.instance
+        existing_income_date = existing.income_date if isinstance(existing, IncomeEntry) else None
+        existing_is_received = existing.is_received if isinstance(existing, IncomeEntry) else False
+        existing_received_date = (
+            existing.received_date if isinstance(existing, IncomeEntry) else None
+        )
+        if instance is not None:
+            income_date = existing_income_date
+            is_received = existing_is_received
+            received_date = existing_received_date
+        else:
+            income_date = cast(
+                "date | None", serializer.validated_data.get("income_date", existing_income_date)
+            )
+            is_received = cast(
+                bool, serializer.validated_data.get("is_received", existing_is_received)
+            )
+            received_date = cast(
+                "date | None",
+                serializer.validated_data.get("received_date", existing_received_date),
+            )
         if income_date is not None:
             CondoMonthCloseService.assert_open(income_date.replace(day=1))
+        if is_received and received_date is not None:
+            CondoMonthCloseService.assert_open(received_date.replace(day=1))
 
 
 class CondoMonthCloseViewSet(viewsets.ReadOnlyModelViewSet):
