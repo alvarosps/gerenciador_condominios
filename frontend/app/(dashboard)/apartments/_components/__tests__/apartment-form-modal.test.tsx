@@ -1,12 +1,13 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { http, HttpResponse } from 'msw';
 import { screen, fireEvent, waitFor } from '@testing-library/react';
-import { renderWithProviders } from '@/tests/test-utils';
+import { renderWithProviders, waitForQueriesToSettle } from '@/tests/test-utils';
+import { server } from '@/tests/mocks/server';
+import { useAuthStore } from '@/store/auth-store';
 import { ApartmentFormModal } from '../apartment-form-modal';
-import * as apartmentHooks from '@/lib/api/hooks/use-apartments';
-import * as buildingHooks from '@/lib/api/hooks/use-buildings';
-import * as furnitureHooks from '@/lib/api/hooks/use-furniture';
-import * as personHooks from '@/lib/api/hooks/use-persons';
-import * as authStore from '@/store/auth-store';
+import type { Apartment } from '@/lib/schemas/apartment.schema';
+
+const API_BASE = 'http://localhost:8008/api';
 
 function submitForm() {
   // Radix Dialog portals its content to document.body, so query via the dialog.
@@ -15,66 +16,50 @@ function submitForm() {
   fireEvent.submit(form);
 }
 
-vi.mock('@/lib/api/hooks/use-apartments', async (importOriginal) => {
-  const actual = await importOriginal<typeof apartmentHooks>();
-  return {
-    ...actual,
-    useCreateApartment: vi.fn(),
-    useUpdateApartment: vi.fn(),
-    useAvailableApartments: vi.fn(),
-  };
-});
-
-vi.mock('@/lib/api/hooks/use-buildings', async (importOriginal) => {
-  const actual = await importOriginal<typeof buildingHooks>();
-  return { ...actual, useBuildings: vi.fn() };
-});
-
-vi.mock('@/lib/api/hooks/use-furniture', async (importOriginal) => {
-  const actual = await importOriginal<typeof furnitureHooks>();
-  return { ...actual, useFurniture: vi.fn() };
-});
-
-vi.mock('@/lib/api/hooks/use-persons', async (importOriginal) => {
-  const actual = await importOriginal<typeof personHooks>();
-  return { ...actual, usePersons: vi.fn() };
-});
-
-vi.mock('@/store/auth-store', () => ({ useAuthStore: vi.fn() }));
-
-const createMutateAsync = vi.fn();
-const updateMutateAsync = vi.fn();
-
 function setIsStaff(isStaff: boolean) {
-  vi.mocked(authStore.useAuthStore).mockReturnValue({ user: { is_staff: isStaff } } as never);
+  useAuthStore.setState({
+    user: { id: 1, email: 'a@b.c', first_name: 'A', last_name: 'B', is_staff: isStaff },
+    isAuthenticated: true,
+  });
 }
 
-function mockHooks() {
-  vi.mocked(apartmentHooks.useCreateApartment).mockReturnValue({
-    mutateAsync: createMutateAsync,
-    isPending: false,
-  } as never);
-  vi.mocked(apartmentHooks.useUpdateApartment).mockReturnValue({
-    mutateAsync: updateMutateAsync,
-    isPending: false,
-  } as never);
-  vi.mocked(buildingHooks.useBuildings).mockReturnValue({
-    data: [{ id: 1, name: 'Prédio Central', street_number: 836, address: 'Rua das Flores, 836' }],
-    isLoading: false,
-  } as never);
-  vi.mocked(furnitureHooks.useFurniture).mockReturnValue({
-    data: [{ id: 1, name: 'Sofá' }, { id: 2, name: 'Cama' }],
-  } as never);
-  vi.mocked(personHooks.usePersons).mockReturnValue({
-    data: [
-      { id: 2, name: 'Tiago' },
-      { id: 3, name: 'Alvaro' },
-    ],
-  } as never);
-  setIsStaff(true);
+// useBuildings / useFurniture / usePersons fire real GETs on mount; overridden per-test so the
+// modal sees the exact fixture data the original spy-based test relied on.
+function seedLookups() {
+  server.use(
+    http.get(`${API_BASE}/buildings/`, () =>
+      HttpResponse.json([
+        { id: 1, name: 'Prédio Central', street_number: 836, address: 'Rua das Flores, 836' },
+      ])
+    ),
+    http.get(`${API_BASE}/furnitures/`, () =>
+      HttpResponse.json([
+        { id: 1, name: 'Sofá' },
+        { id: 2, name: 'Cama' },
+      ])
+    ),
+    http.get(`${API_BASE}/persons/`, () =>
+      HttpResponse.json([
+        { id: 2, name: 'Tiago', relationship: 'Filho', is_owner: false, is_employee: false },
+        { id: 3, name: 'Alvaro', relationship: 'Proprietário', is_owner: true, is_employee: false },
+      ])
+    )
+  );
 }
 
-const editableApartment = {
+function spyUpdateApartment() {
+  const calls: Record<string, unknown>[] = [];
+  server.use(
+    http.put(`${API_BASE}/apartments/:id/`, async ({ params, request }) => {
+      const body = (await request.json()) as Record<string, unknown>;
+      calls.push(body);
+      return HttpResponse.json({ id: Number(params.id), ...body });
+    })
+  );
+  return calls;
+}
+
+const editableApartment: Apartment = {
   id: 1,
   number: 101,
   rental_value: 1200,
@@ -84,110 +69,125 @@ const editableApartment = {
   is_rented: false,
   building: { id: 1, name: 'Prédio Central', street_number: 836, address: 'Rua das Flores, 836' },
   furnitures: [],
-  owner: null as { id: number; name: string } | null,
+  owner: null,
 };
 
 describe('ApartmentFormModal', () => {
-  const defaultProps = { open: true, onClose: vi.fn() };
+  const defaultProps = { open: true, onClose: () => undefined };
 
   beforeEach(() => {
-    vi.clearAllMocks();
-    mockHooks();
+    seedLookups();
+    setIsStaff(true);
   });
 
-  afterEach(() => {
-    vi.restoreAllMocks();
+  it('renders dialog when open', async () => {
+    const { queryClient } = renderWithProviders(<ApartmentFormModal {...defaultProps} />);
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    await waitForQueriesToSettle(queryClient);
   });
 
-  it('renders dialog when open', () => {
-    renderWithProviders(<ApartmentFormModal {...defaultProps} />);
-    expect(screen.getByRole('dialog')).toBeInTheDocument();
-  });
-
-  it('does not render dialog when closed', () => {
-    renderWithProviders(<ApartmentFormModal {...defaultProps} open={false} />);
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-  });
-
-  it('shows "Novo Apartamento" title when creating', () => {
-    renderWithProviders(<ApartmentFormModal {...defaultProps} />);
-    expect(screen.getByText('Novo Apartamento')).toBeInTheDocument();
-  });
-
-  it('shows "Editar Apartamento" title when editing', () => {
-    renderWithProviders(
-      <ApartmentFormModal {...defaultProps} apartment={editableApartment as never} />,
+  it('does not render dialog when closed', async () => {
+    const { queryClient } = renderWithProviders(
+      <ApartmentFormModal {...defaultProps} open={false} />
     );
-    expect(screen.getByText('Editar Apartamento')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    await waitForQueriesToSettle(queryClient);
   });
 
-  it('renders required form fields', () => {
-    renderWithProviders(<ApartmentFormModal {...defaultProps} />);
-    expect(screen.getByText('Prédio *')).toBeInTheDocument();
+  it('shows "Novo Apartamento" title when creating', async () => {
+    const { queryClient } = renderWithProviders(<ApartmentFormModal {...defaultProps} />);
+    expect(await screen.findByText('Novo Apartamento')).toBeInTheDocument();
+    await waitForQueriesToSettle(queryClient);
+  });
+
+  it('shows "Editar Apartamento" title when editing', async () => {
+    const { queryClient } = renderWithProviders(
+      <ApartmentFormModal {...defaultProps} apartment={editableApartment} />
+    );
+    expect(await screen.findByText('Editar Apartamento')).toBeInTheDocument();
+    await waitForQueriesToSettle(queryClient);
+  });
+
+  it('renders required form fields', async () => {
+    const { queryClient } = renderWithProviders(<ApartmentFormModal {...defaultProps} />);
+    expect(await screen.findByText('Prédio *')).toBeInTheDocument();
     expect(screen.getByText('Número do Apartamento *')).toBeInTheDocument();
     expect(screen.getByText('Valor do Aluguel *')).toBeInTheDocument();
     expect(screen.getByText('Taxa de Limpeza *')).toBeInTheDocument();
     expect(screen.getByText('Máximo de Inquilinos *')).toBeInTheDocument();
+    await waitForQueriesToSettle(queryClient);
   });
 
-  it('renders furniture checkboxes when furniture data is loaded', () => {
-    renderWithProviders(<ApartmentFormModal {...defaultProps} />);
-    expect(screen.getByText('Sofá')).toBeInTheDocument();
+  it('renders furniture checkboxes when furniture data is loaded', async () => {
+    const { queryClient } = renderWithProviders(<ApartmentFormModal {...defaultProps} />);
+    expect(await screen.findByText('Sofá')).toBeInTheDocument();
     expect(screen.getByText('Cama')).toBeInTheDocument();
+    await waitForQueriesToSettle(queryClient);
   });
 
-  it('renders cancel and submit buttons', () => {
-    renderWithProviders(<ApartmentFormModal {...defaultProps} />);
-    expect(screen.getByRole('button', { name: /cancelar/i })).toBeInTheDocument();
+  it('renders cancel and submit buttons', async () => {
+    const { queryClient } = renderWithProviders(<ApartmentFormModal {...defaultProps} />);
+    expect(await screen.findByRole('button', { name: /cancelar/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /criar/i })).toBeInTheDocument();
+    await waitForQueriesToSettle(queryClient);
   });
 
-  it('calls onClose when cancel button is clicked', () => {
-    const onClose = vi.fn();
-    const { getByRole } = renderWithProviders(
-      <ApartmentFormModal open={true} onClose={onClose} />,
+  it('calls onClose when cancel button is clicked', async () => {
+    let closed = false;
+    const onClose = () => {
+      closed = true;
+    };
+    const { queryClient } = renderWithProviders(
+      <ApartmentFormModal open={true} onClose={onClose} />
     );
-    getByRole('button', { name: /cancelar/i }).click();
-    expect(onClose).toHaveBeenCalledOnce();
+    fireEvent.click(await screen.findByRole('button', { name: /cancelar/i }));
+    await waitFor(() => expect(closed).toBe(true));
+    await waitForQueriesToSettle(queryClient);
   });
 
   // --- Session 35: owner field (is_staff gated) ---
 
-  it('renders the owner field for admin (is_staff)', () => {
+  it('renders the owner field for admin (is_staff)', async () => {
     setIsStaff(true);
-    renderWithProviders(<ApartmentFormModal {...defaultProps} />);
-    expect(screen.getByText('Proprietário')).toBeInTheDocument();
+    const { queryClient } = renderWithProviders(<ApartmentFormModal {...defaultProps} />);
+    expect(await screen.findByText('Proprietário')).toBeInTheDocument();
+    await waitForQueriesToSettle(queryClient);
   });
 
-  it('hides the owner field for non-admin', () => {
+  it('hides the owner field for non-admin', async () => {
     setIsStaff(false);
-    renderWithProviders(<ApartmentFormModal {...defaultProps} />);
+    const { queryClient } = renderWithProviders(<ApartmentFormModal {...defaultProps} />);
+    await screen.findByRole('dialog');
     expect(screen.queryByText('Proprietário')).not.toBeInTheDocument();
+    await waitForQueriesToSettle(queryClient);
   });
 
   it('submits a numeric owner_id when the apartment has an owner', async () => {
     setIsStaff(true);
-    renderWithProviders(
+    const calls = spyUpdateApartment();
+    const { queryClient } = renderWithProviders(
       <ApartmentFormModal
         {...defaultProps}
-        apartment={{ ...editableApartment, owner: { id: 2, name: 'Tiago' } } as never}
-      />,
+        apartment={{ ...editableApartment, owner: { id: 2, name: 'Tiago' } }}
+      />
     );
+    await screen.findByText('Editar Apartamento');
     submitForm();
-    await waitFor(() => expect(updateMutateAsync).toHaveBeenCalled());
-    expect(updateMutateAsync).toHaveBeenCalledWith(expect.objectContaining({ owner_id: 2 }));
+    await waitFor(() => expect(calls).toHaveLength(1));
+    expect(calls[0]).toMatchObject({ owner_id: 2 });
+    await waitForQueriesToSettle(queryClient);
   });
 
   it('submits owner_id null when the apartment belongs to the condominium', async () => {
     setIsStaff(true);
-    renderWithProviders(
-      <ApartmentFormModal
-        {...defaultProps}
-        apartment={{ ...editableApartment, owner: null } as never}
-      />,
+    const calls = spyUpdateApartment();
+    const { queryClient } = renderWithProviders(
+      <ApartmentFormModal {...defaultProps} apartment={{ ...editableApartment, owner: null }} />
     );
+    await screen.findByText('Editar Apartamento');
     submitForm();
-    await waitFor(() => expect(updateMutateAsync).toHaveBeenCalled());
-    expect(updateMutateAsync).toHaveBeenCalledWith(expect.objectContaining({ owner_id: null }));
+    await waitFor(() => expect(calls).toHaveLength(1));
+    expect(calls[0]).toMatchObject({ owner_id: null });
+    await waitForQueriesToSettle(queryClient);
   });
 });

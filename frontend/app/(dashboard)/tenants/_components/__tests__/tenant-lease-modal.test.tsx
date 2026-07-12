@@ -1,50 +1,12 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { screen } from '@testing-library/react';
-import { renderWithProviders } from '@/tests/test-utils';
+import { describe, it, expect } from 'vitest';
+import { screen, waitFor, fireEvent } from '@testing-library/react';
+import { renderWithProviders, waitForQueriesToSettle } from '@/tests/test-utils';
 import { TenantLeaseModal } from '../tenant-lease-modal';
-import * as leaseHooks from '@/lib/api/hooks/use-leases';
-import * as apartmentHooks from '@/lib/api/hooks/use-apartments';
 import type { Tenant } from '@/lib/schemas/tenant.schema';
 
-vi.mock('@/lib/api/hooks/use-leases', async (importOriginal) => {
-  const actual = await importOriginal<typeof leaseHooks>();
-  return {
-    ...actual,
-    useCreateLease: vi.fn(),
-    useTransferLease: vi.fn(),
-  };
-});
-
-vi.mock('@/lib/api/hooks/use-apartments', async (importOriginal) => {
-  const actual = await importOriginal<typeof apartmentHooks>();
-  return {
-    ...actual,
-    useAvailableApartments: vi.fn(),
-  };
-});
-
-const idleMutation = { mutateAsync: vi.fn(), isPending: false, mutate: vi.fn() };
-
-function mockHooks() {
-  vi.mocked(leaseHooks.useCreateLease).mockReturnValue(idleMutation as never);
-  vi.mocked(leaseHooks.useTransferLease).mockReturnValue(idleMutation as never);
-  vi.mocked(apartmentHooks.useAvailableApartments).mockReturnValue({
-    data: [
-      {
-        id: 2,
-        number: 202,
-        rental_value: 1500,
-        rental_value_double: null,
-        cleaning_fee: 250,
-        max_tenants: 1,
-        is_rented: false,
-        building: { id: 1, name: 'Prédio Central', street_number: 836, address: 'Rua das Flores' },
-        furnitures: [],
-      },
-    ],
-    isLoading: false,
-  } as never);
-}
+// useAvailableApartments fires a real GET on mount, served by the global apartments MSW handler
+// (tests/mocks/data/apartments.ts) — no hook is mocked. Every test awaits the dialog title (a
+// findBy*) before further sync assertions, so the initial fetch settles inside act().
 
 const mockTenant: Tenant = {
   id: 1,
@@ -65,81 +27,95 @@ describe('TenantLeaseModal', () => {
     mode: 'create' as const,
     tenant: mockTenant,
     open: true,
-    onClose: vi.fn(),
+    onClose: () => undefined,
   };
 
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockHooks();
+  it('renders dialog when open', async () => {
+    const { queryClient } = renderWithProviders(<TenantLeaseModal {...defaultProps} />);
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    await waitForQueriesToSettle(queryClient);
   });
 
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  it('renders dialog when open', () => {
-    renderWithProviders(<TenantLeaseModal {...defaultProps} />);
-    expect(screen.getByRole('dialog')).toBeInTheDocument();
-  });
-
-  it('does not render dialog when closed', () => {
-    renderWithProviders(<TenantLeaseModal {...defaultProps} open={false} />);
+  it('does not render dialog when closed', async () => {
+    const { queryClient } = renderWithProviders(
+      <TenantLeaseModal {...defaultProps} open={false} />
+    );
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    await waitForQueriesToSettle(queryClient);
   });
 
-  it('shows tenant name in title for create mode', () => {
-    renderWithProviders(<TenantLeaseModal {...defaultProps} />);
-    expect(screen.getByText(`Criar Contrato — ${mockTenant.name}`)).toBeInTheDocument();
+  it('shows tenant name in title for create mode', async () => {
+    const { queryClient } = renderWithProviders(<TenantLeaseModal {...defaultProps} />);
+    expect(await screen.findByText(`Criar Contrato — ${mockTenant.name}`)).toBeInTheDocument();
+    await waitForQueriesToSettle(queryClient);
   });
 
-  it('shows tenant name in title for transfer mode', () => {
-    renderWithProviders(<TenantLeaseModal {...defaultProps} mode="transfer" />);
-    expect(screen.getByText(`Trocar de Kitnet — ${mockTenant.name}`)).toBeInTheDocument();
+  it('shows tenant name in title for transfer mode', async () => {
+    const { queryClient } = renderWithProviders(
+      <TenantLeaseModal {...defaultProps} mode="transfer" />
+    );
+    expect(await screen.findByText(`Trocar de Kitnet — ${mockTenant.name}`)).toBeInTheDocument();
+    await waitForQueriesToSettle(queryClient);
   });
 
-  it('displays tenant information card', () => {
-    renderWithProviders(<TenantLeaseModal {...defaultProps} />);
-    expect(screen.getByText(mockTenant.name)).toBeInTheDocument();
+  it('displays tenant information card', async () => {
+    const { queryClient } = renderWithProviders(<TenantLeaseModal {...defaultProps} />);
+    expect(await screen.findByText(mockTenant.name)).toBeInTheDocument();
+    await waitForQueriesToSettle(queryClient);
   });
 
-  it('renders apartment select field', () => {
-    renderWithProviders(<TenantLeaseModal {...defaultProps} />);
-    expect(screen.getByText('Apartamento Disponível')).toBeInTheDocument();
+  it('renders apartment select field', async () => {
+    const { queryClient } = renderWithProviders(<TenantLeaseModal {...defaultProps} />);
+    expect(await screen.findByText('Apartamento Disponível')).toBeInTheDocument();
+    await waitForQueriesToSettle(queryClient);
   });
 
-  it('renders period and value fields', () => {
-    renderWithProviders(<TenantLeaseModal {...defaultProps} />);
-    expect(screen.getByText('Data de Início')).toBeInTheDocument();
+  it('renders period and value fields', async () => {
+    const { queryClient } = renderWithProviders(<TenantLeaseModal {...defaultProps} />);
+    expect(await screen.findByText('Data de Início')).toBeInTheDocument();
     expect(screen.getByText('Validade (meses)')).toBeInTheDocument();
     expect(screen.getByText('Taxa de Tag')).toBeInTheDocument();
     expect(screen.getByText('Valor do Aluguel')).toBeInTheDocument();
+    await waitForQueriesToSettle(queryClient);
   });
 
-  it('renders payment confirmation checkboxes', () => {
-    renderWithProviders(<TenantLeaseModal {...defaultProps} />);
-    expect(screen.getByText('Taxa de Limpeza Paga')).toBeInTheDocument();
+  it('renders payment confirmation checkboxes', async () => {
+    const { queryClient } = renderWithProviders(<TenantLeaseModal {...defaultProps} />);
+    expect(await screen.findByText('Taxa de Limpeza Paga')).toBeInTheDocument();
     expect(screen.getByText('Taxa de Tag Paga')).toBeInTheDocument();
+    await waitForQueriesToSettle(queryClient);
   });
 
-  it('shows "Criar Contrato" submit button in create mode', () => {
-    renderWithProviders(<TenantLeaseModal {...defaultProps} />);
-    expect(screen.getByRole('button', { name: /criar contrato/i })).toBeInTheDocument();
+  it('shows "Criar Contrato" submit button in create mode', async () => {
+    const { queryClient } = renderWithProviders(<TenantLeaseModal {...defaultProps} />);
+    expect(await screen.findByRole('button', { name: /criar contrato/i })).toBeInTheDocument();
+    await waitForQueriesToSettle(queryClient);
   });
 
-  it('shows "Transferir" submit button in transfer mode', () => {
-    renderWithProviders(<TenantLeaseModal {...defaultProps} mode="transfer" />);
-    expect(screen.getByRole('button', { name: /transferir/i })).toBeInTheDocument();
+  it('shows "Transferir" submit button in transfer mode', async () => {
+    const { queryClient } = renderWithProviders(
+      <TenantLeaseModal {...defaultProps} mode="transfer" />
+    );
+    expect(await screen.findByRole('button', { name: /transferir/i })).toBeInTheDocument();
+    await waitForQueriesToSettle(queryClient);
   });
 
-  it('renders cancel button', () => {
-    renderWithProviders(<TenantLeaseModal {...defaultProps} />);
-    expect(screen.getByRole('button', { name: /cancelar/i })).toBeInTheDocument();
+  it('renders cancel button', async () => {
+    const { queryClient } = renderWithProviders(<TenantLeaseModal {...defaultProps} />);
+    expect(await screen.findByRole('button', { name: /cancelar/i })).toBeInTheDocument();
+    await waitForQueriesToSettle(queryClient);
   });
 
-  it('calls onClose when cancel button is clicked', () => {
-    const onClose = vi.fn();
-    renderWithProviders(<TenantLeaseModal {...defaultProps} onClose={onClose} />);
-    screen.getByRole('button', { name: /cancelar/i }).click();
-    expect(onClose).toHaveBeenCalledOnce();
+  it('calls onClose when cancel button is clicked', async () => {
+    let closed = false;
+    const onClose = () => {
+      closed = true;
+    };
+    const { queryClient } = renderWithProviders(
+      <TenantLeaseModal {...defaultProps} onClose={onClose} />
+    );
+    fireEvent.click(await screen.findByRole('button', { name: /cancelar/i }));
+    await waitFor(() => expect(closed).toBe(true));
+    await waitForQueriesToSettle(queryClient);
   });
 });

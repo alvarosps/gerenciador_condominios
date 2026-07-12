@@ -1,35 +1,14 @@
 import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
+import { http, HttpResponse } from 'msw';
 import userEvent from '@testing-library/user-event';
-import { renderWithProviders } from '@/tests/test-utils';
+import { renderWithProviders, waitForQueriesToSettle } from '@/tests/test-utils';
+import { server } from '@/tests/mocks/server';
 import { useAuthStore } from '@/store/auth-store';
-import {
-  createMockBillExit,
-  createMockCombinedCalendar,
-  createMockOverdueResponse,
-} from '@/tests/mocks/data/finances';
+import { createMockBillExit, createMockCombinedCalendar } from '@/tests/mocks/data/finances';
 import { CombinedCalendarSection } from '../combined-calendar-section';
-import * as calendarHooks from '@/lib/api/hooks/use-combined-calendar';
-import type { UseQueryResult } from '@tanstack/react-query';
-import type { CombinedCalendar, OverdueBillsResponse } from '@/lib/api/hooks/use-combined-calendar';
 
-vi.mock('@/lib/api/hooks/use-combined-calendar', async (importOriginal) => {
-  const actual = await importOriginal<typeof calendarHooks>();
-  return { ...actual, useCombinedCalendar: vi.fn(), useOverdueBills: vi.fn() };
-});
-
-// Test-fixture carve-out: building a TanStack query result shape is infeasible without an assertion.
-function makeQueryResult<T>(data: T | undefined, isLoading: boolean): UseQueryResult<T> {
-  return {
-    data,
-    isLoading,
-    isPending: isLoading,
-    isSuccess: !isLoading,
-    error: null,
-    isError: false,
-    status: isLoading ? 'pending' : 'success',
-  } as unknown as UseQueryResult<T>;
-}
+const API_BASE = 'http://localhost:8008/api';
 
 beforeAll(() => {
   if (!Element.prototype.hasPointerCapture) {
@@ -42,13 +21,38 @@ beforeAll(() => {
   }
 });
 
-function mockCalendar(calendar: CombinedCalendar | undefined, isLoading = false) {
-  vi.mocked(calendarHooks.useCombinedCalendar).mockReturnValue(
-    makeQueryResult<CombinedCalendar>(calendar, isLoading)
+function setCombinedCalendarResponse(overrides: Parameters<typeof createMockCombinedCalendar>[0]) {
+  server.use(
+    http.get(`${API_BASE}/finances/finance-dashboard/combined_calendar/`, () =>
+      HttpResponse.json(createMockCombinedCalendar(overrides))
+    )
   );
-  vi.mocked(calendarHooks.useOverdueBills).mockReturnValue(
-    makeQueryResult<OverdueBillsResponse>({ ...createMockOverdueResponse(), bills: [] }, false)
+}
+
+// combined_calendar is uncached and re-requested on every navigation — capture the params of the
+// latest request so navigation/filter assertions inspect the real query string.
+function captureCombinedCalendarParams() {
+  const captured: { year: number | null; month: number | null; building_id: number | null } = {
+    year: null,
+    month: null,
+    building_id: null,
+  };
+  server.use(
+    http.get(`${API_BASE}/finances/finance-dashboard/combined_calendar/`, ({ request }) => {
+      const params = new URL(request.url).searchParams;
+      captured.year = Number(params.get('year') ?? '0');
+      captured.month = Number(params.get('month') ?? '0');
+      const buildingId = params.get('building_id');
+      captured.building_id = buildingId ? Number(buildingId) : null;
+      return HttpResponse.json(
+        createMockCombinedCalendar({
+          year: captured.year,
+          month: captured.month,
+        })
+      );
+    })
   );
+  return captured;
 }
 
 describe('CombinedCalendarSection', () => {
@@ -60,7 +64,6 @@ describe('CombinedCalendarSection', () => {
     // userEvent's internal delays keep working normally.
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date(2026, 5, 7));
-    vi.clearAllMocks();
     useAuthStore.setState({
       user: { id: 1, email: 'a@b.c', first_name: 'A', last_name: 'B', is_staff: true },
       isAuthenticated: true,
@@ -69,30 +72,33 @@ describe('CombinedCalendarSection', () => {
 
   afterEach(() => {
     vi.useRealTimers();
-    vi.restoreAllMocks();
   });
 
-  it('renders a skeleton while loading', () => {
-    mockCalendar(undefined, true);
-    const { container } = renderWithProviders(<CombinedCalendarSection />);
+  it('renders a skeleton while loading', async () => {
+    server.use(
+      http.get(`${API_BASE}/finances/finance-dashboard/combined_calendar/`, async () => {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        return HttpResponse.json(createMockCombinedCalendar());
+      })
+    );
+    const { container, queryClient } = renderWithProviders(<CombinedCalendarSection />);
     expect(container.querySelectorAll('[class*="animate-pulse"]').length).toBeGreaterThan(0);
+    await waitForQueriesToSettle(queryClient);
   });
 
   it('renders the day panel, the grid and the stats column with data (1 assertion per column)', async () => {
-    mockCalendar(
-      createMockCombinedCalendar({
-        days: [
-          {
-            day: 7,
-            date: '2026-06-07',
-            weekday: 'Domingo',
-            rent_entries: [],
-            bill_exits: [createMockBillExit({ description: 'Conta de Luz' })],
-          },
-        ],
-      })
-    );
-    renderWithProviders(<CombinedCalendarSection />);
+    setCombinedCalendarResponse({
+      days: [
+        {
+          day: 7,
+          date: '2026-06-07',
+          weekday: 'Domingo',
+          rent_entries: [],
+          bill_exits: [createMockBillExit({ description: 'Conta de Luz' })],
+        },
+      ],
+    });
+    const { queryClient } = renderWithProviders(<CombinedCalendarSection />);
 
     // Column 1 (day panel)
     expect(await screen.findByText('Aluguéis (entradas)')).toBeInTheDocument();
@@ -100,60 +106,60 @@ describe('CombinedCalendarSection', () => {
     expect(screen.getAllByRole('gridcell').length).toBeGreaterThan(0);
     // Column 3 (stats)
     expect(screen.getByText('A pagar (mês)')).toBeInTheDocument();
+    await waitForQueriesToSettle(queryClient);
   });
 
-  it('passes the new month to useCombinedCalendar when navigating', async () => {
-    mockCalendar(createMockCombinedCalendar({ year: 2026, month: 6 }));
-    renderWithProviders(<CombinedCalendarSection />);
+  it('passes the new month to the combined_calendar request when navigating', async () => {
+    const captured = captureCombinedCalendarParams();
+    const { queryClient } = renderWithProviders(<CombinedCalendarSection />);
 
     await screen.findByText('Calendário do Condomínio');
-    vi.mocked(calendarHooks.useCombinedCalendar).mockClear();
+    await waitFor(() => expect(captured.month).toBe(6));
 
-    await userEvent.click(screen.getByRole('button', { name: /próximo mês/i }));
-
-    await waitFor(() => {
-      const lastCall = vi.mocked(calendarHooks.useCombinedCalendar).mock.calls.at(-1);
-      expect(lastCall?.[1]).toBe(7);
+    await userEvent.click(screen.getByRole('button', { name: /próximo mês/i }), {
+      advanceTimers: vi.advanceTimersByTime,
     });
+
+    await waitFor(() => expect(captured.month).toBe(7));
+    await waitForQueriesToSettle(queryClient);
   });
 
-  it('passes the building_id to useCombinedCalendar when a building filter is selected', async () => {
-    mockCalendar(createMockCombinedCalendar());
-    const user = userEvent.setup({ pointerEventsCheck: 0 });
-    renderWithProviders(<CombinedCalendarSection />);
+  it('passes the building_id to the combined_calendar request when a building filter is selected', async () => {
+    const captured = captureCombinedCalendarParams();
+    const user = userEvent.setup({ pointerEventsCheck: 0, advanceTimers: vi.advanceTimersByTime });
+    const { queryClient } = renderWithProviders(<CombinedCalendarSection />);
 
     await screen.findByText('Calendário do Condomínio');
+    await waitFor(() => expect(captured.building_id).toBeNull());
 
     await user.click(screen.getByRole('combobox'));
     const option = await screen.findByRole('option', { name: 'Edifício São Paulo' });
-    vi.mocked(calendarHooks.useCombinedCalendar).mockClear();
     await user.click(option);
 
-    await waitFor(() => {
-      const lastCall = vi.mocked(calendarHooks.useCombinedCalendar).mock.calls.at(-1);
-      expect(typeof lastCall?.[2]).toBe('number');
-    });
+    await waitFor(() => expect(typeof captured.building_id).toBe('number'));
+    await waitForQueriesToSettle(queryClient);
   });
 
   it('opens the payment dialog when a bill toggle is used', async () => {
-    mockCalendar(
-      createMockCombinedCalendar({
-        days: [
-          {
-            day: 7,
-            date: '2026-06-07',
-            weekday: 'Domingo',
-            rent_entries: [],
-            bill_exits: [createMockBillExit({ bill_id: 9, description: 'Conta de Luz' })],
-          },
-        ],
-      })
-    );
-    renderWithProviders(<CombinedCalendarSection />);
+    setCombinedCalendarResponse({
+      days: [
+        {
+          day: 7,
+          date: '2026-06-07',
+          weekday: 'Domingo',
+          rent_entries: [],
+          bill_exits: [createMockBillExit({ bill_id: 9, description: 'Conta de Luz' })],
+        },
+      ],
+    });
+    const { queryClient } = renderWithProviders(<CombinedCalendarSection />);
 
-    await userEvent.click(await screen.findByRole('switch'));
+    await userEvent.click(await screen.findByRole('switch'), {
+      advanceTimers: vi.advanceTimersByTime,
+    });
 
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
     expect(screen.getByText(/Pagar conta/i)).toBeInTheDocument();
+    await waitForQueriesToSettle(queryClient);
   });
 });
