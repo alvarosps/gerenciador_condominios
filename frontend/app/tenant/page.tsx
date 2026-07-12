@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { CreditCard, FileText, Bell, Home } from 'lucide-react';
+import { CreditCard, FileText, Bell, Home, HomeIcon } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -70,7 +70,8 @@ export default function TenantDashboardPage() {
     );
   }
 
-  const rentalValue = profile ? parseFloat(profile.lease.rental_value) : 0;
+  const hasActiveLease = Boolean(profile?.lease && profile.apartment);
+  const rentalValue = profile?.lease ? parseFloat(profile.lease.rental_value) : 0;
 
   return (
     <div className="space-y-4">
@@ -79,7 +80,7 @@ export default function TenantDashboardPage() {
         <h2 className="text-xl font-bold">
           Olá, {user?.first_name ?? profile?.name.split(' ')[0]}!
         </h2>
-        {profile && (
+        {profile?.apartment && (
           <p className="text-sm text-muted-foreground">
             Apartamento {profile.apartment.number} — {profile.apartment.building_name}
           </p>
@@ -87,7 +88,7 @@ export default function TenantDashboardPage() {
       </div>
 
       {/* Rent card */}
-      {profile && (
+      {profile?.lease ? (
         <Card className="border-primary/20 bg-primary/5">
           <CardHeader className="pb-2">
             <CardTitle className="text-base text-muted-foreground">Aluguel mensal</CardTitle>
@@ -108,7 +109,17 @@ export default function TenantDashboardPage() {
             )}
           </CardContent>
         </Card>
-      )}
+      ) : profile && !hasActiveLease ? (
+        <Card>
+          <CardContent className="pt-6 flex flex-col items-center text-center gap-2">
+            <HomeIcon className="h-8 w-8 text-muted-foreground" />
+            <p className="text-sm font-medium">Nenhuma locação ativa</p>
+            <p className="text-xs text-muted-foreground">
+              Você não possui um contrato de locação vinculado no momento.
+            </p>
+          </CardContent>
+        </Card>
+      ) : null}
 
       {/* Quick actions */}
       <div className="grid grid-cols-2 gap-3">

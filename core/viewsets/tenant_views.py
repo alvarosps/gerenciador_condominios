@@ -308,6 +308,35 @@ class TenantViewSet(viewsets.ViewSet):
             status=status.HTTP_201_CREATED,
         )
 
+    @action(detail=False, methods=["get"], url_path="payments/proof")
+    def payments_proof_list(self, request: Request) -> Response:
+        """
+        GET /api/tenant/payments/proof/
+
+        Returns a paginated list of payment proofs uploaded by the tenant's active
+        lease, most recent first.
+        """
+        tenant = _get_tenant(request)
+        if tenant is None:
+            return Response(
+                {"detail": "Perfil de inquilino não encontrado."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        lease = _get_active_lease(tenant)
+        if lease is None:
+            return Response(
+                {"detail": "Nenhuma locação ativa encontrada."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        queryset = PaymentProof.objects.filter(lease=lease).order_by("-created_at")
+
+        paginator = CustomPageNumberPagination()
+        page = paginator.paginate_queryset(queryset, request)
+        serializer = PaymentProofSerializer(page, many=True)
+        return paginator.get_paginated_response(serializer.data)
+
     @action(
         detail=False,
         methods=["get"],

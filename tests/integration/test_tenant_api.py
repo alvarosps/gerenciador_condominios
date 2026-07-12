@@ -94,6 +94,15 @@ class TestTenantMe:
         response = authenticated_api_client.get("/api/tenant/me/")
         assert response.status_code == 403
 
+    def test_no_lease_omits_lease_and_apartment_keys(self, tenant_user_no_lease):
+        """A tenant without an active lease still gets 200, with lease/apartment simply
+        absent — the frontend types these as optional and renders an empty state."""
+        _, _, client = tenant_user_no_lease
+        response = client.get("/api/tenant/me/")
+        assert response.status_code == 200
+        assert "lease" not in response.data
+        assert "apartment" not in response.data
+
 
 @pytest.mark.integration
 @pytest.mark.django_db
@@ -364,6 +373,75 @@ class TestTenantProof:
 
     def test_proof_status_not_found_returns_404(self, tenant_client):
         response = tenant_client.get("/api/tenant/payments/proof/999999/")
+        assert response.status_code == 404
+
+    def test_list_own_proofs_returns_paginated_results(self, tenant_client, tenant_user):
+        """GET /api/tenant/payments/proof/ lists the tenant's own proofs, most recent first."""
+        _, _, lease = tenant_user
+        older = PaymentProof.objects.create(
+            lease=lease,
+            reference_month=date(2026, 1, 1),
+            file=SimpleUploadedFile("p1.png", b"img", content_type="image/png"),
+        )
+        newer = PaymentProof.objects.create(
+            lease=lease,
+            reference_month=date(2026, 2, 1),
+            file=SimpleUploadedFile("p2.png", b"img", content_type="image/png"),
+        )
+
+        response = tenant_client.get("/api/tenant/payments/proof/")
+
+        assert response.status_code == 200
+        assert response.data["count"] == 2
+        results = response.data["results"]
+        assert [item["id"] for item in results] == [newer.pk, older.pk]
+
+    def test_list_own_proofs_excludes_other_tenants(self, tenant_client, tenant_user, admin_user):
+        """A proof belonging to a different lease must never leak into the list."""
+        other_building = make_building(
+            street_number=9001, user=admin_user, name="Other Building", address="Rua X"
+        )
+        other_apartment = make_apartment(
+            building=other_building,
+            number=1,
+            user=admin_user,
+            rental_value=Decimal("1000.00"),
+            cleaning_fee=Decimal("100.00"),
+            max_tenants=1,
+        )
+        other_tenant = Tenant.objects.create(
+            name="Outro Inquilino",
+            cpf_cnpj="11122233396",
+            phone="(11) 91111-1111",
+            marital_status="Solteiro(a)",
+            profession="Autônomo",
+            due_day=5,
+            created_by=admin_user,
+            updated_by=admin_user,
+        )
+        other_lease = make_lease(
+            apartment=other_apartment,
+            tenant=other_tenant,
+            user=admin_user,
+            start_date=timezone.now().date(),
+            validity_months=12,
+            rental_value=Decimal("1000.00"),
+            number_of_tenants=1,
+        )
+        PaymentProof.objects.create(
+            lease=other_lease,
+            reference_month=date(2026, 1, 1),
+            file=SimpleUploadedFile("other.png", b"img", content_type="image/png"),
+        )
+
+        response = tenant_client.get("/api/tenant/payments/proof/")
+
+        assert response.status_code == 200
+        assert response.data["count"] == 0
+
+    def test_list_own_proofs_no_lease_returns_404(self, tenant_user_no_lease):
+        _, _, client = tenant_user_no_lease
+        response = client.get("/api/tenant/payments/proof/")
         assert response.status_code == 404
 
 

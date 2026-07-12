@@ -26,6 +26,7 @@ export interface PixResponse {
 export const tenantPaymentKeys = {
   all: ['tenant', 'payments'] as const,
   adjustments: ['tenant', 'rent-adjustments'] as const,
+  proofs: ['tenant', 'payments', 'proof'] as const,
 } as const;
 
 export function useTenantPayments() {
@@ -68,6 +69,21 @@ export function useUploadProof() {
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: tenantPaymentKeys.all });
+      void queryClient.invalidateQueries({ queryKey: tenantPaymentKeys.proofs });
+    },
+  });
+}
+
+export function useTenantProofs() {
+  return useQuery({
+    queryKey: tenantPaymentKeys.proofs,
+    queryFn: async () => {
+      // The axios response interceptor already unwraps DRF's paginated envelope
+      // ({results, count, ...}) into a plain array — handle both shapes defensively.
+      const { data } = await apiClient.get<{ results: PaymentProof[] } | PaymentProof[]>(
+        '/tenant/payments/proof/'
+      );
+      return Array.isArray(data) ? data : data.results;
     },
   });
 }
