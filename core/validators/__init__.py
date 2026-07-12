@@ -19,6 +19,7 @@ from .model_validators import (
     validate_lease_dates,
     validate_rental_value,
     validate_tenant_count,
+    validate_tenant_deletable,
 )
 
 __all__ = [
@@ -36,4 +37,5 @@ __all__ = [
     "validate_lease_dates",
     "validate_rental_value",
     "validate_tenant_count",
+    "validate_tenant_deletable",
 ]

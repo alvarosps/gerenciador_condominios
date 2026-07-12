@@ -177,3 +177,35 @@ class TestAdminCanAccessAllData:
         assert response_b.status_code == status.HTTP_200_OK
         assert response_a.data["id"] == tenant_a_setup["lease"].pk
         assert response_b.data["id"] == tenant_b_setup["lease"].pk
+
+
+class TestTenantBlockedFromPropertyEndpoints:
+    """B1: an authenticated tenant (non-staff, linked via Tenant.user) must not be able to
+    read the full property portfolio (buildings/apartments — including owner PII) or the
+    furniture catalog through the admin CRUD endpoints. The tenant's own data is served
+    exclusively via the isolated /api/tenant/* portal."""
+
+    def test_tenant_forbidden_from_buildings_list(self, api_client, tenant_a_setup):
+        api_client.force_authenticate(user=tenant_a_setup["user"])
+        response = api_client.get("/api/buildings/")
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_tenant_forbidden_from_own_building_detail(self, api_client, tenant_a_setup):
+        api_client.force_authenticate(user=tenant_a_setup["user"])
+        response = api_client.get(f"/api/buildings/{tenant_a_setup['building'].pk}/")
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_tenant_forbidden_from_apartments_list(self, api_client, tenant_a_setup):
+        api_client.force_authenticate(user=tenant_a_setup["user"])
+        response = api_client.get("/api/apartments/")
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_tenant_forbidden_from_own_apartment_detail(self, api_client, tenant_a_setup):
+        api_client.force_authenticate(user=tenant_a_setup["user"])
+        response = api_client.get(f"/api/apartments/{tenant_a_setup['apartment'].pk}/")
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_tenant_forbidden_from_furnitures_list(self, api_client, tenant_a_setup):
+        api_client.force_authenticate(user=tenant_a_setup["user"])
+        response = api_client.get("/api/furnitures/")
+        assert response.status_code == status.HTTP_403_FORBIDDEN

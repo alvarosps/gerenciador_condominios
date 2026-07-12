@@ -142,6 +142,27 @@ def validate_tenant_count(lease: Any) -> None:
         )
 
 
+def validate_tenant_deletable(tenant: Any) -> None:
+    """
+    Validate that a tenant can be soft-deleted.
+
+    A tenant who is the responsible party on a non-deleted (active) lease cannot be
+    deleted — the lease must be terminated or transferred to another tenant first.
+
+    Args:
+        tenant: Tenant instance to validate
+
+    Raises:
+        ValidationError: If the tenant is the responsible_tenant of an active lease
+    """
+    if tenant.leases_responsible.exists():
+        msg = (
+            "Não é possível excluir um inquilino responsável por uma locação ativa. "
+            "Encerre ou transfira a locação primeiro."
+        )
+        raise ValidationError(msg, code="tenant_has_active_lease")
+
+
 def validate_rental_value(value: float) -> None:
     """
     Validate that rental value is reasonable.

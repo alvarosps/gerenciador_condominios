@@ -185,7 +185,7 @@ def exchange_oauth_code(request: Request) -> Response:
             },
         }
     )
-    _set_auth_cookies(response, access_token, refresh_token, role=role_for_user(user))
+    _set_auth_cookies(request, response, access_token, refresh_token, role=role_for_user(user))
     return response
 
 

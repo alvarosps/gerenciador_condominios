@@ -143,9 +143,13 @@ class TestBuildingViewSet:
         assert response.status_code == status.HTTP_200_OK
         assert building.id in get_ids(response)
 
-    def test_list_buildings_regular_user(self, regular_authenticated_api_client, building):
+    def test_list_buildings_regular_user_forbidden(
+        self, regular_authenticated_api_client, building
+    ):
+        # BuildingViewSet is admin-only (B1): the tenant portal is isolated under /api/tenant/*
+        # and must never expose the full building portfolio to a non-staff user.
         response = regular_authenticated_api_client.get("/api/buildings/")
-        assert response.status_code == status.HTTP_200_OK
+        assert response.status_code == status.HTTP_403_FORBIDDEN
 
     def test_list_buildings_unauthenticated(self, api_client):
         response = api_client.get("/api/buildings/")

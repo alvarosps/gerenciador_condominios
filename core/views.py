@@ -42,6 +42,7 @@ from .services.lease_creation_service import LeaseCreationService
 from .services.lease_service import change_tenant_due_day, terminate_lease, transfer_lease
 from .services.rent_adjustment_service import RentAdjustmentService
 from .services.rent_schedule_service import RentScheduleService
+from .validators import validate_tenant_deletable
 
 logger = logging.getLogger(__name__)
 
@@ -81,15 +82,15 @@ class BuildingViewSet(viewsets.ModelViewSet):
     ViewSet for Building model.
 
     Permissions:
-    - Read: All authenticated users
-    - Write: Admin only
+    - Read and write: Admin only
 
-    Buildings are reference data managed by administrators.
+    Buildings are reference data managed by administrators. The tenant portal is isolated
+    under /api/tenant/*; tenants must never see the full building portfolio.
     """
 
     queryset = Building.objects.all().order_by("id")
     serializer_class = BuildingSerializer
-    permission_classes = [ReadOnlyForNonAdmin]
+    permission_classes = [IsAdminUser]
 
     def get_queryset(self) -> QuerySet[Building]:
         """
@@ -111,15 +112,15 @@ class FurnitureViewSet(viewsets.ModelViewSet):
     ViewSet for Furniture model.
 
     Permissions:
-    - Read: All authenticated users
-    - Write: Admin only
+    - Read and write: Admin only
 
-    Furniture catalog is reference data managed by administrators.
+    Furniture catalog is reference data managed by administrators. The tenant portal is
+    isolated under /api/tenant/*; tenants must never see the full furniture catalog.
     """
 
     queryset = Furniture.objects.all().order_by("id")
     serializer_class = FurnitureSerializer
-    permission_classes = [ReadOnlyForNonAdmin]
+    permission_classes = [IsAdminUser]
 
 
 class ApartmentViewSet(viewsets.ModelViewSet):
@@ -127,10 +128,11 @@ class ApartmentViewSet(viewsets.ModelViewSet):
     ViewSet for Apartment model.
 
     Permissions:
-    - Read: All authenticated users
-    - Write: Admin only
+    - Read and write: Admin only
 
-    Apartment data (units, rental values, etc.) is managed by administrators.
+    Apartment data (units, rental values, owner PII, etc.) is managed by administrators.
+    The tenant portal is isolated under /api/tenant/*; tenants must never see the full
+    apartment portfolio (including other tenants' units and owner PII).
 
     Filters (query params):
     - building_id: Filter by building ID
@@ -141,7 +143,7 @@ class ApartmentViewSet(viewsets.ModelViewSet):
 
     queryset = Apartment.objects.all().order_by("id")
     serializer_class = ApartmentSerializer
-    permission_classes = [ReadOnlyForNonAdmin]
+    permission_classes = [IsAdminUser]
 
     def get_queryset(self) -> QuerySet[Apartment]:
         """
@@ -274,6 +276,11 @@ class TenantViewSet(viewsets.ModelViewSet):
                 )
 
         return queryset
+
+    def perform_destroy(self, instance: Tenant) -> None:
+        """Block soft-deleting a tenant who is responsible for an active lease."""
+        validate_tenant_deletable(instance)
+        instance.delete(deleted_by=self.request.user)
 
 
 class LeaseViewSet(viewsets.ModelViewSet):

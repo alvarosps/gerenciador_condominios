@@ -8,6 +8,11 @@ export const apiClient = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8008/api',
   timeout: REQUEST_TIMEOUT_MS,
   withCredentials: true,
+  // Axios reads the csrftoken cookie (set by the backend on cookie-auth login/refresh) and
+  // echoes it back as X-CSRFToken on same-origin requests — required by
+  // CookieJWTAuthentication.enforce_csrf on the backend for cookie-authenticated writes.
+  xsrfCookieName: 'csrftoken',
+  xsrfHeaderName: 'X-CSRFToken',
   headers: {
     'Content-Type': 'application/json',
   },

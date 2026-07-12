@@ -1,13 +1,17 @@
 """Integration tests for DeviceTokenViewSet — register, update duplicate, unregister."""
 
+import logging
+
 import pytest
 from rest_framework import status
+from rest_framework.test import APIClient
 
 from core.models import DeviceToken
 
 _EXPO_PUSH_ID = "ExpoToken[test123]"
 _EXPO_PUSH_ID_DUP = "ExpoToken[dup-test]"
 _EXPO_PUSH_ID_DEL = "ExpoToken[to-delete]"
+_EXPO_PUSH_ID_HANDOVER = "ExpoToken[handover]"
 
 
 @pytest.mark.integration
@@ -94,3 +98,90 @@ class TestDeviceTokenAPI:
             format="json",
         )
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+@pytest.mark.integration
+class TestDeviceTokenHandoverSemantics:
+    """B7: re-registering an existing token under a different authenticated user is a
+    legitimate device-owner handover (Expo/shared-device pattern) — allowed, but logged as a
+    structured warning for audit visibility, and it must not touch any other token belonging
+    to the previous owner."""
+
+    register_url = "/api/devices/register/"
+
+    def test_reassigning_token_to_another_user_logs_warning(
+        self, authenticated_api_client, admin_user, regular_user, caplog
+    ):
+        # admin_user registers the token first.
+        authenticated_api_client.post(
+            self.register_url,
+            {"token": _EXPO_PUSH_ID_HANDOVER, "platform": "android"},
+            format="json",
+        )
+
+        # regular_user re-registers the same token — a legitimate handover.
+        other_client = APIClient()
+        other_client.force_authenticate(user=regular_user)
+        with caplog.at_level(logging.WARNING, logger="core.viewsets.device_views"):
+            response = other_client.post(
+                self.register_url,
+                {"token": _EXPO_PUSH_ID_HANDOVER, "platform": "ios"},
+                format="json",
+            )
+
+        assert response.status_code == status.HTTP_200_OK
+        device = DeviceToken.objects.get(token=_EXPO_PUSH_ID_HANDOVER)
+        assert device.user_id == regular_user.id
+        assert any(
+            str(admin_user.pk) in record.getMessage()
+            and str(regular_user.pk) in record.getMessage()
+            for record in caplog.records
+        )
+
+    def test_reassignment_does_not_affect_other_tokens_of_previous_owner(
+        self, authenticated_api_client, admin_user, regular_user
+    ):
+        # admin_user owns two tokens.
+        authenticated_api_client.post(
+            self.register_url,
+            {"token": _EXPO_PUSH_ID_HANDOVER, "platform": "android"},
+            format="json",
+        )
+        untouched_token = "ExpoToken[untouched]"
+        authenticated_api_client.post(
+            self.register_url,
+            {"token": untouched_token, "platform": "android"},
+            format="json",
+        )
+
+        # regular_user takes over only the first token.
+        other_client = APIClient()
+        other_client.force_authenticate(user=regular_user)
+        other_client.post(
+            self.register_url,
+            {"token": _EXPO_PUSH_ID_HANDOVER, "platform": "ios"},
+            format="json",
+        )
+
+        assert DeviceToken.objects.get(token=untouched_token).user_id == admin_user.id
+
+
+@pytest.mark.integration
+class TestDeviceTokenViewSetExposesNoListOrDestroy:
+    """B7: the viewset only exposes register/unregister — never list/retrieve/destroy — so
+    there is no route through which a user could enumerate or delete another user's tokens."""
+
+    def test_list_route_does_not_exist(self, authenticated_api_client):
+        response = authenticated_api_client.get("/api/devices/")
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+
+    def test_destroy_route_does_not_exist(self, authenticated_api_client, admin_user):
+        device = DeviceToken.objects.create(
+            token="ExpoToken[no-destroy-route]",
+            platform="ios",
+            user=admin_user,
+            created_by=admin_user,
+            updated_by=admin_user,
+        )
+        response = authenticated_api_client.delete(f"/api/devices/{device.pk}/")
+        assert response.status_code == status.HTTP_404_NOT_FOUND
