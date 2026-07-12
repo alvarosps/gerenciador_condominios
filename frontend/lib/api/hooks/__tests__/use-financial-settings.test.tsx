@@ -39,7 +39,7 @@ describe('useFinancialSettings', () => {
       server.use(
         http.get(`${API_BASE}/financial-settings/current/`, () => {
           return new HttpResponse(null, { status: 500 });
-        }),
+        })
       );
 
       const { result } = renderHook(() => useFinancialSettings(), {
@@ -69,13 +69,17 @@ describe('useFinancialSettings', () => {
 
       expect(result.current.data?.notes).toBe('Saldo ajustado');
       expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['financial-settings'] });
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['financial-dashboard'] });
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['cash-flow'] });
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['daily-control'] });
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['rent-calendar'] });
     });
 
     it('should handle update failure gracefully', async () => {
       server.use(
         http.put(`${API_BASE}/financial-settings/current/`, () => {
           return new HttpResponse(null, { status: 500 });
-        }),
+        })
       );
 
       const { result } = renderHook(() => useUpdateFinancialSettings(), {

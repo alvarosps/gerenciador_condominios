@@ -49,15 +49,12 @@ import { DataTable } from '@/components/tables/data-table';
 import { SearchableSelect, type SearchableSelectOption } from '@/components/ui/searchable-select';
 import { createLeaseColumns, getLeaseStatus } from './_components/lease-table-columns';
 import { LeaseDeleteDialog, LeaseBulkDeleteDialog } from './_components/lease-dialogs';
-import {
-  useLeases,
-  useDeleteLease,
-  useTerminateLease,
-} from '@/lib/api/hooks/use-leases';
+import { useLeases, useDeleteLease, useTerminateLease } from '@/lib/api/hooks/use-leases';
 import { useBuildings } from '@/lib/api/hooks/use-buildings';
 import { type Lease } from '@/lib/schemas/lease.schema';
 import { leaseExportColumns } from '@/lib/hooks/use-export';
 import { useCrudPage } from '@/lib/hooks/use-crud-page';
+import { getErrorMessage } from '@/lib/utils/error-handler';
 
 // Loading component for modals
 function ModalLoader() {
@@ -95,7 +92,10 @@ const RentAdjustmentModal = dynamic(
 );
 
 const RentAdjustmentHistorySheet = dynamic(
-  () => import('./_components/rent-adjustment-history-sheet').then((mod) => mod.RentAdjustmentHistorySheet),
+  () =>
+    import('./_components/rent-adjustment-history-sheet').then(
+      (mod) => mod.RentAdjustmentHistorySheet
+    ),
   { loading: () => <ModalLoader />, ssr: false }
 );
 
@@ -112,7 +112,9 @@ export default function LeasesPage() {
   const modals = useLeaseModals();
 
   // Per-building filter state
-  const [filtersByBuilding, setFiltersByBuilding] = useState<Record<number, BuildingLeaseFilters>>({});
+  const [filtersByBuilding, setFiltersByBuilding] = useState<Record<number, BuildingLeaseFilters>>(
+    {}
+  );
 
   const { data: leases, isLoading, error } = useLeases();
   const { data: buildings } = useBuildings();
@@ -142,7 +144,11 @@ export default function LeasesPage() {
   }, [leases]);
 
   const getFilters = (buildingId: number): BuildingLeaseFilters =>
-    filtersByBuilding[buildingId] ?? { responsible_tenant_id: undefined, status: 'all', contract_status: 'all' };
+    filtersByBuilding[buildingId] ?? {
+      responsible_tenant_id: undefined,
+      status: 'all',
+      contract_status: 'all',
+    };
 
   const updateFilter = (buildingId: number, updates: Partial<BuildingLeaseFilters>): void => {
     setFiltersByBuilding((prev) => ({
@@ -153,7 +159,7 @@ export default function LeasesPage() {
 
   const clearFilters = (buildingId: number): void => {
     setFiltersByBuilding((prev) =>
-      Object.fromEntries(Object.entries(prev).filter(([key]) => Number(key) !== buildingId)),
+      Object.fromEntries(Object.entries(prev).filter(([key]) => Number(key) !== buildingId))
     );
   };
 
@@ -188,42 +194,42 @@ export default function LeasesPage() {
     (lease: Lease) => {
       modals.openModal('contract', lease);
     },
-    [modals],
+    [modals]
   );
 
   const handleCalculateLateFee = useCallback(
     (lease: Lease) => {
       modals.openModal('lateFee', lease);
     },
-    [modals],
+    [modals]
   );
 
   const handleChangeDueDate = useCallback(
     (lease: Lease) => {
       modals.openModal('dueDate', lease);
     },
-    [modals],
+    [modals]
   );
 
   const handleTerminate = useCallback(
     (lease: Lease) => {
       modals.openModal('terminate', lease);
     },
-    [modals],
+    [modals]
   );
 
   const handleAdjustRent = useCallback(
     (lease: Lease) => {
       modals.openModal('adjustRent', lease);
     },
-    [modals],
+    [modals]
   );
 
   const handleViewAdjustmentHistory = useCallback(
     (lease: Lease) => {
       if (lease.id !== undefined) modals.openHistory(lease.id);
     },
-    [modals],
+    [modals]
   );
 
   const handleConfirmTerminate = useCallback(async () => {
@@ -232,15 +238,18 @@ export default function LeasesPage() {
       await terminateMutation.mutateAsync(modals.actionLease.id);
       toast.success('Contrato encerrado com sucesso');
       modals.closeModal();
-    } catch {
-      toast.error('Erro ao encerrar contrato');
+    } catch (error) {
+      toast.error(getErrorMessage(error, 'Erro ao encerrar contrato'));
     }
   }, [modals, terminateMutation]);
 
-  const handleDelete = useCallback((lease: Lease) => {
-    crud.setItemToDelete(lease);
-    if (lease.id !== undefined) crud.handleDeleteClick(lease.id);
-  }, [crud]);
+  const handleDelete = useCallback(
+    (lease: Lease) => {
+      crud.setItemToDelete(lease);
+      if (lease.id !== undefined) crud.handleDeleteClick(lease.id);
+    },
+    [crud]
+  );
 
   // Memoize columns to prevent unnecessary re-renders
   const columns = useMemo(
@@ -356,136 +365,138 @@ export default function LeasesPage() {
           </div>
         </div>
       ) : (
-      <Accordion type="multiple" className="space-y-4">
-        {buildings?.map((building) => {
-          const buildingId = building.id;
-          if (buildingId === undefined) return null;
-          const buildingLeases = groupedLeases.get(buildingId) ?? [];
-          const filteredLeases = getFilteredLeases(buildingId, buildingLeases);
-          const filters = getFilters(buildingId);
-          const hasActiveFilters =
-            filters.responsible_tenant_id !== undefined || filters.status !== 'all' || filters.contract_status !== 'all';
+        <Accordion type="multiple" className="space-y-4">
+          {buildings?.map((building) => {
+            const buildingId = building.id;
+            if (buildingId === undefined) return null;
+            const buildingLeases = groupedLeases.get(buildingId) ?? [];
+            const filteredLeases = getFilteredLeases(buildingId, buildingLeases);
+            const filters = getFilters(buildingId);
+            const hasActiveFilters =
+              filters.responsible_tenant_id !== undefined ||
+              filters.status !== 'all' ||
+              filters.contract_status !== 'all';
 
-          // Build tenant options from leases in this building
-          const tenantOptions: SearchableSelectOption[] = [
-            { value: 'all', label: 'Todos os inquilinos' },
-          ];
-          const seenTenantIds = new Set<number>();
-          buildingLeases.forEach((lease) => {
-            const tenant = lease.responsible_tenant;
-            if (tenant?.id !== undefined && !seenTenantIds.has(tenant.id)) {
-              seenTenantIds.add(tenant.id);
-              tenantOptions.push({ value: String(tenant.id), label: tenant.name });
-            }
-          });
+            // Build tenant options from leases in this building
+            const tenantOptions: SearchableSelectOption[] = [
+              { value: 'all', label: 'Todos os inquilinos' },
+            ];
+            const seenTenantIds = new Set<number>();
+            buildingLeases.forEach((lease) => {
+              const tenant = lease.responsible_tenant;
+              if (tenant?.id !== undefined && !seenTenantIds.has(tenant.id)) {
+                seenTenantIds.add(tenant.id);
+                tenantOptions.push({ value: String(tenant.id), label: tenant.name });
+              }
+            });
 
-          return (
-            <AccordionItem key={buildingId} value={String(buildingId)}>
-              <AccordionTrigger className="px-4">
-                <div className="flex items-center gap-2">
-                  <span>
-                    {building.name} — Nº {building.street_number}
-                  </span>
-                  <Badge variant="secondary">{buildingLeases.length} locações</Badge>
-                </div>
-              </AccordionTrigger>
-              <AccordionContent className="px-4 pb-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Inquilino Responsável</label>
-                    <SearchableSelect
-                      value={
-                        filters.responsible_tenant_id
-                          ? String(filters.responsible_tenant_id)
-                          : 'all'
-                      }
-                      onValueChange={(value) =>
-                        updateFilter(buildingId, {
-                          responsible_tenant_id: value === 'all' ? undefined : Number(value),
-                        })
-                      }
-                      options={tenantOptions}
-                      placeholder="Todos os inquilinos"
-                      searchPlaceholder="Buscar inquilino..."
-                    />
+            return (
+              <AccordionItem key={buildingId} value={String(buildingId)}>
+                <AccordionTrigger className="px-4">
+                  <div className="flex items-center gap-2">
+                    <span>
+                      {building.name} — Nº {building.street_number}
+                    </span>
+                    <Badge variant="secondary">{buildingLeases.length} locações</Badge>
                   </div>
-
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Status</label>
-                    <Select
-                      value={filters.status}
-                      onValueChange={(value) =>
-                        updateFilter(buildingId, { status: value as StatusFilter })
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Todos" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Todos</SelectItem>
-                        <SelectItem value="active">Ativo</SelectItem>
-                        <SelectItem value="expired">Expirado</SelectItem>
-                        <SelectItem value="expiring">Expirando em breve</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Status do Contrato</label>
-                    <Select
-                      value={filters.contract_status}
-                      onValueChange={(value) =>
-                        updateFilter(buildingId, { contract_status: value as 'all' | 'generated' | 'signed' | 'pending' })
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Todos" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Todos</SelectItem>
-                        <SelectItem value="generated">Gerado</SelectItem>
-                        <SelectItem value="signed">Assinado</SelectItem>
-                        <SelectItem value="pending">Pendente</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {hasActiveFilters && (
-                    <div className="flex items-end">
-                      <Button
-                        variant="outline"
-                        onClick={() => clearFilters(buildingId)}
-                        className="w-full"
-                      >
-                        Limpar Filtros
-                      </Button>
+                </AccordionTrigger>
+                <AccordionContent className="px-4 pb-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                    <div>
+                      <label className="block text-sm font-medium mb-2">
+                        Inquilino Responsável
+                      </label>
+                      <SearchableSelect
+                        value={
+                          filters.responsible_tenant_id
+                            ? String(filters.responsible_tenant_id)
+                            : 'all'
+                        }
+                        onValueChange={(value) =>
+                          updateFilter(buildingId, {
+                            responsible_tenant_id: value === 'all' ? undefined : Number(value),
+                          })
+                        }
+                        options={tenantOptions}
+                        placeholder="Todos os inquilinos"
+                        searchPlaceholder="Buscar inquilino..."
+                      />
                     </div>
-                  )}
-                </div>
 
-                <DataTable<Lease>
-                  columns={columns}
-                  dataSource={filteredLeases}
-                  loading={isLoading}
-                  rowKey="id"
-                  rowSelection={crud.bulkOps.rowSelection}
-                  defaultSortKey="apartment"
-                  defaultSortDirection="asc"
-                  pagination={false}
-                />
-              </AccordionContent>
-            </AccordionItem>
-          );
-        })}
-      </Accordion>
+                    <div>
+                      <label className="block text-sm font-medium mb-2">Status</label>
+                      <Select
+                        value={filters.status}
+                        onValueChange={(value) =>
+                          updateFilter(buildingId, { status: value as StatusFilter })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Todos" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todos</SelectItem>
+                          <SelectItem value="active">Ativo</SelectItem>
+                          <SelectItem value="expired">Expirado</SelectItem>
+                          <SelectItem value="expiring">Expirando em breve</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium mb-2">Status do Contrato</label>
+                      <Select
+                        value={filters.contract_status}
+                        onValueChange={(value) =>
+                          updateFilter(buildingId, {
+                            contract_status: value as 'all' | 'generated' | 'signed' | 'pending',
+                          })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Todos" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todos</SelectItem>
+                          <SelectItem value="generated">Gerado</SelectItem>
+                          <SelectItem value="signed">Assinado</SelectItem>
+                          <SelectItem value="pending">Pendente</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {hasActiveFilters && (
+                      <div className="flex items-end">
+                        <Button
+                          variant="outline"
+                          onClick={() => clearFilters(buildingId)}
+                          className="w-full"
+                        >
+                          Limpar Filtros
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+
+                  <DataTable<Lease>
+                    columns={columns}
+                    dataSource={filteredLeases}
+                    loading={isLoading}
+                    rowKey="id"
+                    rowSelection={crud.bulkOps.rowSelection}
+                    defaultSortKey="apartment"
+                    defaultSortDirection="asc"
+                    pagination={false}
+                  />
+                </AccordionContent>
+              </AccordionItem>
+            );
+          })}
+        </Accordion>
       )}
 
       {/* Modals */}
-      <LeaseFormModal
-        open={crud.isModalOpen}
-        lease={crud.editingItem}
-        onClose={crud.closeModal}
-      />
+      <LeaseFormModal open={crud.isModalOpen} lease={crud.editingItem} onClose={crud.closeModal} />
 
       <ContractGenerateModal
         open={modals.isOpen('contract')}

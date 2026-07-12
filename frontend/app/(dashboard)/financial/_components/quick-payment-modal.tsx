@@ -16,6 +16,8 @@ import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api/client';
 import { queryKeys } from '@/lib/api/query-keys';
+import { getTodayLocalISO } from '@/lib/utils/formatters';
+import { getErrorMessage } from '@/lib/utils/error-handler';
 
 export function QuickPaymentModal({
   open,
@@ -51,7 +53,7 @@ export function QuickPaymentModal({
         person_id: personId,
         reference_month: referenceMonth,
         amount: value,
-        payment_date: new Date().toISOString().split('T')[0],
+        payment_date: getTodayLocalISO(),
       });
       toast.success(`Pagamento de R$ ${value.toFixed(2)} registrado para ${personName}`);
       await queryClient.invalidateQueries({ queryKey: queryKeys.financialDashboard.all });
@@ -59,8 +61,8 @@ export function QuickPaymentModal({
       await queryClient.invalidateQueries({ queryKey: queryKeys.expenses.all });
       setAmount('');
       onClose();
-    } catch {
-      toast.error('Erro ao registrar pagamento');
+    } catch (error) {
+      toast.error(getErrorMessage(error, 'Erro ao registrar pagamento'));
     } finally {
       setIsSaving(false);
     }
@@ -72,7 +74,12 @@ export function QuickPaymentModal({
   };
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { if (!o) handleClose(); }}>
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        if (!o) handleClose();
+      }}
+    >
       <DialogContent className="max-w-sm">
         <DialogHeader>
           <DialogTitle>Registrar Pagamento — {personName}</DialogTitle>

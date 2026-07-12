@@ -10,6 +10,7 @@ import {
   Dialog,
   DialogBody,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -148,7 +149,7 @@ function billToDefaults(bill: Bill): BillFormValues {
 }
 
 function draftWaterStatement(
-  statement: ParsedInvoice['statement'],
+  statement: ParsedInvoice['statement']
 ): BillFormValues['water_statement'] {
   if (statement === null || !('consumo_m3' in statement)) {
     return emptyWaterStatement();
@@ -165,7 +166,7 @@ function draftWaterStatement(
 }
 
 function draftElectricityStatement(
-  statement: ParsedInvoice['statement'],
+  statement: ParsedInvoice['statement']
 ): BillFormValues['electricity_statement'] {
   if (statement === null || !('consumo_kwh' in statement)) {
     return emptyElectricityStatement();
@@ -210,7 +211,7 @@ function draftToDefaults(draft: ParsedInvoice): BillFormValues {
 
 function buildStatementInput(
   accountType: BillAccountType,
-  values: BillFormValues,
+  values: BillFormValues
 ): BillStatementInput | null {
   if (accountType === 'water') {
     const consumo = Number(values.water_statement.consumo_m3);
@@ -300,9 +301,7 @@ export function BillFormModal({ open, bill, draft, onClose }: BillFormModalProps
     // no-match draft (billing_account_id === null) has no account to type it, so sending the
     // statement would 400. Only attach it when an account is bound (matched or selected).
     const statement =
-      values.billing_account_id !== null
-        ? buildStatementInput(values.account_type, values)
-        : null;
+      values.billing_account_id !== null ? buildStatementInput(values.account_type, values) : null;
     const billPayload: Record<string, unknown> = {
       description: values.description,
       building_id: values.building_id,
@@ -430,6 +429,11 @@ export function BillFormModal({ open, bill, draft, onClose }: BillFormModalProps
           <DialogTitle>
             {isDraft ? 'Importar fatura' : isEdit ? 'Editar Conta' : 'Nova Conta'}
           </DialogTitle>
+          <DialogDescription>
+            {isDraft
+              ? 'Revise os dados extraídos da fatura antes de confirmar o cadastro da conta.'
+              : 'Preencha os dados da conta, categoria, valores e vencimento.'}
+          </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>

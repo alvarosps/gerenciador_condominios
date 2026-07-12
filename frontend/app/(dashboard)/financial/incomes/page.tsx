@@ -13,12 +13,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Plus, Loader2, Pencil, Trash2, CheckCircle, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import { DataTable, type Column } from '@/components/tables/data-table';
@@ -35,6 +30,7 @@ import { type Income } from '@/lib/schemas/income.schema';
 import { useCrudPage } from '@/lib/hooks/use-crud-page';
 import { useExport, incomeExportColumns } from '@/lib/hooks/use-export';
 import { formatCurrency, formatDate } from '@/lib/utils/formatters';
+import { getErrorMessage } from '@/lib/utils/error-handler';
 
 interface ExtendedIncomeFilters extends IncomeFilters {
   date_from?: string;
@@ -51,7 +47,7 @@ function ModalLoader() {
 
 const IncomeFormModal = dynamic(
   () => import('./_components/income-form-modal').then((mod) => mod.IncomeFormModal),
-  { loading: () => <ModalLoader />, ssr: false },
+  { loading: () => <ModalLoader />, ssr: false }
 );
 
 interface IncomeActionHandlers {
@@ -119,7 +115,11 @@ function createIncomeColumns(handlers: IncomeActionHandlers): Column<Income>[] {
       width: 110,
       align: 'center',
       render: (_, record) => (
-        <Badge className={cn(record.is_recurring ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground')}>
+        <Badge
+          className={cn(
+            record.is_recurring ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'
+          )}
+        >
           {record.is_recurring ? 'Sim' : 'Não'}
         </Badge>
       ),
@@ -130,7 +130,11 @@ function createIncomeColumns(handlers: IncomeActionHandlers): Column<Income>[] {
       width: 110,
       align: 'center',
       render: (_, record) => (
-        <Badge className={cn(record.is_received ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning')}>
+        <Badge
+          className={cn(
+            record.is_received ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'
+          )}
+        >
           {record.is_received ? 'Recebido' : 'Pendente'}
         </Badge>
       ),
@@ -143,29 +147,34 @@ function createIncomeColumns(handlers: IncomeActionHandlers): Column<Income>[] {
       render: (_, record) => (
         <TooltipProvider>
           <div className="flex items-center gap-1">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" aria-label="Editar" onClick={() => handlers.onEdit(record)}>
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Editar</TooltipContent>
-                </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Editar"
+                  onClick={() => handlers.onEdit(record)}
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Editar</TooltipContent>
+            </Tooltip>
 
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      aria-label="Excluir"
-                      onClick={() => handlers.onDelete(record)}
-                      disabled={handlers.isDeleting}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Excluir</TooltipContent>
-                </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Excluir"
+                  onClick={() => handlers.onDelete(record)}
+                  disabled={handlers.isDeleting}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Excluir</TooltipContent>
+            </Tooltip>
 
             {!record.is_received && (
               <Tooltip>
@@ -211,7 +220,7 @@ export default function IncomesPage() {
       crud.setItemToDelete(income);
       if (income.id !== undefined) crud.handleDeleteClick(income.id);
     },
-    [crud],
+    [crud]
   );
 
   const handleMarkReceived = useCallback(
@@ -220,11 +229,11 @@ export default function IncomesPage() {
       try {
         await markReceivedMutation.mutateAsync(income.id);
         toast.success('Receita marcada como recebida');
-      } catch {
-        toast.error('Erro ao marcar receita como recebida');
+      } catch (error) {
+        toast.error(getErrorMessage(error, 'Erro ao marcar receita como recebida'));
       }
     },
-    [markReceivedMutation],
+    [markReceivedMutation]
   );
 
   const columns = useMemo(
@@ -236,7 +245,13 @@ export default function IncomesPage() {
         isDeleting: crud.isDeleting,
         isMarkingReceived: markReceivedMutation.isPending,
       }),
-    [crud.openEditModal, crud.isDeleting, handleDelete, handleMarkReceived, markReceivedMutation.isPending],
+    [
+      crud.openEditModal,
+      crud.isDeleting,
+      handleDelete,
+      handleMarkReceived,
+      markReceivedMutation.isPending,
+    ]
   );
 
   const hasActiveFilters = Object.entries(filters).some(([, v]) => v !== undefined && v !== '');
@@ -263,14 +278,17 @@ export default function IncomesPage() {
       <div className="mb-4 flex justify-between items-center flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold">Receitas</h1>
-          <p className="text-muted-foreground mt-1">
-            Gerencie receitas e recebimentos
-          </p>
+          <p className="text-muted-foreground mt-1">Gerencie receitas e recebimentos</p>
         </div>
         <div className="flex gap-2">
           <Button
             variant="outline"
-            onClick={() => incomes && exportToExcel(incomes as Record<string, unknown>[], incomeExportColumns, { filename: 'receitas' })}
+            onClick={() =>
+              incomes &&
+              exportToExcel(incomes as Record<string, unknown>[], incomeExportColumns, {
+                filename: 'receitas',
+              })
+            }
             disabled={isExporting || !incomes?.length}
           >
             <Download className="h-4 w-4 mr-2" />
@@ -317,7 +335,13 @@ export default function IncomesPage() {
             <div className="flex-1 min-w-[130px]">
               <label className="block text-sm font-medium mb-2">Recorrente</label>
               <Select
-                value={filters.is_recurring === undefined ? 'all' : filters.is_recurring ? 'true' : 'false'}
+                value={
+                  filters.is_recurring === undefined
+                    ? 'all'
+                    : filters.is_recurring
+                      ? 'true'
+                      : 'false'
+                }
                 onValueChange={(value) =>
                   setFilters({
                     ...filters,
@@ -340,7 +364,13 @@ export default function IncomesPage() {
             <div className="flex-1 min-w-[130px]">
               <label className="block text-sm font-medium mb-2">Status</label>
               <Select
-                value={filters.is_received === undefined ? 'all' : filters.is_received ? 'received' : 'pending'}
+                value={
+                  filters.is_received === undefined
+                    ? 'all'
+                    : filters.is_received
+                      ? 'received'
+                      : 'pending'
+                }
                 onValueChange={(value) =>
                   setFilters({
                     ...filters,
@@ -399,12 +429,7 @@ export default function IncomesPage() {
       </Card>
 
       {/* Data Table */}
-      <DataTable<Income>
-        columns={columns}
-        dataSource={incomes}
-        loading={isLoading}
-        rowKey="id"
-      />
+      <DataTable<Income> columns={columns} dataSource={incomes} loading={isLoading} rowKey="id" />
 
       {/* Form Modal */}
       <IncomeFormModal

@@ -142,6 +142,8 @@ export function usePatchLease() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.leases.all });
       void queryClient.invalidateQueries({ queryKey: queryKeys.apartments.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.rentCalendar.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.financialDashboard.all });
     },
   });
 }
@@ -313,6 +315,8 @@ export function useTransferLease() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.leases.all });
       void queryClient.invalidateQueries({ queryKey: queryKeys.apartments.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.rentCalendar.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.financialDashboard.all });
     },
   });
 }
@@ -333,6 +337,8 @@ export function useTerminateLease() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.leases.all });
       void queryClient.invalidateQueries({ queryKey: queryKeys.apartments.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.rentCalendar.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.financialDashboard.all });
     },
   });
 }

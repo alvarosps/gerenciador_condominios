@@ -18,6 +18,7 @@ import {
   usePersonPaymentSchedules,
 } from '@/lib/api/hooks/use-person-payment-schedules';
 import { formatCurrency } from '@/lib/utils/formatters';
+import { getErrorMessage } from '@/lib/utils/error-handler';
 import { toast } from 'sonner';
 
 export interface PersonPayModalProps {
@@ -43,7 +44,7 @@ export function PersonPayModal({
 }: PersonPayModalProps) {
   const { data: monthTotal, isLoading: isLoadingTotal } = usePersonMonthTotal(
     personId,
-    referenceMonth,
+    referenceMonth
   );
   const { data: schedules, isLoading: isLoadingSchedules } = usePersonPaymentSchedules({
     person_id: personId,
@@ -53,10 +54,8 @@ export function PersonPayModal({
   const markPaidMutation = useMarkItemPaid();
 
   const expectedUntilDay =
-    schedules?.reduce(
-      (sum, s) => (s.due_day <= dueDay ? sum + s.amount : sum),
-      0,
-    ) ?? scheduleAmount;
+    schedules?.reduce((sum, s) => (s.due_day <= dueDay ? sum + s.amount : sum), 0) ??
+    scheduleAmount;
 
   const totalPaid = monthTotal?.total_paid ?? 0;
   const suggestedAmount = Math.max(0, expectedUntilDay - totalPaid);
@@ -92,8 +91,8 @@ export function PersonPayModal({
       });
       toast.success(`Pagamento de ${formatCurrency(numericAmount)} registrado para ${personName}`);
       onOpenChange(false);
-    } catch {
-      toast.error('Erro ao registrar pagamento');
+    } catch (error) {
+      toast.error(getErrorMessage(error, 'Erro ao registrar pagamento'));
     }
   };
 
@@ -157,10 +156,7 @@ export function PersonPayModal({
           >
             Cancelar
           </Button>
-          <Button
-            onClick={handleConfirmSync}
-            disabled={markPaidMutation.isPending || isLoading}
-          >
+          <Button onClick={handleConfirmSync} disabled={markPaidMutation.isPending || isLoading}>
             {markPaidMutation.isPending ? 'Registrando...' : 'Confirmar Pagamento'}
           </Button>
         </DialogFooter>

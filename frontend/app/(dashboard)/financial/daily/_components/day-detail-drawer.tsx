@@ -2,18 +2,19 @@
 
 import { useState, useCallback } from 'react';
 import { ArrowDownCircle, ArrowUpCircle, CheckCircle2, User } from 'lucide-react';
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { useMarkItemPaid } from '@/lib/api/hooks/use-daily-control';
-import type { DailyBreakdownDay, DailyEntry, DailyExit, MarkPaidRequest } from '@/lib/api/hooks/use-daily-control';
-import { formatCurrency, formatDate } from '@/lib/utils/formatters';
+import type {
+  DailyBreakdownDay,
+  DailyEntry,
+  DailyExit,
+  MarkPaidRequest,
+} from '@/lib/api/hooks/use-daily-control';
+import { formatCurrency, formatDate, isDateStringBeforeToday } from '@/lib/utils/formatters';
+import { getErrorMessage } from '@/lib/utils/error-handler';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useAuthStore } from '@/store/auth-store';
@@ -55,11 +56,7 @@ interface Props {
 function isOverdueExit(exit: DailyExit, dateStr: string): boolean {
   if (exit.paid) return false;
   if (!exit.due) return false;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const exitDate = new Date(dateStr);
-  exitDate.setHours(0, 0, 0, 0);
-  return exitDate < today;
+  return isDateStringBeforeToday(dateStr);
 }
 
 function EntryItem({
@@ -81,7 +78,9 @@ function EntryItem({
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm font-medium">{entry.description}</span>
-          <Badge variant="outline" className="text-xs">{entry.type}</Badge>
+          <Badge variant="outline" className="text-xs">
+            {entry.type}
+          </Badge>
         </div>
         {entry.payment_date && (
           <p className="text-xs text-muted-foreground mt-0.5">
@@ -93,7 +92,9 @@ function EntryItem({
         {entry.paid ? (
           <Badge className="bg-success/10 text-success hover:bg-success/10 text-xs">Pago</Badge>
         ) : (
-          <Badge variant="secondary" className="text-xs">Pendente</Badge>
+          <Badge variant="secondary" className="text-xs">
+            Pendente
+          </Badge>
         )}
         <span className="text-sm font-bold text-success">{formatCurrency(entry.amount)}</span>
         {isAdmin && !entry.paid && entry.id !== undefined && (
@@ -118,20 +119,31 @@ interface PersonScheduleExitItemProps {
   onPayPerson: (exit: DailyExit) => void;
 }
 
-function PersonScheduleExitItem({ exit, dateStr, isAdmin, isPending, onPayPerson }: PersonScheduleExitItemProps) {
+function PersonScheduleExitItem({
+  exit,
+  dateStr,
+  isAdmin,
+  isPending,
+  onPayPerson,
+}: PersonScheduleExitItemProps) {
   const overdue = isOverdueExit(exit, dateStr);
 
   return (
-    <div className={cn('flex items-start gap-3 py-3', overdue && 'bg-destructive/10 -mx-2 px-2 rounded')}>
+    <div
+      className={cn(
+        'flex items-start gap-3 py-3',
+        overdue && 'bg-destructive/10 -mx-2 px-2 rounded'
+      )}
+    >
       <User className="h-5 w-5 text-primary shrink-0 mt-0.5" />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm font-medium">{exit.description}</span>
-          <Badge variant="outline" className="text-xs">pessoa</Badge>
+          <Badge variant="outline" className="text-xs">
+            pessoa
+          </Badge>
         </div>
-        {exit.person && (
-          <div className="text-xs text-muted-foreground mt-0.5">{exit.person}</div>
-        )}
+        {exit.person && <div className="text-xs text-muted-foreground mt-0.5">{exit.person}</div>}
         {exit.payment_date && (
           <div className="text-xs text-muted-foreground mt-0.5">
             Pago em {formatDate(exit.payment_date)}
@@ -142,9 +154,13 @@ function PersonScheduleExitItem({ exit, dateStr, isAdmin, isPending, onPayPerson
         {exit.paid ? (
           <Badge className="bg-success/10 text-success hover:bg-success/10 text-xs">Pago</Badge>
         ) : overdue ? (
-          <Badge variant="destructive" className="text-xs">Vencida</Badge>
+          <Badge variant="destructive" className="text-xs">
+            Vencida
+          </Badge>
         ) : (
-          <Badge variant="secondary" className="text-xs">Pendente</Badge>
+          <Badge variant="secondary" className="text-xs">
+            Pendente
+          </Badge>
         )}
         <span className="text-sm font-bold text-destructive">{formatCurrency(exit.amount)}</span>
         {isAdmin && !exit.paid && (
@@ -190,12 +206,19 @@ function ExitItem({ exit, dateStr, isAdmin, isPending, onMarkPaid, onPayPerson }
   const overdue = isOverdueExit(exit, dateStr);
 
   return (
-    <div className={cn('flex items-start gap-3 py-3', overdue && 'bg-destructive/10 -mx-2 px-2 rounded')}>
+    <div
+      className={cn(
+        'flex items-start gap-3 py-3',
+        overdue && 'bg-destructive/10 -mx-2 px-2 rounded'
+      )}
+    >
       <ArrowUpCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm font-medium">{exit.description}</span>
-          <Badge variant="outline" className="text-xs">{exit.type}</Badge>
+          <Badge variant="outline" className="text-xs">
+            {exit.type}
+          </Badge>
         </div>
         <div className="text-xs text-muted-foreground mt-0.5 flex gap-1 flex-wrap">
           {exit.person && <span>{exit.person}</span>}
@@ -208,9 +231,13 @@ function ExitItem({ exit, dateStr, isAdmin, isPending, onMarkPaid, onPayPerson }
         {exit.paid ? (
           <Badge className="bg-success/10 text-success hover:bg-success/10 text-xs">Pago</Badge>
         ) : overdue ? (
-          <Badge variant="destructive" className="text-xs">Vencida</Badge>
+          <Badge variant="destructive" className="text-xs">
+            Vencida
+          </Badge>
         ) : (
-          <Badge variant="secondary" className="text-xs">Pendente</Badge>
+          <Badge variant="secondary" className="text-xs">
+            Pendente
+          </Badge>
         )}
         <span className="text-sm font-bold text-destructive">{formatCurrency(exit.amount)}</span>
         {isAdmin && !exit.paid && (
@@ -252,18 +279,18 @@ export function DayDetailDrawer({ day, open, onClose }: Props) {
       try {
         await markPaidMutation.mutateAsync(req);
         toast.success('Item marcado como pago');
-      } catch {
-        toast.error('Erro ao marcar item como pago');
+      } catch (error) {
+        toast.error(getErrorMessage(error, 'Erro ao marcar item como pago'));
       }
     },
-    [markPaidMutation],
+    [markPaidMutation]
   );
 
   const handleMarkPaidSync = useCallback(
     (req: MarkPaidRequest) => {
       void handleMarkPaid(req);
     },
-    [handleMarkPaid],
+    [handleMarkPaid]
   );
 
   const handlePayPerson = useCallback(
@@ -272,7 +299,7 @@ export function DayDetailDrawer({ day, open, onClose }: Props) {
       const referenceMonth = exit.reference_month ?? day.date.substring(0, 7) + '-01';
       setSelectedPersonExit({ exit, referenceMonth });
     },
-    [day],
+    [day]
   );
 
   if (!day) return null;
@@ -282,7 +309,12 @@ export function DayDetailDrawer({ day, open, onClose }: Props) {
 
   return (
     <>
-      <Sheet open={open} onOpenChange={(isOpen) => { if (!isOpen) onClose(); }}>
+      <Sheet
+        open={open}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) onClose();
+        }}
+      >
         <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
           <SheetHeader>
             <SheetTitle>
@@ -301,9 +333,19 @@ export function DayDetailDrawer({ day, open, onClose }: Props) {
                 <p className="text-xs text-muted-foreground">Saídas</p>
                 <p className="text-sm font-bold text-destructive">{formatCurrency(totalExits)}</p>
               </div>
-              <div className={cn('rounded-lg p-3', day.cumulative_balance >= 0 ? 'bg-info/10' : 'bg-destructive/10')}>
+              <div
+                className={cn(
+                  'rounded-lg p-3',
+                  day.cumulative_balance >= 0 ? 'bg-info/10' : 'bg-destructive/10'
+                )}
+              >
                 <p className="text-xs text-muted-foreground">Saldo Acumulado</p>
-                <p className={cn('text-sm font-bold', day.cumulative_balance >= 0 ? 'text-info' : 'text-destructive')}>
+                <p
+                  className={cn(
+                    'text-sm font-bold',
+                    day.cumulative_balance >= 0 ? 'text-info' : 'text-destructive'
+                  )}
+                >
                   {formatCurrency(day.cumulative_balance)}
                 </p>
               </div>
@@ -365,7 +407,9 @@ export function DayDetailDrawer({ day, open, onClose }: Props) {
             )}
 
             {day.entries.length === 0 && day.exits.length === 0 && (
-              <p className="text-center text-muted-foreground py-8">Nenhuma movimentação neste dia</p>
+              <p className="text-center text-muted-foreground py-8">
+                Nenhuma movimentação neste dia
+              </p>
             )}
           </div>
         </SheetContent>

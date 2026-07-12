@@ -26,6 +26,10 @@ export function useUpdateFinancialSettings() {
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.financialSettings.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.financialDashboard.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.cashFlow.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.dailyControl.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.rentCalendar.all });
     },
   });
 }

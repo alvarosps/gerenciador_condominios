@@ -25,6 +25,7 @@ import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { useCreateAdminUser, useUpdateAdminUser } from '@/lib/api/hooks/use-users';
 import { userFormSchema, type UserFormValues, type AdminUser } from '@/lib/schemas/user';
+import { getErrorMessage } from '@/lib/utils/error-handler';
 
 interface UserFormModalProps {
   open: boolean;
@@ -79,8 +80,8 @@ export function UserFormModal({ open, user, onClose }: UserFormModalProps) {
       }
       onClose();
       formMethods.reset();
-    } catch {
-      toast.error('Erro ao salvar usuário');
+    } catch (error) {
+      toast.error(getErrorMessage(error, 'Erro ao salvar usuário'));
     }
   };
 
@@ -162,12 +163,7 @@ export function UserFormModal({ open, user, onClose }: UserFormModalProps) {
                 <FormItem>
                   <FormLabel>{isEditing ? 'Nova Senha' : 'Senha *'}</FormLabel>
                   <FormControl>
-                    <Input
-                      type="password"
-                      placeholder="••••••••"
-                      {...field}
-                      disabled={isLoading}
-                    />
+                    <Input type="password" placeholder="••••••••" {...field} disabled={isLoading} />
                   </FormControl>
                   {isEditing && (
                     <FormDescription>Deixe em branco para manter a senha atual</FormDescription>

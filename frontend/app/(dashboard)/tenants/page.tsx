@@ -52,16 +52,14 @@ import { DataTable, type Column } from '@/components/tables/data-table';
 import { TenantFormWizard } from './_components/wizard';
 import { TenantLeaseModal } from './_components/tenant-lease-modal';
 import { ContractViewModal } from './_components/contract-view-modal';
-import {
-  useTenants,
-  useDeleteTenant,
-} from '@/lib/api/hooks/use-tenants';
+import { useTenants, useDeleteTenant } from '@/lib/api/hooks/use-tenants';
 import { useLeases, usePatchLease } from '@/lib/api/hooks/use-leases';
 import { type Tenant } from '@/lib/schemas/tenant.schema';
 import { type Lease } from '@/lib/schemas/lease.schema';
 import { formatCpfCnpj, formatPhone } from '@/lib/utils/formatters';
 import { tenantExportColumns } from '@/lib/hooks/use-export';
 import { useCrudPage } from '@/lib/hooks/use-crud-page';
+import { getErrorMessage } from '@/lib/utils/error-handler';
 
 export default function TenantsPage() {
   // Page-specific filters state
@@ -119,11 +117,15 @@ export default function TenantsPage() {
       });
       toast.success(
         field === 'contract_signed'
-          ? (lease.contract_signed ? 'Assinatura revertida' : 'Contrato marcado como assinado')
-          : (lease.interfone_configured ? 'Interfone desconfigurado' : 'Interfone marcado como configurado')
+          ? lease.contract_signed
+            ? 'Assinatura revertida'
+            : 'Contrato marcado como assinado'
+          : lease.interfone_configured
+            ? 'Interfone desconfigurado'
+            : 'Interfone marcado como configurado'
       );
-    } catch {
-      toast.error('Erro ao atualizar');
+    } catch (error) {
+      toast.error(getErrorMessage(error, 'Erro ao atualizar'));
     }
     setToggleConfirm(null);
   };
@@ -269,11 +271,7 @@ export default function TenantsPage() {
         const lease = record.id !== undefined ? leaseByTenantId.get(record.id) : undefined;
         if (!lease) return <span className="text-muted-foreground">—</span>;
         return (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setContractViewLease(lease)}
-          >
+          <Button variant="outline" size="sm" onClick={() => setContractViewLease(lease)}>
             Ver
           </Button>
         );
@@ -289,29 +287,17 @@ export default function TenantsPage() {
         return (
           <div className="flex items-center gap-1">
             {lease ? (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => openTransferModal(record, lease)}
-              >
+              <Button variant="ghost" size="sm" onClick={() => openTransferModal(record, lease)}>
                 <ArrowRightLeft className="h-4 w-4 mr-1" />
                 Trocar
               </Button>
             ) : (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => openCreateLeaseModal(record)}
-              >
+              <Button variant="ghost" size="sm" onClick={() => openCreateLeaseModal(record)}>
                 <FilePlus className="h-4 w-4 mr-1" />
                 Contrato
               </Button>
             )}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => crud.openEditModal(record)}
-            >
+            <Button variant="ghost" size="sm" onClick={() => crud.openEditModal(record)}>
               <Pencil className="h-4 w-4 mr-1" />
               Editar
             </Button>
@@ -360,9 +346,7 @@ export default function TenantsPage() {
       <div className="mb-4 flex justify-between items-center flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold">Inquilinos</h1>
-          <p className="text-muted-foreground mt-1">
-            Gerencie os inquilinos dos apartamentos
-          </p>
+          <p className="text-muted-foreground mt-1">Gerencie os inquilinos dos apartamentos</p>
         </div>
         <div className="flex gap-2">
           <DropdownMenu>
@@ -407,7 +391,9 @@ export default function TenantsPage() {
         <div className="mb-4 p-4 bg-primary/5 border border-primary/20 rounded flex justify-between items-center flex-wrap gap-3">
           <span className="text-primary font-medium">
             {crud.bulkOps.selectionCount}{' '}
-            {crud.bulkOps.selectionCount === 1 ? 'inquilino selecionado' : 'inquilinos selecionados'}
+            {crud.bulkOps.selectionCount === 1
+              ? 'inquilino selecionado'
+              : 'inquilinos selecionados'}
           </span>
           <div className="flex gap-2">
             <Button variant="outline" onClick={crud.bulkOps.clearSelection}>
@@ -430,9 +416,7 @@ export default function TenantsPage() {
         <CardContent className="pt-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-medium mb-2">
-                Buscar por Nome ou CPF/CNPJ
-              </label>
+              <label className="block text-sm font-medium mb-2">Buscar por Nome ou CPF/CNPJ</label>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -557,17 +541,21 @@ export default function TenantsPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>
               {toggleConfirm?.field === 'contract_signed'
-                ? (toggleConfirm.lease.contract_signed ? 'Reverter assinatura' : 'Confirmar assinatura')
-                : (toggleConfirm?.lease.interfone_configured ? 'Desconfigurar interfone' : 'Confirmar interfone')}
+                ? toggleConfirm.lease.contract_signed
+                  ? 'Reverter assinatura'
+                  : 'Confirmar assinatura'
+                : toggleConfirm?.lease.interfone_configured
+                  ? 'Desconfigurar interfone'
+                  : 'Confirmar interfone'}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {toggleConfirm?.field === 'contract_signed'
-                ? (toggleConfirm.lease.contract_signed
-                    ? 'Deseja reverter a assinatura do contrato?'
-                    : 'O contrato foi assinado?')
-                : (toggleConfirm?.lease.interfone_configured
-                    ? 'Deseja desconfigurar o interfone?'
-                    : 'O interfone foi cadastrado?')}
+                ? toggleConfirm.lease.contract_signed
+                  ? 'Deseja reverter a assinatura do contrato?'
+                  : 'O contrato foi assinado?'
+                : toggleConfirm?.lease.interfone_configured
+                  ? 'Deseja desconfigurar o interfone?'
+                  : 'O interfone foi cadastrado?'}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

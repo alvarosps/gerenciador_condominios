@@ -1,13 +1,21 @@
 'use client';
 
 import { useState } from 'react';
-import { AlertTriangle, CheckCircle, ChevronDown, ChevronRight, Pencil, Trash2 } from 'lucide-react';
+import {
+  AlertTriangle,
+  CheckCircle,
+  ChevronDown,
+  ChevronRight,
+  Pencil,
+  Trash2,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import type { ExpenseDetailItem } from '@/lib/api/hooks/use-financial-dashboard';
 import { useMarkInstallmentPaid } from '@/lib/api/hooks/use-expense-installments';
 import { formatCurrency } from '@/lib/utils/formatters';
+import { getErrorMessage } from '@/lib/utils/error-handler';
 
 interface OverdueSectionProps {
   items: ExpenseDetailItem[];
@@ -29,8 +37,8 @@ export function OverdueSection({ items, total, onEdit, onDelete, onPaid }: Overd
       await markPaidMutation.mutateAsync(item.installment_id);
       toast.success(`"${item.description}" marcada como paga`);
       onPaid?.();
-    } catch {
-      toast.error('Erro ao marcar como paga');
+    } catch (error) {
+      toast.error(getErrorMessage(error, 'Erro ao marcar como paga'));
     }
   };
 
@@ -85,11 +93,12 @@ export function OverdueSection({ items, total, onEdit, onDelete, onPaid }: Overd
                   className="border-b hover:bg-destructive/5"
                 >
                   <td className="py-2 px-2 max-w-[200px] truncate">{item.description}</td>
-                  <td className="py-2 px-2 text-muted-foreground">
-                    {item.building_name ?? '—'}
-                  </td>
+                  <td className="py-2 px-2 text-muted-foreground">{item.building_name ?? '—'}</td>
                   <td className="py-2 px-2 text-center text-muted-foreground">
-                    {item.installment_number !== null && item.installment_number !== undefined && item.total_installments !== null && item.total_installments !== undefined
+                    {item.installment_number !== null &&
+                    item.installment_number !== undefined &&
+                    item.total_installments !== null &&
+                    item.total_installments !== undefined
                       ? `${item.installment_number}/${item.total_installments}`
                       : '—'}
                   </td>

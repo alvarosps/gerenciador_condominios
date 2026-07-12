@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   formatCurrency,
   formatCPF,
@@ -8,6 +8,9 @@ import {
   formatDate,
   formatMonthYear,
   formatDateISO,
+  getTodayLocalISO,
+  isDateStringBeforeToday,
+  isDateStringAfterToday,
 } from '../formatters';
 
 describe('formatCurrency', () => {
@@ -98,7 +101,6 @@ describe('formatCpfCnpj', () => {
   it('returns original for other lengths', () => {
     expect(formatCpfCnpj('12345')).toBe('12345');
   });
-
 });
 
 describe('formatPhone', () => {
@@ -117,7 +119,6 @@ describe('formatPhone', () => {
   it('returns original for other lengths', () => {
     expect(formatPhone('1234')).toBe('1234');
   });
-
 });
 
 describe('formatDate', () => {
@@ -182,5 +183,73 @@ describe('formatDateISO', () => {
 
   it('returns empty string for invalid Date', () => {
     expect(formatDateISO(new Date('invalid'))).toBe('');
+  });
+});
+
+describe('getTodayLocalISO', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('returns today as YYYY-MM-DD using local time, not UTC', () => {
+    // 2026-03-15 23:30 in UTC-3 (Brazil) is already 2026-03-16 02:30 UTC.
+    // A UTC-based implementation would incorrectly return 2026-03-16.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 2, 15, 23, 30, 0));
+    expect(getTodayLocalISO()).toBe('2026-03-15');
+  });
+
+  it('pads single-digit month and day', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 0, 5, 10, 0, 0));
+    expect(getTodayLocalISO()).toBe('2026-01-05');
+  });
+});
+
+describe('isDateStringBeforeToday', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('returns false for today (item due today is not overdue)', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 6, 12, 23, 45, 0));
+    expect(isDateStringBeforeToday('2026-07-12')).toBe(false);
+  });
+
+  it('returns true for a date strictly before today', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 6, 12, 1, 0, 0));
+    expect(isDateStringBeforeToday('2026-07-11')).toBe(true);
+  });
+
+  it('returns false for a future date', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 6, 12, 1, 0, 0));
+    expect(isDateStringBeforeToday('2026-07-13')).toBe(false);
+  });
+});
+
+describe('isDateStringAfterToday', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('returns false for today', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 6, 12, 23, 45, 0));
+    expect(isDateStringAfterToday('2026-07-12')).toBe(false);
+  });
+
+  it('returns true for a date strictly after today', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 6, 12, 1, 0, 0));
+    expect(isDateStringAfterToday('2026-07-13')).toBe(true);
+  });
+
+  it('returns false for a past date', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 6, 12, 1, 0, 0));
+    expect(isDateStringAfterToday('2026-07-11')).toBe(false);
   });
 });

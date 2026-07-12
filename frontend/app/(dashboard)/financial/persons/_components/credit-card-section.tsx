@@ -22,6 +22,7 @@ import {
   useDeleteCreditCard,
 } from '@/lib/api/hooks/use-credit-cards';
 import { type CreditCard } from '@/lib/schemas/credit-card.schema';
+import { getErrorMessage } from '@/lib/utils/error-handler';
 
 interface CreditCardSectionProps {
   personId: number;
@@ -103,8 +104,13 @@ export function CreditCardSection({ personId, creditCards }: CreditCardSectionPr
         toast.success('Cartão adicionado com sucesso');
       }
       cancelForm();
-    } catch {
-      toast.error(editingCardId ? 'Erro ao atualizar cartão' : 'Erro ao adicionar cartão');
+    } catch (error) {
+      toast.error(
+        getErrorMessage(
+          error,
+          editingCardId ? 'Erro ao atualizar cartão' : 'Erro ao adicionar cartão'
+        )
+      );
     }
   };
 
@@ -112,8 +118,8 @@ export function CreditCardSection({ personId, creditCards }: CreditCardSectionPr
     try {
       await deleteMutation.mutateAsync(cardId);
       toast.success('Cartão removido com sucesso');
-    } catch {
-      toast.error('Erro ao remover cartão');
+    } catch (error) {
+      toast.error(getErrorMessage(error, 'Erro ao remover cartão'));
     }
   };
 
@@ -228,7 +234,9 @@ export function CreditCardSection({ personId, creditCards }: CreditCardSectionPr
                         max={31}
                         {...field}
                         value={field.value}
-                        onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : 1)}
+                        onChange={(e) =>
+                          field.onChange(e.target.value ? Number(e.target.value) : 1)
+                        }
                         disabled={isSaving}
                       />
                     </FormControl>
@@ -249,7 +257,9 @@ export function CreditCardSection({ personId, creditCards }: CreditCardSectionPr
                         max={31}
                         {...field}
                         value={field.value}
-                        onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : 1)}
+                        onChange={(e) =>
+                          field.onChange(e.target.value ? Number(e.target.value) : 1)
+                        }
                         disabled={isSaving}
                       />
                     </FormControl>

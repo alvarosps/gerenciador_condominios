@@ -15,7 +15,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { DailyBreakdownDay } from '@/lib/api/hooks/use-daily-control';
-import { formatCurrency } from '@/lib/utils/formatters';
+import { formatCurrency, isDateStringAfterToday } from '@/lib/utils/formatters';
 
 interface Props {
   data: DailyBreakdownDay[];
@@ -38,19 +38,14 @@ interface TooltipPayloadItem {
 }
 
 function toChartData(days: DailyBreakdownDay[]): ChartDataItem[] {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
   return days.map((d) => {
-    const dayDate = new Date(d.date);
-    dayDate.setHours(0, 0, 0, 0);
     const dayNum = parseInt(d.date.split('-')[2] ?? '0', 10);
     return {
       day: dayNum,
       entries: d.total_entries,
       exits: d.total_exits,
       cumulative: d.cumulative_balance,
-      isFuture: dayDate > today,
+      isFuture: isDateStringAfterToday(d.date),
     };
   });
 }
@@ -73,7 +68,10 @@ function CustomTooltip({
 
   return (
     <div className="bg-card border rounded-lg shadow-lg p-4">
-      <p className="font-bold mb-2">Dia {label}{item.isFuture ? ' (futuro)' : ''}</p>
+      <p className="font-bold mb-2">
+        Dia {label}
+        {item.isFuture ? ' (futuro)' : ''}
+      </p>
       <p className="text-sm">
         <span className="text-muted-foreground">Entradas: </span>
         <span className="font-medium text-success">{formatCurrency(item.entries)}</span>
@@ -115,7 +113,9 @@ export function DailyBalanceChart({ data, isLoading }: Props) {
           <CardTitle>Fluxo Diário</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-center text-muted-foreground py-8">Nenhum dado disponível para o período</p>
+          <p className="text-center text-muted-foreground py-8">
+            Nenhum dado disponível para o período
+          </p>
         </CardContent>
       </Card>
     );

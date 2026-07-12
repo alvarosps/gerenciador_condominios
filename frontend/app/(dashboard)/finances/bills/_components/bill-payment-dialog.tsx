@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -41,7 +42,7 @@ import type { FundedFrom } from '@/lib/schemas/finances/category.schema';
 function todayISO(): string {
   const now = new Date();
   return `${String(now.getFullYear())}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(
-    now.getDate(),
+    now.getDate()
   ).padStart(2, '0')}`;
 }
 
@@ -113,7 +114,7 @@ export function BillPaymentDialog({
         onError: (error) => {
           handleError(error, 'Erro ao pagar conta');
         },
-      },
+      }
     );
   }
 
@@ -122,6 +123,9 @@ export function BillPaymentDialog({
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Pagar conta{description ? ` — ${description}` : ''}</DialogTitle>
+          <DialogDescription>
+            Informe o valor, a origem do pagamento e a data para registrar o pagamento desta conta.
+          </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>

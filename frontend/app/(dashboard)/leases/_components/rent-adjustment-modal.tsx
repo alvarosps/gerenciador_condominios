@@ -29,6 +29,7 @@ import { useApplyRentAdjustment } from '@/lib/api/hooks/use-rent-adjustments';
 import { type Lease } from '@/lib/schemas/lease.schema';
 import { rentAdjustmentFormSchema } from '@/lib/schemas/rent-adjustment.schema';
 import { formatCurrency } from '@/lib/utils/formatters';
+import { getErrorMessage } from '@/lib/utils/error-handler';
 
 interface Props {
   open: boolean;
@@ -81,8 +82,8 @@ export function RentAdjustmentModal({ open, lease, onClose }: Props) {
       }
 
       handleClose();
-    } catch {
-      toast.error('Erro ao aplicar reajuste');
+    } catch (error) {
+      toast.error(getErrorMessage(error, 'Erro ao aplicar reajuste'));
     }
   };
 

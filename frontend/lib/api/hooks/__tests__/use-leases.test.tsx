@@ -10,9 +10,12 @@ import {
   useCreateLease,
   useUpdateLease,
   useDeleteLease,
+  usePatchLease,
   useGenerateContract,
   useCalculateLateFee,
   useChangeDueDate,
+  useTransferLease,
+  useTerminateLease,
   useActiveLeases,
   useExpiredLeases,
   useExpiringSoonLeases,
@@ -156,6 +159,66 @@ describe('useLeases', () => {
       result.current.mutate(1);
 
       await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    });
+  });
+
+  describe('usePatchLease', () => {
+    it('should invalidate leases, apartments, rentCalendar and financialDashboard after patch', async () => {
+      const queryClient = createTestQueryClient();
+      const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+
+      const { result } = renderHook(() => usePatchLease(), {
+        wrapper: createWrapper(queryClient),
+      });
+
+      result.current.mutate({ id: 1, tag_fee: 60 });
+
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['leases'] });
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['apartments'] });
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['rent-calendar'] });
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['financial-dashboard'] });
+    });
+  });
+
+  describe('useTransferLease', () => {
+    it('should invalidate leases, apartments, rentCalendar and financialDashboard after transfer', async () => {
+      const queryClient = createTestQueryClient();
+      const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+
+      const { result } = renderHook(() => useTransferLease(), {
+        wrapper: createWrapper(queryClient),
+      });
+
+      result.current.mutate({ leaseId: 1, apartment_id: 2 });
+
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['leases'] });
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['apartments'] });
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['rent-calendar'] });
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['financial-dashboard'] });
+    });
+  });
+
+  describe('useTerminateLease', () => {
+    it('should invalidate leases, apartments, rentCalendar and financialDashboard after termination', async () => {
+      const queryClient = createTestQueryClient();
+      const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+
+      const { result } = renderHook(() => useTerminateLease(), {
+        wrapper: createWrapper(queryClient),
+      });
+
+      result.current.mutate(1);
+
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['leases'] });
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['apartments'] });
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['rent-calendar'] });
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['financial-dashboard'] });
     });
   });
 

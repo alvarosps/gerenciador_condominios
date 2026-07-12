@@ -88,7 +88,9 @@ export function formatDate(date: string | Date | null | undefined): string {
  */
 export function formatMonthYear(year: number, month: number): string {
   const date = new Date(year, month - 1, 1);
-  const formatted = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(date);
+  const formatted = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(
+    date
+  );
   return formatted.charAt(0).toUpperCase() + formatted.slice(1);
 }
 
@@ -101,11 +103,34 @@ export function formatDateISO(date: Date | null | undefined): string {
   return date.toISOString().split('T')[0] ?? '';
 }
 
-export const MONTH_ABBR = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'] as const;
+export const MONTH_ABBR = [
+  'Jan',
+  'Fev',
+  'Mar',
+  'Abr',
+  'Mai',
+  'Jun',
+  'Jul',
+  'Ago',
+  'Set',
+  'Out',
+  'Nov',
+  'Dez',
+] as const;
 
 export const MONTH_NAMES = [
-  'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-  'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
+  'Janeiro',
+  'Fevereiro',
+  'Março',
+  'Abril',
+  'Maio',
+  'Junho',
+  'Julho',
+  'Agosto',
+  'Setembro',
+  'Outubro',
+  'Novembro',
+  'Dezembro',
 ] as const;
 
 /**
@@ -118,4 +143,39 @@ export function getDefaultExpenseDate(year: number, month: number): string {
   const lastDay = new Date(year, month, 0).getDate();
   const targetDay = Math.min(day, lastDay);
   return `${String(year)}-${String(month).padStart(2, '0')}-${String(targetDay).padStart(2, '0')}`;
+}
+
+/**
+ * Get today's date as a LOCAL YYYY-MM-DD string.
+ *
+ * Unlike `new Date().toISOString().split('T')[0]`, this does not shift to
+ * UTC first, so it never rolls back a day in negative-offset timezones
+ * (e.g. Brazil UTC−3 in the early hours).
+ */
+export function getTodayLocalISO(): string {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  return `${String(year)}-${month}-${day}`;
+}
+
+/**
+ * Compare a YYYY-MM-DD date string against today (local), lexicographically.
+ * Returns true when `dateStr` is strictly before today's local date.
+ *
+ * Lexicographic comparison is safe and equivalent to calendar comparison
+ * for zero-padded ISO date-only strings, and avoids any Date/timezone
+ * parsing pitfalls entirely.
+ */
+export function isDateStringBeforeToday(dateStr: string): boolean {
+  return dateStr < getTodayLocalISO();
+}
+
+/**
+ * Compare a YYYY-MM-DD date string against today (local), lexicographically.
+ * Returns true when `dateStr` is strictly after today's local date.
+ */
+export function isDateStringAfterToday(dateStr: string): boolean {
+  return dateStr > getTodayLocalISO();
 }

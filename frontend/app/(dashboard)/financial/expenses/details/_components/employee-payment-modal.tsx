@@ -24,6 +24,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { apiClient } from '@/lib/api/client';
+import { getErrorMessage } from '@/lib/utils/error-handler';
 
 const formSchema = z.object({
   base_salary: z.number().min(0, 'Salário base deve ser >= 0'),
@@ -82,15 +83,20 @@ export function EmployeePaymentModal({ payment, onClose, onSaved }: Props) {
       toast.success('Pagamento atualizado com sucesso');
       onSaved();
       onClose();
-    } catch {
-      toast.error('Erro ao salvar pagamento');
+    } catch (error) {
+      toast.error(getErrorMessage(error, 'Erro ao salvar pagamento'));
     } finally {
       setIsSaving(false);
     }
   };
 
   return (
-    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Editar Pagamento — {payment.person_name}</DialogTitle>
@@ -152,9 +158,7 @@ export function EmployeePaymentModal({ payment, onClose, onSaved }: Props) {
 
             <div className="rounded-md bg-muted/30 p-3 text-sm">
               <span className="text-muted-foreground">Total: </span>
-              <span className="font-semibold">
-                R$ {total.toFixed(2).replace('.', ',')}
-              </span>
+              <span className="font-semibold">R$ {total.toFixed(2).replace('.', ',')}</span>
             </div>
 
             <FormField

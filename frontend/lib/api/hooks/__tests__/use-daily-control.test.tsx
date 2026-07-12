@@ -103,6 +103,10 @@ describe('useDailyControl', () => {
       expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['expenses'] });
       expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['financial-dashboard'] });
       expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['cash-flow'] });
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['expense-installments'] });
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['incomes'] });
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['person-payments'] });
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['person-payment-schedules'] });
     });
 
     it('should mark an expense as paid', async () => {

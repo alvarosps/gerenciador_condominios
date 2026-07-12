@@ -7,8 +7,7 @@ import { Sidebar } from './sidebar';
 import { Header } from './header';
 import { type ReactNode } from 'react';
 import { useAuthStore } from '@/store/auth-store';
-import { apiClient } from '@/lib/api/client';
-import type { User } from '@/store/auth-store';
+import { useCurrentUser } from '@/lib/api/hooks/use-auth';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { ErrorBoundary } from '@/components/shared/error-boundary';
@@ -23,14 +22,15 @@ export function MainLayout({ children }: MainLayoutProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const router = useRouter();
 
-  // Fetch user profile if authenticated but no user data (e.g., cookie session restored)
+  // Fetch user profile if authenticated but no user data (e.g., cookie session restored).
+  // Uses TanStack Query (retries transient failures) instead of an untracked one-off fetch —
+  // a failed request no longer leaves `user` null forever.
+  const { data: fetchedUser } = useCurrentUser();
   useEffect(() => {
-    if (isAuthenticated && !user) {
-      void apiClient.get<User>('/auth/me/').then(({ data }) => {
-        setUser(data);
-      });
+    if (isAuthenticated && !user && fetchedUser) {
+      setUser(fetchedUser);
     }
-  }, [isAuthenticated, user, setUser]);
+  }, [isAuthenticated, user, fetchedUser, setUser]);
 
   // Role guard (defense in depth alongside the Edge middleware): a non-staff tenant who
   // reaches the admin dashboard is sent to their portal. The backend is the real barrier.

@@ -11,10 +11,7 @@ import {
 import { CombinedCalendarSection } from '../combined-calendar-section';
 import * as calendarHooks from '@/lib/api/hooks/use-combined-calendar';
 import type { UseQueryResult } from '@tanstack/react-query';
-import type {
-  CombinedCalendar,
-  OverdueBillsResponse,
-} from '@/lib/api/hooks/use-combined-calendar';
+import type { CombinedCalendar, OverdueBillsResponse } from '@/lib/api/hooks/use-combined-calendar';
 
 vi.mock('@/lib/api/hooks/use-combined-calendar', async (importOriginal) => {
   const actual = await importOriginal<typeof calendarHooks>();
@@ -47,18 +44,22 @@ beforeAll(() => {
 
 function mockCalendar(calendar: CombinedCalendar | undefined, isLoading = false) {
   vi.mocked(calendarHooks.useCombinedCalendar).mockReturnValue(
-    makeQueryResult<CombinedCalendar>(calendar, isLoading),
+    makeQueryResult<CombinedCalendar>(calendar, isLoading)
   );
   vi.mocked(calendarHooks.useOverdueBills).mockReturnValue(
-    makeQueryResult<OverdueBillsResponse>(
-      { ...createMockOverdueResponse(), bills: [] },
-      false,
-    ),
+    makeQueryResult<OverdueBillsResponse>({ ...createMockOverdueResponse(), bills: [] }, false)
   );
 }
 
 describe('CombinedCalendarSection', () => {
   beforeEach(() => {
+    // The component defaults its selected month/day to the real system clock,
+    // while every fixture below is anchored to 2026-06-07 — pin the clock so
+    // the default selection lands on the day the fixtures expect. Only `Date`
+    // is faked (not timers) so RTL's async `findBy*`/`waitFor` polling and
+    // userEvent's internal delays keep working normally.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 5, 7));
     vi.clearAllMocks();
     useAuthStore.setState({
       user: { id: 1, email: 'a@b.c', first_name: 'A', last_name: 'B', is_staff: true },
@@ -67,6 +68,7 @@ describe('CombinedCalendarSection', () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
   });
 
@@ -88,7 +90,7 @@ describe('CombinedCalendarSection', () => {
             bill_exits: [createMockBillExit({ description: 'Conta de Luz' })],
           },
         ],
-      }),
+      })
     );
     renderWithProviders(<CombinedCalendarSection />);
 
@@ -145,7 +147,7 @@ describe('CombinedCalendarSection', () => {
             bill_exits: [createMockBillExit({ bill_id: 9, description: 'Conta de Luz' })],
           },
         ],
-      }),
+      })
     );
     renderWithProviders(<CombinedCalendarSection />);
 

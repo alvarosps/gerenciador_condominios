@@ -458,6 +458,44 @@ const leaseHandlers = [
       adjustment_fee: Math.abs(data.new_due_day - oldDueDay) * 50,
     });
   }),
+
+  // Partially update lease
+  http.patch(`${API_BASE}/leases/:id/`, async ({ params, request }) => {
+    await delay(100);
+    const id = Number(params.id);
+    const data = (await request.json()) as Partial<(typeof leases)[0]>;
+    const index = leases.findIndex((l) => l.id === id);
+    const existingLease = leases[index];
+    if (index === -1 || !existingLease) {
+      return new HttpResponse(null, { status: 404 });
+    }
+    leases[index] = Object.assign({}, existingLease, data);
+    return HttpResponse.json(leases[index]);
+  }),
+
+  // Transfer lease to a different apartment
+  http.post(`${API_BASE}/leases/:id/transfer/`, async ({ params }) => {
+    await delay(100);
+    const id = Number(params.id);
+    const lease = leases.find((l) => l.id === id);
+    if (!lease) {
+      return new HttpResponse(null, { status: 404 });
+    }
+    const newLease = createMockLease({ ...lease, id: leases.length + 1 });
+    leases.push(newLease);
+    return HttpResponse.json(newLease, { status: 201 });
+  }),
+
+  // Terminate lease
+  http.post(`${API_BASE}/leases/:id/terminate/`, async ({ params }) => {
+    await delay(100);
+    const id = Number(params.id);
+    const lease = leases.find((l) => l.id === id);
+    if (!lease) {
+      return new HttpResponse(null, { status: 404 });
+    }
+    return HttpResponse.json({ detail: 'Lease terminated successfully' });
+  }),
 ];
 
 /**
