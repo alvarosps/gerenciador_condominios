@@ -22,6 +22,14 @@ import { PAGINATION } from '@/lib/utils/constants';
 import { renderCellContent } from './cell-value';
 import { DataTableCards } from './data-table-cards';
 
+type ColumnAlign = 'left' | 'center' | 'right';
+
+const ALIGN_CLASSES: Record<ColumnAlign, string> = {
+  left: 'text-left',
+  center: 'text-center',
+  right: 'text-right',
+};
+
 export interface Column<T> {
   title: string;
   dataIndex?: keyof T | string;
@@ -31,7 +39,6 @@ export interface Column<T> {
   sorter?: (a: T, b: T) => number;
   filters?: { text: string; value: unknown }[];
   onFilter?: (value: unknown, record: T) => boolean;
-  fixed?: 'left' | 'right';
   align?: 'left' | 'center' | 'right';
   primary?: boolean;
   hideOnCard?: boolean;
@@ -229,9 +236,19 @@ export function DataTable<T extends object>({
                 </TableHead>
               )}
               {columns.map((column) => (
-                <TableHead key={column.key} style={{ width: column.width }}>
+                <TableHead
+                  key={column.key}
+                  style={{ width: column.width }}
+                  className={column.align ? ALIGN_CLASSES[column.align] : undefined}
+                >
                   {column.sorter ? (
-                    <div className="flex items-center gap-1">
+                    <div
+                      className={cn(
+                        'flex items-center gap-1',
+                        column.align === 'right' && 'justify-end',
+                        column.align === 'center' && 'justify-center'
+                      )}
+                    >
                       <span>{column.title}</span>
                       <div className="flex flex-col -space-y-1 ml-1">
                         <button
@@ -298,7 +315,10 @@ export function DataTable<T extends object>({
                       </TableCell>
                     )}
                     {columns.map((column) => (
-                      <TableCell key={column.key}>
+                      <TableCell
+                        key={column.key}
+                        className={column.align ? ALIGN_CLASSES[column.align] : undefined}
+                      >
                         {renderCellContent(column, record, index)}
                       </TableCell>
                     ))}

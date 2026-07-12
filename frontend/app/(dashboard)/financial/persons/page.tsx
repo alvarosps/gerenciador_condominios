@@ -9,10 +9,7 @@ import { toast } from 'sonner';
 import { DataTable, type Column } from '@/components/tables/data-table';
 import { DeleteConfirmDialog } from '@/components/shared/delete-confirm-dialog';
 import { PersonFormModal } from './_components/person-form-modal';
-import {
-  usePersons,
-  useDeletePerson,
-} from '@/lib/api/hooks/use-persons';
+import { usePersons, useDeletePerson } from '@/lib/api/hooks/use-persons';
 import { type Person } from '@/lib/schemas/person.schema';
 import { useCrudPage } from '@/lib/hooks/use-crud-page';
 
@@ -24,7 +21,8 @@ export default function PersonsPage() {
     entityName: 'pessoa',
     entityNamePlural: 'pessoas',
     deleteMutation,
-    deleteErrorMessage: 'Erro ao excluir pessoa. Verifique se não há despesas ou cartões vinculados.',
+    deleteErrorMessage:
+      'Erro ao excluir pessoa. Verifique se não há despesas ou cartões vinculados.',
   });
 
   const columns: Column<Person>[] = [
@@ -76,22 +74,15 @@ export default function PersonsPage() {
       key: 'credit_cards_count',
       width: 100,
       align: 'center',
-      render: (_, record) => (
-        <span>{record.credit_cards?.length ?? 0}</span>
-      ),
+      render: (_, record) => <span>{record.credit_cards?.length ?? 0}</span>,
     },
     {
       title: 'Ações',
       key: 'actions',
       width: 150,
-      fixed: 'right' as const,
       render: (_: unknown, record: Person) => (
         <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => crud.openEditModal(record)}
-          >
+          <Button variant="ghost" size="sm" onClick={() => crud.openEditModal(record)}>
             <Pencil className="h-4 w-4 mr-1" />
             Editar
           </Button>
@@ -123,7 +114,9 @@ export default function PersonsPage() {
       <div className="mb-4 flex justify-between items-center flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold">Pessoas</h1>
-          <p className="text-muted-foreground mt-1">Gerencie pessoas, proprietários e seus cartões de crédito</p>
+          <p className="text-muted-foreground mt-1">
+            Gerencie pessoas, proprietários e seus cartões de crédito
+          </p>
         </div>
         <Button onClick={crud.openCreateModal}>
           <Plus className="h-4 w-4 mr-2" />
@@ -141,12 +134,7 @@ export default function PersonsPage() {
         </Alert>
       )}
 
-      <DataTable<Person>
-        columns={columns}
-        dataSource={persons}
-        loading={isLoading}
-        rowKey="id"
-      />
+      <DataTable<Person> columns={columns} dataSource={persons} loading={isLoading} rowKey="id" />
 
       <PersonFormModal
         open={crud.isModalOpen}

@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { Lock, Unlock } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { ChevronLeft, ChevronRight, Lock, Unlock } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -19,6 +19,35 @@ import { formatReferenceMonth } from '@/lib/utils/finances';
 import { getErrorMessage, handleError } from '@/lib/utils/error-handler';
 import type { CondoMonthClose } from '@/lib/schemas/finances/condo-month-close.schema';
 import { MonthCloseActionDialog } from './_components/month-close-action-dialog';
+
+/** Previous calendar month relative to today, as a { year, month } pair (1-indexed month). */
+function previousMonth(): { year: number; month: number } {
+  const now = new Date();
+  const year = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
+  const month = now.getMonth() === 0 ? 12 : now.getMonth();
+  return { year, month };
+}
+
+/** Build the `YYYY-MM-01` reference_month string the backend/dialog expect. */
+function toReferenceMonth(year: number, month: number): string {
+  return `${year}-${String(month).padStart(2, '0')}-01`;
+}
+
+/**
+ * A synthetic record for a competence that has no CondoMonthClose row yet — lets the
+ * existing per-row dialog/mutations drive the "close for the first time" flow from the
+ * header selector (U1: the "Fechar" button only shows on rows created by a prior reopen).
+ */
+function buildDraftClose(year: number, month: number): CondoMonthClose {
+  return {
+    reference_month: toReferenceMonth(year, month),
+    status: 'open',
+    net_result: 0,
+    cash_balance_end: 0,
+    reserve_balance_end: 0,
+    carry_forward_out: 0,
+  };
+}
 
 function createColumns(handlers: {
   onClose: (record: CondoMonthClose) => void;
@@ -41,7 +70,7 @@ function createColumns(handlers: {
         <Badge
           className={cn(
             'inline-flex items-center gap-1',
-            rec.status === 'closed' ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning',
+            rec.status === 'closed' ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'
           )}
         >
           {rec.status === 'closed' ? <Lock className="h-3 w-3" /> : <Unlock className="h-3 w-3" />}
@@ -72,7 +101,11 @@ function createColumns(handlers: {
       key: 'closed_at',
       width: 130,
       render: (_, rec) =>
-        rec.closed_at ? formatDate(rec.closed_at) : <span className="text-muted-foreground">-</span>,
+        rec.closed_at ? (
+          formatDate(rec.closed_at)
+        ) : (
+          <span className="text-muted-foreground">-</span>
+        ),
     },
     ...(handlers.isStaff
       ? [
@@ -81,25 +114,14 @@ function createColumns(handlers: {
             key: 'actions',
             width: 130,
             isActions: true,
-            fixed: 'right' as const,
             render: (_: unknown, rec: CondoMonthClose) => (
               <div className="flex gap-1">
                 {rec.status === 'open' ? (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    aria-label="Fechar mês"
-                    onClick={() => handlers.onClose(rec)}
-                  >
+                  <Button size="sm" variant="outline" onClick={() => handlers.onClose(rec)}>
                     Fechar
                   </Button>
                 ) : (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    aria-label="Reabrir mês"
-                    onClick={() => handlers.onReopen(rec)}
-                  >
+                  <Button size="sm" variant="outline" onClick={() => handlers.onReopen(rec)}>
                     Reabrir
                   </Button>
                 )}
@@ -121,15 +143,33 @@ export default function MonthClosePage() {
 
   const [dialogRecord, setDialogRecord] = useState<CondoMonthClose | null>(null);
   const [dialogAction, setDialogAction] = useState<'close' | 'reopen'>('close');
+  const [selectedPeriod, setSelectedPeriod] = useState(previousMonth);
 
   useEffect(() => {
     if (error) toast.error('Erro ao carregar fechamentos mensais');
   }, [error]);
 
+  const shiftSelectedMonth = (delta: number): void => {
+    setSelectedPeriod((prev) => {
+      const base = new Date(prev.year, prev.month - 1 + delta, 1);
+      return { year: base.getFullYear(), month: base.getMonth() + 1 };
+    });
+  };
+
+  const selectedReferenceMonth = toReferenceMonth(selectedPeriod.year, selectedPeriod.month);
+  const selectedClose = useMemo(
+    () => closes?.find((close) => close.reference_month === selectedReferenceMonth) ?? null,
+    [closes, selectedReferenceMonth]
+  );
+
   const openCloseDialog = useCallback((record: CondoMonthClose) => {
     setDialogRecord(record);
     setDialogAction('close');
   }, []);
+
+  const openCloseDialogForSelectedMonth = useCallback((): void => {
+    openCloseDialog(selectedClose ?? buildDraftClose(selectedPeriod.year, selectedPeriod.month));
+  }, [openCloseDialog, selectedClose, selectedPeriod]);
 
   const openReopenDialog = useCallback((record: CondoMonthClose) => {
     setDialogRecord(record);
@@ -152,7 +192,10 @@ export default function MonthClosePage() {
       // Surface the backend's PT message (gap / already-closed / not-found) — the chronological
       // guard lives in the service, the front only displays it (design §4.7/§18).
       toast.error(
-        getErrorMessage(err, dialogAction === 'close' ? 'Erro ao fechar mês' : 'Erro ao reabrir mês'),
+        getErrorMessage(
+          err,
+          dialogAction === 'close' ? 'Erro ao fechar mês' : 'Erro ao reabrir mês'
+        )
       );
       handleError(err, 'MonthClosePage.handleConfirm');
     }
@@ -175,6 +218,38 @@ export default function MonthClosePage() {
             Histórico de fechamentos e saldos do condomínio
           </p>
         </div>
+
+        {isStaff && (
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => shiftSelectedMonth(-1)}
+                aria-label="Mês anterior"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="min-w-[10rem] text-center text-sm font-medium">
+                {formatReferenceMonth(selectedReferenceMonth)}
+              </span>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => shiftSelectedMonth(1)}
+                aria-label="Próximo mês"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+            <Button
+              disabled={selectedClose?.status === 'closed'}
+              onClick={openCloseDialogForSelectedMonth}
+            >
+              Fechar mês
+            </Button>
+          </div>
+        )}
       </div>
 
       <DataTable<CondoMonthClose>
@@ -189,7 +264,9 @@ export default function MonthClosePage() {
         close={dialogRecord}
         action={dialogAction}
         isPending={isPending}
-        onConfirm={() => { void handleConfirm(); }}
+        onConfirm={() => {
+          void handleConfirm();
+        }}
         onCancel={() => setDialogRecord(null)}
       />
     </div>

@@ -143,7 +143,6 @@ function createIncomeColumns(handlers: IncomeActionHandlers): Column<Income>[] {
       title: 'Ações',
       key: 'actions',
       width: 150,
-      fixed: 'right',
       render: (_, record) => (
         <TooltipProvider>
           <div className="flex items-center gap-1">

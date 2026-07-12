@@ -80,4 +80,18 @@ describe('DataTable responsive table/cards', () => {
     expect(screen.getByLabelText('Página anterior')).toBeInTheDocument();
     expect(screen.getByLabelText('Próxima página')).toBeInTheDocument();
   });
+
+  it('applies the align prop as a text-align class on header and body cells', () => {
+    const alignedColumns: Column<Row>[] = [
+      { title: 'Nome', dataIndex: 'name', key: 'name', primary: true },
+      { title: 'Telefone', dataIndex: 'phone', key: 'phone', align: 'right' },
+    ];
+    renderWithProviders(<DataTable dataSource={data} columns={alignedColumns} rowKey="id" />);
+
+    const headerCell = screen.getByRole('columnheader', { name: 'Telefone' });
+    expect(headerCell).toHaveClass('text-right');
+
+    const bodyCell = screen.getAllByText('11999990000')[0]?.closest('td');
+    expect(bodyCell).toHaveClass('text-right');
+  });
 });

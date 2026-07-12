@@ -79,7 +79,6 @@ export function buildInstallmentPlanColumns({
     key: 'actions',
     isActions: true,
     width: 80,
-    fixed: 'right',
     render: (_, record) => (
       <DropdownMenu>
         <DropdownMenuTrigger asChild>

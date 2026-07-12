@@ -17,10 +17,7 @@ import { toast } from 'sonner';
 import { DataTable } from '@/components/tables/data-table';
 import type { Column } from '@/components/tables/data-table';
 import { DeleteConfirmDialog } from '@/components/shared/delete-confirm-dialog';
-import {
-  usePersonPayments,
-  useDeletePersonPayment,
-} from '@/lib/api/hooks/use-person-payments';
+import { usePersonPayments, useDeletePersonPayment } from '@/lib/api/hooks/use-person-payments';
 import { usePersons } from '@/lib/api/hooks/use-persons';
 import type { PersonPayment } from '@/lib/schemas/person-payment.schema';
 import { formatCurrency, formatDate } from '@/lib/utils/formatters';
@@ -37,11 +34,8 @@ function ModalLoader() {
 }
 
 const PersonPaymentFormModal = dynamic(
-  () =>
-    import('./_components/person-payment-form-modal').then(
-      (mod) => mod.PersonPaymentFormModal,
-    ),
-  { loading: () => <ModalLoader />, ssr: false },
+  () => import('./_components/person-payment-form-modal').then((mod) => mod.PersonPaymentFormModal),
+  { loading: () => <ModalLoader />, ssr: false }
 );
 
 function formatReferenceMonth(dateStr: string): string {
@@ -71,7 +65,11 @@ export default function PersonPaymentsPage() {
   const selectedMonthNum = Number(selectedMonth.split('-')[1]);
 
   const { data: persons } = usePersons();
-  const { data: allPayments, isLoading, error } = usePersonPayments({
+  const {
+    data: allPayments,
+    isLoading,
+    error,
+  } = usePersonPayments({
     reference_month: selectedMonth + '-01',
     person_id: filterPersonId,
   });
@@ -84,10 +82,7 @@ export default function PersonPaymentsPage() {
     deleteErrorMessage: 'Erro ao excluir pagamento.',
   });
 
-  const relevantPersons = useMemo(
-    () => persons?.filter((p) => !p.is_employee) ?? [],
-    [persons],
-  );
+  const relevantPersons = useMemo(() => persons?.filter((p) => !p.is_employee) ?? [], [persons]);
 
   const filteredPayments = useMemo(() => {
     if (!allPayments) return [];
@@ -99,7 +94,7 @@ export default function PersonPaymentsPage() {
       setPaymentPersonId(personId);
       crud.openCreateModal();
     },
-    [crud],
+    [crud]
   );
 
   const handleDelete = useCallback(
@@ -107,7 +102,7 @@ export default function PersonPaymentsPage() {
       crud.setItemToDelete(payment);
       if (payment.id !== undefined) crud.handleDeleteClick(payment.id);
     },
-    [crud],
+    [crud]
   );
 
   const columns: Column<PersonPayment>[] = useMemo(
@@ -150,14 +145,9 @@ export default function PersonPaymentsPage() {
               title: 'Ações',
               key: 'actions',
               width: 120,
-              fixed: 'right' as const,
               render: (_: unknown, record: PersonPayment) => (
                 <div className="flex items-center gap-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => crud.openEditModal(record)}
-                  >
+                  <Button variant="ghost" size="sm" onClick={() => crud.openEditModal(record)}>
                     <Pencil className="h-4 w-4 mr-1" />
                     Editar
                   </Button>
@@ -176,7 +166,7 @@ export default function PersonPaymentsPage() {
           ]
         : []),
     ],
-    [crud, handleDelete, isAdmin],
+    [crud, handleDelete, isAdmin]
   );
 
   useEffect(() => {
@@ -188,12 +178,15 @@ export default function PersonPaymentsPage() {
       <div className="mb-4 flex justify-between items-center flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold">Pagamentos a Pessoas</h1>
-          <p className="text-muted-foreground mt-1">
-            Controle de pagamentos mensais às pessoas
-          </p>
+          <p className="text-muted-foreground mt-1">Controle de pagamentos mensais às pessoas</p>
         </div>
         {isAdmin && (
-          <Button onClick={() => { setPaymentPersonId(undefined); crud.openCreateModal(); }}>
+          <Button
+            onClick={() => {
+              setPaymentPersonId(undefined);
+              crud.openCreateModal();
+            }}
+          >
             <Plus className="h-4 w-4 mr-2" />
             Registrar Pagamento
           </Button>

@@ -17,10 +17,7 @@ import { toast } from 'sonner';
 import { DataTable } from '@/components/tables/data-table';
 import type { Column } from '@/components/tables/data-table';
 import { DeleteConfirmDialog } from '@/components/shared/delete-confirm-dialog';
-import {
-  useRentPayments,
-  useDeleteRentPayment,
-} from '@/lib/api/hooks/use-rent-payments';
+import { useRentPayments, useDeleteRentPayment } from '@/lib/api/hooks/use-rent-payments';
 import { useBuildings } from '@/lib/api/hooks/use-buildings';
 import { useApartments } from '@/lib/api/hooks/use-apartments';
 import type { RentPayment } from '@/lib/schemas/rent-payment.schema';
@@ -38,11 +35,8 @@ function ModalLoader() {
 }
 
 const RentPaymentFormModal = dynamic(
-  () =>
-    import('./_components/rent-payment-form-modal').then(
-      (mod) => mod.RentPaymentFormModal,
-    ),
-  { loading: () => <ModalLoader />, ssr: false },
+  () => import('./_components/rent-payment-form-modal').then((mod) => mod.RentPaymentFormModal),
+  { loading: () => <ModalLoader />, ssr: false }
 );
 
 function formatReferenceMonth(dateStr: string): string {
@@ -64,9 +58,7 @@ export default function RentPaymentsPage() {
   const { exportToExcel, isExporting } = useExport();
   const { data: allPayments, isLoading, error } = useRentPayments();
   const { data: buildings } = useBuildings();
-  const { data: apartments } = useApartments(
-    buildingId ? { building_id: buildingId } : undefined,
-  );
+  const { data: apartments } = useApartments(buildingId ? { building_id: buildingId } : undefined);
   const deleteMutation = useDeleteRentPayment();
 
   const crud = useCrudPage<RentPayment>({
@@ -103,10 +95,7 @@ export default function RentPaymentsPage() {
   }, [allPayments, buildingId, apartmentId, monthFrom, monthTo]);
 
   const hasActiveFilters =
-    buildingId !== undefined ||
-    apartmentId !== undefined ||
-    monthFrom !== '' ||
-    monthTo !== '';
+    buildingId !== undefined || apartmentId !== undefined || monthFrom !== '' || monthTo !== '';
 
   const clearFilters = useCallback(() => {
     setBuildingId(undefined);
@@ -120,7 +109,7 @@ export default function RentPaymentsPage() {
       crud.setItemToDelete(payment);
       if (payment.id !== undefined) crud.handleDeleteClick(payment.id);
     },
-    [crud],
+    [crud]
   );
 
   const columns: Column<RentPayment>[] = useMemo(
@@ -156,15 +145,13 @@ export default function RentPaymentsPage() {
         title: 'Valor Pago',
         key: 'amount_paid',
         render: (_, record) => formatCurrency(record.amount_paid),
-        sorter: (a: RentPayment, b: RentPayment) =>
-          a.amount_paid - b.amount_paid,
+        sorter: (a: RentPayment, b: RentPayment) => a.amount_paid - b.amount_paid,
       },
       {
         title: 'Data Pgto.',
         key: 'payment_date',
         render: (_, record) => formatDate(record.payment_date),
-        sorter: (a: RentPayment, b: RentPayment) =>
-          a.payment_date.localeCompare(b.payment_date),
+        sorter: (a: RentPayment, b: RentPayment) => a.payment_date.localeCompare(b.payment_date),
       },
       ...(isAdmin
         ? [
@@ -172,14 +159,9 @@ export default function RentPaymentsPage() {
               title: 'Ações',
               key: 'actions',
               width: 120,
-              fixed: 'right' as const,
               render: (_: unknown, record: RentPayment) => (
                 <div className="flex items-center gap-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => crud.openEditModal(record)}
-                  >
+                  <Button variant="ghost" size="sm" onClick={() => crud.openEditModal(record)}>
                     <Pencil className="h-4 w-4 mr-1" />
                     Editar
                   </Button>
@@ -198,7 +180,7 @@ export default function RentPaymentsPage() {
           ]
         : []),
     ],
-    [crud, handleDelete, isAdmin],
+    [crud, handleDelete, isAdmin]
   );
 
   useEffect(() => {
@@ -212,14 +194,19 @@ export default function RentPaymentsPage() {
       <div className="mb-4 flex justify-between items-center flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold">Pagamentos de Aluguel</h1>
-          <p className="text-muted-foreground mt-1">
-            Gerencie os pagamentos de aluguel recebidos
-          </p>
+          <p className="text-muted-foreground mt-1">Gerencie os pagamentos de aluguel recebidos</p>
         </div>
         <div className="flex gap-2">
           <Button
             variant="outline"
-            onClick={() => filteredPayments.length > 0 && exportToExcel(filteredPayments as Record<string, unknown>[], rentPaymentExportColumns, { filename: 'pagamentos_aluguel' })}
+            onClick={() =>
+              filteredPayments.length > 0 &&
+              exportToExcel(
+                filteredPayments as Record<string, unknown>[],
+                rentPaymentExportColumns,
+                { filename: 'pagamentos_aluguel' }
+              )
+            }
             disabled={isExporting || filteredPayments.length === 0}
           >
             <Download className="h-4 w-4 mr-2" />
@@ -260,22 +247,16 @@ export default function RentPaymentsPage() {
           </div>
 
           <div className="flex-1 min-w-[180px]">
-            <label className="block text-sm font-medium mb-2">
-              Apartamento
-            </label>
+            <label className="block text-sm font-medium mb-2">Apartamento</label>
             <Select
               value={apartmentId !== undefined ? String(apartmentId) : 'all'}
-              onValueChange={(value) =>
-                setApartmentId(value === 'all' ? undefined : Number(value))
-              }
+              onValueChange={(value) => setApartmentId(value === 'all' ? undefined : Number(value))}
               disabled={buildingId === undefined}
             >
               <SelectTrigger>
                 <SelectValue
                   placeholder={
-                    buildingId === undefined
-                      ? 'Selecione um prédio'
-                      : 'Todos os apartamentos'
+                    buildingId === undefined ? 'Selecione um prédio' : 'Todos os apartamentos'
                   }
                 />
               </SelectTrigger>
@@ -292,20 +273,12 @@ export default function RentPaymentsPage() {
 
           <div className="flex-1 min-w-[160px]">
             <label className="block text-sm font-medium mb-2">Mês de</label>
-            <Input
-              type="month"
-              value={monthFrom}
-              onChange={(e) => setMonthFrom(e.target.value)}
-            />
+            <Input type="month" value={monthFrom} onChange={(e) => setMonthFrom(e.target.value)} />
           </div>
 
           <div className="flex-1 min-w-[160px]">
             <label className="block text-sm font-medium mb-2">Mês até</label>
-            <Input
-              type="month"
-              value={monthTo}
-              onChange={(e) => setMonthTo(e.target.value)}
-            />
+            <Input type="month" value={monthTo} onChange={(e) => setMonthTo(e.target.value)} />
           </div>
 
           {hasActiveFilters && (
@@ -333,9 +306,7 @@ export default function RentPaymentsPage() {
         open={crud.deleteDialogOpen}
         onOpenChange={crud.setDeleteDialogOpen}
         itemName={
-          crud.itemToDelete
-            ? formatReferenceMonth(crud.itemToDelete.reference_month)
-            : undefined
+          crud.itemToDelete ? formatReferenceMonth(crud.itemToDelete.reference_month) : undefined
         }
         onConfirm={crud.handleDelete}
         isLoading={crud.isDeleting}

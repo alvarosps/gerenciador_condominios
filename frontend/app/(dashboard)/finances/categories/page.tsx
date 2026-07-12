@@ -69,7 +69,6 @@ export default function FinanceCategoriesPage() {
             title: 'Ações',
             key: 'actions',
             width: 150,
-            fixed: 'right' as const,
             render: (_: unknown, record: FinanceCategory) => (
               <div className="flex items-center gap-2">
                 <Button variant="ghost" size="sm" onClick={() => crud.openEditModal(record)}>

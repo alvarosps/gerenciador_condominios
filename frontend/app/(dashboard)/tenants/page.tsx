@@ -281,7 +281,6 @@ export default function TenantsPage() {
       title: 'Ações',
       key: 'actions',
       width: 220,
-      fixed: 'right',
       render: (_, record: Tenant) => {
         const lease = record.id !== undefined ? leaseByTenantId.get(record.id) : undefined;
         return (
