@@ -137,6 +137,16 @@ class TestCashFlowProjectionView:
         response = authenticated_api_client.get(f"{self.base_url}/projection/?months=0")
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
+    @freeze_time("2026-03-15")
+    def test_projection_months_at_cap_returns_200(self, authenticated_api_client) -> None:
+        response = authenticated_api_client.get(f"{self.base_url}/projection/?months=60")
+        assert response.status_code == status.HTTP_200_OK
+        assert len(response.data) == 60
+
+    def test_projection_months_above_cap_returns_400(self, authenticated_api_client) -> None:
+        response = authenticated_api_client.get(f"{self.base_url}/projection/?months=61")
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
     def test_projection_unauthenticated_returns_401(self, api_client) -> None:
         response = api_client.get(f"{self.base_url}/projection/")
         assert response.status_code == status.HTTP_401_UNAUTHORIZED

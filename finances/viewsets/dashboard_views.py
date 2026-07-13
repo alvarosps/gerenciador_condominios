@@ -27,7 +27,7 @@ from finances.models import (
 )
 from finances.money import money_str, quantize_money
 from finances.serializers import BillSerializer
-from finances.services.condo_balance_service import CondoBalanceService, _next_month
+from finances.services.condo_balance_service import CondoBalanceService
 from finances.services.condo_calendar_service import CondoCalendarService
 from finances.services.condo_projection_service import CondoProjectionService
 from finances.services.condo_simulation_service import CondoSimulationService
@@ -125,6 +125,14 @@ def _monthly_balance(year: int, building_id: int | None) -> list[dict[str, Any]]
 
     Reserve and total_balance are CONDO-LEVEL (one Reserve per condominium); a per-building request
     reports them as None rather than mixing one building's cash with the whole-condo reserve.
+
+    ``running_cash_end`` carries the cash balance forward across the loop in ONE pass instead of
+    each open month calling ``CondoBalanceService.cash_balance`` (which independently re-walks
+    every month since the last close) — that would make the whole series O(n^2) in the number of
+    open months. It is re-seeded from ``CondoBalanceService.cash_balance`` only once, right
+    before the first month whose end balance this loop needs to derive itself (the first open
+    month, or an open month immediately following a closed one where the frozen
+    ``cash_balance_end`` is the authoritative seed).
     """
     condo_wide = building_id is None
     closes = {
@@ -133,22 +141,30 @@ def _monthly_balance(year: int, building_id: int | None) -> list[dict[str, Any]]
             reference_month__year=year, status=CondoMonthCloseStatus.CLOSED
         )
     }
+    reserve_end = CondoBalanceService.reserve_balance() if condo_wide else None
+
     rows: list[dict[str, Any]] = []
+    running_cash_end: Decimal | None = None
     for month in range(1, MONTHS_IN_YEAR + 1):
         close = closes.get(month)
         if close is not None:
             result = close.net_result
             cash_end = close.cash_balance_end
-            reserve_end = close.reserve_balance_end if condo_wide else None
             cash_change = Decimal(str(close.breakdown.get("cash_change_of_month", "0.00")))
             is_closed = True
+            running_cash_end = cash_end
         else:
             result = CondoBalanceService.result_of_month(year, month, building_id)
             cash_change = CondoBalanceService.cash_change_of_month(year, month, building_id)
-            cash_end = CondoBalanceService.cash_balance(
-                _next_month(date(year, month, 1)), building_id
-            )
-            reserve_end = CondoBalanceService.reserve_balance() if condo_wide else None
+            if running_cash_end is None:
+                # First month this loop must derive itself — seed once from the real baseline
+                # (last close before this month / FinancialSettings / 0.00), then walk forward
+                # by simple addition from here on.
+                running_cash_end = CondoBalanceService.cash_balance(
+                    date(year, month, 1), building_id
+                )
+            running_cash_end = running_cash_end + cash_change
+            cash_end = running_cash_end
             is_closed = False
         total = quantize_money(cash_end + reserve_end) if reserve_end is not None else None
         rows.append(

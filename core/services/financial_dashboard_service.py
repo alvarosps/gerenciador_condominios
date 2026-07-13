@@ -9,8 +9,8 @@ from datetime import date, timedelta
 from decimal import Decimal
 from typing import Any
 
-from django.db.models import Count, Q, Sum
-from django.db.models.functions import Coalesce
+from django.db.models import Case, Count, DecimalField, Prefetch, Q, Sum, When
+from django.db.models.functions import Coalesce, TruncMonth
 
 from core.cache import cache_result
 from core.models import (
@@ -124,68 +124,129 @@ class FinancialDashboardService:
     @staticmethod
     @cache_result(timeout=120, key_prefix="financial-dashboard-debt-person")
     def get_debt_by_person() -> list[dict[str, Any]]:
-        """Return debt breakdown per person: card debt, loan debt, monthly amounts."""
+        """Return debt breakdown per person: card debt, loan debt, monthly amounts.
+
+        Grouped aggregation — 3 fixed queries total (persons, installments, cards),
+        independent of the number of persons.
+        """
         today = today_sp()
         month_start = date(today.year, today.month, 1)
         next_month = DateCalculatorService.next_month_start(today.year, today.month)
+        zero = Decimal("0.00")
+        decimal_field: DecimalField[Decimal, Decimal] = DecimalField(
+            max_digits=10, decimal_places=2
+        )
 
         # Get persons who have expenses with installments
-        persons_with_expenses = Person.objects.filter(
-            expenses__installments__isnull=False,
-        ).distinct()
+        persons_with_expenses = list(
+            Person.objects.filter(expenses__installments__isnull=False)
+            .distinct()
+            .values("id", "name")
+        )
+        if not persons_with_expenses:
+            return []
+
+        person_ids = [person["id"] for person in persons_with_expenses]
+
+        loan_types = [ExpenseType.BANK_LOAN, ExpenseType.PERSONAL_LOAN]
+        debt_by_person = {
+            row["expense__person"]: row
+            for row in (
+                ExpenseInstallment.objects.filter(
+                    expense__person_id__in=person_ids,
+                    is_paid=False,
+                    expense__is_offset=False,
+                )
+                .values("expense__person")
+                .annotate(
+                    card_debt=Coalesce(
+                        Sum(
+                            Case(
+                                When(
+                                    expense__expense_type=ExpenseType.CARD_PURCHASE,
+                                    then="amount",
+                                ),
+                                default=zero,
+                                output_field=decimal_field,
+                            )
+                        ),
+                        zero,
+                    ),
+                    loan_debt=Coalesce(
+                        Sum(
+                            Case(
+                                When(
+                                    expense__expense_type__in=loan_types,
+                                    then="amount",
+                                ),
+                                default=zero,
+                                output_field=decimal_field,
+                            )
+                        ),
+                        zero,
+                    ),
+                    monthly_card=Coalesce(
+                        Sum(
+                            Case(
+                                When(
+                                    expense__expense_type=ExpenseType.CARD_PURCHASE,
+                                    due_date__gte=month_start,
+                                    due_date__lt=next_month,
+                                    then="amount",
+                                ),
+                                default=zero,
+                                output_field=decimal_field,
+                            )
+                        ),
+                        zero,
+                    ),
+                    monthly_loan=Coalesce(
+                        Sum(
+                            Case(
+                                When(
+                                    expense__expense_type__in=loan_types,
+                                    due_date__gte=month_start,
+                                    due_date__lt=next_month,
+                                    then="amount",
+                                ),
+                                default=zero,
+                                output_field=decimal_field,
+                            )
+                        ),
+                        zero,
+                    ),
+                )
+            )
+        }
+
+        cards_count_by_person = {
+            row["person"]: row["count"]
+            for row in (
+                CreditCard.objects.filter(person_id__in=person_ids, is_active=True)
+                .values("person")
+                .annotate(count=Count("id"))
+            )
+        }
 
         result = []
         for person in persons_with_expenses:
-            unpaid_installments = ExpenseInstallment.objects.filter(
-                expense__person=person,
-                is_paid=False,
-                expense__is_offset=False,
-            )
-
-            card_debt = unpaid_installments.filter(
-                expense__expense_type=ExpenseType.CARD_PURCHASE,
-            ).aggregate(total=Coalesce(Sum("amount"), Decimal("0.00")))["total"]
-
-            loan_debt = unpaid_installments.filter(
-                expense__expense_type__in=[ExpenseType.BANK_LOAN, ExpenseType.PERSONAL_LOAN],
-            ).aggregate(total=Coalesce(Sum("amount"), Decimal("0.00")))["total"]
-
-            # Monthly amounts (this month only, excluding offsets)
-            monthly_card = ExpenseInstallment.objects.filter(
-                expense__person=person,
-                expense__expense_type=ExpenseType.CARD_PURCHASE,
-                expense__is_offset=False,
-                due_date__gte=month_start,
-                due_date__lt=next_month,
-                is_paid=False,
-            ).aggregate(total=Coalesce(Sum("amount"), Decimal("0.00")))["total"]
-
-            monthly_loan = ExpenseInstallment.objects.filter(
-                expense__person=person,
-                expense__expense_type__in=[ExpenseType.BANK_LOAN, ExpenseType.PERSONAL_LOAN],
-                expense__is_offset=False,
-                due_date__gte=month_start,
-                due_date__lt=next_month,
-                is_paid=False,
-            ).aggregate(total=Coalesce(Sum("amount"), Decimal("0.00")))["total"]
-
-            cards_count = CreditCard.objects.filter(
-                person=person,
-                is_active=True,
-            ).count()
-
-            total_debt = card_debt + loan_debt
+            person_id = person["id"]
+            debt_row = debt_by_person.get(person_id)
+            card_debt = debt_row["card_debt"] if debt_row else zero
+            loan_debt = debt_row["loan_debt"] if debt_row else zero
+            monthly_card = debt_row["monthly_card"] if debt_row else zero
+            monthly_loan = debt_row["monthly_loan"] if debt_row else zero
 
             result.append(
                 {
-                    "person_id": person.id,
-                    "person_name": person.name,
+                    "person_id": person_id,
+                    "person_name": person["name"],
                     "card_debt": card_debt,
                     "loan_debt": loan_debt,
-                    "total_debt": total_debt,
+                    "total_debt": card_debt + loan_debt,
                     "monthly_card": monthly_card,
                     "monthly_loan": monthly_loan,
-                    "cards_count": cards_count,
+                    "cards_count": cards_count_by_person.get(person_id, 0),
                 }
             )
 
@@ -648,6 +709,452 @@ class FinancialDashboardService:
         )
 
     @staticmethod
+    def _bulk_add_installment_totals(
+        totals: dict[int, dict[str, Decimal]],
+        month_keys: dict[date, str],
+        *,
+        person_ids: list[int],
+        expense_types: list[str],
+        range_start: date,
+        range_end: date,
+        sign: int = 1,
+    ) -> None:
+        """Add grouped ``ExpenseInstallment`` totals (by person/month) into ``totals`` in place."""
+        rows = (
+            ExpenseInstallment.objects.filter(
+                due_date__gte=range_start,
+                due_date__lt=range_end,
+                expense__person_id__in=person_ids,
+                expense__expense_type__in=expense_types,
+                expense__is_debt_installment=False,
+                expense__is_offset=False,
+            )
+            .annotate(month=TruncMonth("due_date"))
+            .values("expense__person_id", "month")
+            .annotate(total=Sum("amount"))
+        )
+        for row in rows:
+            month_key = month_keys.get(row["month"])
+            if month_key is not None:
+                totals[row["expense__person_id"]][month_key] += sign * row["total"]
+
+    @staticmethod
+    def _bulk_add_single_expense_totals(
+        totals: dict[int, dict[str, Decimal]],
+        month_keys: dict[date, str],
+        *,
+        person_ids: list[int],
+        expense_types: list[str],
+        range_start: date,
+        range_end: date,
+        amount_field: str,
+        sign: int = 1,
+    ) -> None:
+        """Add grouped single-payment ``Expense`` totals (by person/month) into ``totals``."""
+        rows = (
+            Expense.objects.filter(
+                person_id__in=person_ids,
+                expense_type__in=expense_types,
+                is_installment=False,
+                is_offset=False,
+                expense_date__gte=range_start,
+                expense_date__lt=range_end,
+            )
+            .annotate(month=TruncMonth("expense_date"))
+            .values("person_id", "month")
+            .annotate(total=Sum(amount_field))
+        )
+        for row in rows:
+            month_key = month_keys.get(row["month"])
+            if month_key is not None:
+                totals[row["person_id"]][month_key] += sign * row["total"]
+
+    @staticmethod
+    def _bulk_add_fixed_and_stipend_totals(
+        totals: dict[int, dict[str, Decimal]],
+        month_keys: dict[date, str],
+        *,
+        person_ids: list[int],
+        months: list[tuple[int, int]],
+        skipped_by_month: dict[date, set[int]],
+    ) -> None:
+        """Add fixed recurring expenses + fixed stipends (by person/month) into ``totals``.
+
+        Not date-range-groupable via ``TruncMonth`` (bounded only by ``end_date``/
+        ``start_date``, not a due/expense date within the month) — one query per category per
+        month, fixed and small regardless of ``len(person_ids)``.
+        """
+        for y, m in months:
+            month_start = date(y, m, 1)
+            month_key = month_keys[month_start]
+            skipped_ids = skipped_by_month.get(month_start, set())
+
+            fixed_rows = (
+                Expense.objects.filter(
+                    expense_type=ExpenseType.FIXED_EXPENSE,
+                    is_recurring=True,
+                    is_offset=False,
+                    person_id__in=person_ids,
+                )
+                .exclude(end_date__lt=month_start)
+                .exclude(pk__in=skipped_ids)
+                .values("person_id")
+                .annotate(total=Sum("expected_monthly_amount"))
+            )
+            for row in fixed_rows:
+                totals[row["person_id"]][month_key] += row["total"] or Decimal("0.00")
+
+            stipend_rows = (
+                PersonIncome.objects.filter(
+                    person_id__in=person_ids,
+                    income_type=PersonIncomeType.FIXED_STIPEND,
+                    is_active=True,
+                    start_date__lte=month_start,
+                )
+                .exclude(end_date__lt=month_start)
+                .values("person_id")
+                .annotate(total=Sum("fixed_amount"))
+            )
+            for row in stipend_rows:
+                totals[row["person_id"]][month_key] += row["total"] or Decimal("0.00")
+
+    @staticmethod
+    def _bulk_subtract_installment_skip_corrections(
+        totals: dict[int, dict[str, Decimal]],
+        month_keys: dict[date, str],
+        *,
+        person_ids: list[int],
+        skipped_by_month: dict[date, set[int]],
+        expense_types: list[str],
+        amount_field: str,
+    ) -> None:
+        """Subtract skipped ``ExpenseInstallment`` amounts for their reference month (mirrors
+        ``.exclude(pk__in=skipped_expense_ids)`` in the single-person version, without a
+        per-month exclude inside each grouped total query)."""
+        for reference_month, skipped_ids in skipped_by_month.items():
+            month_key = month_keys.get(reference_month)
+            if month_key is None or not skipped_ids:
+                continue
+            next_m = DateCalculatorService.next_month_start(
+                reference_month.year, reference_month.month
+            )
+            rows = (
+                ExpenseInstallment.objects.filter(
+                    expense_id__in=skipped_ids,
+                    expense__person_id__in=person_ids,
+                    expense__expense_type__in=expense_types,
+                    expense__is_debt_installment=False,
+                    expense__is_offset=False,
+                    due_date__gte=reference_month,
+                    due_date__lt=next_m,
+                )
+                .values("expense__person_id")
+                .annotate(total=Sum(amount_field))
+            )
+            for row in rows:
+                totals[row["expense__person_id"]][month_key] -= row["total"]
+
+    @staticmethod
+    def _bulk_subtract_single_expense_skip_corrections(
+        totals: dict[int, dict[str, Decimal]],
+        month_keys: dict[date, str],
+        *,
+        person_ids: list[int],
+        skipped_by_month: dict[date, set[int]],
+        expense_types: list[str],
+        amount_field: str,
+    ) -> None:
+        """Subtract skipped single-payment ``Expense`` amounts for their reference month
+        (mirrors ``.exclude(pk__in=skipped_expense_ids)`` in the single-person version)."""
+        for reference_month, skipped_ids in skipped_by_month.items():
+            month_key = month_keys.get(reference_month)
+            if month_key is None or not skipped_ids:
+                continue
+            next_m = DateCalculatorService.next_month_start(
+                reference_month.year, reference_month.month
+            )
+            rows = (
+                Expense.objects.filter(
+                    pk__in=skipped_ids,
+                    person_id__in=person_ids,
+                    expense_type__in=expense_types,
+                    is_installment=False,
+                    is_offset=False,
+                    expense_date__gte=reference_month,
+                    expense_date__lt=next_m,
+                )
+                .values("person_id")
+                .annotate(total=Sum(amount_field))
+            )
+            for row in rows:
+                totals[row["person_id"]][month_key] -= row["total"]
+
+    @staticmethod
+    def _calc_person_expense_totals_bulk(
+        person_ids: list[int], months: list[tuple[int, int]]
+    ) -> dict[int, dict[str, Decimal]]:
+        """Batched equivalent of ``_calc_person_expense_total`` for many persons/months at once.
+
+        Returns ``{person_id: {"YYYY-MM": expense_total}}``. Each of the 9 categories
+        ``_calc_person_expense_total`` sums per (person, month) is fetched with ONE grouped
+        query (via ``TruncMonth``) across every person and month, instead of one query per
+        category per person per month — the query count no longer scales with ``len(person_ids)``
+        or ``len(months)``.
+        """
+        if not person_ids or not months:
+            return {}
+
+        month_starts = [date(y, m, 1) for y, m in months]
+        range_start = min(month_starts)
+        range_end = max(DateCalculatorService.next_month_start(y, m) for y, m in months)
+        month_keys = {date(y, m, 1): f"{y}-{m:02d}" for y, m in months}
+        card_types: list[str] = [ExpenseType.CARD_PURCHASE]
+        loan_types: list[str] = [ExpenseType.BANK_LOAN, ExpenseType.PERSONAL_LOAN]
+        one_time_types: list[str] = [ExpenseType.ONE_TIME_EXPENSE]
+
+        totals: dict[int, dict[str, Decimal]] = {
+            person_id: dict.fromkeys(month_keys.values(), Decimal("0.00"))
+            for person_id in person_ids
+        }
+
+        skipped_by_month: dict[date, set[int]] = {}
+        for reference_month, expense_id in ExpenseMonthSkip.objects.filter(
+            reference_month__in=month_starts,
+        ).values_list("reference_month", "expense_id"):
+            skipped_by_month.setdefault(reference_month, set()).add(expense_id)
+
+        FinancialDashboardService._bulk_add_installment_totals(
+            totals,
+            month_keys,
+            person_ids=person_ids,
+            expense_types=card_types,
+            range_start=range_start,
+            range_end=range_end,
+        )
+        FinancialDashboardService._bulk_add_single_expense_totals(
+            totals,
+            month_keys,
+            person_ids=person_ids,
+            expense_types=card_types,
+            range_start=range_start,
+            range_end=range_end,
+            amount_field="total_amount",
+        )
+        FinancialDashboardService._bulk_add_installment_totals(
+            totals,
+            month_keys,
+            person_ids=person_ids,
+            expense_types=loan_types,
+            range_start=range_start,
+            range_end=range_end,
+        )
+        FinancialDashboardService._bulk_add_single_expense_totals(
+            totals,
+            month_keys,
+            person_ids=person_ids,
+            expense_types=loan_types,
+            range_start=range_start,
+            range_end=range_end,
+            amount_field="total_amount",
+        )
+        FinancialDashboardService._bulk_add_single_expense_totals(
+            totals,
+            month_keys,
+            person_ids=person_ids,
+            expense_types=one_time_types,
+            range_start=range_start,
+            range_end=range_end,
+            amount_field="total_amount",
+        )
+        # Offsets (installment + single) are subtracted — filtered by expense__is_offset=True
+        # rather than expense_type, so they use their own queries below.
+        offset_inst_rows = (
+            ExpenseInstallment.objects.filter(
+                due_date__gte=range_start,
+                due_date__lt=range_end,
+                expense__person_id__in=person_ids,
+                expense__is_offset=True,
+            )
+            .annotate(month=TruncMonth("due_date"))
+            .values("expense__person_id", "month")
+            .annotate(total=Sum("amount"))
+        )
+        for row in offset_inst_rows:
+            month_key = month_keys.get(row["month"])
+            if month_key is not None:
+                totals[row["expense__person_id"]][month_key] -= row["total"]
+
+        offset_single_rows = (
+            Expense.objects.filter(
+                expense_date__gte=range_start,
+                expense_date__lt=range_end,
+                person_id__in=person_ids,
+                is_offset=True,
+                is_installment=False,
+            )
+            .annotate(month=TruncMonth("expense_date"))
+            .values("person_id", "month")
+            .annotate(total=Sum("total_amount"))
+        )
+        for row in offset_single_rows:
+            month_key = month_keys.get(row["month"])
+            if month_key is not None:
+                totals[row["person_id"]][month_key] -= row["total"]
+
+        FinancialDashboardService._bulk_add_fixed_and_stipend_totals(
+            totals,
+            month_keys,
+            person_ids=person_ids,
+            months=months,
+            skipped_by_month=skipped_by_month,
+        )
+
+        # Skip corrections for card/loan installments and single expenses (fixed/stipend
+        # already excluded their skipped ids directly above; offsets are not part of
+        # ExpenseMonthSkip's payable-expense scope in the single-person version either).
+        FinancialDashboardService._bulk_subtract_installment_skip_corrections(
+            totals,
+            month_keys,
+            person_ids=person_ids,
+            skipped_by_month=skipped_by_month,
+            expense_types=card_types,
+            amount_field="amount",
+        )
+        FinancialDashboardService._bulk_subtract_single_expense_skip_corrections(
+            totals,
+            month_keys,
+            person_ids=person_ids,
+            skipped_by_month=skipped_by_month,
+            expense_types=card_types,
+            amount_field="total_amount",
+        )
+        FinancialDashboardService._bulk_subtract_installment_skip_corrections(
+            totals,
+            month_keys,
+            person_ids=person_ids,
+            skipped_by_month=skipped_by_month,
+            expense_types=loan_types,
+            amount_field="amount",
+        )
+        FinancialDashboardService._bulk_subtract_single_expense_skip_corrections(
+            totals,
+            month_keys,
+            person_ids=person_ids,
+            skipped_by_month=skipped_by_month,
+            expense_types=loan_types,
+            amount_field="total_amount",
+        )
+        FinancialDashboardService._bulk_subtract_single_expense_skip_corrections(
+            totals,
+            month_keys,
+            person_ids=person_ids,
+            skipped_by_month=skipped_by_month,
+            expense_types=one_time_types,
+            amount_field="total_amount",
+        )
+
+        return totals
+
+    @staticmethod
+    def _get_person_waterfalls_bulk(
+        persons: list[Person],
+        current_year: int,
+        current_month: int,
+        lookback_months: int = 6,
+        financial_settings: FinancialSettings | None = None,
+    ) -> dict[int, dict[str, dict[str, Any]]]:
+        """Batched equivalent of ``_get_person_waterfall`` for many persons at once.
+
+        Returns ``{person_id: {"YYYY-MM": {expense_total, allocated_paid, pending}}}``,
+        identical in shape and values to calling ``_get_person_waterfall`` once per person —
+        but with a fixed number of queries instead of one full per-person waterfall
+        (each doing up to 9 queries per lookback month) per person.
+        """
+        if not persons:
+            return {}
+
+        settings = financial_settings or FinancialSettings.objects.first()
+        start_date = (
+            settings.initial_balance_date if settings else date(current_year, current_month, 1)
+        )
+
+        months: list[tuple[int, int]] = []
+        y, m = current_year, current_month
+        for _ in range(lookback_months):
+            m -= 1
+            if m == 0:
+                m = MONTHS_IN_YEAR
+                y -= 1
+            if date(y, m, 1) >= start_date:
+                months.append((y, m))
+        months.reverse()  # oldest first
+        months.append((current_year, current_month))
+
+        person_ids = [person.pk for person in persons]
+        expense_totals = FinancialDashboardService._calc_person_expense_totals_bulk(
+            person_ids, months
+        )
+
+        # Total payments per person (all time, regardless of reference_month) — one grouped query.
+        total_payments_by_person = {
+            row["person_id"]: row["total"]
+            for row in (
+                PersonPayment.objects.filter(person_id__in=person_ids)
+                .values("person_id")
+                .annotate(total=Sum("amount"))
+            )
+        }
+
+        result: dict[int, dict[str, dict[str, Any]]] = {}
+        for person in persons:
+            # Prepend initial_balance as the first month if the person has one and it falls
+            # before the lookback window — same rule as the single-person version.
+            initial_balance_entry: dict[str, Any] | None = None
+            if (
+                person.initial_balance > Decimal("0.00")
+                and person.initial_balance_date
+                and (person.initial_balance_date.year, person.initial_balance_date.month)
+                not in months
+            ):
+                ib_y, ib_m = person.initial_balance_date.year, person.initial_balance_date.month
+                if date(ib_y, ib_m, 1) < date(current_year, current_month, 1):
+                    initial_balance_entry = {
+                        "year": ib_y,
+                        "month": ib_m,
+                        "expense_total": person.initial_balance,
+                    }
+
+            month_data: list[dict[str, Any]] = []
+            if initial_balance_entry:
+                month_data.append(initial_balance_entry)
+            person_totals = expense_totals.get(person.pk, {})
+            for y, m in months:
+                key = f"{y}-{m:02d}"
+                month_data.append(
+                    {
+                        "year": y,
+                        "month": m,
+                        "expense_total": person_totals.get(key, Decimal("0.00")),
+                    }
+                )
+
+            remaining_payment = total_payments_by_person.get(person.pk, Decimal("0.00"))
+            person_result: dict[str, dict[str, Any]] = {}
+            for md in month_data:
+                key = f"{md['year']}-{md['month']:02d}"
+                expense = md["expense_total"]
+                allocated = min(remaining_payment, expense)
+                remaining_payment -= allocated
+                person_result[key] = {
+                    "expense_total": expense,
+                    "allocated_paid": allocated,
+                    "pending": expense - allocated,
+                }
+            result[person.pk] = person_result
+
+        return result
+
+    @staticmethod
     def _build_overdue_previous_months(
         current_year: int, current_month: int, lookback_months: int = 6
     ) -> list[dict[str, Any]]:
@@ -730,9 +1237,18 @@ class FinancialDashboardService:
         total_income = Decimal("0.00")
         all_apartments: list[dict[str, Any]] = []
 
-        # All rented apartments with active leases (including owner apartments)
-        rented_apartments = Apartment.objects.filter(is_rented=True).select_related(
-            "building", "owner"
+        # All rented apartments with active leases (including owner apartments). The
+        # `leases` prefetch is ordered by pk (Lease has no default Meta.ordering) to match
+        # the un-prefetched `.first()` it replaces — avoids one query per apartment.
+        rented_apartments = (
+            Apartment.objects.filter(is_rented=True)
+            .select_related("building", "owner")
+            .prefetch_related(
+                Prefetch(
+                    "leases",
+                    queryset=Lease.objects.select_related("responsible_tenant").order_by("pk"),
+                )
+            )
         )
 
         owner_income_map: dict[str, dict[str, Any]] = {}
@@ -741,7 +1257,7 @@ class FinancialDashboardService:
         salary_offset_apartments: list[dict[str, Any]] = []
 
         for apt in rented_apartments:
-            lease = apt.leases.first()
+            lease = next(iter(apt.leases.all()), None)
             if lease is None:
                 continue
 
@@ -889,9 +1405,27 @@ class FinancialDashboardService:
     ) -> dict[str, Any]:
         """Build expense breakdown: per person, utility bills, IPTU."""
         # Per-person expense summary with waterfall payment allocation
-        persons = Person.objects.filter(is_employee=False).order_by("name")
+        persons = list(Person.objects.filter(is_employee=False).order_by("name"))
         person_expenses: list[dict[str, Any]] = []
         current_key = f"{year}-{month:02d}"
+
+        # Waterfalls for every payable person are computed in one batched pass (fixed number
+        # of queries regardless of len(persons)) instead of one full waterfall per person.
+        # "Payable" itself is resolved with 2 grouped queries instead of 2 per person.
+        person_ids = [person.pk for person in persons]
+        payable_ids_via_income = set(
+            PersonIncome.objects.filter(person_id__in=person_ids, is_active=True).values_list(
+                "person_id", flat=True
+            )
+        )
+        payable_ids_via_apartment = set(
+            Apartment.objects.filter(owner_id__in=person_ids).values_list("owner_id", flat=True)
+        )
+        payable_ids = payable_ids_via_income | payable_ids_via_apartment
+        payable_persons = [person for person in persons if person.pk in payable_ids]
+        waterfalls_by_person = FinancialDashboardService._get_person_waterfalls_bulk(
+            payable_persons, year, month
+        )
 
         for person in persons:
             person_data = FinancialDashboardService._get_person_month_expenses(
@@ -899,7 +1433,7 @@ class FinancialDashboardService:
             )
             # Use waterfall for payable persons to get correct allocated payment
             if person_data["is_payable"]:
-                waterfall = FinancialDashboardService._get_person_waterfall(person, year, month)
+                waterfall = waterfalls_by_person.get(person.pk, {})
                 current_alloc = waterfall.get(current_key)
                 if current_alloc:
                     person_data["total_paid"] = current_alloc["allocated_paid"]
@@ -1224,23 +1758,34 @@ class FinancialDashboardService:
         next_month: date,
     ) -> None:
         """Add notes about truly new debt installments (not yet started) and missing bills."""
+        # Only show a note for debts where the FIRST installment is in the future (i.e.
+        # parcelamento that hasn't started yet — not ongoing ones). One grouped query for all
+        # buildings instead of one `.first()` query per building: candidate rows are fetched
+        # in pk order (matching `.first()`'s implicit ordering) and reduced to one per
+        # building in Python.
+        candidate_installments = (
+            ExpenseInstallment.objects.filter(
+                expense__expense_type=expense_type,
+                expense__is_debt_installment=True,
+                expense__building__isnull=False,
+                installment_number=1,
+                is_paid=False,
+                due_date__gte=next_month,
+            )
+            .select_related("expense", "expense__building")
+            .order_by("pk")
+        )
+        first_installment_by_building_id: dict[int, ExpenseInstallment] = {}
+        for inst in candidate_installments:
+            building_id = inst.expense.building_id
+            # The queryset already filters expense__building__isnull=False; this narrows the
+            # type for mypy without a cast.
+            if building_id is not None and building_id not in first_installment_by_building_id:
+                first_installment_by_building_id[building_id] = inst
+
         for building in Building.objects.all():
             building_name = str(building.street_number)
-
-            # Only show note for debts where the FIRST installment is in the future
-            # (i.e., parcelamento that hasn't started yet — not ongoing ones)
-            first_installment = (
-                ExpenseInstallment.objects.filter(
-                    expense__expense_type=expense_type,
-                    expense__is_debt_installment=True,
-                    expense__building=building,
-                    installment_number=1,
-                    is_paid=False,
-                    due_date__gte=next_month,
-                )
-                .select_related("expense")
-                .first()
-            )
+            first_installment = first_installment_by_building_id.get(building.pk)
 
             if first_installment:
                 amount_fmt = (
