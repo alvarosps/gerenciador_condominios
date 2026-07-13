@@ -201,6 +201,8 @@ python manage.py migrate
 
 Production runs on **Vercel** (frontend) + **Render** (backend, see `render_build.sh`) + **Supabase** (PostgreSQL). There is no Docker/nginx stack — deploys happen by pushing to the repo; the Render build runs migrations and `playwright install chromium`.
 
+`render.yaml` (repo root) is the source of truth for the Render topology: the web service (gunicorn) plus the `send_finance_alerts` and `send_scheduled_notifications` cron jobs. Secrets are declared there with `sync: false` and set once in the Render dashboard — never committed.
+
 ## Running Tests
 
 ### Backend Tests
