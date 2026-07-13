@@ -1,0 +1,85 @@
+# Render Blueprint — source of truth for the production deploy topology.
+# Docs: https://render.com/docs/blueprint-spec
+#
+# Secrets (SECRET_KEY, DATABASE_URL, REDIS_URL, GOOGLE_CLIENT_*, etc.) are NEVER committed
+# here — they're declared with `sync: false` and set once in the Render dashboard, or wired
+# via the `condominios-manager-env` group shared by the web service and both cron jobs.
+envVarGroups:
+  - name: condominios-manager-env
+    envVars:
+      - key: DJANGO_SETTINGS_MODULE
+        value: condominios_manager.settings_production
+      - key: SECRET_KEY
+        sync: false
+      - key: ALLOWED_HOSTS
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+      - key: CSRF_TRUSTED_ORIGINS
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_SUBJECT
+        sync: false
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_WHATSAPP_FROM
+        sync: false
+      - key: SENTRY_DSN
+        sync: false
+
+services:
+  - type: web
+    name: condominios-manager-api
+    runtime: python
+    plan: free
+    region: oregon
+    buildCommand: ./render_build.sh
+    # 1 worker + 4 threads: leaves enough headroom on the free tier (512 MB) for the
+    # synchronous Chromium/Playwright burst during contract PDF generation — see
+    # docs/plans/2026-06-09-contract-pdf-prod-fix-plan.md (Fase 2).
+    startCommand: >-
+      gunicorn condominios_manager.wsgi:application
+      --workers 1 --threads 4 --timeout 180 --graceful-timeout 30
+      --bind 0.0.0.0:$PORT
+    envVarGroups:
+      - condominios-manager-env
+    autoDeploy: true
+
+  - type: cron
+    name: condominios-manager-finance-alerts
+    runtime: python
+    plan: free
+    region: oregon
+    schedule: "0 9 * * *"
+    timeZone: America/Sao_Paulo
+    buildCommand: ./render_build.sh
+    startCommand: python manage.py send_finance_alerts
+    envVarGroups:
+      - condominios-manager-env
+
+  - type: cron
+    name: condominios-manager-scheduled-notifications
+    runtime: python
+    plan: free
+    region: oregon
+    schedule: "0 8 * * *"
+    timeZone: America/Sao_Paulo
+    buildCommand: ./render_build.sh
+    startCommand: python manage.py send_scheduled_notifications
+    envVarGroups:
+      - condominios-manager-env

@@ -53,6 +53,46 @@ def test_create_plan_returns_nested_read_and_string_money(authenticated_api_clie
     assert "category_id" not in response.data
 
 
+# --- B5: create via API must materialize the Installment schedule, like every other path ---
+
+
+def test_create_plan_materializes_installments(authenticated_api_client) -> None:
+    condo = make_condominium()
+    payload = {
+        "condominium_id": condo.id,
+        "description": "Notebook 12x",
+        "total_amount": "1200.00",
+        "installment_count": 12,
+        "start_due_date": "2026-07-10",
+        "default_due_day": 10,
+    }
+    response = authenticated_api_client.post(PLANS_URL, payload, format="json")
+    assert response.status_code == 201
+    installments = response.data["installments"]
+    assert len(installments) == 12
+    assert sum(Decimal(row["amount"]) for row in installments) == Decimal("1200.00")
+    assert installments[0]["due_date"] == "2026-07-10"
+    assert installments[1]["due_date"] == "2026-08-10"
+
+    plan = InstallmentPlan.objects.get(pk=response.data["id"])
+    assert plan.installments.count() == 12
+
+
+def test_create_plan_remainder_lands_on_last_installment(authenticated_api_client) -> None:
+    condo = make_condominium()
+    payload = {
+        "condominium_id": condo.id,
+        "description": "Resto",
+        "total_amount": "100.00",
+        "installment_count": 3,
+        "start_due_date": "2026-07-10",
+        "default_due_day": 10,
+    }
+    response = authenticated_api_client.post(PLANS_URL, payload, format="json")
+    amounts = [Decimal(row["amount"]) for row in response.data["installments"]]
+    assert amounts == [Decimal("33.33"), Decimal("33.33"), Decimal("33.34")]
+
+
 def test_create_embedded_plan_with_billing_account_id(authenticated_api_client) -> None:
     account = make_billing_account(
         account_type=BillingAccountType.WATER, external_identifier="UC-100"
@@ -343,14 +383,20 @@ def test_anonymous_is_unauthorized(api_client) -> None:
 
 def test_plan_write_invalidates_finance_cache(authenticated_api_client) -> None:
     # LocMem cache: invalidation is asserted by a probe key disappearing after the write
-    # (same pattern as test_finance_cache_signals; no internal mocking).
+    # (same pattern as test_finance_cache_signals; no internal mocking). The probe is
+    # registered via set_tracked_cache_probe (not a bare cache.set) because P4.2 item (e)'s
+    # LocMem fallback only deletes keys it knows @cache_result created; and
+    # CacheManager.invalidate_pattern defers the real deletion to transaction.on_commit
+    # (P4.2 item (d)), which pytest-django's wrapping transaction never fires on its own —
+    # flush_on_commit_callbacks runs it explicitly.
     from django.core.cache import cache
 
     from finances.cache import FINANCE_CACHE_PREFIXES
+    from tests.utils import flush_on_commit_callbacks, set_tracked_cache_probe
 
     condo = make_condominium()
     for prefix in FINANCE_CACHE_PREFIXES:
-        cache.set(f"{prefix}:probe", "x")
+        set_tracked_cache_probe(f"{prefix}:probe")
     authenticated_api_client.post(
         PLANS_URL,
         {
@@ -363,4 +409,5 @@ def test_plan_write_invalidates_finance_cache(authenticated_api_client) -> None:
         },
         format="json",
     )
+    flush_on_commit_callbacks()
     assert all(cache.get(f"{prefix}:probe") is None for prefix in FINANCE_CACHE_PREFIXES)

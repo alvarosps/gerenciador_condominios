@@ -425,6 +425,40 @@ class TestCoreModelRealPrefixInvalidation:
         assert "cash-flow-projection*" in patterns
         assert not any("*Lease*" in p for p in patterns)
 
+    def test_lease_save_invalidates_legacy_financial_dashboard(
+        self, apartment, tenant, mocker
+    ) -> None:
+        """B17(c): the legacy financial-dashboard overview derives rent income from Lease
+        via CashFlowService, so a Lease write must drop financial-dashboard* too."""
+        from core.cache import CacheManager
+
+        spy = mocker.spy(CacheManager, "invalidate_pattern")
+        make_lease(apartment=apartment, tenant=tenant, rental_value=Decimal("1000.00"))
+        patterns = [c.args[0] for c in spy.call_args_list]
+        assert "financial-dashboard*" in patterns
+
+    def test_apartment_save_invalidates_legacy_financial_dashboard(self, apartment, mocker) -> None:
+        """B17(c): an Apartment write (e.g. rental_value) also changes the legacy
+        financial-dashboard overview, so it must drop financial-dashboard* too."""
+        from core.cache import CacheManager
+
+        spy = mocker.spy(CacheManager, "invalidate_pattern")
+        apartment.rental_value = Decimal("1234.56")
+        apartment.save()
+        patterns = [c.args[0] for c in spy.call_args_list]
+        assert "financial-dashboard*" in patterns
+
+    def test_building_save_invalidates_legacy_financial_dashboard(self, building, mocker) -> None:
+        """B17(c): a Building write also cascades to the legacy financial-dashboard
+        overview (buildings own the apartments/leases that feed it)."""
+        from core.cache import CacheManager
+
+        spy = mocker.spy(CacheManager, "invalidate_pattern")
+        building.name = "Renamed Building"
+        building.save()
+        patterns = [c.args[0] for c in spy.call_args_list]
+        assert "financial-dashboard*" in patterns
+
     def test_tenant_save_invalidates_tenant_not_building_stats(self, mocker) -> None:
         from core.cache import CacheManager
 
@@ -433,6 +467,18 @@ class TestCoreModelRealPrefixInvalidation:
         patterns = [c.args[0] for c in spy.call_args_list]
         assert "dashboard-tenant-stats*" in patterns
         assert "dashboard-building-stats*" not in patterns
+
+    def test_tenant_save_invalidates_finance_module_caches(self, mocker) -> None:
+        """B17(b): Tenant.due_day controls the pay-to-live prepaid boundary that feeds the
+        condominium-finance (finances app) revenue/projection, so a Tenant write must drop
+        finance-* too, not just the legacy core dashboards."""
+        from core.cache import CacheManager
+
+        spy = mocker.spy(CacheManager, "invalidate_pattern")
+        make_tenant()
+        patterns = [c.args[0] for c in spy.call_args_list]
+        assert "finance-dashboard*" in patterns
+        assert "finance-projection*" in patterns
 
 
 @pytest.mark.unit

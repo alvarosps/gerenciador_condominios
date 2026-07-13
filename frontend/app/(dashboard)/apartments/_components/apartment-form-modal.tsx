@@ -7,6 +7,7 @@ import { z } from 'zod';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -104,7 +105,9 @@ export function ApartmentFormModal({ open, apartment, onClose }: Props) {
         rental_value_double: apartment.rental_value_double ?? null,
         cleaning_fee: apartment.cleaning_fee,
         max_tenants: apartment.max_tenants,
-        furniture_ids: apartment.furnitures?.map((f) => f.id).filter((id): id is number => id !== undefined) ?? [],
+        furniture_ids:
+          apartment.furnitures?.map((f) => f.id).filter((id): id is number => id !== undefined) ??
+          [],
         last_rent_increase_date: apartment.last_rent_increase_date ?? '',
         owner_id: apartment.owner?.id ?? null,
       });
@@ -154,6 +157,11 @@ export function ApartmentFormModal({ open, apartment, onClose }: Props) {
               </Badge>
             )}
           </DialogTitle>
+          <DialogDescription>
+            {apartment
+              ? 'Atualize os dados do apartamento, valores e móveis vinculados.'
+              : 'Preencha os dados do novo apartamento, valores e móveis vinculados.'}
+          </DialogDescription>
         </DialogHeader>
 
         <Form {...formMethods}>
@@ -201,7 +209,9 @@ export function ApartmentFormModal({ open, apartment, onClose }: Props) {
                       placeholder="Ex: 101"
                       {...field}
                       value={field.value || ''}
-                      onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
+                      onChange={(e) =>
+                        field.onChange(e.target.value ? Number(e.target.value) : undefined)
+                      }
                     />
                   </FormControl>
                   <FormMessage />
@@ -226,7 +236,9 @@ export function ApartmentFormModal({ open, apartment, onClose }: Props) {
                       placeholder="0.00"
                       {...field}
                       value={field.value || ''}
-                      onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
+                      onChange={(e) =>
+                        field.onChange(e.target.value ? Number(e.target.value) : undefined)
+                      }
                     />
                   </FormControl>
                   <FormMessage />
@@ -249,10 +261,14 @@ export function ApartmentFormModal({ open, apartment, onClose }: Props) {
                         placeholder="0.00"
                         {...field}
                         value={field.value ?? ''}
-                        onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
+                        onChange={(e) =>
+                          field.onChange(e.target.value ? Number(e.target.value) : null)
+                        }
                       />
                     </FormControl>
-                    <FormDescription>Valor para 2 pessoas. Obrigatório quando máximo de inquilinos é 2.</FormDescription>
+                    <FormDescription>
+                      Valor para 2 pessoas. Obrigatório quando máximo de inquilinos é 2.
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -273,7 +289,9 @@ export function ApartmentFormModal({ open, apartment, onClose }: Props) {
                       placeholder="0.00"
                       {...field}
                       value={field.value || ''}
-                      onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
+                      onChange={(e) =>
+                        field.onChange(e.target.value ? Number(e.target.value) : undefined)
+                      }
                     />
                   </FormControl>
                   <FormMessage />
@@ -394,7 +412,8 @@ export function ApartmentFormModal({ open, apartment, onClose }: Props) {
                       </SelectContent>
                     </Select>
                     <FormDescription>
-                      Vazio = receita do condomínio. Definir proprietário repassa o aluguel (não conta como receita).
+                      Vazio = receita do condomínio. Definir proprietário repassa o aluguel (não
+                      conta como receita).
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -406,10 +425,7 @@ export function ApartmentFormModal({ open, apartment, onClose }: Props) {
               <Button type="button" variant="outline" onClick={onClose}>
                 Cancelar
               </Button>
-              <Button
-                type="submit"
-                disabled={createMutation.isPending || updateMutation.isPending}
-              >
+              <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
                 {apartment ? 'Atualizar' : 'Criar'}
               </Button>
             </DialogFooter>

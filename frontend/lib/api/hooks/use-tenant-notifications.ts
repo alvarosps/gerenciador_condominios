@@ -1,5 +1,24 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { isAxiosError } from 'axios';
 import { apiClient } from '@/lib/api/client';
+
+/**
+ * Parse a failed blob-responseType request's error body (itself a Blob, since axios still
+ * honors responseType on error responses) into a plain object so getErrorMessage() can read
+ * the real backend message (e.g. {"detail": "..."}) instead of falling back to a generic
+ * HTTP-status message.
+ */
+async function rethrowWithParsedBlobError(error: unknown): Promise<never> {
+  if (isAxiosError(error) && error.response?.data instanceof Blob) {
+    try {
+      const text = await error.response.data.text();
+      error.response.data = JSON.parse(text) as unknown;
+    } catch {
+      // Not JSON (or empty) — leave the original Blob, getErrorMessage falls back to status.
+    }
+  }
+  throw error;
+}
 
 export interface TenantNotification {
   id: number;
@@ -19,7 +38,7 @@ export function useTenantNotifications() {
     queryKey: tenantNotificationKeys.all,
     queryFn: async () => {
       const { data } = await apiClient.get<{ results: TenantNotification[] }>(
-        '/tenant/notifications/',
+        '/tenant/notifications/'
       );
       return data.results;
     },
@@ -54,15 +73,19 @@ export function useMarkAllNotificationsRead() {
 export function useDownloadContract() {
   return useMutation({
     mutationFn: async () => {
-      const response = await apiClient.get('/tenant/contract/', {
-        responseType: 'blob',
-      });
-      const url = URL.createObjectURL(response.data as Blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = 'contrato.pdf';
-      link.click();
-      URL.revokeObjectURL(url);
+      try {
+        const response = await apiClient.get('/tenant/contract/', {
+          responseType: 'blob',
+        });
+        const url = URL.createObjectURL(response.data as Blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'contrato.pdf';
+        link.click();
+        URL.revokeObjectURL(url);
+      } catch (error) {
+        await rethrowWithParsedBlobError(error);
+      }
     },
   });
 }

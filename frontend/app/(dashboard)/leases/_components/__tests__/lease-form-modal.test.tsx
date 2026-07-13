@@ -1,11 +1,13 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { http, HttpResponse } from 'msw';
 import { screen, fireEvent, waitFor } from '@testing-library/react';
-import { renderWithProviders } from '@/tests/test-utils';
+import { renderWithProviders, waitForQueriesToSettle } from '@/tests/test-utils';
+import { server } from '@/tests/mocks/server';
+import { useAuthStore } from '@/store/auth-store';
 import { LeaseFormModal } from '../lease-form-modal';
-import * as leaseHooks from '@/lib/api/hooks/use-leases';
-import * as apartmentHooks from '@/lib/api/hooks/use-apartments';
-import * as tenantHooks from '@/lib/api/hooks/use-tenants';
-import * as authStore from '@/store/auth-store';
+import type { Lease } from '@/lib/schemas/lease.schema';
+
+const API_BASE = 'http://localhost:8008/api';
 
 function submitForm() {
   // Radix Dialog portals its content to document.body, so query via the dialog.
@@ -14,78 +16,66 @@ function submitForm() {
   fireEvent.submit(form);
 }
 
-vi.mock('@/lib/api/hooks/use-leases', async (importOriginal) => {
-  const actual = await importOriginal<typeof leaseHooks>();
-  return {
-    ...actual,
-    useCreateLease: vi.fn(),
-    useUpdateLease: vi.fn(),
-  };
-});
-
-vi.mock('@/lib/api/hooks/use-apartments', async (importOriginal) => {
-  const actual = await importOriginal<typeof apartmentHooks>();
-  return {
-    ...actual,
-    useAvailableApartments: vi.fn(),
-  };
-});
-
-vi.mock('@/lib/api/hooks/use-tenants', async (importOriginal) => {
-  const actual = await importOriginal<typeof tenantHooks>();
-  return { ...actual, useTenants: vi.fn() };
-});
-
-vi.mock('@/store/auth-store', () => ({ useAuthStore: vi.fn() }));
-
-const createMutateAsync = vi.fn();
-const updateMutateAsync = vi.fn();
-
 function setIsStaff(isStaff: boolean) {
-  vi.mocked(authStore.useAuthStore).mockReturnValue({ user: { is_staff: isStaff } } as never);
+  useAuthStore.setState({
+    user: { id: 1, email: 'a@b.c', first_name: 'A', last_name: 'B', is_staff: isStaff },
+    isAuthenticated: true,
+  });
 }
 
-function mockHooks() {
-  vi.mocked(leaseHooks.useCreateLease).mockReturnValue({
-    mutateAsync: createMutateAsync,
-    isPending: false,
-  } as never);
-  vi.mocked(leaseHooks.useUpdateLease).mockReturnValue({
-    mutateAsync: updateMutateAsync,
-    isPending: false,
-  } as never);
-  vi.mocked(apartmentHooks.useAvailableApartments).mockReturnValue({
-    data: [
-      {
-        id: 1,
-        number: 101,
-        rental_value: 1200,
-        rental_value_double: null,
-        cleaning_fee: 200,
-        max_tenants: 1,
-        is_rented: false,
-        building: { id: 1, name: 'Prédio Central', street_number: 836, address: 'Rua das Flores' },
-        furnitures: [],
-      },
-    ],
-    isLoading: false,
-  } as never);
-  vi.mocked(tenantHooks.useTenants).mockReturnValue({
-    data: [
-      {
-        id: 1,
-        name: 'João Silva',
-        cpf_cnpj: '12345678901',
-        due_day: 5,
-        dependents: [],
-      },
-    ],
-    isLoading: false,
-  } as never);
-  setIsStaff(true);
+// useAvailableApartments / useTenants fire real GETs on mount; overridden per-test so the modal
+// sees exactly one available apartment and one tenant, matching the original fixture data.
+function seedApartmentsAndTenants() {
+  server.use(
+    http.get(`${API_BASE}/apartments/`, () =>
+      HttpResponse.json([
+        {
+          id: 1,
+          number: 101,
+          rental_value: 1200,
+          rental_value_double: null,
+          cleaning_fee: 200,
+          max_tenants: 1,
+          is_rented: false,
+          building: {
+            id: 1,
+            name: 'Prédio Central',
+            street_number: 836,
+            address: 'Rua das Flores',
+          },
+          furnitures: [],
+        },
+      ])
+    ),
+    http.get(`${API_BASE}/tenants/`, () =>
+      HttpResponse.json([
+        {
+          id: 1,
+          name: 'João Silva',
+          cpf_cnpj: '12345678901',
+          due_day: 5,
+          dependents: [],
+          is_company: false,
+          furnitures: [],
+        },
+      ])
+    )
+  );
 }
 
-const editableLease = {
+function spyUpdateLease() {
+  const calls: Record<string, unknown>[] = [];
+  server.use(
+    http.put(`${API_BASE}/leases/:id/`, async ({ params, request }) => {
+      const body = (await request.json()) as Record<string, unknown>;
+      calls.push(body);
+      return HttpResponse.json({ id: Number(params.id), ...body });
+    })
+  );
+  return calls;
+}
+
+const editableLease: Lease = {
   id: 1,
   apartment: {
     id: 1,
@@ -98,139 +88,163 @@ const editableLease = {
     building: { id: 1, name: 'Prédio Central', street_number: 836, address: 'Rua das Flores' },
     furnitures: [],
   },
-  responsible_tenant: { id: 1, name: 'João Silva', cpf_cnpj: '12345678901', due_day: 5 },
+  responsible_tenant: {
+    id: 1,
+    name: 'João Silva',
+    cpf_cnpj: '12345678901',
+    due_day: 5,
+    phone: '(11) 99999-0000',
+    is_company: false,
+    furnitures: [],
+    dependents: [],
+  },
+  tenants: [],
   number_of_tenants: 1,
   rental_value: 1200,
+  deposit_amount: null,
   start_date: '2024-01-01',
   validity_months: 12,
   tag_fee: 20,
   cleaning_fee_paid: false,
   tag_deposit_paid: false,
   contract_generated: false,
-  prepaid_until: null as string | null,
+  prepaid_until: null,
   is_salary_offset: false,
 };
 
 describe('LeaseFormModal', () => {
-  const defaultProps = { open: true, onClose: vi.fn() };
+  const defaultProps = { open: true, onClose: () => undefined };
 
   beforeEach(() => {
-    vi.clearAllMocks();
-    mockHooks();
+    seedApartmentsAndTenants();
+    setIsStaff(true);
   });
 
-  afterEach(() => {
-    vi.restoreAllMocks();
+  it('renders dialog when open', async () => {
+    const { queryClient } = renderWithProviders(<LeaseFormModal {...defaultProps} />);
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    await waitForQueriesToSettle(queryClient);
   });
 
-  it('renders dialog when open', () => {
-    renderWithProviders(<LeaseFormModal {...defaultProps} />);
-    expect(screen.getByRole('dialog')).toBeInTheDocument();
-  });
-
-  it('does not render dialog when closed', () => {
-    renderWithProviders(<LeaseFormModal {...defaultProps} open={false} />);
+  it('does not render dialog when closed', async () => {
+    const { queryClient } = renderWithProviders(<LeaseFormModal {...defaultProps} open={false} />);
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    await waitForQueriesToSettle(queryClient);
   });
 
-  it('shows "Nova Locação" title when creating', () => {
-    renderWithProviders(<LeaseFormModal {...defaultProps} />);
-    expect(screen.getByText('Nova Locação')).toBeInTheDocument();
+  it('shows "Nova Locação" title when creating', async () => {
+    const { queryClient } = renderWithProviders(<LeaseFormModal {...defaultProps} />);
+    expect(await screen.findByText('Nova Locação')).toBeInTheDocument();
+    await waitForQueriesToSettle(queryClient);
   });
 
-  it('shows "Editar Locação" title when editing', () => {
-    renderWithProviders(<LeaseFormModal {...defaultProps} lease={editableLease as never} />);
-    expect(screen.getByText('Editar Locação')).toBeInTheDocument();
+  it('shows "Editar Locação" title when editing', async () => {
+    const { queryClient } = renderWithProviders(
+      <LeaseFormModal {...defaultProps} lease={editableLease} />
+    );
+    expect(await screen.findByText('Editar Locação')).toBeInTheDocument();
+    await waitForQueriesToSettle(queryClient);
   });
 
-  it('renders apartment and tenant select fields', () => {
-    renderWithProviders(<LeaseFormModal {...defaultProps} />);
-    expect(screen.getByText('Apartamento')).toBeInTheDocument();
+  it('renders apartment and tenant select fields', async () => {
+    const { queryClient } = renderWithProviders(<LeaseFormModal {...defaultProps} />);
+    expect(await screen.findByText('Apartamento')).toBeInTheDocument();
     expect(screen.getByText('Inquilino Responsável')).toBeInTheDocument();
+    await waitForQueriesToSettle(queryClient);
   });
 
-  it('renders period and value fields', () => {
-    renderWithProviders(<LeaseFormModal {...defaultProps} />);
-    expect(screen.getByText('Data de Início')).toBeInTheDocument();
+  it('renders period and value fields', async () => {
+    const { queryClient } = renderWithProviders(<LeaseFormModal {...defaultProps} />);
+    expect(await screen.findByText('Data de Início')).toBeInTheDocument();
     expect(screen.getByText('Validade (meses)')).toBeInTheDocument();
     expect(screen.getByText('Taxa de Tag')).toBeInTheDocument();
     expect(screen.getByText('Valor do Aluguel')).toBeInTheDocument();
+    await waitForQueriesToSettle(queryClient);
   });
 
-  it('renders payment confirmation checkboxes', () => {
-    renderWithProviders(<LeaseFormModal {...defaultProps} />);
-    expect(screen.getByText('Taxa de Limpeza Paga')).toBeInTheDocument();
+  it('renders payment confirmation checkboxes', async () => {
+    const { queryClient } = renderWithProviders(<LeaseFormModal {...defaultProps} />);
+    expect(await screen.findByText('Taxa de Limpeza Paga')).toBeInTheDocument();
     expect(screen.getByText('Taxa de Tag Paga')).toBeInTheDocument();
+    await waitForQueriesToSettle(queryClient);
   });
 
-  it('renders cancel and submit buttons', () => {
-    renderWithProviders(<LeaseFormModal {...defaultProps} />);
-    expect(screen.getByRole('button', { name: /cancelar/i })).toBeInTheDocument();
+  it('renders cancel and submit buttons', async () => {
+    const { queryClient } = renderWithProviders(<LeaseFormModal {...defaultProps} />);
+    expect(await screen.findByRole('button', { name: /cancelar/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /criar/i })).toBeInTheDocument();
+    await waitForQueriesToSettle(queryClient);
   });
 
-  it('calls onClose when cancel button is clicked', () => {
-    const onClose = vi.fn();
-    renderWithProviders(<LeaseFormModal open={true} onClose={onClose} />);
-    screen.getByRole('button', { name: /cancelar/i }).click();
-    expect(onClose).toHaveBeenCalledOnce();
+  it('calls onClose when cancel button is clicked', async () => {
+    let closed = false;
+    const onClose = () => {
+      closed = true;
+    };
+    const { queryClient } = renderWithProviders(<LeaseFormModal open={true} onClose={onClose} />);
+    fireEvent.click(await screen.findByRole('button', { name: /cancelar/i }));
+    await waitFor(() => expect(closed).toBe(true));
+    await waitForQueriesToSettle(queryClient);
   });
 
   // --- Session 35: prepaid_until + is_salary_offset (is_staff gated) ---
 
-  it('renders the prepaid/salary-offset fields for admin (is_staff)', () => {
+  it('renders the prepaid/salary-offset fields for admin (is_staff)', async () => {
     setIsStaff(true);
-    renderWithProviders(<LeaseFormModal {...defaultProps} />);
-    expect(screen.getByText('Aluguel compensado por salário')).toBeInTheDocument();
+    const { queryClient } = renderWithProviders(<LeaseFormModal {...defaultProps} />);
+    expect(await screen.findByText('Aluguel compensado por salário')).toBeInTheDocument();
     expect(screen.getByText('Pré-pago até')).toBeInTheDocument();
+    await waitForQueriesToSettle(queryClient);
   });
 
-  it('hides the prepaid/salary-offset fields for non-admin', () => {
+  it('hides the prepaid/salary-offset fields for non-admin', async () => {
     setIsStaff(false);
-    renderWithProviders(<LeaseFormModal {...defaultProps} />);
+    const { queryClient } = renderWithProviders(<LeaseFormModal {...defaultProps} />);
+    await screen.findByRole('dialog');
     expect(screen.queryByText('Aluguel compensado por salário')).not.toBeInTheDocument();
     expect(screen.queryByText('Pré-pago até')).not.toBeInTheDocument();
+    await waitForQueriesToSettle(queryClient);
   });
 
-  it('pre-fills prepaid_until when editing', () => {
+  it('pre-fills prepaid_until when editing', async () => {
     setIsStaff(true);
-    renderWithProviders(
+    const { queryClient } = renderWithProviders(
       <LeaseFormModal
         {...defaultProps}
-        lease={{ ...editableLease, prepaid_until: '2026-07-01', is_salary_offset: true } as never}
-      />,
+        lease={{ ...editableLease, prepaid_until: '2026-07-01', is_salary_offset: true }}
+      />
     );
-    expect(screen.getByDisplayValue('2026-07-01')).toBeInTheDocument();
+    expect(await screen.findByDisplayValue('2026-07-01')).toBeInTheDocument();
+    await waitForQueriesToSettle(queryClient);
   });
 
   it('submits prepaid_until and is_salary_offset on update', async () => {
     setIsStaff(true);
-    renderWithProviders(
+    const calls = spyUpdateLease();
+    const { queryClient } = renderWithProviders(
       <LeaseFormModal
         {...defaultProps}
-        lease={{ ...editableLease, prepaid_until: '2026-07-01', is_salary_offset: true } as never}
-      />,
+        lease={{ ...editableLease, prepaid_until: '2026-07-01', is_salary_offset: true }}
+      />
     );
+    await screen.findByDisplayValue('2026-07-01');
     submitForm();
-    await waitFor(() => expect(updateMutateAsync).toHaveBeenCalled());
-    expect(updateMutateAsync).toHaveBeenCalledWith(
-      expect.objectContaining({ prepaid_until: '2026-07-01', is_salary_offset: true }),
-    );
+    await waitFor(() => expect(calls).toHaveLength(1));
+    expect(calls[0]).toMatchObject({ prepaid_until: '2026-07-01', is_salary_offset: true });
+    await waitForQueriesToSettle(queryClient);
   });
 
   it('clears prepaid_until to null when the date input is emptied', async () => {
     setIsStaff(true);
-    renderWithProviders(
-      <LeaseFormModal
-        {...defaultProps}
-        lease={{ ...editableLease, prepaid_until: '2026-07-01' } as never}
-      />,
+    const calls = spyUpdateLease();
+    const { queryClient } = renderWithProviders(
+      <LeaseFormModal {...defaultProps} lease={{ ...editableLease, prepaid_until: '2026-07-01' }} />
     );
-    fireEvent.change(screen.getByDisplayValue('2026-07-01'), { target: { value: '' } });
+    const dateInput = await screen.findByDisplayValue('2026-07-01');
+    fireEvent.change(dateInput, { target: { value: '' } });
     submitForm();
-    await waitFor(() => expect(updateMutateAsync).toHaveBeenCalled());
-    expect(updateMutateAsync).toHaveBeenCalledWith(
-      expect.objectContaining({ prepaid_until: null }),
-    );
+    await waitFor(() => expect(calls).toHaveLength(1));
+    expect(calls[0]).toMatchObject({ prepaid_until: null });
+    await waitForQueriesToSettle(queryClient);
   });
 });

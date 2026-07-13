@@ -13,6 +13,7 @@ import {
   Settings,
   DollarSign,
   Wallet,
+  ShieldCheck,
   ChevronDown,
   ChevronRight,
 } from 'lucide-react';
@@ -20,6 +21,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { ROUTES } from '@/lib/utils/constants';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
+import { useAuthStore } from '@/store/auth-store';
 
 interface MenuItem {
   key: string;
@@ -40,6 +42,8 @@ interface SidebarProps {
 export function Sidebar({ onNavigate }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const { user } = useAuthStore();
+  const isStaff = user?.is_staff ?? false;
   const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({});
 
   const financialChildren: SubMenuItem[] = [
@@ -55,6 +59,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
     { key: ROUTES.FINANCIAL_EMPLOYEES, label: 'Funcionários' },
     { key: ROUTES.FINANCIAL_CATEGORIES, label: 'Categorias' },
     { key: ROUTES.FINANCIAL_SIMULATOR, label: 'Simulador' },
+    { key: ROUTES.FINANCIAL_MONTH_ADVANCE, label: 'Virada de Mês' },
     { key: ROUTES.FINANCIAL_SETTINGS, label: 'Configurações' },
   ];
 
@@ -110,7 +115,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
     {
       key: ROUTES.FINANCIAL,
       icon: <DollarSign className="h-5 w-5" />,
-      label: 'Financeiro',
+      label: 'Financeiro (legado)',
       children: financialChildren,
     },
     {
@@ -124,7 +129,20 @@ export function Sidebar({ onNavigate }: SidebarProps) {
       icon: <Settings className="h-5 w-5" />,
       label: 'Configurações',
     },
+    ...(isStaff
+      ? [
+          {
+            key: ROUTES.ADMIN_USERS,
+            icon: <ShieldCheck className="h-5 w-5" />,
+            label: 'Usuários',
+          },
+        ]
+      : []),
   ];
+
+  const isChildActive = (children: SubMenuItem[]): boolean => {
+    return children.some((child) => pathname === child.key);
+  };
 
   const handleMenuClick = (key: string): void => {
     router.push(key);
@@ -133,10 +151,6 @@ export function Sidebar({ onNavigate }: SidebarProps) {
 
   const toggleExpanded = (key: string): void => {
     setExpandedMenus((prev) => ({ ...prev, [key]: !prev[key] }));
-  };
-
-  const isChildActive = (children: SubMenuItem[]): boolean => {
-    return children.some((child) => pathname === child.key);
   };
 
   const handleApiDocsClick = (): void => {
@@ -153,8 +167,10 @@ export function Sidebar({ onNavigate }: SidebarProps) {
       <nav className="flex-1 py-2">
         {mainMenuItems.map((item) => {
           if (item.children) {
-            const isExpanded = expandedMenus[item.key] ?? false;
             const hasActiveChild = isChildActive(item.children);
+            // A group starts expanded when it owns the active route; once the user
+            // explicitly toggles it, that choice (in expandedMenus) takes over.
+            const isExpanded = expandedMenus[item.key] ?? hasActiveChild;
 
             return (
               <div key={item.key}>
@@ -164,7 +180,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
                     'w-full flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors',
                     hasActiveChild
                       ? 'bg-primary/10 text-primary'
-                      : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                      : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                   )}
                 >
                   {item.icon}
@@ -187,7 +203,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
                             'w-full flex items-center gap-3 pl-12 pr-4 py-2 text-sm transition-colors',
                             isActive
                               ? 'bg-primary/10 text-primary border-r-4 border-primary font-medium'
-                              : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                              : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                           )}
                         >
                           <span>{child.label}</span>
@@ -209,7 +225,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
                 'w-full flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors',
                 isActive
                   ? 'bg-primary/10 text-primary border-r-4 border-primary'
-                  : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                  : 'text-muted-foreground hover:bg-muted hover:text-foreground'
               )}
             >
               {item.icon}
@@ -227,7 +243,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
             className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
           >
             <BookOpen className="h-5 w-5" />
-            <span>API Documentation</span>
+            <span>Documentação da API</span>
           </button>
         </div>
       </div>

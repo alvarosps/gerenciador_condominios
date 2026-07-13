@@ -10,6 +10,7 @@ from decimal import Decimal
 from typing import Any
 
 from django.db import transaction
+from django.db.models import Sum
 from django.utils import timezone
 
 from core.models import (
@@ -199,24 +200,24 @@ class MonthAdvanceService:
         # Collectible rent for the month — single source of truth (start-date floor +
         # pay-to-live prepaid boundary), consistent with the rent calendar that gates on
         # the MonthSnapshot this advance produces. Avoids finalizing a still-due month.
-        active_leases = RentScheduleService.collectible_leases(month_start)
+        active_leases = list(RentScheduleService.collectible_leases(month_start))
 
-        unpaid = []
-        for lease in active_leases:
-            has_payment = RentPayment.objects.filter(
-                lease=lease,
-                reference_month=month_start,
-            ).exists()
-            if not has_payment:
-                unpaid.append(
-                    {
-                        "lease_id": lease.pk,
-                        "apartment": f"{lease.apartment.number}/{lease.apartment.building.street_number}",
-                        "tenant": lease.responsible_tenant.name,
-                        "rental_value": float(lease.rental_value),
-                    }
-                )
-        return unpaid
+        paid_lease_ids = set(
+            RentPayment.objects.filter(reference_month=month_start).values_list(
+                "lease_id", flat=True
+            )
+        )
+
+        return [
+            {
+                "lease_id": lease.pk,
+                "apartment": f"{lease.apartment.number}/{lease.apartment.building.street_number}",
+                "tenant": lease.responsible_tenant.name,
+                "rental_value": float(lease.rental_value),
+            }
+            for lease in active_leases
+            if lease.pk not in paid_lease_ids
+        ]
 
     def _check_unpaid_installments(self, month_start: date, next_month: date) -> list[dict]:
         """Check for unpaid installments due this month."""
@@ -241,14 +242,16 @@ class MonthAdvanceService:
 
     def _check_unpaid_employees(self, month_start: date) -> list[dict]:
         """Check for employees without EmployeePayment for this month."""
-        employees = Person.objects.filter(is_employee=True)
+        employees = list(Person.objects.filter(is_employee=True))
+
+        payments_by_person = {
+            payment.person_id: payment
+            for payment in EmployeePayment.objects.filter(reference_month=month_start)
+        }
 
         unpaid = []
         for emp in employees:
-            payment = EmployeePayment.objects.filter(
-                person=emp,
-                reference_month=month_start,
-            ).first()
+            payment = payments_by_person.get(emp.pk)
             if not payment:
                 unpaid.append(
                     {
@@ -286,17 +289,24 @@ class MonthAdvanceService:
 
     def _check_unpaid_person_schedules(self, month_start: date) -> list[dict]:
         """Check PersonPaymentSchedule entries without corresponding PersonPayment."""
-        schedules = PersonPaymentSchedule.objects.filter(
-            reference_month=month_start,
-        ).select_related("person")
+        schedules = list(
+            PersonPaymentSchedule.objects.filter(
+                reference_month=month_start,
+            ).select_related("person")
+        )
+
+        total_paid_by_person = {
+            row["person_id"]: row["total"]
+            for row in (
+                PersonPayment.objects.filter(reference_month=month_start)
+                .values("person_id")
+                .annotate(total=Sum("amount"))
+            )
+        }
 
         unpaid = []
         for schedule in schedules:
-            payments = PersonPayment.objects.filter(
-                person=schedule.person,
-                reference_month=month_start,
-            )
-            total_paid = sum(p.amount for p in payments)
+            total_paid = total_paid_by_person.get(schedule.person_id, Decimal(0))
             if total_paid < schedule.amount:
                 unpaid.append(
                     {
@@ -463,17 +473,17 @@ class MonthAdvanceService:
 
     def _carry_forward_employee_payments(self, current_month: date, next_month: date) -> int:
         """Create EmployeePayment entries for next month based on current month."""
-        current_payments = EmployeePayment.objects.filter(
-            reference_month=current_month,
+        current_payments = list(EmployeePayment.objects.filter(reference_month=current_month))
+
+        existing_next_month_person_ids = set(
+            EmployeePayment.objects.filter(reference_month=next_month).values_list(
+                "person_id", flat=True
+            )
         )
 
         created = 0
         for payment in current_payments:
-            exists = EmployeePayment.objects.filter(
-                person=payment.person,
-                reference_month=next_month,
-            ).exists()
-            if not exists:
+            if payment.person_id not in existing_next_month_person_ids:
                 EmployeePayment.objects.create(
                     person=payment.person,
                     reference_month=next_month,
@@ -484,22 +494,25 @@ class MonthAdvanceService:
                     is_paid=False,
                 )
                 created += 1
+                existing_next_month_person_ids.add(payment.person_id)
         return created
 
     def _carry_forward_payment_schedules(self, current_month: date, next_month: date) -> int:
         """Carry forward PersonPaymentSchedule entries to next month."""
-        current_schedules = PersonPaymentSchedule.objects.filter(
-            reference_month=current_month,
+        current_schedules = list(
+            PersonPaymentSchedule.objects.filter(reference_month=current_month)
+        )
+
+        existing_next_month_keys = set(
+            PersonPaymentSchedule.objects.filter(reference_month=next_month).values_list(
+                "person_id", "due_day"
+            )
         )
 
         created = 0
         for schedule in current_schedules:
-            exists = PersonPaymentSchedule.objects.filter(
-                person=schedule.person,
-                reference_month=next_month,
-                due_day=schedule.due_day,
-            ).exists()
-            if not exists:
+            key = (schedule.person_id, schedule.due_day)
+            if key not in existing_next_month_keys:
                 PersonPaymentSchedule.objects.create(
                     person=schedule.person,
                     reference_month=next_month,
@@ -507,6 +520,7 @@ class MonthAdvanceService:
                     amount=schedule.amount,
                 )
                 created += 1
+                existing_next_month_keys.add(key)
         return created
 
     def _build_next_month_preview(self, year: int, month: int) -> dict[str, Any]:

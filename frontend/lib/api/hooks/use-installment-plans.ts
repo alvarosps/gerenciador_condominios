@@ -1,13 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
 import { queryKeys } from '../query-keys';
+import { parseList } from '../parse-list';
 import {
   type Installment,
   type InstallmentPlan,
   installmentPlanSchema,
   installmentSchema,
 } from '@/lib/schemas/finances/installment-plan.schema';
-import { type PaginatedResponse, extractResults } from '@/lib/types/api';
 
 const PLANS_ENDPOINT = '/finances/installment-plans/';
 const INSTALLMENTS_ENDPOINT = '/finances/installments/';
@@ -57,11 +57,10 @@ export function useInstallmentPlans(filters?: InstallmentPlanFilters) {
   return useQuery({
     queryKey: queryKeys.finances.installmentPlans.list(params),
     queryFn: async () => {
-      const { data } = await apiClient.get<PaginatedResponse<InstallmentPlan> | InstallmentPlan[]>(
-        PLANS_ENDPOINT,
-        { params: { page_size: 10000, ...params } },
-      );
-      return extractResults(data).map((plan) => installmentPlanSchema.parse(plan));
+      const { data } = await apiClient.get<unknown>(PLANS_ENDPOINT, {
+        params: { page_size: 10000, ...params },
+      });
+      return parseList(data, installmentPlanSchema).items;
     },
   });
 }
@@ -108,7 +107,7 @@ export function useUpdateInstallmentPlan() {
       } = data;
       const response = await apiClient.patch<InstallmentPlan>(
         `${PLANS_ENDPOINT}${data.id}/`,
-        updateData,
+        updateData
       );
       return response.data;
     },
@@ -131,11 +130,10 @@ export function useInstallments(filters?: InstallmentFilters) {
   return useQuery({
     queryKey: queryKeys.finances.installments.list(params),
     queryFn: async () => {
-      const { data } = await apiClient.get<PaginatedResponse<Installment> | Installment[]>(
-        INSTALLMENTS_ENDPOINT,
-        { params: { page_size: 10000, ...params } },
-      );
-      return extractResults(data).map((installment) => installmentSchema.parse(installment));
+      const { data } = await apiClient.get<unknown>(INSTALLMENTS_ENDPOINT, {
+        params: { page_size: 10000, ...params },
+      });
+      return parseList(data, installmentSchema).items;
     },
   });
 }
@@ -148,7 +146,7 @@ export function useUpdateInstallment() {
       const { id, ...updateData } = data;
       const response = await apiClient.patch<Installment>(
         `${INSTALLMENTS_ENDPOINT}${id}/`,
-        updateData,
+        updateData
       );
       return installmentSchema.parse(response.data);
     },
@@ -171,7 +169,7 @@ export function useConvertDeferred() {
     mutationFn: async (params: ConvertDeferredParams) => {
       const { data } = await apiClient.post<InstallmentPlan>(
         `${PLANS_ENDPOINT}convert_deferred/`,
-        params,
+        params
       );
       return installmentPlanSchema.parse(data);
     },

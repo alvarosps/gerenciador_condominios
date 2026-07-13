@@ -58,6 +58,7 @@ import {
   BUILDING_REQUIRED_TYPES,
 } from '@/lib/utils/expense-type-config';
 import type { ExpenseType } from '@/lib/utils/expense-type-config';
+import { getErrorMessage } from '@/lib/utils/error-handler';
 
 interface Props {
   open: boolean;
@@ -66,7 +67,6 @@ interface Props {
   onClose: () => void;
   onSuccess?: () => void;
 }
-
 
 const expenseFormSchema = z
   .object({
@@ -93,7 +93,6 @@ const expenseFormSchema = z
   .superRefine(validateExpenseRules);
 
 type ExpenseFormValues = z.infer<typeof expenseFormSchema>;
-
 
 export function ExpenseFormModal({ open, expense, defaultExpenseDate, onClose, onSuccess }: Props) {
   const createMutation = useCreateExpense();
@@ -247,8 +246,8 @@ export function ExpenseFormModal({ open, expense, defaultExpenseDate, onClose, o
       onSuccess?.();
       onClose();
       form.reset();
-    } catch {
-      toast.error('Erro ao salvar despesa');
+    } catch (error) {
+      toast.error(getErrorMessage(error, 'Erro ao salvar despesa'));
     } finally {
       isSubmittingRef.current = false;
     }
@@ -358,7 +357,9 @@ export function ExpenseFormModal({ open, expense, defaultExpenseDate, onClose, o
                     <FormLabel>Categoria (opcional)</FormLabel>
                     <Select
                       value={field.value ? String(field.value) : 'none'}
-                      onValueChange={(value) => field.onChange(value === 'none' ? null : Number(value))}
+                      onValueChange={(value) =>
+                        field.onChange(value === 'none' ? null : Number(value))
+                      }
                     >
                       <FormControl>
                         <SelectTrigger>
@@ -385,7 +386,10 @@ export function ExpenseFormModal({ open, expense, defaultExpenseDate, onClose, o
               <Alert>
                 <Info className="h-4 w-4" />
                 <AlertDescription className="flex items-center justify-between">
-                  <span>Use a p\u00e1gina de Funcion\u00e1rios para registrar pagamentos de sal\u00e1rio.</span>
+                  <span>
+                    Use a p\u00e1gina de Funcion\u00e1rios para registrar pagamentos de
+                    sal\u00e1rio.
+                  </span>
                   <Button variant="link" asChild>
                     <Link href={ROUTES.FINANCIAL_EMPLOYEES}>Ir para Funcion\u00e1rios</Link>
                   </Button>
@@ -406,11 +410,16 @@ export function ExpenseFormModal({ open, expense, defaultExpenseDate, onClose, o
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>
-                          Pessoa{PERSON_REQUIRED_TYPES.includes(watchedType as ExpenseType) ? '' : ' (opcional)'}
+                          Pessoa
+                          {PERSON_REQUIRED_TYPES.includes(watchedType as ExpenseType)
+                            ? ''
+                            : ' (opcional)'}
                         </FormLabel>
                         <Select
                           value={field.value ? String(field.value) : 'none'}
-                          onValueChange={(value) => field.onChange(value === 'none' ? null : Number(value))}
+                          onValueChange={(value) =>
+                            field.onChange(value === 'none' ? null : Number(value))
+                          }
                         >
                           <FormControl>
                             <SelectTrigger>
@@ -442,12 +451,20 @@ export function ExpenseFormModal({ open, expense, defaultExpenseDate, onClose, o
                         <FormLabel>Cart\u00e3o de Cr\u00e9dito</FormLabel>
                         <Select
                           value={field.value ? String(field.value) : 'none'}
-                          onValueChange={(value) => field.onChange(value === 'none' ? null : Number(value))}
+                          onValueChange={(value) =>
+                            field.onChange(value === 'none' ? null : Number(value))
+                          }
                           disabled={!watchedPersonId}
                         >
                           <FormControl>
                             <SelectTrigger>
-                              <SelectValue placeholder={watchedPersonId ? 'Selecione o cart\u00e3o' : 'Selecione uma pessoa primeiro'} />
+                              <SelectValue
+                                placeholder={
+                                  watchedPersonId
+                                    ? 'Selecione o cart\u00e3o'
+                                    : 'Selecione uma pessoa primeiro'
+                                }
+                              />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
@@ -460,7 +477,9 @@ export function ExpenseFormModal({ open, expense, defaultExpenseDate, onClose, o
                           </SelectContent>
                         </Select>
                         {!watchedPersonId && (
-                          <FormDescription>Selecione uma pessoa para ver os cart\u00f5es</FormDescription>
+                          <FormDescription>
+                            Selecione uma pessoa para ver os cart\u00f5es
+                          </FormDescription>
                         )}
                         <FormMessage />
                       </FormItem>
@@ -501,11 +520,16 @@ export function ExpenseFormModal({ open, expense, defaultExpenseDate, onClose, o
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>
-                          Pr\u00e9dio{BUILDING_REQUIRED_TYPES.includes(watchedType as ExpenseType) ? '' : ' (opcional)'}
+                          Pr\u00e9dio
+                          {BUILDING_REQUIRED_TYPES.includes(watchedType as ExpenseType)
+                            ? ''
+                            : ' (opcional)'}
                         </FormLabel>
                         <Select
                           value={field.value ? String(field.value) : 'none'}
-                          onValueChange={(value) => field.onChange(value === 'none' ? null : Number(value))}
+                          onValueChange={(value) =>
+                            field.onChange(value === 'none' ? null : Number(value))
+                          }
                         >
                           <FormControl>
                             <SelectTrigger>
@@ -619,7 +643,9 @@ export function ExpenseFormModal({ open, expense, defaultExpenseDate, onClose, o
                         <FormItem className="flex items-center justify-between">
                           <div>
                             <FormLabel>Parcelamento de d\u00edvida?</FormLabel>
-                            <FormDescription>Marque se esta conta est\u00e1 sendo parcelada</FormDescription>
+                            <FormDescription>
+                              Marque se esta conta est\u00e1 sendo parcelada
+                            </FormDescription>
                           </div>
                           <FormControl>
                             <Switch checked={field.value} onCheckedChange={field.onChange} />
@@ -766,7 +792,11 @@ export function ExpenseFormModal({ open, expense, defaultExpenseDate, onClose, o
               {!isEmployeeSalary && (
                 <Button
                   type="submit"
-                  disabled={createMutation.isPending || updateMutation.isPending || generateInstallmentsMutation.isPending}
+                  disabled={
+                    createMutation.isPending ||
+                    updateMutation.isPending ||
+                    generateInstallmentsMutation.isPending
+                  }
                 >
                   {expense ? 'Atualizar' : 'Criar'}
                 </Button>

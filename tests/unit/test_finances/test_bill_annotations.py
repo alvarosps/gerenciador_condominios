@@ -66,6 +66,19 @@ def test_amount_paid_excludes_soft_deleted_allocation() -> None:
     assert _amounts(bill).amount_paid == Decimal("300.00")
 
 
+def test_amount_paid_excludes_allocation_of_soft_deleted_payment() -> None:
+    """B10b: a soft-deleted PAYMENT (not the allocation itself) must not count either — the
+    forward FK join (PaymentAllocation.payment) does not apply Payment's default manager, so this
+    must be an explicit payment__is_deleted=False filter, symmetric to _caixa_outflow (B10b)."""
+    bill = make_bill()
+    make_bill_line_item(bill=bill, amount=Decimal("500.00"))
+    payment = make_payment(condominium=bill.condominium)
+    make_payment_allocation(payment=payment, bill=bill, amount=Decimal("300.00"))
+    payment.delete()  # soft delete the PAYMENT directly, allocation left untouched
+    assert _amounts(bill).amount_paid == Decimal("0.00")
+    assert _amounts(bill).payment_status == "open"
+
+
 def test_payment_status_open_partial_paid() -> None:
     open_bill = make_bill()
     make_bill_line_item(bill=open_bill, amount=Decimal("900.00"))

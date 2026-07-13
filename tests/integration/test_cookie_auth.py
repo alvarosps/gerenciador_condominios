@@ -2,6 +2,7 @@
 
 import pytest
 from rest_framework import status
+from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from tests.constants import TEST_PASSWORD
@@ -20,6 +21,17 @@ class TestCookieLogin:
         assert "refresh_token" in response.cookies
         assert response.cookies["access_token"]["httponly"]
         assert response.cookies["refresh_token"]["httponly"]
+
+    def test_login_sets_readable_csrftoken_cookie(self, api_client, admin_user):
+        response = api_client.post(
+            "/api/auth/token/",
+            {"username": "admin", "password": TEST_PASSWORD},
+            format="json",
+        )
+        assert response.status_code == status.HTTP_200_OK
+        assert "csrftoken" in response.cookies
+        # Must be JS-readable (axios reads it to echo back as X-CSRFToken) — not HttpOnly.
+        assert not response.cookies["csrftoken"]["httponly"]
 
     def test_login_returns_user_in_body_not_tokens(self, api_client, admin_user):
         response = api_client.post(
@@ -199,3 +211,62 @@ class TestOAuthCookieFlow:
             format="json",
         )
         assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+
+@pytest.mark.integration
+class TestCookieAuthenticationCsrfEnforcement:
+    """CookieJWTAuthentication.enforce_csrf — only the cookie path is protected; Bearer
+    (Authorization header) stays exempt since it is never sent automatically by a browser.
+
+    Uses a real APIClient(enforce_csrf_checks=True) because the project's default `api_client`
+    fixture (plain APIClient()) disables CSRF enforcement, as DRF's test client does for every
+    other test in the suite.
+    """
+
+    def _csrf_client(self) -> APIClient:
+        return APIClient(enforce_csrf_checks=True)
+
+    def test_cookie_write_without_csrf_header_returns_403(self, admin_user):
+        client = self._csrf_client()
+        access_token = RefreshToken.for_user(admin_user).access_token
+        client.cookies["access_token"] = str(access_token)
+
+        response = client.post("/api/auth/logout/")
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert "CSRF" in str(response.data["detail"])
+
+    def test_cookie_write_with_matching_csrf_header_succeeds(self, admin_user):
+        client = self._csrf_client()
+        login_response = client.post(
+            "/api/auth/token/",
+            {"username": "admin", "password": TEST_PASSWORD},
+            format="json",
+        )
+        csrf_cookie = login_response.cookies["csrftoken"]
+
+        response = client.post("/api/auth/logout/", HTTP_X_CSRFTOKEN=csrf_cookie.value)
+
+        assert response.status_code == status.HTTP_204_NO_CONTENT
+
+    def test_bearer_write_without_csrf_header_still_succeeds(self, admin_user):
+        # Authorization header path is exempt: a browser never attaches it automatically,
+        # so it cannot be forged cross-site the way a cookie can.
+        client = self._csrf_client()
+        refresh = RefreshToken.for_user(admin_user)
+        client.credentials(HTTP_AUTHORIZATION=f"Bearer {refresh.access_token}")
+        client.cookies["refresh_token"] = str(refresh)
+
+        response = client.post("/api/auth/logout/")
+
+        assert response.status_code == status.HTTP_204_NO_CONTENT
+
+    def test_cookie_read_without_csrf_header_succeeds(self, admin_user):
+        # Safe methods (GET) are never subject to CSRF checks.
+        client = self._csrf_client()
+        access_token = RefreshToken.for_user(admin_user).access_token
+        client.cookies["access_token"] = str(access_token)
+
+        response = client.get("/api/auth/me/")
+
+        assert response.status_code == status.HTTP_200_OK

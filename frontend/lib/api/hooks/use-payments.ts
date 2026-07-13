@@ -1,9 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
 import { queryKeys } from '../query-keys';
+import { parseList } from '../parse-list';
 import { invalidateFinanceMoneyCaches } from './use-bills';
 import { type Payment, paymentSchema } from '@/lib/schemas/finances/payment.schema';
-import { type PaginatedResponse, extractResults } from '@/lib/types/api';
 
 const ENDPOINT = '/finances/payments/';
 
@@ -20,10 +20,10 @@ export function usePayments(filters?: PaymentFilters) {
   return useQuery({
     queryKey: queryKeys.finances.payments.list(cleanFilters),
     queryFn: async () => {
-      const { data } = await apiClient.get<PaginatedResponse<Payment> | Payment[]>(ENDPOINT, {
+      const { data } = await apiClient.get<unknown>(ENDPOINT, {
         params: { page_size: 10000, ...cleanFilters },
       });
-      return extractResults(data).map((payment) => paymentSchema.parse(payment));
+      return parseList(data, paymentSchema).items;
     },
   });
 }

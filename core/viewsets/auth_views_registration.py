@@ -97,5 +97,5 @@ class RegisterView(APIView):
             },
             status=status.HTTP_201_CREATED,
         )
-        _set_auth_cookies(response, str(refresh.access_token), str(refresh))
+        _set_auth_cookies(request, response, str(refresh.access_token), str(refresh))
         return response

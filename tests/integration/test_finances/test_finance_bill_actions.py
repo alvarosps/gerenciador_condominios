@@ -162,6 +162,44 @@ def test_create_with_lines(authenticated_api_client):
     assert resp.data["amount_total"] == "500.00"
 
 
+# --- B4: a paid Bill cannot be destroyed/suspended/canceled (unpay first) ---
+
+
+@freeze_time(FROZEN)
+def test_destroy_rejects_paid_bill(authenticated_api_client):
+    bill = _bill_total("300.00")
+    authenticated_api_client.post(
+        f"/api/finances/bills/{bill.id}/pay/", {"payment_date": "2026-06-05"}, format="json"
+    )
+    resp = authenticated_api_client.delete(f"/api/finances/bills/{bill.id}/")
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    assert Bill.objects.filter(pk=bill.id).exists()
+
+
+@freeze_time(FROZEN)
+def test_suspend_rejects_paid_bill(authenticated_api_client):
+    bill = _bill_total("300.00")
+    authenticated_api_client.post(
+        f"/api/finances/bills/{bill.id}/pay/", {"payment_date": "2026-06-05"}, format="json"
+    )
+    resp = authenticated_api_client.post(f"/api/finances/bills/{bill.id}/suspend/")
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    bill.refresh_from_db()
+    assert bill.lifecycle_state == BillLifecycleState.ACTIVE
+
+
+@freeze_time(FROZEN)
+def test_cancel_rejects_paid_bill(authenticated_api_client):
+    bill = _bill_total("300.00")
+    authenticated_api_client.post(
+        f"/api/finances/bills/{bill.id}/pay/", {"payment_date": "2026-06-05"}, format="json"
+    )
+    resp = authenticated_api_client.post(f"/api/finances/bills/{bill.id}/cancel/")
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    bill.refresh_from_db()
+    assert bill.lifecycle_state == BillLifecycleState.ACTIVE
+
+
 def test_create_with_lines_negative_rejected(authenticated_api_client):
     cond = make_condominium()
     before = Bill.all_objects.count()

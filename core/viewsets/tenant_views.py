@@ -56,10 +56,21 @@ def _get_tenant(request: Request) -> Tenant | None:
 
 
 def _get_active_lease(tenant: Tenant) -> Lease | None:
-    """Return the active (non-deleted) lease for a tenant, or None."""
-    return tenant.leases_responsible.select_related(
-        "apartment", "apartment__building", "apartment__owner"
-    ).first()
+    """Return the active (non-deleted) lease for a tenant, or None.
+
+    A tenant can be the responsible party on 2+ non-deleted leases simultaneously (one
+    per apartment — the ``unique_active_lease_per_apartment`` constraint is per apartment,
+    not per tenant). Ordered by most recent ``start_date`` first (tie-broken by ``-pk``)
+    so the portal deterministically picks the latest lease instead of relying on
+    unordered ``.first()`` (whose result depends on incidental DB row order).
+    """
+    return (
+        tenant.leases_responsible.select_related(
+            "apartment", "apartment__building", "apartment__owner"
+        )
+        .order_by("-start_date", "-pk")
+        .first()
+    )
 
 
 class TenantViewSet(viewsets.ViewSet):
@@ -307,6 +318,35 @@ class TenantViewSet(viewsets.ViewSet):
             PaymentProofSerializer(proof).data,
             status=status.HTTP_201_CREATED,
         )
+
+    @action(detail=False, methods=["get"], url_path="payments/proof")
+    def payments_proof_list(self, request: Request) -> Response:
+        """
+        GET /api/tenant/payments/proof/
+
+        Returns a paginated list of payment proofs uploaded by the tenant's active
+        lease, most recent first.
+        """
+        tenant = _get_tenant(request)
+        if tenant is None:
+            return Response(
+                {"detail": "Perfil de inquilino não encontrado."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        lease = _get_active_lease(tenant)
+        if lease is None:
+            return Response(
+                {"detail": "Nenhuma locação ativa encontrada."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        queryset = PaymentProof.objects.filter(lease=lease).order_by("-created_at")
+
+        paginator = CustomPageNumberPagination()
+        page = paginator.paginate_queryset(queryset, request)
+        serializer = PaymentProofSerializer(page, many=True)
+        return paginator.get_paginated_response(serializer.data)
 
     @action(
         detail=False,

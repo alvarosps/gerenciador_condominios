@@ -1,8 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
 import { queryKeys } from '../query-keys';
+import { parseList } from '../parse-list';
 import { type Apartment, apartmentSchema } from '@/lib/schemas/apartment.schema';
-import { type PaginatedResponse, extractResults } from '@/lib/types/api';
 
 /**
  * Hook to fetch all apartments
@@ -21,13 +21,10 @@ export function useApartments(filters?: {
   return useQuery({
     queryKey: queryKeys.apartments.list(cleanFilters),
     queryFn: async () => {
-      const { data } = await apiClient.get<PaginatedResponse<Apartment> | Apartment[]>('/apartments/', {
+      const { data } = await apiClient.get<unknown>('/apartments/', {
         params: { ...cleanFilters, page_size: 10000 },
       });
-      // Handle both paginated and non-paginated responses
-      const apartments = extractResults(data);
-      // Validate each apartment with Zod schema
-      return apartments.map((apartment) => apartmentSchema.parse(apartment));
+      return parseList(data, apartmentSchema).items;
     },
   });
 }
@@ -40,7 +37,7 @@ export function useApartment(id: number | null) {
     queryKey: id ? queryKeys.apartments.detail(id) : queryKeys.apartments.all,
     queryFn: async () => {
       if (!id) throw new Error('Apartment ID is required');
-      const { data} = await apiClient.get<Apartment>(`/apartments/${id}/`);
+      const { data } = await apiClient.get<Apartment>(`/apartments/${id}/`);
       return apartmentSchema.parse(data);
     },
     enabled: Boolean(id),
@@ -54,9 +51,13 @@ export function useCreateApartment() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: Omit<Apartment, 'id' | 'building' | 'furnitures' | 'is_rented' | 'owner'>) => {
+    mutationFn: async (
+      data: Omit<Apartment, 'id' | 'building' | 'furnitures' | 'is_rented' | 'owner'>
+    ) => {
       // Validate data before sending
-      const validated = apartmentSchema.omit({ id: true, building: true, furnitures: true }).parse(data);
+      const validated = apartmentSchema
+        .omit({ id: true, building: true, furnitures: true })
+        .parse(data);
       const response = await apiClient.post<Apartment>('/apartments/', validated);
       return response.data;
     },
@@ -79,12 +80,15 @@ export function useUpdateApartment() {
       if (!data.id) throw new Error('Apartment ID is required for update');
 
       // Remove nested objects for API call
-      const { building: _building, furnitures: _furnitures, active_lease: _active_lease, owner: _owner, ...updateData } = data;
+      const {
+        building: _building,
+        furnitures: _furnitures,
+        active_lease: _active_lease,
+        owner: _owner,
+        ...updateData
+      } = data;
 
-      const response = await apiClient.put<Apartment>(
-        `/apartments/${data.id}/`,
-        updateData
-      );
+      const response = await apiClient.put<Apartment>(`/apartments/${data.id}/`, updateData);
       return response.data;
     },
     onSuccess: (data) => {

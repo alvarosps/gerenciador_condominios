@@ -6,6 +6,7 @@ from typing import Any, Literal, cast
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.exceptions import ImproperlyConfigured
+from django.middleware.csrf import get_token
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -63,10 +64,20 @@ def _role_from_access(access: str) -> str:
 
 
 def _set_auth_cookies(
-    response: Response, access: str, refresh: str | None = None, role: str = "tenant"
+    request: Request,
+    response: Response,
+    access: str,
+    refresh: str | None = None,
+    role: str = "tenant",
 ) -> None:
     is_secure = not settings.DEBUG
     samesite = _cookie_samesite()
+    # Issue the csrftoken cookie so the frontend (axios xsrfCookieName/xsrfHeaderName) can echo
+    # it back as X-CSRFToken on subsequent cookie-authenticated writes — enforced by
+    # CookieJWTAuthentication.enforce_csrf. get_token() only touches request.META, which DRF's
+    # Request proxies straight through to the underlying Django HttpRequest, so this flags
+    # CsrfViewMiddleware to add the Set-Cookie on the way out.
+    get_token(request)
     response.set_cookie(
         key="access_token",
         value=access,
@@ -122,7 +133,11 @@ class CookieTokenObtainPairView(TokenObtainPairView):
             token = AccessToken(access_token_str)
             user = User.objects.get(pk=token["user_id"])
             _set_auth_cookies(
-                response, access_token_str, response.data["refresh"], role=role_for_user(user)
+                request,
+                response,
+                access_token_str,
+                response.data["refresh"],
+                role=role_for_user(user),
             )
             response.data = {
                 "user": {
@@ -152,7 +167,9 @@ class CookieTokenRefreshView(TokenRefreshView):
             access = serializer.validated_data.get("access", "")
             new_refresh = serializer.validated_data.get("refresh")
             response = Response(status=status.HTTP_200_OK)
-            _set_auth_cookies(response, access, new_refresh, role=_role_from_access(access))
+            _set_auth_cookies(
+                request, response, access, new_refresh, role=_role_from_access(access)
+            )
             response.data = {}
             return response
 
@@ -160,7 +177,9 @@ class CookieTokenRefreshView(TokenRefreshView):
         if response.status_code == status.HTTP_200_OK:
             access = response.data.get("access", "")
             new_refresh = response.data.get("refresh")
-            _set_auth_cookies(response, access, new_refresh, role=_role_from_access(access))
+            _set_auth_cookies(
+                request, response, access, new_refresh, role=_role_from_access(access)
+            )
             response.data = {}
         return response
 

@@ -1,18 +1,17 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
+import { parseList } from '../parse-list';
 import { type CreditCard, creditCardSchema } from '@/lib/schemas/credit-card.schema';
-import { type PaginatedResponse, extractResults } from '@/lib/types/api';
 import { queryKeys } from '@/lib/api/query-keys';
 
 export function useCreditCards() {
   return useQuery({
     queryKey: queryKeys.creditCards.list(),
     queryFn: async () => {
-      const { data } = await apiClient.get<PaginatedResponse<CreditCard> | CreditCard[]>('/credit-cards/', {
+      const { data } = await apiClient.get<unknown>('/credit-cards/', {
         params: { page_size: 10000 },
       });
-      const cards = extractResults(data);
-      return cards.map((card) => creditCardSchema.parse(card));
+      return parseList(data, creditCardSchema).items;
     },
   });
 }

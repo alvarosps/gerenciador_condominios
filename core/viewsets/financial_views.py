@@ -9,7 +9,7 @@ from django.db import transaction
 from django.db.models import QuerySet
 from django.http import QueryDict
 from django.utils import timezone
-from rest_framework import status, viewsets
+from rest_framework import serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -49,6 +49,7 @@ from core.serializers import (
 )
 from core.services.expense_service import ExpenseService
 from core.services.person_payment_schedule_service import PersonPaymentScheduleService
+from core.services.timezone import today_sp
 
 logger = logging.getLogger(__name__)
 
@@ -142,6 +143,11 @@ class ExpenseViewSet(viewsets.ModelViewSet):
     serializer_class = ExpenseSerializer
     permission_classes = [IsAdminUser]
 
+    def perform_create(self, serializer: serializers.BaseSerializer[Expense]) -> None:
+        """Pass the requesting user through so ExpenseSerializer.create() can attribute
+        installments created via the atomic installments_data path (created_by/updated_by)."""
+        serializer.save(created_by=cast(User, self.request.user))
+
     def get_queryset(self) -> QuerySet[Expense]:
         queryset = Expense.objects.select_related(
             "person", "credit_card", "building", "category"
@@ -201,7 +207,7 @@ class ExpenseViewSet(viewsets.ModelViewSet):
     def mark_paid(self, request: Request, pk: str | None = None) -> Response:
         if pk is None:
             return Response(status=status.HTTP_404_NOT_FOUND)
-        paid_date = request.data.get("paid_date", timezone.now().date())
+        paid_date = request.data.get("paid_date", today_sp())
         with transaction.atomic():
             expense = Expense.objects.select_for_update().get(pk=pk)
             expense.is_paid = True
@@ -315,14 +321,14 @@ class ExpenseInstallmentViewSet(viewsets.ModelViewSet):
         """If all installments are paid, mark the expense as paid too."""
         if not expense.installments.filter(is_paid=False).exists():
             expense.is_paid = True
-            expense.paid_date = timezone.now().date()
+            expense.paid_date = today_sp()
             expense.save(update_fields=["is_paid", "paid_date"])
 
     @action(detail=True, methods=["post"])
     def mark_paid(self, request: Request, pk: str | None = None) -> Response:
         if pk is None:
             return Response(status=status.HTTP_404_NOT_FOUND)
-        paid_date = request.data.get("paid_date", timezone.now().date())
+        paid_date = request.data.get("paid_date", today_sp())
         with transaction.atomic():
             installment = ExpenseInstallment.objects.select_for_update().get(pk=pk)
             installment.is_paid = True
@@ -336,7 +342,7 @@ class ExpenseInstallmentViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=["post"])
     def bulk_mark_paid(self, request: Request) -> Response:
         installment_ids = request.data.get("installment_ids", [])
-        paid_date = request.data.get("paid_date", timezone.now().date())
+        paid_date = request.data.get("paid_date", today_sp())
 
         if not installment_ids:
             return Response(
@@ -412,7 +418,7 @@ class IncomeViewSet(viewsets.ModelViewSet):
     def mark_received(self, request: Request, pk: str | None = None) -> Response:
         if pk is None:
             return Response(status=status.HTTP_404_NOT_FOUND)
-        received_date = request.data.get("received_date", timezone.now().date())
+        received_date = request.data.get("received_date", today_sp())
         with transaction.atomic():
             income = Income.objects.select_for_update().get(pk=pk)
             income.is_received = True
@@ -505,7 +511,7 @@ class EmployeePaymentViewSet(viewsets.ModelViewSet):
     def mark_paid(self, request: Request, pk: str | None = None) -> Response:
         if pk is None:
             return Response(status=status.HTTP_404_NOT_FOUND)
-        payment_date = request.data.get("payment_date", timezone.now().date())
+        payment_date = request.data.get("payment_date", today_sp())
         with transaction.atomic():
             payment = EmployeePayment.objects.select_for_update().get(pk=pk)
             payment.is_paid = True

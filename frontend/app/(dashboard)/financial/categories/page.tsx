@@ -130,7 +130,6 @@ export default function CategoriesPage() {
             title: 'Ações',
             key: 'actions',
             width: 150,
-            fixed: 'right' as const,
             render: (_: unknown, record: FlatCategory) => (
               <div className="flex items-center gap-2">
                 <Button
@@ -175,7 +174,9 @@ export default function CategoriesPage() {
       <div className="mb-4 flex justify-between items-center flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold">Categorias de Despesas</h1>
-          <p className="text-muted-foreground mt-1">Gerencie as categorias e subcategorias de despesas</p>
+          <p className="text-muted-foreground mt-1">
+            Gerencie as categorias e subcategorias de despesas
+          </p>
         </div>
         {isAdmin && (
           <Button onClick={crud.openCreateModal}>

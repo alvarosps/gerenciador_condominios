@@ -2,9 +2,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import { renderWithProviders } from '@/tests/test-utils';
 import { MainLayout } from '../main-layout';
-import { useAuthStore } from '@/store/auth-store';
+import { useAuthStore, type User } from '@/store/auth-store';
 
 const replace = vi.fn();
+const { apiClientGet } = vi.hoisted(() => ({
+  apiClientGet: vi.fn<() => Promise<{ data: User | null }>>(() => Promise.resolve({ data: null })),
+}));
 
 vi.mock('next/navigation', () => ({
   usePathname: vi.fn(() => '/'),
@@ -16,7 +19,7 @@ vi.mock('../sidebar', () => ({ Sidebar: () => <div data-testid="sidebar" /> }));
 vi.mock('../header', () => ({ Header: () => <div data-testid="header" /> }));
 vi.mock('@/components/offline-banner', () => ({ OfflineBanner: () => null }));
 vi.mock('@/lib/api/client', () => ({
-  apiClient: { get: vi.fn(() => Promise.resolve({ data: null })) },
+  apiClient: { get: apiClientGet },
 }));
 
 describe('MainLayout role guard', () => {
@@ -62,5 +65,30 @@ describe('MainLayout role guard', () => {
 
     expect(screen.getByTestId('admin-child')).toBeInTheDocument();
     expect(replace).not.toHaveBeenCalled();
+  });
+
+  it('bootstraps the user profile via TanStack Query when session is restored from cookie', async () => {
+    apiClientGet.mockResolvedValueOnce({
+      data: {
+        id: 3,
+        email: 'restored@test.com',
+        first_name: 'Rest',
+        last_name: 'Ored',
+        is_staff: true,
+      },
+    });
+
+    useAuthStore.setState({ user: null, isAuthenticated: true });
+
+    renderWithProviders(
+      <MainLayout>
+        <div data-testid="admin-child">Admin content</div>
+      </MainLayout>
+    );
+
+    await waitFor(() => {
+      expect(useAuthStore.getState().user?.email).toBe('restored@test.com');
+    });
+    expect(screen.getByTestId('admin-child')).toBeInTheDocument();
   });
 });

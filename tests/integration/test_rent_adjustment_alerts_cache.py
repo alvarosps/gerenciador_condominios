@@ -41,17 +41,22 @@ class TestRentAdjustmentAlertsCache:
         # The payload is now in the cache — a second load is served without recomputing.
         assert cache.get(_ALERTS_KEY) is not None
 
-    def test_landlord_save_invalidates_cache(self) -> None:
+    def test_landlord_save_invalidates_cache(self, django_capture_on_commit_callbacks) -> None:
         # Discriminating: Landlord had NO signal receiver before P5.1, so without the new
         # receiver this save would leave the cache populated.
         self.client.get(_ALERTS_URL)
         assert cache.get(_ALERTS_KEY) is not None
 
-        baker.make(Landlord, is_active=True, rent_adjustment_percentage=Decimal("4.50"))
+        # CacheManager.invalidate_pattern defers to transaction.on_commit (P4.2 item (d)) so a
+        # concurrent read cannot re-populate the cache with pre-commit data; the test must run
+        # the deferred callbacks itself, as it would happen on a real commit outside the test's
+        # wrapping transaction.
+        with django_capture_on_commit_callbacks(execute=True):
+            baker.make(Landlord, is_active=True, rent_adjustment_percentage=Decimal("4.50"))
 
         assert cache.get(_ALERTS_KEY) is None
 
-    def test_ipca_index_save_invalidates_cache(self) -> None:
+    def test_ipca_index_save_invalidates_cache(self, django_capture_on_commit_callbacks) -> None:
         # Discriminating: IPCAIndex had NO signal receiver at all before this fix, so without the
         # new receiver persisting a new index month (what the daily cron's fetch_latest does) would
         # leave the stale alert percentages cached until the 300s TTL. The alert payload derives
@@ -59,17 +64,17 @@ class TestRentAdjustmentAlertsCache:
         self.client.get(_ALERTS_URL)
         assert cache.get(_ALERTS_KEY) is not None
 
-        baker.make(IPCAIndex)
+        with django_capture_on_commit_callbacks(execute=True):
+            baker.make(IPCAIndex)
 
         assert cache.get(_ALERTS_KEY) is None
 
     def test_alerts_prefix_wired_in_cache_maps(self) -> None:
         # The invalidation must be wired through the P4.2 model->prefix map, not a hand-rolled
-        # invalidate_pattern call. On the LocMem test cache invalidate_pattern clears everything,
-        # so a behavioural test alone can't prove the prefix is registered (a Tenant write already
-        # clears every key via its other prefixes) — assert membership directly. Tenant carries the
-        # prefix because the alert card embeds lease.responsible_tenant.name; IPCAIndex because the
-        # suggested percentage derives from the latest index.
+        # invalidate_pattern call — assert membership directly rather than relying on a
+        # behavioural side effect. Tenant carries the prefix because the alert card embeds
+        # lease.responsible_tenant.name; IPCAIndex because the suggested percentage derives
+        # from the latest index.
         assert _ALERTS_KEY in _PROPERTY_CACHE_PREFIXES
         for model_name in ("Lease", "RentAdjustment", "Landlord", "Tenant", "IPCAIndex"):
             assert _ALERTS_KEY in _CORE_MODEL_CACHE_PREFIXES[model_name]

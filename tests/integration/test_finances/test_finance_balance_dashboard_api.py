@@ -13,11 +13,14 @@ from tests.factories import (
     make_bill,
     make_bill_line_item,
     make_building,
+    make_condo_month_close,
     make_condominium,
     make_finance_category,
+    make_income_entry,
     make_lease,
     make_rent_payment,
 )
+from tests.utils import flush_on_commit_callbacks
 
 pytestmark = [pytest.mark.integration, pytest.mark.django_db]
 
@@ -84,6 +87,49 @@ def test_malformed_building_id_is_400_not_500(authenticated_api_client, url):
     assert authenticated_api_client.get(url).status_code == status.HTTP_400_BAD_REQUEST
 
 
+@freeze_time("2027-01-01 12:00:00")
+def test_monthly_balance_query_count_scales_linearly_not_quadratically():
+    """B16 #9: _monthly_balance walked cash_balance() independently per open month (each
+    re-walking from the baseline), making the whole 12-month series O(n^2) in open months.
+    Comparing a year with a close mid-way (6 open months to walk) against a year with no
+    close at all (12 open months) must show linear, not quadratic, query growth."""
+    from django.db import connection
+    from django.test.utils import CaptureQueriesContext
+
+    from finances.viewsets.dashboard_views import _monthly_balance
+
+    condo = make_condominium()
+    for month in range(1, 13):
+        make_income_entry(
+            condominium=condo,
+            income_date=date(2027, month, 5),
+            is_received=True,
+            received_date=date(2027, month, 5),
+            amount=Decimal("100.00"),
+        )
+
+    with CaptureQueriesContext(connection) as ctx_all_open:
+        _monthly_balance(2027, None)
+    all_open_count = len(ctx_all_open)
+
+    make_condo_month_close(condominium=condo, reference_month=date(2027, 6, 1), status="closed")
+
+    with CaptureQueriesContext(connection) as ctx_one_closed:
+        _monthly_balance(2027, None)
+    one_closed_count = len(ctx_one_closed)
+
+    # O(n^2) over 12 open months (78 walked-months) vs 11 open months + 1 close read (~66
+    # walked-months) would show a large drop; O(n) shows a small, roughly proportional one.
+    assert one_closed_count < all_open_count, (
+        "closing one month should reduce work (one fewer open month to compute)"
+    )
+    ratio = all_open_count / one_closed_count
+    assert ratio < 1.3, (
+        f"query count scales super-linearly with open months: {one_closed_count} -> "
+        f"{all_open_count} (ratio {ratio:.2f}) — O(n^2) walk in cash_balance() per month"
+    )
+
+
 @freeze_time("2026-07-01 12:00:00")
 def test_by_category_donut(authenticated_api_client):
     energia = make_finance_category(name="Energia", color="#f59e0b")
@@ -136,7 +182,11 @@ def test_overview_cached_and_invalidated(authenticated_api_client):
     BillLineItem.objects.filter(bill=bill).update(amount=Decimal("500.00"))
     cached = authenticated_api_client.get(url)
     assert cached.data["result_of_month"] == "-100.00"
-    # a normal save fires the finance-* signal → cache invalidated → fresh value
+    # a normal save fires the finance-* signal → cache invalidated → fresh value.
+    # CacheManager.invalidate_pattern defers its real deletion to transaction.on_commit (P4.2
+    # item (d)), which pytest-django's per-test wrapping transaction never fires on its own —
+    # flush it explicitly, mirroring what a real commit (between two separate requests) does.
     bill.save()
+    flush_on_commit_callbacks()
     fresh = authenticated_api_client.get(url)
     assert fresh.data["result_of_month"] == "-500.00"

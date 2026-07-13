@@ -37,11 +37,8 @@ function ModalLoader() {
 }
 
 const PersonIncomeFormModal = dynamic(
-  () =>
-    import('./_components/person-income-form-modal').then(
-      (mod) => mod.PersonIncomeFormModal,
-    ),
-  { loading: () => <ModalLoader />, ssr: false },
+  () => import('./_components/person-income-form-modal').then((mod) => mod.PersonIncomeFormModal),
+  { loading: () => <ModalLoader />, ssr: false }
 );
 
 const INCOME_TYPE_LABELS: Record<string, string> = {
@@ -87,7 +84,7 @@ export default function PersonIncomesPage() {
       income_type: filterIncomeType,
       is_active: filterIsActive,
     }),
-    [filterPersonId, filterIncomeType, filterIsActive],
+    [filterPersonId, filterIncomeType, filterIsActive]
   );
 
   const { data: persons } = usePersons();
@@ -106,7 +103,7 @@ export default function PersonIncomesPage() {
       crud.setItemToDelete(record);
       if (record.id !== undefined) crud.handleDeleteClick(record.id);
     },
-    [crud],
+    [crud]
   );
 
   const columns: Column<PersonIncome>[] = useMemo(
@@ -150,8 +147,10 @@ export default function PersonIncomesPage() {
         key: 'value',
         render: (_, record) => getIncomeValue(record),
         sorter: (a: PersonIncome, b: PersonIncome) => {
-          const valA = a.income_type === 'fixed_stipend' ? (a.fixed_amount ?? 0) : (a.current_value ?? 0);
-          const valB = b.income_type === 'fixed_stipend' ? (b.fixed_amount ?? 0) : (b.current_value ?? 0);
+          const valA =
+            a.income_type === 'fixed_stipend' ? (a.fixed_amount ?? 0) : (a.current_value ?? 0);
+          const valB =
+            b.income_type === 'fixed_stipend' ? (b.fixed_amount ?? 0) : (b.current_value ?? 0);
           return valA - valB;
         },
       },
@@ -181,14 +180,9 @@ export default function PersonIncomesPage() {
               title: 'Ações',
               key: 'actions',
               width: 150,
-              fixed: 'right' as const,
               render: (_: unknown, record: PersonIncome) => (
                 <div className="flex items-center gap-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => crud.openEditModal(record)}
-                  >
+                  <Button variant="ghost" size="sm" onClick={() => crud.openEditModal(record)}>
                     <Pencil className="h-4 w-4 mr-1" />
                     Editar
                   </Button>
@@ -207,7 +201,7 @@ export default function PersonIncomesPage() {
           ]
         : []),
     ],
-    [crud, handleDelete, isAdmin],
+    [crud, handleDelete, isAdmin]
   );
 
   useEffect(() => {
@@ -260,9 +254,7 @@ export default function PersonIncomesPage() {
             <label className="block text-sm font-medium mb-2">Tipo</label>
             <Select
               value={filterIncomeType ?? 'all'}
-              onValueChange={(value) =>
-                setFilterIncomeType(value === 'all' ? undefined : value)
-              }
+              onValueChange={(value) => setFilterIncomeType(value === 'all' ? undefined : value)}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Todos os tipos" />

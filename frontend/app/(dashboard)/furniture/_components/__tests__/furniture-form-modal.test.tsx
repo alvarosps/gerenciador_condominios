@@ -1,35 +1,31 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { screen } from '@testing-library/react';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { screen, waitFor } from '@testing-library/react';
+import { http, HttpResponse } from 'msw';
 import { renderWithProviders } from '@/tests/test-utils';
+import { server } from '@/tests/mocks/server';
 import { FurnitureFormModal } from '../furniture-form-modal';
-import * as furnitureHooks from '@/lib/api/hooks/use-furniture';
 
-vi.mock('@/lib/api/hooks/use-furniture', async (importOriginal) => {
-  const actual = await importOriginal<typeof furnitureHooks>();
-  return {
-    ...actual,
-    useCreateFurniture: vi.fn(),
-    useUpdateFurniture: vi.fn(),
-  };
-});
+const API_BASE = 'http://localhost:8008/api';
 
-const idleMutation = { mutateAsync: vi.fn(), isPending: false };
-
-function mockHooks() {
-  vi.mocked(furnitureHooks.useCreateFurniture).mockReturnValue(idleMutation as never);
-  vi.mocked(furnitureHooks.useUpdateFurniture).mockReturnValue(idleMutation as never);
+// useCreateFurniture/useUpdateFurniture are mutation-only hooks (no GET fires on mount) — the real
+// hooks hit MSW, no hook is mocked.
+function spyCreateFurniture() {
+  const calls: Record<string, unknown>[] = [];
+  server.use(
+    http.post(`${API_BASE}/furnitures/`, async ({ request }) => {
+      const body = (await request.json()) as Record<string, unknown>;
+      calls.push(body);
+      return HttpResponse.json({ id: 10, ...body }, { status: 201 });
+    })
+  );
+  return calls;
 }
 
 describe('FurnitureFormModal', () => {
-  const defaultProps = { open: true, onClose: vi.fn() };
+  const defaultProps = { open: true, onClose: () => undefined };
 
   beforeEach(() => {
-    vi.clearAllMocks();
-    mockHooks();
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
+    spyCreateFurniture();
   });
 
   it('renders dialog when open', () => {
@@ -49,7 +45,7 @@ describe('FurnitureFormModal', () => {
 
   it('shows "Editar Móvel" title when editing', () => {
     const furniture = { id: 1, name: 'Sofá' };
-    renderWithProviders(<FurnitureFormModal {...defaultProps} furniture={furniture as never} />);
+    renderWithProviders(<FurnitureFormModal {...defaultProps} furniture={furniture} />);
     expect(screen.getByText('Editar Móvel')).toBeInTheDocument();
   });
 
@@ -67,20 +63,23 @@ describe('FurnitureFormModal', () => {
 
   it('shows "Atualizar" button when editing', () => {
     const furniture = { id: 1, name: 'Sofá' };
-    renderWithProviders(<FurnitureFormModal {...defaultProps} furniture={furniture as never} />);
+    renderWithProviders(<FurnitureFormModal {...defaultProps} furniture={furniture} />);
     expect(screen.getByRole('button', { name: /atualizar/i })).toBeInTheDocument();
   });
 
   it('pre-fills name field when editing', () => {
     const furniture = { id: 1, name: 'Sofá de Couro' };
-    renderWithProviders(<FurnitureFormModal {...defaultProps} furniture={furniture as never} />);
+    renderWithProviders(<FurnitureFormModal {...defaultProps} furniture={furniture} />);
     expect(screen.getByDisplayValue('Sofá de Couro')).toBeInTheDocument();
   });
 
-  it('calls onClose when cancel button is clicked', () => {
-    const onClose = vi.fn();
+  it('calls onClose when cancel button is clicked', async () => {
+    let closed = false;
+    const onClose = () => {
+      closed = true;
+    };
     renderWithProviders(<FurnitureFormModal open={true} onClose={onClose} />);
     screen.getByRole('button', { name: /cancelar/i }).click();
-    expect(onClose).toHaveBeenCalledOnce();
+    await waitFor(() => expect(closed).toBe(true));
   });
 });

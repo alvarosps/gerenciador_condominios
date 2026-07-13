@@ -9,6 +9,11 @@ Session 45 extensions:
 - funded_from='reserve' also records a ReserveMovement(withdrawal, bill=...) on the condominium's
   reserve, guarded so the reserve never goes negative; unpay reverses that movement too. A
   reserve-funded payment debits only the reserve, never the cash (design §4.3).
+
+B3: pay/unpay/bulk_pay (bulk_pay delegates to pay per bill) also guard the CASH month
+(payment_date) via the same CondoMonthCloseService.assert_open, not just competence_month — a
+payment dated into a closed cash month would silently change that month's frozen
+cash_balance_end even though the bill's own competence month is still open.
 """
 
 import logging
@@ -67,6 +72,7 @@ class BillPaymentService:
         charge (its expense is already excluded from the result), so it is rejected (PT 400).
         """
         CondoMonthCloseService.assert_open(bill.competence_month)
+        CondoMonthCloseService.assert_open(payment_date.replace(day=1))
         if bill.lifecycle_state != BillLifecycleState.ACTIVE:
             raise ValidationError(_BILL_NOT_ACTIVE)
         today = today_sp()
@@ -109,9 +115,12 @@ class BillPaymentService:
 
         A reserve-funded payment also reverses every ReserveMovement(withdrawal) linked to it by
         the deterministic ``payment`` FK (never the old bill+kind+amount heuristic, which could
-        reverse a sibling payment's movement). Rejected on a closed competence month (assert_open).
+        reverse a sibling payment's movement). Rejected on a closed competence month OR a closed
+        cash month (payment_date) — B3: reversing a payment made in a now-closed cash month would
+        change that month's frozen cash_balance_end (assert_open).
         """
         with transaction.atomic():
+            CondoMonthCloseService.assert_open(payment.payment_date.replace(day=1))
             for allocation in payment.allocations.all():
                 CondoMonthCloseService.assert_open(allocation.bill.competence_month)
                 allocation.delete(deleted_by=user)

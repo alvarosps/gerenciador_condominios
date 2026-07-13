@@ -159,7 +159,7 @@ export function useMonthSnapshotDetail(year: number, month: number) {
     queryKey: queryKeys.monthAdvance.snapshotDetail(year, month),
     queryFn: async () => {
       const { data } = await apiClient.get<MonthSnapshotDetail>(
-        `/month-advance/snapshots/${String(year)}/${String(month)}/`,
+        `/month-advance/snapshots/${String(year)}/${String(month)}/`
       );
       return data;
     },
@@ -189,7 +189,7 @@ export function useAdvanceMonth() {
     mutationFn: async (request: AdvanceMonthRequest) => {
       const { data } = await apiClient.post<AdvanceMonthResponse>(
         '/month-advance/advance/',
-        request,
+        request
       );
       return data;
     },
@@ -197,6 +197,11 @@ export function useAdvanceMonth() {
       void queryClient.invalidateQueries({ queryKey: queryKeys.monthAdvance.all });
       void queryClient.invalidateQueries({ queryKey: queryKeys.financialDashboard.all });
       void queryClient.invalidateQueries({ queryKey: queryKeys.cashFlow.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.employeePayments.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.personPaymentSchedules.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.rentPayments.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.expenses.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.dailyControl.all });
       const monthLabel = `${String(variables.month).padStart(2, '0')}/${String(variables.year)}`;
       toast.success(`Mês ${monthLabel} finalizado com sucesso!`);
     },
@@ -213,7 +218,7 @@ export function useRollbackMonth() {
     mutationFn: async (request: RollbackMonthRequest) => {
       const { data } = await apiClient.post<RollbackMonthResponse>(
         '/month-advance/rollback/',
-        request,
+        request
       );
       return data;
     },
@@ -221,6 +226,11 @@ export function useRollbackMonth() {
       void queryClient.invalidateQueries({ queryKey: queryKeys.monthAdvance.all });
       void queryClient.invalidateQueries({ queryKey: queryKeys.financialDashboard.all });
       void queryClient.invalidateQueries({ queryKey: queryKeys.cashFlow.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.employeePayments.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.personPaymentSchedules.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.rentPayments.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.expenses.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.dailyControl.all });
       const monthLabel = `${String(variables.month).padStart(2, '0')}/${String(variables.year)}`;
       toast.success(`Mês ${monthLabel} revertido com sucesso.`);
     },

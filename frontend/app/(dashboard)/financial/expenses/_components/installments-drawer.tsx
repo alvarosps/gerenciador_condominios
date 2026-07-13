@@ -21,6 +21,7 @@ import {
   useBulkMarkInstallmentsPaid,
 } from '@/lib/api/hooks/use-expense-installments';
 import { formatCurrency, formatDate } from '@/lib/utils/formatters';
+import { getErrorMessage } from '@/lib/utils/error-handler';
 
 interface Props {
   open: boolean;
@@ -43,7 +44,7 @@ function getInstallmentStatus(installment: ExpenseInstallment): {
 
 export function InstallmentsDrawer({ open, expense, onClose }: Props) {
   const { data: installments, isLoading } = useExpenseInstallments(
-    expense?.id ? { expense_id: expense.id } : undefined,
+    expense?.id ? { expense_id: expense.id } : undefined
   );
   const markPaidMutation = useMarkInstallmentPaid();
   const bulkMarkPaidMutation = useBulkMarkInstallmentsPaid();
@@ -55,22 +56,20 @@ export function InstallmentsDrawer({ open, expense, onClose }: Props) {
     try {
       await markPaidMutation.mutateAsync(installmentId);
       toast.success('Parcela marcada como paga');
-    } catch {
-      toast.error('Erro ao marcar parcela como paga');
+    } catch (error) {
+      toast.error(getErrorMessage(error, 'Erro ao marcar parcela como paga'));
     }
   };
 
   const handleMarkAllPaid = async () => {
-    const ids = unpaidInstallments
-      .map((i) => i.id)
-      .filter((id): id is number => id !== undefined);
+    const ids = unpaidInstallments.map((i) => i.id).filter((id): id is number => id !== undefined);
     if (ids.length === 0) return;
 
     try {
       await bulkMarkPaidMutation.mutateAsync(ids);
       toast.success(`${ids.length} parcelas marcadas como pagas`);
-    } catch {
-      toast.error('Erro ao marcar parcelas como pagas');
+    } catch (error) {
+      toast.error(getErrorMessage(error, 'Erro ao marcar parcelas como pagas'));
     }
   };
 
@@ -139,9 +138,7 @@ export function InstallmentsDrawer({ open, expense, onClose }: Props) {
               disabled={bulkMarkPaidMutation.isPending}
               className="w-full"
             >
-              {bulkMarkPaidMutation.isPending && (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              )}
+              {bulkMarkPaidMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Marcar todas como pagas ({unpaidInstallments.length})
             </Button>
           </SheetFooter>

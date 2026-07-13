@@ -70,7 +70,8 @@ def validate_lease_dates(lease: Any) -> None:
     Validate lease date consistency.
 
     Checks that:
-    - Start date is not in the distant past
+    - Start date is not in the distant past (only enforced when start_date is being
+      changed — see below)
     - Calculated end date is after start date
     - Validity months is reasonable (1-60 months)
 
@@ -80,6 +81,11 @@ def validate_lease_dates(lease: Any) -> None:
     Raises:
         ValidationError: If lease dates are inconsistent
     """
+    # Local import: core.models imports this module at load time, and
+    # core.services.timezone is reached through the core.services package
+    # __init__ (which imports ContractService -> core.models) — a top-level
+    # import here would create a circular import during core.models init.
+    from core.services.timezone import today_sp
 
     errors = {}
 
@@ -95,14 +101,32 @@ def validate_lease_dates(lease: Any) -> None:
         if end_date <= lease.start_date:
             errors["validity_months"] = "Calculated end date must be after start date."
 
-    # Validate start date is not too far in the past
-    if lease.start_date:
-        years_ago = date.today().year - lease.start_date.year
+    # Validate start date is not too far in the past — only when start_date is actually
+    # being changed. ``save()`` calls ``full_clean()`` on every save (not just create), so
+    # without this guard a genuinely historical lease (start_date > 10 years ago, created
+    # legitimately when it was recent) would become permanently uneditable: any unrelated
+    # field update would re-trigger this check against today's date and fail.
+    if lease.start_date and _is_start_date_changing(lease):
+        years_ago = today_sp().year - lease.start_date.year
         if years_ago > _LEASE_HISTORY_YEARS_MAX:
             errors["start_date"] = "Start date cannot be more than 10 years in the past."
 
     if errors:
         raise ValidationError(errors)
+
+
+def _is_start_date_changing(lease: Any) -> bool:
+    """Whether ``lease.start_date`` differs from the value currently persisted.
+
+    A new (unsaved) lease has no persisted value, so its start_date is always
+    "changing". An existing lease is compared against its current DB value.
+    """
+    if not lease.pk:
+        return True
+    persisted_start_date = (
+        type(lease).objects.filter(pk=lease.pk).values_list("start_date", flat=True).first()
+    )
+    return bool(persisted_start_date != lease.start_date)
 
 
 def validate_tenant_count(lease: Any) -> None:
@@ -140,6 +164,27 @@ def validate_tenant_count(lease: Any) -> None:
             },
             code="tenant_count_exceeds_max",
         )
+
+
+def validate_tenant_deletable(tenant: Any) -> None:
+    """
+    Validate that a tenant can be soft-deleted.
+
+    A tenant who is the responsible party on a non-deleted (active) lease cannot be
+    deleted — the lease must be terminated or transferred to another tenant first.
+
+    Args:
+        tenant: Tenant instance to validate
+
+    Raises:
+        ValidationError: If the tenant is the responsible_tenant of an active lease
+    """
+    if tenant.leases_responsible.exists():
+        msg = (
+            "Não é possível excluir um inquilino responsável por uma locação ativa. "
+            "Encerre ou transfira a locação primeiro."
+        )
+        raise ValidationError(msg, code="tenant_has_active_lease")
 
 
 def validate_rental_value(value: float) -> None:

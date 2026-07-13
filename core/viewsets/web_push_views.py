@@ -5,6 +5,7 @@ Provides endpoints for browser PWA clients to fetch the VAPID public key and
 to subscribe/unsubscribe their push endpoint for web push notifications.
 """
 
+import logging
 from typing import cast
 
 from django.conf import settings
@@ -17,6 +18,8 @@ from rest_framework.response import Response
 from rest_framework.viewsets import ViewSet
 
 from core.models import WebPushSubscription
+
+logger = logging.getLogger(__name__)
 
 
 def _as_str(value: object) -> str:
@@ -59,6 +62,12 @@ class WebPushViewSet(ViewSet):
             )
 
         authenticated_user = cast(User, request.user)
+        previous_owner_id = (
+            WebPushSubscription.objects.filter(endpoint=endpoint)
+            .exclude(user=authenticated_user)
+            .values_list("user_id", flat=True)
+            .first()
+        )
         sub, created = WebPushSubscription.objects.update_or_create(
             endpoint=endpoint,
             defaults={
@@ -77,6 +86,18 @@ class WebPushViewSet(ViewSet):
                 "updated_by": authenticated_user,
             },
         )
+        if previous_owner_id is not None:
+            # Handover semantics: re-subscribing an existing endpoint under a different
+            # authenticated user is a legitimate device-owner change (shared-browser
+            # pattern). Logged for audit visibility — no other subscriptions of the
+            # previous owner are affected (this update_or_create touches only this row).
+            logger.warning(
+                "Web push subscription reassigned to a different user: from_user_id=%s "
+                "to_user_id=%s subscription_id=%s",
+                previous_owner_id,
+                authenticated_user.pk,
+                sub.pk,
+            )
         return Response(
             {"id": sub.pk, "endpoint": sub.endpoint},
             status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,

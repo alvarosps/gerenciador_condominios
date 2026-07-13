@@ -33,11 +33,7 @@ import {
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Calendar } from '@/components/ui/calendar';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { CalendarIcon } from 'lucide-react';
@@ -53,6 +49,7 @@ import { type Lease } from '@/lib/schemas/lease.schema';
 import { formatCpfCnpj, formatCurrency } from '@/lib/utils/formatters';
 import { calculateTagFee } from '@/lib/utils/helpers';
 import { apiClient } from '@/lib/api/client';
+import { getErrorMessage } from '@/lib/utils/error-handler';
 
 /** Parse yyyy-MM-dd as local date (avoids UTC timezone shift) */
 function parseLocalDate(dateStr: string): Date {
@@ -210,7 +207,7 @@ export function TenantLeaseModal({
     const existingDependents: Dependent[] = tenant.dependents ?? [];
 
     const updatedDependents = [
-      ...existingDependents.map(d => ({
+      ...existingDependents.map((d) => ({
         id: d.id,
         name: d.name,
         phone: d.phone,
@@ -230,7 +227,7 @@ export function TenantLeaseModal({
 
     const createdDependents = response.data.dependents;
     const newDependent = createdDependents.find(
-      d => d.name === newDependentForm.name && d.cpf_cnpj === newDependentForm.cpf_cnpj
+      (d) => d.name === newDependentForm.name && d.cpf_cnpj === newDependentForm.cpf_cnpj
     );
 
     if (!newDependent?.id) {
@@ -254,7 +251,9 @@ export function TenantLeaseModal({
         if (newDependentForm.name && newDependentForm.phone) {
           residentDependentId = await createDependentAndGetId(tenantId);
         } else if (newDependentForm.name || newDependentForm.phone || newDependentForm.cpf_cnpj) {
-          toast.error('Preencha nome e telefone do dependente, ou deixe tudo em branco para informar depois');
+          toast.error(
+            'Preencha nome e telefone do dependente, ou deixe tudo em branco para informar depois'
+          );
           return;
         } else {
           residentDependentId = null;
@@ -286,8 +285,8 @@ export function TenantLeaseModal({
 
       onClose();
       formMethods.reset();
-    } catch {
-      toast.error('Erro ao salvar contrato');
+    } catch (error) {
+      toast.error(getErrorMessage(error, 'Erro ao salvar contrato'));
     }
   };
 
@@ -299,9 +298,7 @@ export function TenantLeaseModal({
   };
 
   const dialogTitle =
-    mode === 'transfer'
-      ? `Trocar de Kitnet — ${tenant.name}`
-      : `Criar Contrato — ${tenant.name}`;
+    mode === 'transfer' ? `Trocar de Kitnet — ${tenant.name}` : `Criar Contrato — ${tenant.name}`;
 
   const dependents = tenant.dependents ?? [];
 
@@ -345,7 +342,8 @@ export function TenantLeaseModal({
                     <SelectContent>
                       {apartments?.map((apt) => (
                         <SelectItem key={apt.id} value={String(apt.id)}>
-                          {apt.building?.name} - Apto {apt.number} ({formatCurrency(apt.rental_value)})
+                          {apt.building?.name} - Apto {apt.number} (
+                          {formatCurrency(apt.rental_value)})
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -397,7 +395,11 @@ export function TenantLeaseModal({
 
                 {dependents.length > 0 && (
                   <RadioGroup
-                    value={showNewDependentForm ? 'new' : String(formMethods.watch('resident_dependent_id') ?? '')}
+                    value={
+                      showNewDependentForm
+                        ? 'new'
+                        : String(formMethods.watch('resident_dependent_id') ?? '')
+                    }
                     onValueChange={handleDependentSelection}
                     className="space-y-2"
                   >
@@ -579,7 +581,8 @@ export function TenantLeaseModal({
                     </div>
                   </FormControl>
                   <FormDescription>
-                    Preenchido automaticamente com base no número de moradores. Pode ser editado manualmente.
+                    Preenchido automaticamente com base no número de moradores. Pode ser editado
+                    manualmente.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -664,8 +667,15 @@ export function TenantLeaseModal({
                     <div>• Apartamento: {selectedApartment.number}</div>
                     {selectedApartment.max_tenants === 2 ? (
                       <>
-                        <div>• Aluguel (1 pessoa): {formatCurrency(selectedApartment.rental_value)}</div>
-                        <div>• Aluguel (2 pessoas): {formatCurrency(selectedApartment.rental_value_double ?? selectedApartment.rental_value)}</div>
+                        <div>
+                          • Aluguel (1 pessoa): {formatCurrency(selectedApartment.rental_value)}
+                        </div>
+                        <div>
+                          • Aluguel (2 pessoas):{' '}
+                          {formatCurrency(
+                            selectedApartment.rental_value_double ?? selectedApartment.rental_value
+                          )}
+                        </div>
                         <div className="font-medium text-primary">
                           • Valor selecionado: {formatCurrency(formMethods.watch('rental_value'))}
                         </div>

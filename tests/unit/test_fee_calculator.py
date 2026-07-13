@@ -5,6 +5,7 @@ from decimal import Decimal
 
 import pytest
 from django.conf import settings
+from django.core.exceptions import ValidationError
 
 from core.services.fee_calculator import FeeCalculatorService
 
@@ -195,6 +196,17 @@ class TestCalculateDueDateChangeFee:
         )
         assert result["old_due_date"] == date(2026, 12, 28)
         assert result["new_due_date"] == date(2027, 1, 5)
+
+    def test_same_due_day_raises_before_any_calculation(self):
+        # T1: new_due_day == current_due_day must raise 400 (ValidationError),
+        # never charge ~1 month's fee for a no-op change.
+        with pytest.raises(ValidationError, match="igual ao atual"):
+            FeeCalculatorService.calculate_due_date_change_fee(
+                rental_value=Decimal("1500.00"),
+                current_due_day=10,
+                new_due_day=10,
+                reference_date=date(2026, 3, 1),
+            )
 
 
 @pytest.mark.unit

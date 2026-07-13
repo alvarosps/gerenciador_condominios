@@ -2,12 +2,14 @@
 
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
   Pencil,
   Trash2,
@@ -17,6 +19,7 @@ import {
   XCircle,
   TrendingUp,
   History,
+  MoreHorizontal,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { type Column } from '@/components/tables/data-table';
@@ -143,12 +146,11 @@ export function createLeaseColumns(handlers: LeaseActionHandlers): Column<Lease>
           <div className="text-muted-foreground">
             até {record.final_date ? format(parseISO(record.final_date), 'dd/MM/yyyy') : 'N/A'}
           </div>
-          <div className="text-xs text-muted-foreground">
-            {record.validity_months} meses
-          </div>
+          <div className="text-xs text-muted-foreground">{record.validity_months} meses</div>
         </div>
       ),
-      sorter: (a: Lease, b: Lease) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime(),
+      sorter: (a: Lease, b: Lease) =>
+        new Date(a.start_date).getTime() - new Date(b.start_date).getTime(),
     },
     {
       title: 'Status',
@@ -179,7 +181,12 @@ export function createLeaseColumns(handlers: LeaseActionHandlers): Column<Lease>
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Badge className={cn(badgeVariants[color] ?? 'bg-muted text-muted-foreground', 'cursor-help')}>
+                <Badge
+                  className={cn(
+                    badgeVariants[color] ?? 'bg-muted text-muted-foreground',
+                    'cursor-help'
+                  )}
+                >
                   {label}
                 </Badge>
               </TooltipTrigger>
@@ -222,7 +229,9 @@ export function createLeaseColumns(handlers: LeaseActionHandlers): Column<Lease>
                     </div>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>Reajuste pendente a partir de {format(parseISO(pendingDate), 'dd/MM/yyyy')}</p>
+                    <p>
+                      Reajuste pendente a partir de {format(parseISO(pendingDate), 'dd/MM/yyyy')}
+                    </p>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
@@ -238,7 +247,8 @@ export function createLeaseColumns(handlers: LeaseActionHandlers): Column<Lease>
       key: 'due_day',
       width: 100,
       render: (_, record: Lease) => `Dia ${String(record.responsible_tenant?.due_day ?? '-')}`,
-      sorter: (a: Lease, b: Lease) => (a.responsible_tenant?.due_day ?? 0) - (b.responsible_tenant?.due_day ?? 0),
+      sorter: (a: Lease, b: Lease) =>
+        (a.responsible_tenant?.due_day ?? 0) - (b.responsible_tenant?.due_day ?? 0),
     },
     {
       title: 'Último Reajuste',
@@ -280,9 +290,7 @@ export function createLeaseColumns(handlers: LeaseActionHandlers): Column<Lease>
           {record.contract_generated && (
             <Badge className="bg-success/10 text-success">Gerado</Badge>
           )}
-          {record.contract_signed && (
-            <Badge className="bg-info/10 text-info">Assinado</Badge>
-          )}
+          {record.contract_signed && <Badge className="bg-info/10 text-info">Assinado</Badge>}
           {!record.contract_generated && !record.contract_signed && (
             <Badge variant="secondary">Pendente</Badge>
           )}
@@ -300,12 +308,11 @@ export function createLeaseColumns(handlers: LeaseActionHandlers): Column<Lease>
     {
       title: 'Ações',
       key: 'actions',
-      width: 240,
-      fixed: 'right',
+      width: 120,
       isActions: true,
       render: (_, record: Lease) => (
         <TooltipProvider>
-          <div className="flex items-center gap-1 flex-wrap sm:flex-nowrap">
+          <div className="flex items-center gap-1">
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
@@ -334,90 +341,47 @@ export function createLeaseColumns(handlers: LeaseActionHandlers): Column<Lease>
               <TooltipContent>Gerar Contrato</TooltipContent>
             </Tooltip>
 
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label="Calcular Multa"
-                  onClick={() => handlers.onCalculateLateFee(record)}
-                >
-                  <Calculator className="h-4 w-4" />
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" aria-label="Mais ações">
+                  <MoreHorizontal className="h-4 w-4" />
                 </Button>
-              </TooltipTrigger>
-              <TooltipContent>Calcular Multa</TooltipContent>
-            </Tooltip>
-
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label="Mudar Vencimento"
-                  onClick={() => handlers.onChangeDueDate(record)}
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => handlers.onCalculateLateFee(record)}>
+                  <Calculator className="mr-2 h-4 w-4" />
+                  Calcular Multa
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handlers.onChangeDueDate(record)}>
+                  <Calendar className="mr-2 h-4 w-4" />
+                  Mudar Vencimento
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handlers.onAdjustRent(record)}>
+                  <TrendingUp className="mr-2 h-4 w-4" />
+                  Reajustar Aluguel
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handlers.onViewAdjustmentHistory(record)}>
+                  <History className="mr-2 h-4 w-4" />
+                  Histórico de Reajustes
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => handlers.onTerminate(record)}
+                  className="text-destructive"
                 >
-                  <Calendar className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Mudar Vencimento</TooltipContent>
-            </Tooltip>
-
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label="Reajustar Aluguel"
-                  onClick={() => handlers.onAdjustRent(record)}
-                >
-                  <TrendingUp className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Reajustar Aluguel</TooltipContent>
-            </Tooltip>
-
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label="Histórico de Reajustes"
-                  onClick={() => handlers.onViewAdjustmentHistory(record)}
-                >
-                  <History className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Histórico de Reajustes</TooltipContent>
-            </Tooltip>
-
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label="Excluir"
+                  <XCircle className="mr-2 h-4 w-4" />
+                  Encerrar Contrato
+                </DropdownMenuItem>
+                <DropdownMenuItem
                   onClick={() => handlers.onDelete(record)}
                   disabled={handlers.isDeleting}
+                  className="text-destructive"
                 >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Excluir</TooltipContent>
-            </Tooltip>
-
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label="Encerrar Contrato"
-                  onClick={() => handlers.onTerminate(record)}
-                >
-                  <XCircle className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Encerrar Contrato</TooltipContent>
-            </Tooltip>
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Excluir
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </TooltipProvider>
       ),

@@ -105,6 +105,10 @@ _CORE_MODEL_CACHE_PREFIXES: dict[str, tuple[str, ...]] = {
         # The rent-adjustment alert card embeds lease.responsible_tenant.name, so a tenant
         # rename must drop it.
         "dashboard-rent-adjustment-alerts",
+        # Tenant.due_day drives the pay-to-live prepaid boundary (RentScheduleService), which
+        # feeds the condominium-finance revenue/projection — a due_day (or other tenant field)
+        # change must drop finance-* too, not just the legacy dashboards above.
+        *FINANCE_MODULE_CACHE_PREFIXES,
     ),
     "Furniture": ("dashboard-financial-summary", "dashboard-lease-metrics"),
     "Dependent": ("dashboard-tenant-stats",),

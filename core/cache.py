@@ -20,6 +20,7 @@ Usage:
     CacheManager.invalidate_pattern('lease_list*')
 """
 
+import fnmatch
 import hashlib
 import logging
 from collections.abc import Callable
@@ -28,6 +29,7 @@ from typing import Any, TypeVar, cast
 
 from django.conf import settings
 from django.core.cache import cache
+from django.db import transaction
 from django.db.models import Model
 from django_redis import get_redis_connection
 
@@ -45,6 +47,14 @@ T = TypeVar("T")
 _SENTINEL = object()
 
 _CACHE_KEY_MAX_LENGTH = 200
+
+# Registry of bare (pre-versioning) cache keys created by @cache_result — the ONLY place this
+# module ever writes application cache entries. On the in-process LocMemCache backend (no
+# key-scan API), this registry lets CacheManager.invalidate_pattern() delete exactly the keys it
+# created, without touching unrelated keys such as DRF throttle counters (which are written
+# directly by rest_framework.throttling, never through cache_result, and therefore never appear
+# here). Real Redis deployments use SCAN instead — see CacheManager._invalidate_pattern_now.
+_TRACKED_CACHE_KEYS: set[str] = set()
 
 
 def get_cache_key(*args: Any, prefix: str = "", **kwargs: Any) -> str:
@@ -160,6 +170,7 @@ def cache_result(timeout: int = 300, key_prefix: str = "") -> Callable:
 
             # Store in cache
             cache.set(cache_key, result, timeout)
+            _TRACKED_CACHE_KEYS.add(cache_key)
             logger.debug(f"Cache SET: {cache_key} (timeout={timeout}s)")
 
             return result
@@ -186,13 +197,19 @@ class CacheManager:
     @staticmethod
     def invalidate_pattern(pattern: str) -> int:
         """
-        Invalidate all cache keys matching a pattern.
+        Invalidate all cache keys matching a pattern, deferred to transaction commit.
+
+        Runs the actual deletion in ``transaction.on_commit`` so a concurrent read cannot
+        re-populate the cache with pre-commit data (the invalidation would otherwise race
+        the write inside the same transaction). Outside an atomic block, ``on_commit``
+        fires immediately, so behaviour is unchanged there.
 
         Args:
             pattern: Pattern to match (supports wildcards)
 
         Returns:
-            Number of keys invalidated
+            Number of keys invalidated synchronously (0 when deferred to on_commit, since
+            the count is not yet known at call time)
 
         Examples:
             >>> CacheManager.invalidate_pattern("lease:*")
@@ -200,16 +217,20 @@ class CacheManager:
             >>> CacheManager.invalidate_pattern("*building*")
             5
         """
+        transaction.on_commit(lambda: CacheManager._invalidate_pattern_now(pattern))
+        return 0
+
+    @staticmethod
+    def _invalidate_pattern_now(pattern: str) -> int:
+        """Perform the actual pattern invalidation (called via on_commit)."""
         if not _is_redis_backend():
-            # In-process backends (LocMemCache, used in tests/dev) expose no key-scan API,
-            # so selective pattern deletion is not possible — clear the whole cache instead
-            # of silently no-op'ing (which left financial caches stale). Production uses Redis.
-            cache.clear()
-            return 0
+            return CacheManager._invalidate_pattern_locmem(pattern)
         try:
             redis_client = get_redis_connection("default")
-            key_prefix = settings.CACHES["default"].get("KEY_PREFIX", "condominios")
-            full_pattern = f"{key_prefix}:1:{pattern}"
+            # Derive the real on-wire key (KEY_PREFIX + VERSION) via Django's own key
+            # construction rather than hardcoding ":1:" — matches whatever KEY_FUNCTION /
+            # VERSION the cache backend is actually configured with.
+            full_pattern = cache.make_key(pattern)
             count = 0
             cursor = 0
             while True:
@@ -226,6 +247,27 @@ class CacheManager:
             if count > 0:
                 logger.info(f"Invalidated {count} cache keys matching pattern: {pattern}")
             return count
+
+    @staticmethod
+    def _invalidate_pattern_locmem(pattern: str) -> int:
+        """Selective invalidation for in-process backends (LocMemCache, used in tests/dev).
+
+        LocMemCache (and other in-process backends) expose no key-scan API, and their
+        internal key store is a private implementation detail (not part of the public
+        ``BaseCache``/django-stubs surface). Instead, this deletes only the bare cache keys
+        that ``@cache_result`` itself registered in ``_TRACKED_CACHE_KEYS`` — the only place
+        this module ever writes application cache entries — and that match ``pattern``. DRF
+        throttle counters (and any other key not created via ``cache_result``) are never
+        registered, so they can never be touched here. This must NOT fall back to
+        ``cache.clear()``: that would wipe every key regardless of origin.
+        """
+        matching_keys = [key for key in _TRACKED_CACHE_KEYS if fnmatch.fnmatchcase(key, pattern)]
+        for key in matching_keys:
+            cache.delete(key)
+            _TRACKED_CACHE_KEYS.discard(key)
+        if matching_keys:
+            logger.info(f"Invalidated {len(matching_keys)} cache keys matching pattern: {pattern}")
+        return len(matching_keys)
 
     @staticmethod
     def clear_all() -> bool:

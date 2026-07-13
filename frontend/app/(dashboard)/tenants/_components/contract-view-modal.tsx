@@ -10,6 +10,7 @@ import {
 } from '@/lib/api/hooks/use-contract-template';
 import { useContractPdf } from '@/lib/api/hooks/use-leases';
 import { type Lease } from '@/lib/schemas/lease.schema';
+import { getErrorMessage } from '@/lib/utils/error-handler';
 
 interface ContractViewModalProps {
   open: boolean;
@@ -50,8 +51,8 @@ export function ContractViewModal({ open, lease, onClose }: ContractViewModalPro
           lease_id: leaseId,
         });
         setPreviewHtml(result.html);
-      } catch {
-        toast.error('Erro ao gerar preview do contrato');
+      } catch (error) {
+        toast.error(getErrorMessage(error, 'Erro ao gerar preview do contrato'));
       }
     },
     [previewMutation]

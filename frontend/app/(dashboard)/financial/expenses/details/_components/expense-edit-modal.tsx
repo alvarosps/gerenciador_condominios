@@ -44,7 +44,8 @@ import { toast } from 'sonner';
 import { useExpenseCategories } from '@/lib/api/hooks/use-expense-categories';
 import { useCreditCards } from '@/lib/api/hooks/use-credit-cards';
 import { useBuildings } from '@/lib/api/hooks/use-buildings';
-import { getDefaultExpenseDate } from '@/lib/utils/formatters';
+import { getDefaultExpenseDate, getTodayLocalISO, addMonthsClamped } from '@/lib/utils/formatters';
+import { getErrorMessage } from '@/lib/utils/error-handler';
 import { EXPENSE_TYPE_OPTIONS, type ExpenseTypeOption } from '@/lib/utils/constants';
 import { apiClient } from '@/lib/api/client';
 import type { ExpenseDetailItem } from '@/lib/api/hooks/use-financial-dashboard';
@@ -61,7 +62,7 @@ const EDIT_EXPENSE_TYPE_VALUES = new Set<string>([
 ]);
 
 const FILTERED_EXPENSE_TYPE_OPTIONS: ExpenseTypeOption[] = EXPENSE_TYPE_OPTIONS.filter((t) =>
-  EDIT_EXPENSE_TYPE_VALUES.has(t.value),
+  EDIT_EXPENSE_TYPE_VALUES.has(t.value)
 );
 
 const INSTALLMENT_TYPES = ['card_purchase', 'bank_loan', 'personal_loan'];
@@ -114,7 +115,55 @@ const DETAIL_TYPE_TO_EXPENSE_TYPE: Record<string, string> = {
 
 const BUILDING_REQUIRED_TYPES = ['water_bill', 'electricity_bill', 'property_tax'];
 
-export function ExpenseEditModal({ mode, item, personId, detailType, defaultExpenseDate, onClose, onSaved }: Props) {
+interface InstallmentPayload {
+  installment_number: number;
+  total_installments: number;
+  amount: number;
+  due_date: string;
+  is_paid: boolean;
+  paid_date: string | null;
+}
+
+/**
+ * Build the installment schedule for a parceled expense starting at `startDate`.
+ *
+ * Due dates advance by calendar months via `addMonthsClamped` (F1 fix): the previous
+ * `new Date(iso)` + `setMonth` + `toISOString().split('T')[0]` combo shifts a day in
+ * negative-offset timezones (Brazil UTC-3) and, on short months, rolls a day-31 purchase
+ * into the wrong month (e.g. 31/jan skipping straight to March). This clamps the day to the
+ * target month's last day instead, mirroring the backend's DateCalculatorService/
+ * `_schedule_due_dates` day-clamping.
+ */
+function buildInstallments(
+  startDate: string,
+  totalParcelas: number,
+  currentInst: number,
+  parcelaAmount: number
+): InstallmentPayload[] {
+  const installments: InstallmentPayload[] = [];
+  for (let i = 1; i <= totalParcelas; i++) {
+    const dueDateStr = addMonthsClamped(startDate, i - currentInst);
+    installments.push({
+      installment_number: i,
+      total_installments: totalParcelas,
+      amount: parcelaAmount,
+      due_date: dueDateStr,
+      is_paid: i < currentInst,
+      paid_date: i < currentInst ? dueDateStr : null,
+    });
+  }
+  return installments;
+}
+
+export function ExpenseEditModal({
+  mode,
+  item,
+  personId,
+  detailType,
+  defaultExpenseDate,
+  onClose,
+  onSaved,
+}: Props) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [pendingValues, setPendingValues] = useState<FormValues | null>(null);
@@ -126,9 +175,7 @@ export function ExpenseEditModal({ mode, item, personId, detailType, defaultExpe
   const isCreate = mode === 'create';
   const presetExpenseType = detailType ? (DETAIL_TYPE_TO_EXPENSE_TYPE[detailType] ?? '') : '';
 
-  const filteredCreditCards = allCreditCards?.filter(
-    (card) => card.person?.id === personId
-  ) ?? [];
+  const filteredCreditCards = allCreditCards?.filter((card) => card.person?.id === personId) ?? [];
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -139,7 +186,9 @@ export function ExpenseEditModal({ mode, item, personId, detailType, defaultExpe
       subcategory_id: null,
       notes: '',
       expense_type: presetExpenseType,
-      expense_date: defaultExpenseDate ?? getDefaultExpenseDate(new Date().getFullYear(), new Date().getMonth() + 1),
+      expense_date:
+        defaultExpenseDate ??
+        getDefaultExpenseDate(new Date().getFullYear(), new Date().getMonth() + 1),
       credit_card_id: null,
       building_id: null,
       is_installment: false,
@@ -159,8 +208,7 @@ export function ExpenseEditModal({ mode, item, personId, detailType, defaultExpe
   const showBuildingField = isCreate && BUILDING_REQUIRED_TYPES.includes(watchedExpenseType);
 
   // Top-level categories have no parent (parent is null/undefined, not a number or object)
-  const topLevelCategories =
-    categories?.filter((cat) => !cat.parent && !cat.parent_id) ?? [];
+  const topLevelCategories = categories?.filter((cat) => !cat.parent && !cat.parent_id) ?? [];
 
   const subcategories =
     watchedCategoryId !== null
@@ -192,7 +240,9 @@ export function ExpenseEditModal({ mode, item, personId, detailType, defaultExpe
         subcategory_id: null,
         notes: '',
         expense_type: presetExpenseType,
-        expense_date: defaultExpenseDate ?? getDefaultExpenseDate(new Date().getFullYear(), new Date().getMonth() + 1),
+        expense_date:
+          defaultExpenseDate ??
+          getDefaultExpenseDate(new Date().getFullYear(), new Date().getMonth() + 1),
         credit_card_id: null,
         building_id: null,
         is_installment: false,
@@ -226,10 +276,18 @@ export function ExpenseEditModal({ mode, item, personId, detailType, defaultExpe
         : parcelaAmount;
 
       if (isCreate) {
-        // === CREATE ===
+        // === CREATE: single request — expense + installments created atomically server-side ===
         const isFixed = pendingValues.expense_type === 'fixed_expense';
+        const installmentsData = isParcelado
+          ? buildInstallments(
+              pendingValues.expense_date,
+              totalParcelas,
+              pendingValues.current_installment ?? 1,
+              parcelaAmount
+            )
+          : [];
 
-        const { data: created } = await apiClient.post<{ id: number }>('/expenses/', {
+        await apiClient.post('/expenses/', {
           description: pendingValues.description,
           total_amount: totalAmount,
           expense_type: pendingValues.expense_type,
@@ -244,57 +302,24 @@ export function ExpenseEditModal({ mode, item, personId, detailType, defaultExpe
           is_recurring: isFixed,
           expected_monthly_amount: isFixed ? parcelaAmount : null,
           is_offset: pendingValues.is_offset,
+          installments_data: installmentsData,
         });
-
-        if (isParcelado) {
-          const currentInst = pendingValues.current_installment ?? 1;
-          const startDate = new Date(pendingValues.expense_date);
-
-          for (let i = 1; i <= totalParcelas; i++) {
-            const dueDate = new Date(startDate);
-            dueDate.setMonth(dueDate.getMonth() + (i - currentInst));
-            const dueDateStr = dueDate.toISOString().split('T')[0] ?? '';
-
-            await apiClient.post('/expense-installments/', {
-              expense: created.id,
-              installment_number: i,
-              total_installments: totalParcelas,
-              amount: parcelaAmount,
-              due_date: dueDateStr,
-              is_paid: i < currentInst,
-              paid_date: i < currentInst ? dueDateStr : null,
-            });
-          }
-        }
 
         toast.success('Despesa criada com sucesso');
       } else {
         // === EDIT: single API call to overwrite expense + rebuild installments ===
         if (!item) return;
         const expenseId = item.expense_id;
-        const expenseDate = item.due_date ?? new Date().toISOString().split('T')[0] ?? '';
+        const expenseDate = item.due_date ?? getTodayLocalISO();
 
-        // Build installments array for the rebuild endpoint
-        const installments: Record<string, unknown>[] = [];
-        if (isParcelado) {
-          const currentInst = pendingValues.current_installment ?? 1;
-          const startDate = new Date(expenseDate);
-
-          for (let i = 1; i <= totalParcelas; i++) {
-            const dueDate = new Date(startDate);
-            dueDate.setMonth(dueDate.getMonth() + (i - currentInst));
-            const dueDateStr = dueDate.toISOString().split('T')[0] ?? '';
-
-            installments.push({
-              installment_number: i,
-              total_installments: totalParcelas,
-              amount: parcelaAmount,
-              due_date: dueDateStr,
-              is_paid: i < currentInst,
-              paid_date: i < currentInst ? dueDateStr : null,
-            });
-          }
-        }
+        const installments = isParcelado
+          ? buildInstallments(
+              expenseDate,
+              totalParcelas,
+              pendingValues.current_installment ?? 1,
+              parcelaAmount
+            )
+          : [];
 
         await apiClient.post(`/expenses/${expenseId}/rebuild/`, {
           description: pendingValues.description,
@@ -313,8 +338,10 @@ export function ExpenseEditModal({ mode, item, personId, detailType, defaultExpe
       setConfirmOpen(false);
       onSaved();
       onClose();
-    } catch {
-      toast.error(isCreate ? 'Erro ao criar despesa' : 'Erro ao salvar alterações');
+    } catch (error) {
+      toast.error(
+        getErrorMessage(error, isCreate ? 'Erro ao criar despesa' : 'Erro ao salvar alterações')
+      );
     } finally {
       setIsSaving(false);
     }
@@ -329,7 +356,12 @@ export function ExpenseEditModal({ mode, item, personId, detailType, defaultExpe
 
   return (
     <>
-      <Dialog open={isOpen} onOpenChange={(open) => { if (!open) handleClose(); }}>
+      <Dialog
+        open={isOpen}
+        onOpenChange={(open) => {
+          if (!open) handleClose();
+        }}
+      >
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>{isCreate ? 'Nova Despesa' : 'Editar Despesa'}</DialogTitle>
@@ -433,7 +465,9 @@ export function ExpenseEditModal({ mode, item, personId, detailType, defaultExpe
                       <FormLabel>Cartão de Crédito</FormLabel>
                       <Select
                         value={field.value ? String(field.value) : 'none'}
-                        onValueChange={(value) => field.onChange(value === 'none' ? null : Number(value))}
+                        onValueChange={(value) =>
+                          field.onChange(value === 'none' ? null : Number(value))
+                        }
                       >
                         <FormControl>
                           <SelectTrigger>
@@ -465,7 +499,9 @@ export function ExpenseEditModal({ mode, item, personId, detailType, defaultExpe
                       <FormLabel>Prédio</FormLabel>
                       <Select
                         value={field.value ? String(field.value) : 'none'}
-                        onValueChange={(value) => field.onChange(value === 'none' ? null : Number(value))}
+                        onValueChange={(value) =>
+                          field.onChange(value === 'none' ? null : Number(value))
+                        }
                       >
                         <FormControl>
                           <SelectTrigger>
@@ -544,7 +580,9 @@ export function ExpenseEditModal({ mode, item, personId, detailType, defaultExpe
                                 placeholder="Ex: 1"
                                 {...field}
                                 value={field.value ?? ''}
-                                onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
+                                onChange={(e) =>
+                                  field.onChange(e.target.value ? Number(e.target.value) : null)
+                                }
                               />
                             </FormControl>
                             <FormMessage />
@@ -564,7 +602,9 @@ export function ExpenseEditModal({ mode, item, personId, detailType, defaultExpe
                                 placeholder="Ex: 12"
                                 {...field}
                                 value={field.value ?? ''}
-                                onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
+                                onChange={(e) =>
+                                  field.onChange(e.target.value ? Number(e.target.value) : null)
+                                }
                               />
                             </FormControl>
                             <FormMessage />
@@ -591,7 +631,9 @@ export function ExpenseEditModal({ mode, item, personId, detailType, defaultExpe
                     >
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder={categoriesLoading ? 'Carregando...' : 'Selecione'} />
+                          <SelectValue
+                            placeholder={categoriesLoading ? 'Carregando...' : 'Selecione'}
+                          />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>

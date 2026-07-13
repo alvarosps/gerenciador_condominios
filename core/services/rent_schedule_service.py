@@ -163,6 +163,12 @@ class RentScheduleService:
         ORM-expressible filters (owner, salary offset, building,
         ``start_date <= last day of month``) stay in the queryset; the prepaid boundary
         (which needs the clamped due date) is applied in Python over the reduced queryset.
+
+        Executes exactly one query: the prepaid filter is applied in Python over the
+        already-fetched rows, and the result is wrapped back into a queryset via
+        ``Lease.objects.filter(pk__in=...)`` without re-hitting the database — Django only
+        evaluates a queryset on iteration/aggregation, so building it from the in-memory pk
+        list (rather than re-filtering the original queryset) avoids a second full scan.
         """
         year, month = reference_month.year, reference_month.month
         if not RentScheduleService.is_month_tracked(year, month):
@@ -180,19 +186,24 @@ class RentScheduleService:
         if building_id is not None:
             queryset = queryset.filter(apartment__building_id=building_id)
 
-        collectible_ids = []
-        for lease in queryset:
+        leases = list(queryset)
+        collectible_ids = [
+            lease.pk
+            for lease in leases
             # Pay-to-live prepaid boundary (single source: is_prepaid_for_month). The month
             # whose due date equals prepaid_until is the next installment due and stays
             # collectible — comparing against month start would be an off-by-one.
-            if RentScheduleService.is_prepaid_for_month(lease, year, month):
-                continue
-            collectible_ids.append(lease.pk)
-        return queryset.filter(id__in=collectible_ids)
+            if not RentScheduleService.is_prepaid_for_month(lease, year, month)
+        ]
+        return Lease.objects.filter(pk__in=collectible_ids).select_related(
+            "apartment", "apartment__building", "responsible_tenant"
+        )
 
     @staticmethod
     def displayable_leases(
-        reference_month: date, building_id: int | None = None
+        reference_month: date,
+        building_id: int | None = None,
+        precomputed_collectible: list[Lease] | None = None,
     ) -> list[tuple[Lease, bool, str | None]]:
         """Leases to display in the rent calendar, classified for collectibility.
 
@@ -206,6 +217,12 @@ class RentScheduleService:
         (``FinancialSettings.rent_tracking_start_date``) — are intentionally NOT surfaced:
         they stay hidden, exactly as the collectible set already hides them. That is why
         ``NonCollectibleReason`` has only the owner-repass and salary-offset literals.
+
+        ``precomputed_collectible`` lets a caller that already evaluated
+        ``collectible_leases`` for the same month/building (e.g. ``get_month_schedule``)
+        pass the result in, avoiding a redundant re-scan. The service stays stateless — no
+        caching happens inside; the caller is responsible for computing and passing a
+        queryset/list that matches ``reference_month``/``building_id``.
         """
         year, month = reference_month.year, reference_month.month
         if not RentScheduleService.is_month_tracked(year, month):
@@ -213,10 +230,12 @@ class RentScheduleService:
         _, days_in_month = monthrange(year, month)
         month_end = date(year, month, days_in_month)
 
-        collectible_ids = {
-            lease.pk
-            for lease in RentScheduleService.collectible_leases(reference_month, building_id)
-        }
+        collectible_source = (
+            precomputed_collectible
+            if precomputed_collectible is not None
+            else RentScheduleService.collectible_leases(reference_month, building_id)
+        )
+        collectible_ids = {lease.pk for lease in collectible_source}
 
         queryset = Lease.objects.filter(start_date__lte=month_end).select_related(
             "apartment", "apartment__building", "responsible_tenant"
@@ -258,7 +277,10 @@ class RentScheduleService:
         )
 
         _, days_in_month = monthrange(year, month)
-        leases = RentScheduleService.displayable_leases(reference_month, building_id)
+        collectible = list(RentScheduleService.collectible_leases(reference_month, building_id))
+        leases = RentScheduleService.displayable_leases(
+            reference_month, building_id, precomputed_collectible=collectible
+        )
         payments = RentScheduleService._active_payments_by_lease(reference_month)
 
         items_by_day: dict[int, list[dict[str, Any]]] = {}
@@ -304,12 +326,18 @@ class RentScheduleService:
             "today": today.isoformat(),
             "next_due_date": next_due_date.isoformat() if next_due_date else None,
             "days": days,
-            "stats": RentScheduleService.get_month_stats(year, month, building_id, as_of=today),
+            "stats": RentScheduleService.get_month_stats(
+                year, month, building_id, as_of=today, precomputed_collectible=collectible
+            ),
         }
 
     @staticmethod
     def get_month_stats(
-        year: int, month: int, building_id: int | None = None, as_of: date | None = None
+        year: int,
+        month: int,
+        building_id: int | None = None,
+        as_of: date | None = None,
+        precomputed_collectible: list[Lease] | None = None,
     ) -> dict[str, Any]:
         """Aggregated month stats for the rent calendar.
 
@@ -320,6 +348,10 @@ class RentScheduleService:
         for the current month (cross-month months report 0). ``as_of`` overrides "today"
         (the condominium-finance dashboard passes São Paulo's date so its overdue/late-fee
         sub-totals match the bill half); it defaults to the server date for the legacy calendar.
+
+        ``precomputed_collectible`` lets a caller that already evaluated
+        ``collectible_leases`` for the same month/building (e.g. ``get_month_schedule``)
+        pass the result in, avoiding a redundant re-scan (see ``displayable_leases``).
         """
         reference_month = date(year, month, 1)
         today = as_of if as_of is not None else today_sp()
@@ -328,7 +360,11 @@ class RentScheduleService:
 
         received_total = RentScheduleService.received_total(reference_month, building_id)
 
-        leases = list(RentScheduleService.collectible_leases(reference_month, building_id))
+        leases = (
+            list(precomputed_collectible)
+            if precomputed_collectible is not None
+            else list(RentScheduleService.collectible_leases(reference_month, building_id))
+        )
         payments = RentScheduleService._active_payments_by_lease(reference_month)
 
         to_receive_total = ZERO

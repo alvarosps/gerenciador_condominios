@@ -31,15 +31,12 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
-import {
-  useCreatePersonIncome,
-  useUpdatePersonIncome,
-} from '@/lib/api/hooks/use-person-incomes';
+import { useCreatePersonIncome, useUpdatePersonIncome } from '@/lib/api/hooks/use-person-incomes';
 import { usePersons } from '@/lib/api/hooks/use-persons';
 import { useApartments } from '@/lib/api/hooks/use-apartments';
 import { useLeases } from '@/lib/api/hooks/use-leases';
 import type { PersonIncome } from '@/lib/schemas/person-income.schema';
-import { formatCurrency } from '@/lib/utils/formatters';
+import { formatCurrency, getTodayLocalISO } from '@/lib/utils/formatters';
 import { handleError } from '@/lib/utils/error-handler';
 
 interface Props {
@@ -61,10 +58,6 @@ const personIncomeFormSchema = z.object({
 
 type PersonIncomeFormValues = z.infer<typeof personIncomeFormSchema>;
 
-function getTodayISO(): string {
-  return new Date().toISOString().split('T')[0] ?? '';
-}
-
 export function PersonIncomeFormModal({ open, personIncome, onClose }: Props) {
   const createMutation = useCreatePersonIncome();
   const updateMutation = useUpdatePersonIncome();
@@ -80,7 +73,7 @@ export function PersonIncomeFormModal({ open, personIncome, onClose }: Props) {
       income_type: 'fixed_stipend',
       apartment_id: null,
       fixed_amount: null,
-      start_date: getTodayISO(),
+      start_date: getTodayLocalISO(),
       end_date: '',
       is_active: true,
       notes: '',
@@ -90,9 +83,7 @@ export function PersonIncomeFormModal({ open, personIncome, onClose }: Props) {
   const watchedIncomeType = form.watch('income_type');
   const watchedApartmentId = form.watch('apartment_id');
 
-  const activeLeaseForApartment = leases?.find(
-    (l) => l.apartment?.id === watchedApartmentId,
-  );
+  const activeLeaseForApartment = leases?.find((l) => l.apartment?.id === watchedApartmentId);
 
   useEffect(() => {
     if (personIncome) {
@@ -112,7 +103,7 @@ export function PersonIncomeFormModal({ open, personIncome, onClose }: Props) {
         income_type: 'fixed_stipend',
         apartment_id: null,
         fixed_amount: null,
-        start_date: getTodayISO(),
+        start_date: getTodayLocalISO(),
         end_date: '',
         is_active: true,
         notes: '',
@@ -140,10 +131,14 @@ export function PersonIncomeFormModal({ open, personIncome, onClose }: Props) {
 
     try {
       if (personIncome?.id) {
-        await updateMutation.mutateAsync({ ...payload, id: personIncome.id } as PersonIncome & { id: number });
+        await updateMutation.mutateAsync({ ...payload, id: personIncome.id } as PersonIncome & {
+          id: number;
+        });
         toast.success('Rendimento atualizado com sucesso');
       } else {
-        await createMutation.mutateAsync(payload as Omit<PersonIncome, 'id' | 'person' | 'apartment' | 'current_value'>);
+        await createMutation.mutateAsync(
+          payload as Omit<PersonIncome, 'id' | 'person' | 'apartment' | 'current_value'>
+        );
         toast.success('Rendimento criado com sucesso');
       }
 
@@ -164,9 +159,7 @@ export function PersonIncomeFormModal({ open, personIncome, onClose }: Props) {
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>
-            {personIncome ? 'Editar Rendimento' : 'Novo Rendimento'}
-          </DialogTitle>
+          <DialogTitle>{personIncome ? 'Editar Rendimento' : 'Novo Rendimento'}</DialogTitle>
         </DialogHeader>
 
         <Form {...form}>
@@ -206,10 +199,7 @@ export function PersonIncomeFormModal({ open, personIncome, onClose }: Props) {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Tipo *</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    value={field.value}
-                  >
+                  <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Selecione o tipo" />
@@ -246,7 +236,8 @@ export function PersonIncomeFormModal({ open, personIncome, onClose }: Props) {
                         <SelectContent>
                           {apartments?.map((apt) => (
                             <SelectItem key={apt.id} value={String(apt.id)}>
-                              Apto {apt.number} - {apt.building?.name ?? apt.building?.street_number ?? ''}
+                              Apto {apt.number} -{' '}
+                              {apt.building?.name ?? apt.building?.street_number ?? ''}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -361,10 +352,7 @@ export function PersonIncomeFormModal({ open, personIncome, onClose }: Props) {
               <Button type="button" variant="outline" onClick={handleClose}>
                 Cancelar
               </Button>
-              <Button
-                type="submit"
-                disabled={createMutation.isPending || updateMutation.isPending}
-              >
+              <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
                 {personIncome ? 'Atualizar' : 'Criar'}
               </Button>
             </DialogFooter>

@@ -26,6 +26,7 @@ export interface PixResponse {
 export const tenantPaymentKeys = {
   all: ['tenant', 'payments'] as const,
   adjustments: ['tenant', 'rent-adjustments'] as const,
+  proofs: ['tenant', 'payments', 'proof'] as const,
 } as const;
 
 export function useTenantPayments() {
@@ -68,6 +69,17 @@ export function useUploadProof() {
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: tenantPaymentKeys.all });
+      void queryClient.invalidateQueries({ queryKey: tenantPaymentKeys.proofs });
+    },
+  });
+}
+
+export function useTenantProofs() {
+  return useQuery({
+    queryKey: tenantPaymentKeys.proofs,
+    queryFn: async () => {
+      const { data } = await apiClient.get<{ results: PaymentProof[] }>('/tenant/payments/proof/');
+      return data.results;
     },
   });
 }

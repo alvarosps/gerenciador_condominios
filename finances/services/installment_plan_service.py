@@ -31,9 +31,9 @@ logger = logging.getLogger(__name__)
 
 
 class _BillTotal(Protocol):
-    # Bill.objects.with_amounts(today) annotates amount_total; django-stubs does not
+    # Bill.objects.with_amounts(today) annotates amount_remaining; django-stubs does not
     # know about dynamic annotations, so a Protocol cast keeps the read type-safe.
-    amount_total: Decimal
+    amount_remaining: Decimal
 
 
 _CENTS = Decimal("0.01")
@@ -72,6 +72,34 @@ class InstallmentPlanService:
     """Stateless installment-plan operations."""
 
     @staticmethod
+    def materialize_schedule(plan: InstallmentPlan, user: User | None = None) -> InstallmentPlan:
+        """Materialize plan.installments (the schedule) from total_amount/installment_count/
+        start_due_date/default_due_day (B5).
+
+        Every other creation path (convert_deferred, seed_condo_utilities) materializes its
+        Installment rows at creation time — a plan with none is an inert shell that generation
+        never fills (BillGenerationService reads Installment rows, it does not create them from
+        the plan's schedule fields). Idempotent no-op when installments already exist (a caller
+        must not double-materialize an existing plan).
+        """
+        if plan.installments.exists():
+            return plan
+        amounts = _split_amount(plan.total_amount, plan.installment_count)
+        due_dates = _schedule_due_dates(
+            plan.start_due_date, plan.installment_count, plan.default_due_day
+        )
+        for number, (amount, due) in enumerate(zip(amounts, due_dates, strict=True), start=1):
+            Installment.objects.create(
+                plan=plan,
+                number=number,
+                due_date=due,
+                amount=amount,
+                created_by=user,
+                updated_by=user,
+            )
+        return plan
+
+    @staticmethod
     def convert_deferred(
         *,
         deferred_bill: Bill,
@@ -84,7 +112,10 @@ class InstallmentPlanService:
         """Convert a deferred Bill into a standalone InstallmentPlan, atomically.
 
         - select_for_update on the bill; precondition lifecycle_state == DEFERRED.
-        - total = with_amounts(today).amount_total (never summed in Python).
+        - total = with_amounts(today).amount_remaining (never summed in Python) — B9: a Bill
+          deferred after a partial payment must reschedule only what is still owed; parceling
+          amount_total would double-charge the part already paid (its PaymentAllocation stays
+          live — the deferred bill goes CANCELED, not deleted, so its payment history persists).
         - Creates the plan + N installments (Σ amount == total, remainder on the last).
         - Deferred bill -> CANCELED (terminal, outside every competence/overdue sum,
           design §4.4). Not soft-deleted: the real Bill history stays auditable.
@@ -107,7 +138,7 @@ class InstallmentPlanService:
                 raise ValidationError({"billing_account": _DEFERRED_NEEDS_IPTU_MSG})
 
             annotated = cast(_BillTotal, Bill.objects.with_amounts(today_sp()).get(pk=locked.pk))
-            total: Decimal = annotated.amount_total
+            total: Decimal = annotated.amount_remaining
             if total < 0:
                 # An offset-heavy bill can annotate a negative total; a plan with a negative
                 # total_amount/installments would violate the non-negative constraints. Reject (400).

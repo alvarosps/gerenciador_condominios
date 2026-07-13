@@ -1,9 +1,12 @@
 """Integration tests for Tenant CRUD — validation, soft delete, filters."""
 
+from datetime import date
+from decimal import Decimal
+
 import pytest
 from rest_framework import status
 
-from core.models import Tenant
+from core.models import Apartment, Building, Lease, Tenant
 
 
 @pytest.fixture
@@ -153,6 +156,60 @@ class TestTenantSoftDelete:
         assert response.status_code == status.HTTP_200_OK
         ids = [item["id"] for item in response.data["results"]]
         assert tenant.id not in ids
+
+
+@pytest.mark.integration
+class TestTenantDeleteBlockedByActiveLease:
+    """B14: a tenant who is the responsible_tenant of a non-terminated lease cannot be
+    soft-deleted — the lease must be terminated (or transferred to another tenant) first."""
+
+    @pytest.fixture
+    def tenant_with_active_lease(self, admin_user, tenant):
+        building = Building.objects.create(
+            street_number=910,
+            name="Edifício B14",
+            address="Rua B14, 910",
+            created_by=admin_user,
+            updated_by=admin_user,
+        )
+        apartment = Apartment.objects.create(
+            building=building,
+            number=101,
+            rental_value=Decimal("1300.00"),
+            cleaning_fee=Decimal("150.00"),
+            max_tenants=2,
+            created_by=admin_user,
+            updated_by=admin_user,
+        )
+        lease = Lease.objects.create(
+            apartment=apartment,
+            responsible_tenant=tenant,
+            start_date=date(2026, 1, 1),
+            validity_months=12,
+            rental_value=Decimal("1300.00"),
+            created_by=admin_user,
+            updated_by=admin_user,
+        )
+        return {"lease": lease, "apartment": apartment}
+
+    def test_destroy_blocked_with_active_lease(
+        self, authenticated_api_client, tenant, tenant_with_active_lease
+    ):
+        response = authenticated_api_client.delete(f"/api/tenants/{tenant.id}/")
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        # Tenant must still exist (not soft-deleted).
+        assert Tenant.objects.filter(id=tenant.id).exists()
+
+    def test_destroy_allowed_after_lease_terminated(
+        self, authenticated_api_client, tenant, tenant_with_active_lease
+    ):
+        tenant_with_active_lease["lease"].delete()  # SoftDeleteMixin — terminates the lease
+
+        response = authenticated_api_client.delete(f"/api/tenants/{tenant.id}/")
+
+        assert response.status_code == status.HTTP_204_NO_CONTENT
+        assert not Tenant.objects.filter(id=tenant.id).exists()
 
 
 @pytest.mark.integration

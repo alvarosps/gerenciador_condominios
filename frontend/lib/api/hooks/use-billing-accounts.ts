@@ -1,11 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
 import { queryKeys } from '../query-keys';
+import { parseList } from '../parse-list';
 import {
   type BillingAccount,
   billingAccountSchema,
 } from '@/lib/schemas/finances/billing-account.schema';
-import { type PaginatedResponse, extractResults } from '@/lib/types/api';
 
 const ENDPOINT = '/finances/billing-accounts/';
 
@@ -27,11 +27,10 @@ export function useBillingAccounts(filters?: BillingAccountFilters) {
   return useQuery({
     queryKey: queryKeys.finances.billingAccounts.list(cleanFilters),
     queryFn: async () => {
-      const { data } = await apiClient.get<PaginatedResponse<BillingAccount> | BillingAccount[]>(
-        ENDPOINT,
-        { params: { page_size: 10000, ...cleanFilters } },
-      );
-      return extractResults(data).map((account) => billingAccountSchema.parse(account));
+      const { data } = await apiClient.get<unknown>(ENDPOINT, {
+        params: { page_size: 10000, ...cleanFilters },
+      });
+      return parseList(data, billingAccountSchema).items;
     },
   });
 }

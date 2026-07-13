@@ -8,9 +8,12 @@ from freezegun import freeze_time
 from rest_framework import status
 
 from core.models import Condominium, FinancialSettings
+from finances.models import IncomeEntry
 from finances.services.condo_balance_service import CondoBalanceService
+from finances.services.condo_month_close_service import CondoMonthCloseService
 from tests.factories import (
     make_condominium,
+    make_income_entry,
     make_reserve,
     make_reserve_movement,
 )
@@ -208,6 +211,41 @@ def test_income_entry_received_date_validation(authenticated_api_client):
         format="json",
     )
     assert resp.status_code == status.HTTP_400_BAD_REQUEST
+
+
+# --- B8a/B8b: IncomeEntry destroy/update guard the received_date month too ---
+
+
+def test_income_entry_destroy_rejects_closed_month(authenticated_api_client):
+    income = make_income_entry(received_date=date(2026, 5, 20), is_received=True)
+    CondoMonthCloseService.close(2026, 5)
+    resp = authenticated_api_client.delete(f"/api/finances/income-entries/{income.id}/")
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    assert IncomeEntry.objects.filter(pk=income.id).exists()
+
+
+def test_income_entry_destroy_allowed_when_month_open(authenticated_api_client):
+    income = make_income_entry(received_date=date(2026, 6, 20), is_received=True)
+    resp = authenticated_api_client.delete(f"/api/finances/income-entries/{income.id}/")
+    assert resp.status_code == status.HTTP_204_NO_CONTENT
+    assert not IncomeEntry.objects.filter(pk=income.id).exists()
+
+
+def test_income_entry_update_rejects_moving_out_of_closed_month(authenticated_api_client):
+    """The OLD received_date's month is closed; moving the income to an open month must still
+    be rejected — moving revenue OUT of a closed month corrupts that month's frozen close too."""
+    income = make_income_entry(
+        income_date=date(2026, 5, 10), received_date=date(2026, 5, 20), is_received=True
+    )
+    CondoMonthCloseService.close(2026, 5)
+    resp = authenticated_api_client.patch(
+        f"/api/finances/income-entries/{income.id}/",
+        {"income_date": "2026-06-10"},
+        format="json",
+    )
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    income.refresh_from_db()
+    assert income.income_date == date(2026, 5, 10)
 
 
 # --- IsAdminUser matrix (admin-only after P1.2) ---

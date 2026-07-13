@@ -9,6 +9,8 @@ from decimal import Decimal
 from typing import Any
 
 from django.db import transaction
+from django.db.models import Sum
+from django.db.models.functions import Coalesce
 from django.utils import timezone
 
 from core.cache import invalidate_legacy_financial_caches
@@ -30,7 +32,7 @@ def _sum_person_expenses(
     person_id: int, month_start: date, next_month_start: date, *, is_offset: bool
 ) -> Decimal:
     """Sum all expense amounts for a person in a given month (installments + recurring + one-time)."""
-    total = Decimal("0.00")
+    zero = Decimal("0.00")
 
     skipped_ids = set(
         ExpenseMonthSkip.objects.filter(reference_month=month_start).values_list(
@@ -39,17 +41,19 @@ def _sum_person_expenses(
     )
 
     # Installments with due_date in the month
-    installments = ExpenseInstallment.objects.filter(
-        expense__person_id=person_id,
-        expense__is_offset=is_offset,
-        due_date__gte=month_start,
-        due_date__lt=next_month_start,
-    ).exclude(expense_id__in=skipped_ids)
-    for inst in installments:
-        total += inst.amount
+    installments_total: Decimal = (
+        ExpenseInstallment.objects.filter(
+            expense__person_id=person_id,
+            expense__is_offset=is_offset,
+            due_date__gte=month_start,
+            due_date__lt=next_month_start,
+        )
+        .exclude(expense_id__in=skipped_ids)
+        .aggregate(total=Coalesce(Sum("amount"), zero))["total"]
+    )
 
     # Fixed recurring expenses (respect end_date)
-    fixed = (
+    fixed_total: Decimal = (
         Expense.objects.filter(
             person_id=person_id,
             expense_type=ExpenseType.FIXED_EXPENSE,
@@ -59,22 +63,23 @@ def _sum_person_expenses(
         )
         .exclude(end_date__lt=month_start)
         .exclude(pk__in=skipped_ids)
+        .aggregate(total=Coalesce(Sum("expected_monthly_amount"), zero))["total"]
     )
-    for exp in fixed:
-        total += exp.expected_monthly_amount or Decimal("0.00")
 
     # One-time expenses in the month
-    one_time = Expense.objects.filter(
-        person_id=person_id,
-        expense_type=ExpenseType.ONE_TIME_EXPENSE,
-        is_offset=is_offset,
-        expense_date__gte=month_start,
-        expense_date__lt=next_month_start,
-    ).exclude(pk__in=skipped_ids)
-    for exp in one_time:
-        total += exp.total_amount
+    one_time_total: Decimal = (
+        Expense.objects.filter(
+            person_id=person_id,
+            expense_type=ExpenseType.ONE_TIME_EXPENSE,
+            is_offset=is_offset,
+            expense_date__gte=month_start,
+            expense_date__lt=next_month_start,
+        )
+        .exclude(pk__in=skipped_ids)
+        .aggregate(total=Coalesce(Sum("total_amount"), zero))["total"]
+    )
 
-    return total
+    return installments_total + fixed_total + one_time_total
 
 
 class PersonPaymentScheduleService:
@@ -92,17 +97,15 @@ class PersonPaymentScheduleService:
         )
         net_total = total_due - total_offsets
 
-        schedules = PersonPaymentSchedule.objects.filter(
+        total_scheduled = PersonPaymentSchedule.objects.filter(
             person_id=person_id,
             reference_month=month_start,
-        )
-        total_scheduled = sum((s.amount for s in schedules), Decimal("0.00"))
+        ).aggregate(total=Coalesce(Sum("amount"), Decimal("0.00")))["total"]
 
-        payments = PersonPayment.objects.filter(
+        total_paid = PersonPayment.objects.filter(
             person_id=person_id,
             reference_month=month_start,
-        )
-        total_paid = sum((p.amount for p in payments), Decimal("0.00"))
+        ).aggregate(total=Coalesce(Sum("amount"), Decimal("0.00")))["total"]
 
         pending = net_total - total_paid
 
@@ -159,18 +162,16 @@ class PersonPaymentScheduleService:
         due_day: int,
     ) -> dict[str, Decimal]:
         """Calculate suggested payment amount for a person up to a given day in the month."""
-        schedules = PersonPaymentSchedule.objects.filter(
+        expected_until_date = PersonPaymentSchedule.objects.filter(
             person_id=person_id,
             reference_month=reference_month,
             due_day__lte=due_day,
-        )
-        expected_until_date = sum((s.amount for s in schedules), Decimal("0.00"))
+        ).aggregate(total=Coalesce(Sum("amount"), Decimal("0.00")))["total"]
 
-        payments = PersonPayment.objects.filter(
+        already_paid = PersonPayment.objects.filter(
             person_id=person_id,
             reference_month=reference_month,
-        )
-        already_paid = sum((p.amount for p in payments), Decimal("0.00"))
+        ).aggregate(total=Coalesce(Sum("amount"), Decimal("0.00")))["total"]
 
         suggested_amount = max(Decimal("0.00"), expected_until_date - already_paid)
 
@@ -203,20 +204,18 @@ class PersonPaymentScheduleService:
     @staticmethod
     def is_schedule_paid(person_id: int, reference_month: date, due_day: int) -> bool:
         """Check if total paid >= total expected for schedules up to and including due_day."""
-        schedules = PersonPaymentSchedule.objects.filter(
+        expected: Decimal = PersonPaymentSchedule.objects.filter(
             person_id=person_id,
             reference_month=reference_month,
             due_day__lte=due_day,
-        )
-        expected = sum((s.amount for s in schedules), Decimal("0.00"))
+        ).aggregate(total=Coalesce(Sum("amount"), Decimal("0.00")))["total"]
 
         if expected == Decimal("0.00"):
             return False
 
-        payments = PersonPayment.objects.filter(
+        paid: Decimal = PersonPayment.objects.filter(
             person_id=person_id,
             reference_month=reference_month,
-        )
-        paid = sum((p.amount for p in payments), Decimal("0.00"))
+        ).aggregate(total=Coalesce(Sum("amount"), Decimal("0.00")))["total"]
 
         return paid >= expected

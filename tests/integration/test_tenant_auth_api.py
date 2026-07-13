@@ -140,13 +140,81 @@ class TestRequestCode:
 
         assert response.status_code == status.HTTP_429_TOO_MANY_REQUESTS
 
+    def test_twilio_send_failure_returns_400_not_500(self, admin_user):
+        """A Twilio-boundary failure surfaces as a clear pt-BR 400, never an unhandled 500."""
+        from twilio.base.exceptions import TwilioRestException
+
+        _make_tenant(admin_user)
+        client = APIClient()
+
+        with patch("core.services.whatsapp_service.Client") as mock_client:
+            mock_client.return_value.messages.create.side_effect = TwilioRestException(
+                status=400, uri="/Messages", msg="Invalid 'To' Phone Number"
+            )
+            response = client.post(REQUEST_URL, {"cpf_cnpj": _CPF}, format="json")
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "error" in response.data
+
+    def test_twilio_send_failure_does_not_create_verification(self, admin_user):
+        """A failed send must not persist a WhatsAppVerification the tenant never received."""
+        from twilio.base.exceptions import TwilioRestException
+
+        _make_tenant(admin_user)
+        client = APIClient()
+
+        with patch("core.services.whatsapp_service.Client") as mock_client:
+            mock_client.return_value.messages.create.side_effect = TwilioRestException(
+                status=500, uri="/Messages", msg="Twilio internal error"
+            )
+            client.post(REQUEST_URL, {"cpf_cnpj": _CPF}, format="json")
+
+        assert WhatsAppVerification.objects.filter(cpf_cnpj=_CPF_DIGITS).count() == 0
+
+    def test_twilio_send_failure_does_not_burn_rate_limit_window(self, admin_user):
+        """Failed sends are never counted — 3 failures followed by a real success still succeed
+        (the window only counts WhatsAppVerification rows, created only after a successful send)."""
+        from twilio.base.exceptions import TwilioRestException
+
+        _make_tenant(admin_user)
+        client = APIClient()
+
+        with patch("core.services.whatsapp_service.Client") as mock_client:
+            mock_client.return_value.messages.create.side_effect = TwilioRestException(
+                status=500, uri="/Messages", msg="Twilio internal error"
+            )
+            for _ in range(3):
+                response = client.post(REQUEST_URL, {"cpf_cnpj": _CPF}, format="json")
+                assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+        with patch("core.services.whatsapp_service.Client"):
+            response = client.post(REQUEST_URL, {"cpf_cnpj": _CPF}, format="json")
+
+        assert response.status_code == status.HTTP_200_OK
+
+    def test_invalid_tenant_phone_returns_400(self, admin_user):
+        """A tenant with an unparseable phone (legacy bad data) gets a clear pt-BR 400,
+        not a 500. ``full_clean`` on save blocks creating this directly, so the blank
+        phone is written via ``update_fields`` (skips validation), mirroring how legacy
+        data could exist before the phone validator was added."""
+        tenant = _make_tenant(admin_user)
+        tenant.phone = ""
+        tenant.save(update_fields=["phone"])
+        client = APIClient()
+
+        response = client.post(REQUEST_URL, {"cpf_cnpj": _CPF}, format="json")
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "error" in response.data
+
 
 @pytest.mark.integration
 class TestVerifyCode:
     """Tests for POST /api/auth/whatsapp/verify/"""
 
     def test_verify_code_success(self, admin_user, django_user_model):
-        """Correct code returns JWT tokens and links tenant.user."""
+        """Correct code links tenant.user and sets the standard auth cookies (no tokens
+        in the body — parity with the password login: `CookieTokenObtainPairView`)."""
         tenant = _make_tenant(admin_user)
         client = APIClient()
 
@@ -163,13 +231,123 @@ class TestVerifyCode:
         )
 
         assert response.status_code == status.HTTP_200_OK
-        assert "access" in response.data
-        assert "refresh" in response.data
+        assert "access" not in response.data
+        assert "refresh" not in response.data
 
         tenant.refresh_from_db()
         assert tenant.user is not None
         assert tenant.user.username == f"tenant_{tenant.pk}"
         assert tenant.user.is_staff is False
+
+    def test_verify_code_sets_auth_cookies(self, admin_user):
+        """The verify response sets the same HttpOnly cookie set as the password login."""
+        _make_tenant(admin_user)
+        client = APIClient()
+
+        with patch("core.services.whatsapp_service.Client"):
+            client.post(REQUEST_URL, {"cpf_cnpj": _CPF}, format="json")
+        verification = WhatsAppVerification.objects.filter(cpf_cnpj=_CPF_DIGITS).latest(
+            "created_at"
+        )
+        response = client.post(
+            VERIFY_URL,
+            {"cpf_cnpj": _CPF, "code": verification.code},
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        assert "access_token" in response.cookies
+        assert response.cookies["access_token"]["httponly"]
+        assert "refresh_token" in response.cookies
+        assert response.cookies["refresh_token"]["httponly"]
+        assert "is_authenticated" in response.cookies
+        assert response.cookies["is_authenticated"].value == "1"
+        assert not response.cookies["is_authenticated"]["httponly"]
+        assert response.cookies["role"].value == "tenant"
+        assert "csrftoken" in response.cookies
+
+    def test_verify_code_returns_user_in_body(self, admin_user):
+        """The response body carries the tenant's linked user, not the JWT tokens."""
+        tenant = _make_tenant(admin_user)
+        client = APIClient()
+
+        with patch("core.services.whatsapp_service.Client"):
+            client.post(REQUEST_URL, {"cpf_cnpj": _CPF}, format="json")
+        verification = WhatsAppVerification.objects.filter(cpf_cnpj=_CPF_DIGITS).latest(
+            "created_at"
+        )
+        response = client.post(
+            VERIFY_URL,
+            {"cpf_cnpj": _CPF, "code": verification.code},
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        tenant.refresh_from_db()
+        user_data = response.data["user"]
+        assert user_data["id"] == tenant.user.pk
+        assert user_data["is_staff"] is False
+
+    def test_verify_code_cookie_grants_access_to_tenant_me(self, admin_user):
+        """The cookies set by verify authenticate a subsequent /api/tenant/me/ call —
+        proves the full login→cookie→authenticated-request chain (not just cookie presence)."""
+        _make_tenant(admin_user)
+        client = APIClient()
+
+        with patch("core.services.whatsapp_service.Client"):
+            client.post(REQUEST_URL, {"cpf_cnpj": _CPF}, format="json")
+        verification = WhatsAppVerification.objects.filter(cpf_cnpj=_CPF_DIGITS).latest(
+            "created_at"
+        )
+        client.post(VERIFY_URL, {"cpf_cnpj": _CPF, "code": verification.code}, format="json")
+
+        me_response = client.get("/api/tenant/me/")
+        assert me_response.status_code == status.HTTP_200_OK
+
+    def test_verify_code_populates_new_user_name_from_tenant(self, admin_user):
+        """A freshly created User gets first/last name from Tenant.name (portal header)."""
+        tenant = _make_tenant(admin_user)
+        client = APIClient()
+
+        with patch("core.services.whatsapp_service.Client"):
+            client.post(REQUEST_URL, {"cpf_cnpj": _CPF}, format="json")
+        verification = WhatsAppVerification.objects.filter(cpf_cnpj=_CPF_DIGITS).latest(
+            "created_at"
+        )
+        client.post(VERIFY_URL, {"cpf_cnpj": _CPF, "code": verification.code}, format="json")
+
+        tenant.refresh_from_db()
+        assert tenant.user.first_name == "João"
+        assert tenant.user.last_name == "da Silva"
+
+    def test_verify_code_backfills_name_on_existing_nameless_user(self, admin_user):
+        """A previously-linked User with a blank first_name gets backfilled on next login."""
+        tenant = _make_tenant(admin_user)
+        client = APIClient()
+
+        with patch("core.services.whatsapp_service.Client"):
+            client.post(REQUEST_URL, {"cpf_cnpj": _CPF}, format="json")
+        verification = WhatsAppVerification.objects.filter(cpf_cnpj=_CPF_DIGITS).latest(
+            "created_at"
+        )
+        client.post(VERIFY_URL, {"cpf_cnpj": _CPF, "code": verification.code}, format="json")
+
+        tenant.refresh_from_db()
+        # Simulate a legacy user created before the name-population fix existed.
+        tenant.user.first_name = ""
+        tenant.user.last_name = ""
+        tenant.user.save(update_fields=["first_name", "last_name"])
+
+        with patch("core.services.whatsapp_service.Client"):
+            client.post(REQUEST_URL, {"cpf_cnpj": _CPF}, format="json")
+        verification2 = WhatsAppVerification.objects.filter(cpf_cnpj=_CPF_DIGITS).latest(
+            "created_at"
+        )
+        client.post(VERIFY_URL, {"cpf_cnpj": _CPF, "code": verification2.code}, format="json")
+
+        tenant.refresh_from_db()
+        assert tenant.user.first_name == "João"
+        assert tenant.user.last_name == "da Silva"
 
     def test_verify_wrong_code_increments_attempts(self, admin_user):
         """Wrong code returns 400 and increments the attempts counter."""

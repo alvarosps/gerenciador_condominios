@@ -2,12 +2,7 @@
 
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Pencil, Trash2, List, CheckCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { type Column } from '@/components/tables/data-table';
@@ -117,7 +112,11 @@ export function createExpenseColumns(handlers: ExpenseActionHandlers): Column<Ex
       width: 100,
       align: 'center',
       render: (_, record) => (
-        <Badge className={cn(record.is_paid ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning')}>
+        <Badge
+          className={cn(
+            record.is_paid ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'
+          )}
+        >
           {record.is_paid ? 'Pago' : 'Pendente'}
         </Badge>
       ),
@@ -134,7 +133,6 @@ export function createExpenseColumns(handlers: ExpenseActionHandlers): Column<Ex
       title: 'Ações',
       key: 'actions',
       width: 180,
-      fixed: 'right',
       render: (_, record) => (
         <TooltipProvider>
           <div className="flex items-center gap-1">
@@ -142,7 +140,12 @@ export function createExpenseColumns(handlers: ExpenseActionHandlers): Column<Ex
               <>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" aria-label="Editar" onClick={() => handlers.onEdit(record)}>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Editar"
+                      onClick={() => handlers.onEdit(record)}
+                    >
                       <Pencil className="h-4 w-4" />
                     </Button>
                   </TooltipTrigger>

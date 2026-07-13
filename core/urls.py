@@ -92,7 +92,9 @@ _tenant_contract = TenantPortalViewSet.as_view({"get": "contract"})
 _tenant_payments = TenantPortalViewSet.as_view({"get": "payments"})
 _tenant_adjustments = TenantPortalViewSet.as_view({"get": "rent_adjustments"})
 _tenant_pix = TenantPortalViewSet.as_view({"post": "payments_pix"})
-_tenant_proof_upload = TenantPortalViewSet.as_view({"post": "payments_proof_upload"})
+_tenant_proof = TenantPortalViewSet.as_view(
+    {"get": "payments_proof_list", "post": "payments_proof_upload"}
+)
 _tenant_proof_status = TenantPortalViewSet.as_view({"get": "payments_proof_status"})
 _tenant_proof_file = TenantPortalViewSet.as_view({"get": "payments_proof_file"})
 _tenant_simulate = TenantPortalViewSet.as_view({"post": "due_date_simulate"})
@@ -115,7 +117,7 @@ urlpatterns = [
     path("api/tenant/payments/", _tenant_payments, name="tenant-payments"),
     path("api/tenant/rent-adjustments/", _tenant_adjustments, name="tenant-adjustments"),
     path("api/tenant/payments/pix/", _tenant_pix, name="tenant-pix"),
-    path("api/tenant/payments/proof/", _tenant_proof_upload, name="tenant-proof-upload"),
+    path("api/tenant/payments/proof/", _tenant_proof, name="tenant-proof-upload"),
     path(
         "api/tenant/payments/proof/<int:proof_id>/file/",
         _tenant_proof_file,

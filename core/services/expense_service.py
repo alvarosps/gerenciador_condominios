@@ -2,7 +2,7 @@
 
 import calendar
 from datetime import date
-from decimal import ROUND_HALF_UP, Decimal
+from decimal import ROUND_DOWN, Decimal
 from typing import Any
 
 from dateutil.relativedelta import relativedelta
@@ -10,6 +10,7 @@ from django.contrib.auth.models import User
 from django.db import transaction
 from rest_framework import serializers
 
+from core.cache import invalidate_legacy_financial_caches
 from core.models import Expense, ExpenseInstallment
 
 _CENTS = Decimal("0.01")
@@ -79,18 +80,62 @@ class ExpenseService:
 
     @staticmethod
     @transaction.atomic
+    def create_with_installments(
+        *,
+        expense_data: dict[str, Any],
+        installments_data: list[dict[str, Any]],
+        user: User,
+    ) -> Expense:
+        """Create an Expense and its installments in a single atomic transaction.
+
+        Replaces the previous non-atomic "1 POST /expenses/ + N POSTs
+        /expense-installments/" client-side loop, which left an orphaned expense behind
+        on a mid-loop failure and duplicated installments on retry. Mirrors
+        ``rebuild_installments``'s bulk-write shape and ``generate_installments``'s
+        explicit cache invalidation (bulk_create bypasses post_save, so the
+        ExpenseInstallment save signal never fires).
+        """
+        expense = Expense.objects.create(**expense_data)
+
+        to_create = [
+            ExpenseInstallment(
+                expense=expense,
+                installment_number=inst["installment_number"],
+                total_installments=inst["total_installments"],
+                amount=inst["amount"],
+                due_date=inst["due_date"],
+                is_paid=inst.get("is_paid", False),
+                paid_date=inst.get("paid_date"),
+                created_by=user,
+                updated_by=user,
+            )
+            for inst in installments_data
+        ]
+        if to_create:
+            ExpenseInstallment.objects.bulk_create(to_create)
+            invalidate_legacy_financial_caches()
+
+        return expense
+
+    @staticmethod
+    @transaction.atomic
     def generate_installments(*, expense: Expense, start_date: date, user: User) -> Expense:
         """Generate the expense's installments, with the residual on the last parcel.
 
         Splitting ``total_amount`` by ``n`` and rounding each parcel can drift from the
         total (e.g. 100.00 / 3); the last parcel absorbs the residual so the parcels
-        always sum to ``total_amount``. Credit-card installments fall on the card's
-        ``due_day``, clamped to the month's last day to avoid a ValueError on short months.
+        always sum to ``total_amount``. The base is rounded DOWN so
+        Σ(base * (n-1)) <= total and the leftover cents land on the LAST installment,
+        which is therefore always >= base >= 0 (ROUND_HALF_UP could round the base UP
+        and make the last installment negative for tiny totals, e.g. 0.05 / 9 — mirrors
+        ``finances/services/installment_plan_service.py::_split_amount``). Credit-card
+        installments fall on the card's ``due_day``, clamped to the month's last day to
+        avoid a ValueError on short months.
         """
         n = expense.total_installments
         if not n:
             raise serializers.ValidationError(_NOT_INSTALLMENT_ERROR)
-        base = (expense.total_amount / n).quantize(_CENTS, rounding=ROUND_HALF_UP)
+        base = (expense.total_amount / n).quantize(_CENTS, rounding=ROUND_DOWN)
         last = expense.total_amount - base * (n - 1)
 
         credit_card = expense.credit_card
@@ -115,4 +160,10 @@ class ExpenseService:
                 )
             )
         ExpenseInstallment.objects.bulk_create(installments)
+        # bulk_create bypasses post_save, so it never fires
+        # signals.invalidate_expense_installment_cache_on_save — invalidate explicitly with the
+        # same mapping the signal uses (ExpenseInstallment -> _invalidate_financial_caches ->
+        # invalidate_legacy_financial_caches), so newly generated installments are reflected
+        # immediately in cash-flow / financial-dashboard / finance-* instead of waiting out the TTL.
+        invalidate_legacy_financial_caches()
         return expense

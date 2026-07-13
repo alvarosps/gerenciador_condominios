@@ -3,12 +3,7 @@
 import { useState } from 'react';
 import { Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Sidebar } from './sidebar';
 
 /**
@@ -34,9 +29,7 @@ export function MobileNav() {
           <SheetHeader className="sr-only">
             <SheetTitle>Menu de navegação</SheetTitle>
           </SheetHeader>
-          <div onClick={() => setOpen(false)}>
-            <Sidebar />
-          </div>
+          <Sidebar onNavigate={() => setOpen(false)} />
         </SheetContent>
       </Sheet>
     </>

@@ -14,7 +14,10 @@ from core.models import Person, PersonPayment
 from core.permissions import IsAdminUser
 from core.services.cash_flow_service import MONTHS_IN_YEAR, CashFlowService
 from core.services.daily_control_service import DailyControlService
-from core.services.financial_dashboard_service import FinancialDashboardService
+from core.services.financial_dashboard_service import (
+    MAX_BREAK_EVEN_MONTHS,
+    FinancialDashboardService,
+)
 from core.services.simulation_service import SimulationService
 
 _DEFAULT_UPCOMING_DAYS = 30
@@ -187,6 +190,12 @@ class CashFlowViewSet(viewsets.ViewSet):
         if months < 1:
             return Response(
                 {"error": "O parâmetro 'months' deve ser maior que zero."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if months > MAX_BREAK_EVEN_MONTHS:
+            return Response(
+                {"error": f"O parâmetro 'months' deve ser no máximo {MAX_BREAK_EVEN_MONTHS}."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 

@@ -90,8 +90,7 @@ export default function ApartmentsPage() {
     return map;
   }, [apartments]);
 
-  const getFilters = (buildingId: number): ApartmentFilters =>
-    filtersByBuilding[buildingId] ?? {};
+  const getFilters = (buildingId: number): ApartmentFilters => filtersByBuilding[buildingId] ?? {};
 
   const updateFilter = (buildingId: number, updates: Partial<ApartmentFilters>): void => {
     setFiltersByBuilding((prev) => ({
@@ -102,7 +101,7 @@ export default function ApartmentsPage() {
 
   const clearFilters = (buildingId: number): void => {
     setFiltersByBuilding((prev) =>
-      Object.fromEntries(Object.entries(prev).filter(([key]) => Number(key) !== buildingId)),
+      Object.fromEntries(Object.entries(prev).filter(([key]) => Number(key) !== buildingId))
     );
   };
 
@@ -196,7 +195,6 @@ export default function ApartmentsPage() {
       title: 'Ações',
       key: 'actions',
       width: 150,
-      fixed: 'right',
       render: (_, record: Apartment) => (
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="sm" onClick={() => crud.openEditModal(record)}>
@@ -278,7 +276,9 @@ export default function ApartmentsPage() {
         <div className="mb-4 p-4 bg-primary/5 border border-primary/20 rounded flex justify-between items-center flex-wrap gap-3">
           <span className="text-primary font-medium">
             {crud.bulkOps.selectionCount}{' '}
-            {crud.bulkOps.selectionCount === 1 ? 'apartamento selecionado' : 'apartamentos selecionados'}
+            {crud.bulkOps.selectionCount === 1
+              ? 'apartamento selecionado'
+              : 'apartamentos selecionados'}
           </span>
           <div className="flex gap-2">
             <Button variant="outline" onClick={crud.bulkOps.clearSelection}>
@@ -304,110 +304,110 @@ export default function ApartmentsPage() {
           </div>
         </div>
       ) : (
-      <Accordion type="multiple" className="space-y-4">
-        {buildings?.map((building) => {
-          const buildingId = building.id;
-          if (buildingId === undefined) return null;
-          const apts = groupedApartments.get(buildingId) ?? [];
-          const filteredApts = getFilteredApartments(buildingId, apts);
-          const filters = getFilters(buildingId);
-          const hasActiveFilters =
-            filters.is_rented !== undefined ||
-            filters.min_price !== undefined ||
-            filters.max_price !== undefined;
+        <Accordion type="multiple" className="space-y-4">
+          {buildings?.map((building) => {
+            const buildingId = building.id;
+            if (buildingId === undefined) return null;
+            const apts = groupedApartments.get(buildingId) ?? [];
+            const filteredApts = getFilteredApartments(buildingId, apts);
+            const filters = getFilters(buildingId);
+            const hasActiveFilters =
+              filters.is_rented !== undefined ||
+              filters.min_price !== undefined ||
+              filters.max_price !== undefined;
 
-          return (
-            <AccordionItem key={buildingId} value={String(buildingId)}>
-              <AccordionTrigger className="px-4">
-                <div className="flex items-center gap-2">
-                  <span>
-                    {building.name} — Nº {building.street_number}
-                  </span>
-                  <Badge variant="secondary">{apts.length} apartamentos</Badge>
-                </div>
-              </AccordionTrigger>
-              <AccordionContent className="px-4 pb-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Status</label>
-                    <Select
-                      value={
-                        filters.is_rented !== undefined ? String(filters.is_rented) : undefined
-                      }
-                      onValueChange={(value) =>
-                        updateFilter(buildingId, {
-                          is_rented: value ? value === 'true' : undefined,
-                        })
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Todos" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="false">Disponível</SelectItem>
-                        <SelectItem value="true">Alugado</SelectItem>
-                      </SelectContent>
-                    </Select>
+            return (
+              <AccordionItem key={buildingId} value={String(buildingId)}>
+                <AccordionTrigger className="px-4">
+                  <div className="flex items-center gap-2">
+                    <span>
+                      {building.name} — Nº {building.street_number}
+                    </span>
+                    <Badge variant="secondary">{apts.length} apartamentos</Badge>
                   </div>
-
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Valor Mínimo</label>
-                    <Input
-                      type="number"
-                      placeholder="R$ 0"
-                      value={filters.min_price ?? ''}
-                      onChange={(e) =>
-                        updateFilter(buildingId, {
-                          min_price: e.target.value ? Number(e.target.value) : undefined,
-                        })
-                      }
-                      min={0}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Valor Máximo</label>
-                    <Input
-                      type="number"
-                      placeholder="R$ 99999"
-                      value={filters.max_price ?? ''}
-                      onChange={(e) =>
-                        updateFilter(buildingId, {
-                          max_price: e.target.value ? Number(e.target.value) : undefined,
-                        })
-                      }
-                      min={0}
-                    />
-                  </div>
-
-                  {hasActiveFilters && (
-                    <div className="flex items-end">
-                      <Button
-                        variant="outline"
-                        onClick={() => clearFilters(buildingId)}
-                        className="w-full"
+                </AccordionTrigger>
+                <AccordionContent className="px-4 pb-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                    <div>
+                      <label className="block text-sm font-medium mb-2">Status</label>
+                      <Select
+                        value={
+                          filters.is_rented !== undefined ? String(filters.is_rented) : undefined
+                        }
+                        onValueChange={(value) =>
+                          updateFilter(buildingId, {
+                            is_rented: value ? value === 'true' : undefined,
+                          })
+                        }
                       >
-                        Limpar Filtros
-                      </Button>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Todos" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="false">Disponível</SelectItem>
+                          <SelectItem value="true">Alugado</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
-                  )}
-                </div>
 
-                <DataTable<Apartment>
-                  columns={columns}
-                  dataSource={filteredApts}
-                  loading={isLoading}
-                  rowKey="id"
-                  rowSelection={crud.bulkOps.rowSelection}
-                  defaultSortKey="number"
-                  defaultSortDirection="asc"
-                  pagination={{ pageSize: 40 }}
-                />
-              </AccordionContent>
-            </AccordionItem>
-          );
-        })}
-      </Accordion>
+                    <div>
+                      <label className="block text-sm font-medium mb-2">Valor Mínimo</label>
+                      <Input
+                        type="number"
+                        placeholder="R$ 0"
+                        value={filters.min_price ?? ''}
+                        onChange={(e) =>
+                          updateFilter(buildingId, {
+                            min_price: e.target.value ? Number(e.target.value) : undefined,
+                          })
+                        }
+                        min={0}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium mb-2">Valor Máximo</label>
+                      <Input
+                        type="number"
+                        placeholder="R$ 99999"
+                        value={filters.max_price ?? ''}
+                        onChange={(e) =>
+                          updateFilter(buildingId, {
+                            max_price: e.target.value ? Number(e.target.value) : undefined,
+                          })
+                        }
+                        min={0}
+                      />
+                    </div>
+
+                    {hasActiveFilters && (
+                      <div className="flex items-end">
+                        <Button
+                          variant="outline"
+                          onClick={() => clearFilters(buildingId)}
+                          className="w-full"
+                        >
+                          Limpar Filtros
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+
+                  <DataTable<Apartment>
+                    columns={columns}
+                    dataSource={filteredApts}
+                    loading={isLoading}
+                    rowKey="id"
+                    rowSelection={crud.bulkOps.rowSelection}
+                    defaultSortKey="number"
+                    defaultSortDirection="asc"
+                    pagination={{ pageSize: 40 }}
+                  />
+                </AccordionContent>
+              </AccordionItem>
+            );
+          })}
+        </Accordion>
       )}
 
       <ApartmentFormModal

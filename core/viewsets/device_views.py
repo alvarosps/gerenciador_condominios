@@ -5,6 +5,7 @@ Provides endpoints for mobile clients to register and unregister
 Expo push notification tokens.
 """
 
+import logging
 from typing import cast
 
 from django.contrib.auth.models import User
@@ -16,6 +17,8 @@ from rest_framework.response import Response
 from rest_framework.viewsets import ViewSet
 
 from core.models import DeviceToken
+
+logger = logging.getLogger(__name__)
 
 _VALID_PLATFORMS = ("ios", "android")
 
@@ -48,6 +51,12 @@ class DeviceTokenViewSet(ViewSet):
             )
 
         authenticated_user = cast(User, request.user)
+        previous_owner_id = (
+            DeviceToken.objects.filter(token=token)
+            .exclude(user=authenticated_user)
+            .values_list("user_id", flat=True)
+            .first()
+        )
         device, created = DeviceToken.objects.update_or_create(
             token=token,
             defaults={
@@ -64,6 +73,18 @@ class DeviceTokenViewSet(ViewSet):
                 "updated_by": authenticated_user,
             },
         )
+        if previous_owner_id is not None:
+            # Handover semantics: re-registering an existing token under a different
+            # authenticated user is a legitimate device-owner change (Expo/shared-device
+            # pattern). Logged for audit visibility — no other tokens of the previous
+            # owner are affected (this update_or_create touches only this token row).
+            logger.warning(
+                "Device token reassigned to a different user: from_user_id=%s to_user_id=%s "
+                "device_id=%s",
+                previous_owner_id,
+                authenticated_user.pk,
+                device.pk,
+            )
         return Response(
             {"id": device.pk, "token": device.token, "platform": device.platform},
             status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,

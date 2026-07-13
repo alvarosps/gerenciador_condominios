@@ -1,35 +1,31 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { screen } from '@testing-library/react';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { screen, waitFor } from '@testing-library/react';
+import { http, HttpResponse } from 'msw';
 import { renderWithProviders } from '@/tests/test-utils';
+import { server } from '@/tests/mocks/server';
 import { BuildingFormModal } from '../building-form-modal';
-import * as buildingHooks from '@/lib/api/hooks/use-buildings';
 
-vi.mock('@/lib/api/hooks/use-buildings', async (importOriginal) => {
-  const actual = await importOriginal<typeof buildingHooks>();
-  return {
-    ...actual,
-    useCreateBuilding: vi.fn(),
-    useUpdateBuilding: vi.fn(),
-  };
-});
+const API_BASE = 'http://localhost:8008/api';
 
-const idleMutation = { mutateAsync: vi.fn(), isPending: false };
-
-function mockHooks() {
-  vi.mocked(buildingHooks.useCreateBuilding).mockReturnValue(idleMutation as never);
-  vi.mocked(buildingHooks.useUpdateBuilding).mockReturnValue(idleMutation as never);
+// useCreateBuilding/useUpdateBuilding are mutation-only hooks (no GET fires on mount) — the real
+// hooks hit MSW, no hook is mocked.
+function spyCreateBuilding() {
+  const calls: Record<string, unknown>[] = [];
+  server.use(
+    http.post(`${API_BASE}/buildings/`, async ({ request }) => {
+      const body = (await request.json()) as Record<string, unknown>;
+      calls.push(body);
+      return HttpResponse.json({ id: 10, ...body }, { status: 201 });
+    })
+  );
+  return calls;
 }
 
 describe('BuildingFormModal', () => {
-  const defaultProps = { open: true, onClose: vi.fn() };
+  const defaultProps = { open: true, onClose: () => undefined };
 
   beforeEach(() => {
-    vi.clearAllMocks();
-    mockHooks();
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
+    spyCreateBuilding();
   });
 
   it('renders dialog when open', () => {
@@ -48,8 +44,13 @@ describe('BuildingFormModal', () => {
   });
 
   it('shows "Editar Prédio" title when editing', () => {
-    const building = { id: 1, name: 'Prédio Central', street_number: 836, address: 'Rua das Flores, 836' };
-    renderWithProviders(<BuildingFormModal {...defaultProps} building={building as never} />);
+    const building = {
+      id: 1,
+      name: 'Prédio Central',
+      street_number: 836,
+      address: 'Rua das Flores, 836',
+    };
+    renderWithProviders(<BuildingFormModal {...defaultProps} building={building} />);
     expect(screen.getByText('Editar Prédio')).toBeInTheDocument();
   });
 
@@ -67,22 +68,35 @@ describe('BuildingFormModal', () => {
   });
 
   it('shows "Atualizar" button when editing', () => {
-    const building = { id: 1, name: 'Prédio Central', street_number: 836, address: 'Rua das Flores, 836' };
-    renderWithProviders(<BuildingFormModal {...defaultProps} building={building as never} />);
+    const building = {
+      id: 1,
+      name: 'Prédio Central',
+      street_number: 836,
+      address: 'Rua das Flores, 836',
+    };
+    renderWithProviders(<BuildingFormModal {...defaultProps} building={building} />);
     expect(screen.getByRole('button', { name: /atualizar/i })).toBeInTheDocument();
   });
 
   it('pre-fills form fields when editing', () => {
-    const building = { id: 1, name: 'Prédio Central', street_number: 836, address: 'Rua das Flores, 836' };
-    renderWithProviders(<BuildingFormModal {...defaultProps} building={building as never} />);
+    const building = {
+      id: 1,
+      name: 'Prédio Central',
+      street_number: 836,
+      address: 'Rua das Flores, 836',
+    };
+    renderWithProviders(<BuildingFormModal {...defaultProps} building={building} />);
     expect(screen.getByDisplayValue('Prédio Central')).toBeInTheDocument();
     expect(screen.getByDisplayValue('836')).toBeInTheDocument();
   });
 
-  it('calls onClose when cancel button is clicked', () => {
-    const onClose = vi.fn();
+  it('calls onClose when cancel button is clicked', async () => {
+    let closed = false;
+    const onClose = () => {
+      closed = true;
+    };
     renderWithProviders(<BuildingFormModal open={true} onClose={onClose} />);
     screen.getByRole('button', { name: /cancelar/i }).click();
-    expect(onClose).toHaveBeenCalledOnce();
+    await waitFor(() => expect(closed).toBe(true));
   });
 });

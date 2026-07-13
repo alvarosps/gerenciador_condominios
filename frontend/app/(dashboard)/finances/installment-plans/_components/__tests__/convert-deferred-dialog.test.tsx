@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { http, HttpResponse } from 'msw';
-import { screen, fireEvent, waitFor } from '@testing-library/react';
+import { screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { toast } from 'sonner';
-import { renderWithProviders } from '@/tests/test-utils';
+import { renderWithProviders, waitForQueriesToSettle } from '@/tests/test-utils';
 import { server } from '@/tests/mocks/server';
 import { createMockInstallmentPlan } from '@/tests/mocks/data/finances';
 import { ConvertDeferredDialog } from '../convert-deferred-dialog';
@@ -37,20 +37,24 @@ describe('ConvertDeferredDialog', () => {
     vi.mocked(toast.error).mockReset();
   });
 
-  it('shows the "valor preservado" note (the FE never sums the total)', () => {
-    renderWithProviders(
+  it('shows the "valor preservado" note (the FE never sums the total)', async () => {
+    const { queryClient } = renderWithProviders(
       <ConvertDeferredDialog open billId={42} description="IPTU 2026" onClose={vi.fn()} />
     );
+    await screen.findByRole('dialog');
     expect(screen.getByText(/o valor total é preservado/i)).toBeInTheDocument();
+
+    await waitForQueriesToSettle(queryClient);
   });
 
   it('submits convert with bill_id + params and toasts on success', async () => {
     const bodies = spyConvert();
     const onClose = vi.fn();
 
-    renderWithProviders(
+    const { queryClient } = renderWithProviders(
       <ConvertDeferredDialog open billId={42} description="IPTU 2026" onClose={onClose} />
     );
+    await screen.findByRole('dialog');
 
     submitDialogForm();
 
@@ -64,6 +68,8 @@ describe('ConvertDeferredDialog', () => {
       expect(toast.success).toHaveBeenCalledWith('Plano de parcelas criado a partir do item adiado')
     );
     expect(onClose).toHaveBeenCalled();
+
+    await waitForQueriesToSettle(queryClient);
   });
 
   it('keeps the dialog open and logs the PT error on a 400 rejection', async () => {
@@ -76,9 +82,10 @@ describe('ConvertDeferredDialog', () => {
       )
     );
     const onClose = vi.fn();
-    renderWithProviders(
+    const { queryClient } = renderWithProviders(
       <ConvertDeferredDialog open billId={42} description="IPTU 2026" onClose={onClose} />
     );
+    await screen.findByRole('dialog');
 
     submitDialogForm();
 
@@ -91,18 +98,27 @@ describe('ConvertDeferredDialog', () => {
     expect(toast.success).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
     errorSpy.mockRestore();
+
+    await waitForQueriesToSettle(queryClient);
   });
 
   it('does not submit when billId is null', async () => {
     const bodies = spyConvert();
-    renderWithProviders(
+    const { queryClient } = renderWithProviders(
       <ConvertDeferredDialog open billId={null} description="IPTU 2026" onClose={vi.fn()} />
     );
+    await screen.findByRole('dialog');
 
     submitDialogForm();
 
     // Give any (unexpected) request a chance to land before asserting nothing was posted.
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    // Wrapped in `act` so any Radix effect scheduled during the wait is flushed and asserted
+    // against, instead of leaking an unwrapped state update warning.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
     expect(bodies).toHaveLength(0);
+
+    await waitForQueriesToSettle(queryClient);
   });
 });

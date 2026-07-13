@@ -1,18 +1,17 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
+import { parseList } from '../parse-list';
 import { type Person, personSchema } from '@/lib/schemas/person.schema';
-import { type PaginatedResponse, extractResults } from '@/lib/types/api';
 import { queryKeys } from '@/lib/api/query-keys';
 
 export function usePersons() {
   return useQuery({
     queryKey: queryKeys.persons.list(),
     queryFn: async () => {
-      const { data } = await apiClient.get<PaginatedResponse<Person> | Person[]>('/persons/', {
+      const { data } = await apiClient.get<unknown>('/persons/', {
         params: { page_size: 10000 },
       });
-      const persons = extractResults(data);
-      return persons.map((person) => personSchema.parse(person));
+      return parseList(data, personSchema).items;
     },
   });
 }

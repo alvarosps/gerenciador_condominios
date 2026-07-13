@@ -1,8 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
 import { queryKeys } from '../query-keys';
+import { parseList } from '../parse-list';
 import { type Lease, leaseSchema } from '@/lib/schemas/lease.schema';
-import { type PaginatedResponse, extractResults } from '@/lib/types/api';
 
 /**
  * Hook to fetch all leases with optional filters
@@ -22,13 +22,10 @@ export function useLeases(filters?: {
   return useQuery({
     queryKey: queryKeys.leases.list(cleanFilters),
     queryFn: async () => {
-      const { data } = await apiClient.get<PaginatedResponse<Lease> | Lease[]>('/leases/', {
+      const { data } = await apiClient.get<unknown>('/leases/', {
         params: { ...cleanFilters, page_size: 10000 },
       });
-      // Handle both paginated and non-paginated responses
-      const leases = extractResults(data);
-      // Validate each lease with Zod schema
-      return leases.map((lease) => leaseSchema.parse(lease));
+      return parseList(data, leaseSchema).items;
     },
   });
 }
@@ -142,6 +139,8 @@ export function usePatchLease() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.leases.all });
       void queryClient.invalidateQueries({ queryKey: queryKeys.apartments.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.rentCalendar.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.financialDashboard.all });
     },
   });
 }
@@ -313,6 +312,8 @@ export function useTransferLease() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.leases.all });
       void queryClient.invalidateQueries({ queryKey: queryKeys.apartments.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.rentCalendar.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.financialDashboard.all });
     },
   });
 }
@@ -333,6 +334,8 @@ export function useTerminateLease() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.leases.all });
       void queryClient.invalidateQueries({ queryKey: queryKeys.apartments.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.rentCalendar.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.financialDashboard.all });
     },
   });
 }

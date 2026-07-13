@@ -11,7 +11,7 @@ from django.db.models import Count, DateField, Q, QuerySet
 from django.db.models.expressions import RawSQL
 from django.http import FileResponse, HttpResponseBase
 from django.utils import timezone
-from rest_framework import serializers, status, viewsets
+from rest_framework import filters, serializers, status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.request import Request
@@ -42,6 +42,8 @@ from .services.lease_creation_service import LeaseCreationService
 from .services.lease_service import change_tenant_due_day, terminate_lease, transfer_lease
 from .services.rent_adjustment_service import RentAdjustmentService
 from .services.rent_schedule_service import RentScheduleService
+from .services.timezone import today_sp
+from .validators import validate_tenant_deletable
 
 logger = logging.getLogger(__name__)
 
@@ -81,15 +83,19 @@ class BuildingViewSet(viewsets.ModelViewSet):
     ViewSet for Building model.
 
     Permissions:
-    - Read: All authenticated users
-    - Write: Admin only
+    - Read and write: Admin only
 
-    Buildings are reference data managed by administrators.
+    Buildings are reference data managed by administrators. The tenant portal is isolated
+    under /api/tenant/*; tenants must never see the full building portfolio.
     """
 
     queryset = Building.objects.all().order_by("id")
     serializer_class = BuildingSerializer
-    permission_classes = [ReadOnlyForNonAdmin]
+    permission_classes = [IsAdminUser]
+    filter_backends = [filters.SearchFilter]
+    # Building has no street_name field — name/address/street_number are the real fields
+    # that identify a building for search purposes.
+    search_fields = ["name", "address", "street_number"]
 
     def get_queryset(self) -> QuerySet[Building]:
         """
@@ -111,15 +117,17 @@ class FurnitureViewSet(viewsets.ModelViewSet):
     ViewSet for Furniture model.
 
     Permissions:
-    - Read: All authenticated users
-    - Write: Admin only
+    - Read and write: Admin only
 
-    Furniture catalog is reference data managed by administrators.
+    Furniture catalog is reference data managed by administrators. The tenant portal is
+    isolated under /api/tenant/*; tenants must never see the full furniture catalog.
     """
 
     queryset = Furniture.objects.all().order_by("id")
     serializer_class = FurnitureSerializer
-    permission_classes = [ReadOnlyForNonAdmin]
+    permission_classes = [IsAdminUser]
+    filter_backends = [filters.SearchFilter]
+    search_fields = ["name"]
 
 
 class ApartmentViewSet(viewsets.ModelViewSet):
@@ -127,10 +135,11 @@ class ApartmentViewSet(viewsets.ModelViewSet):
     ViewSet for Apartment model.
 
     Permissions:
-    - Read: All authenticated users
-    - Write: Admin only
+    - Read and write: Admin only
 
-    Apartment data (units, rental values, etc.) is managed by administrators.
+    Apartment data (units, rental values, owner PII, etc.) is managed by administrators.
+    The tenant portal is isolated under /api/tenant/*; tenants must never see the full
+    apartment portfolio (including other tenants' units and owner PII).
 
     Filters (query params):
     - building_id: Filter by building ID
@@ -141,7 +150,9 @@ class ApartmentViewSet(viewsets.ModelViewSet):
 
     queryset = Apartment.objects.all().order_by("id")
     serializer_class = ApartmentSerializer
-    permission_classes = [ReadOnlyForNonAdmin]
+    permission_classes = [IsAdminUser]
+    filter_backends = [filters.SearchFilter]
+    search_fields = ["number", "building__name"]
 
     def get_queryset(self) -> QuerySet[Apartment]:
         """
@@ -275,6 +286,11 @@ class TenantViewSet(viewsets.ModelViewSet):
 
         return queryset
 
+    def perform_destroy(self, instance: Tenant) -> None:
+        """Block soft-deleting a tenant who is responsible for an active lease."""
+        validate_tenant_deletable(instance)
+        instance.delete(deleted_by=self.request.user)
+
 
 class LeaseViewSet(viewsets.ModelViewSet):
     """
@@ -298,6 +314,8 @@ class LeaseViewSet(viewsets.ModelViewSet):
     queryset = Lease.objects.all().order_by("id")
     serializer_class = LeaseSerializer
     permission_classes = [CanModifyLease]
+    filter_backends = [filters.SearchFilter]
+    search_fields = ["responsible_tenant__name", "apartment__number"]
 
     def perform_create(self, serializer: serializers.BaseSerializer[Lease]) -> None:
         """Delegate lease creation to LeaseCreationService (business logic out of the serializer)."""
@@ -503,12 +521,27 @@ class LeaseViewSet(viewsets.ModelViewSet):
 
         Permissions: Tenant (only their lease) or Admin
 
-        Skips the fee when the month's rent is already paid, clamps the due day to the
-        current month (so due_day 31 in February becomes Feb 28), and delegates the
-        real-date arithmetic to FeeCalculatorService.
+        Honors an optional ``payment_date`` query param (ISO ``YYYY-MM-DD``) as "today"
+        for the calculation, falling back to ``today_sp()`` when absent. Skips the fee
+        when the month's rent is already paid, when the lease is not collectible for the
+        month per ``RentScheduleService`` (prepaid/salary-offset/owner), clamps the due
+        day to the current month (so due_day 31 in February becomes Feb 28), uses the
+        effective rental value (with any active rent adjustment applied), and delegates
+        the real-date arithmetic to FeeCalculatorService.
         """
         lease = self.get_object()
-        today = timezone.now().date()
+
+        payment_date_str = request.query_params.get("payment_date")
+        if payment_date_str:
+            try:
+                today = date.fromisoformat(payment_date_str)
+            except ValueError:
+                return Response(
+                    {"error": "Data de pagamento inválida."}, status=status.HTTP_400_BAD_REQUEST
+                )
+        else:
+            today = today_sp()
+
         reference_month = today.replace(day=1)
 
         already_paid = RentPayment.objects.filter(
@@ -517,13 +550,23 @@ class LeaseViewSet(viewsets.ModelViewSet):
         if already_paid:
             return Response({"message": "Aluguel já pago neste mês."}, status=status.HTTP_200_OK)
 
+        if not (
+            RentScheduleService.collectible_leases(reference_month).filter(pk=lease.pk).exists()
+        ):
+            return Response(
+                {"late_fee": Decimal("0.00"), "reason": "não cobrável — prepago"},
+                status=status.HTTP_200_OK,
+            )
+
         clamped_due = RentScheduleService.clamp_due_day(
             lease.responsible_tenant.due_day, today.year, today.month
         )
         due_date = date(today.year, today.month, clamped_due)
 
+        effective_rental_value = RentScheduleService.effective_rental_value(lease, reference_month)
+
         result = FeeCalculatorService.calculate_late_fee(
-            rental_value=lease.rental_value,
+            rental_value=effective_rental_value,
             due_date=due_date,
             current_date=today,
         )

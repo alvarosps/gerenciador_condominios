@@ -1,12 +1,17 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+import { http, HttpResponse, delay } from 'msw';
 import { screen, waitFor } from '@testing-library/react';
-import { renderWithProviders } from '@/tests/test-utils';
+import { renderWithProviders, waitForQueriesToSettle } from '@/tests/test-utils';
+import { server } from '@/tests/mocks/server';
 import { BuildingStatisticsChart } from '../building-statistics-chart';
-import * as dashboardHooks from '@/lib/api/hooks/use-dashboard';
+
+const API_BASE = 'http://localhost:8008/api';
 
 vi.mock('recharts', () => ({
   ResponsiveContainer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  BarChart: ({ children }: { children: React.ReactNode }) => <div data-testid="bar-chart">{children}</div>,
+  BarChart: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="bar-chart">{children}</div>
+  ),
   Bar: () => null,
   XAxis: () => null,
   YAxis: () => null,
@@ -15,36 +20,6 @@ vi.mock('recharts', () => ({
   Legend: () => null,
   Cell: () => null,
 }));
-
-type BuildingStatisticsResult = ReturnType<typeof dashboardHooks.useDashboardBuildingStatistics>;
-
-function makeQueryResult(overrides: Partial<BuildingStatisticsResult>): BuildingStatisticsResult {
-  return {
-    data: undefined,
-    isLoading: false,
-    isPending: false,
-    isSuccess: false,
-    isError: false,
-    error: null,
-    status: 'pending',
-    fetchStatus: 'idle',
-    dataUpdatedAt: 0,
-    errorUpdatedAt: 0,
-    failureCount: 0,
-    failureReason: null,
-    errorUpdateCount: 0,
-    isFetched: false,
-    isFetchedAfterMount: false,
-    isFetching: false,
-    isLoadingError: false,
-    isPlaceholderData: false,
-    isRefetchError: false,
-    isRefetching: false,
-    isStale: false,
-    refetch: vi.fn(),
-    ...overrides,
-  } as BuildingStatisticsResult;
-}
 
 const mockBuildingData = [
   {
@@ -58,91 +33,62 @@ const mockBuildingData = [
   },
 ];
 
+function setBuildingStatisticsResponse(data: typeof mockBuildingData) {
+  server.use(http.get(`${API_BASE}/dashboard/building_statistics/`, () => HttpResponse.json(data)));
+}
+
 describe('BuildingStatisticsChart', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  it('shows loading state while fetching', () => {
-    vi.spyOn(dashboardHooks, 'useDashboardBuildingStatistics').mockReturnValue(
-      makeQueryResult({ isLoading: true, isPending: true, fetchStatus: 'fetching' }),
+  it('shows loading state while fetching', async () => {
+    server.use(
+      http.get(`${API_BASE}/dashboard/building_statistics/`, async () => {
+        await delay(50);
+        return HttpResponse.json(mockBuildingData);
+      })
     );
-
-    renderWithProviders(<BuildingStatisticsChart />);
+    const { queryClient } = renderWithProviders(<BuildingStatisticsChart />);
 
     expect(screen.getByText('Estatísticas por Prédio')).toBeInTheDocument();
     expect(screen.queryByTestId('bar-chart')).not.toBeInTheDocument();
+    await waitForQueriesToSettle(queryClient);
   });
 
   it('shows error state when API call fails', async () => {
-    vi.spyOn(dashboardHooks, 'useDashboardBuildingStatistics').mockReturnValue(
-      makeQueryResult({
-        isLoading: false,
-        isError: true,
-        status: 'error',
-        error: new Error('Server error'),
-      }),
+    server.use(
+      http.get(`${API_BASE}/dashboard/building_statistics/`, () =>
+        HttpResponse.json({ detail: 'Server error' }, { status: 500 })
+      )
     );
-
-    renderWithProviders(<BuildingStatisticsChart />);
+    const { queryClient } = renderWithProviders(<BuildingStatisticsChart />);
 
     await waitFor(() => {
       expect(screen.getByText(/erro ao carregar estatísticas/i)).toBeInTheDocument();
     });
+    await waitForQueriesToSettle(queryClient);
   });
 
   it('shows empty state when no buildings', async () => {
-    vi.spyOn(dashboardHooks, 'useDashboardBuildingStatistics').mockReturnValue(
-      makeQueryResult({
-        isLoading: false,
-        isSuccess: true,
-        isFetched: true,
-        status: 'success',
-        data: [],
-      }),
-    );
-
-    renderWithProviders(<BuildingStatisticsChart />);
+    setBuildingStatisticsResponse([]);
+    const { queryClient } = renderWithProviders(<BuildingStatisticsChart />);
 
     await waitFor(() => {
       expect(screen.getByText(/nenhum prédio cadastrado/i)).toBeInTheDocument();
     });
+    await waitForQueriesToSettle(queryClient);
   });
 
   it('renders chart with data when loaded', async () => {
-    vi.spyOn(dashboardHooks, 'useDashboardBuildingStatistics').mockReturnValue(
-      makeQueryResult({
-        isLoading: false,
-        isSuccess: true,
-        isFetched: true,
-        status: 'success',
-        data: mockBuildingData,
-      }),
-    );
-
-    renderWithProviders(<BuildingStatisticsChart />);
+    setBuildingStatisticsResponse(mockBuildingData);
+    const { queryClient } = renderWithProviders(<BuildingStatisticsChart />);
 
     await waitFor(() => {
       expect(screen.getByTestId('bar-chart')).toBeInTheDocument();
     });
+    await waitForQueriesToSettle(queryClient);
   });
 
   it('shows summary statistics', async () => {
-    vi.spyOn(dashboardHooks, 'useDashboardBuildingStatistics').mockReturnValue(
-      makeQueryResult({
-        isLoading: false,
-        isSuccess: true,
-        isFetched: true,
-        status: 'success',
-        data: mockBuildingData,
-      }),
-    );
-
-    renderWithProviders(<BuildingStatisticsChart />);
+    setBuildingStatisticsResponse(mockBuildingData);
+    const { queryClient } = renderWithProviders(<BuildingStatisticsChart />);
 
     await waitFor(() => {
       expect(screen.getByText('Prédios')).toBeInTheDocument();
@@ -150,5 +96,6 @@ describe('BuildingStatisticsChart', () => {
       expect(screen.getByText('Aptos Alugados')).toBeInTheDocument();
       expect(screen.getByText('Receita Total')).toBeInTheDocument();
     });
+    await waitForQueriesToSettle(queryClient);
   });
 });

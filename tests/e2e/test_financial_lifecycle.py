@@ -23,6 +23,7 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from core.models import Apartment, Building, Lease, Tenant
+from tests.utils import flush_on_commit_callbacks
 
 pytestmark = pytest.mark.integration
 
@@ -191,6 +192,9 @@ class TestBankLoanLifecycle:
         )
         assert mark_resp.status_code == status.HTTP_200_OK
         assert mark_resp.data["is_paid"] is True
+        # Cache invalidation is deferred to transaction.on_commit; the test transaction never
+        # commits, so flush explicitly (in production the request commit fires it).
+        flush_on_commit_callbacks()
 
         # Debt must decrease by exactly one installment amount (1000.00)
         after_resp = client.get("/api/financial-dashboard/debt_by_type/")

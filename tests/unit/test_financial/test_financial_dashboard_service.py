@@ -14,6 +14,7 @@ from core.models import (
     Expense,
     ExpenseCategory,
     ExpenseInstallment,
+    ExpenseMonthSkip,
     ExpenseType,
     FinancialSettings,
     Income,
@@ -473,10 +474,11 @@ class TestFinancialDashboardOverdue:
         assert len(result) == 1
         assert result[0]["installment_number"] == 2
 
-    @freeze_time("2026-03-15")
+    @freeze_time("2026-03-15 12:00:00")
     def test_days_overdue_calculation(
         self, person_rodrigo: Person, credit_card: CreditCard
     ) -> None:
+        # Frozen at noon UTC so today_sp() stays on 2026-03-15 (not the previous day).
         _create_expense_with_installments(
             description="Compra cartão",
             expense_type=ExpenseType.CARD_PURCHASE,
@@ -1579,6 +1581,151 @@ class TestGetPersonWaterfall:
         assert result[mar_key]["allocated_paid"] == Decimal("200.00")
 
 
+class TestGetPersonWaterfallsBulkEquivalence:
+    """B16 #1: _get_person_waterfalls_bulk must produce results identical to calling
+    _get_person_waterfall once per person, with a fixed query count independent of N."""
+
+    def _build_rich_expense_history(self, person: Person, credit_card: CreditCard) -> None:
+        """Card installments, single card purchase, loan, fixed, one-time, offset, stipend,
+        and a skipped installment spread across Jan-Mar 2026 — exercises every category
+        _calc_person_expense_total sums."""
+        _create_expense_with_installments(
+            description=f"Cartao {person.name}",
+            expense_type=ExpenseType.CARD_PURCHASE,
+            total_amount=Decimal("300.00"),
+            person=person,
+            credit_card=credit_card,
+            installments=[
+                {"number": 1, "amount": Decimal("100.00"), "due_date": date(2026, 1, 22)},
+                {"number": 2, "amount": Decimal("100.00"), "due_date": date(2026, 2, 22)},
+                {"number": 3, "amount": Decimal("100.00"), "due_date": date(2026, 3, 22)},
+            ],
+        )
+        Expense.objects.create(
+            description=f"Fatura avulsa {person.name}",
+            expense_type=ExpenseType.CARD_PURCHASE,
+            total_amount=Decimal("50.00"),
+            expense_date=date(2026, 2, 10),
+            person=person,
+            credit_card=credit_card,
+            is_installment=False,
+        )
+        _create_expense_with_installments(
+            description=f"Emprestimo {person.name}",
+            expense_type=ExpenseType.BANK_LOAN,
+            total_amount=Decimal("200.00"),
+            person=person,
+            installments=[
+                {"number": 1, "amount": Decimal("100.00"), "due_date": date(2026, 1, 15)},
+                {"number": 2, "amount": Decimal("100.00"), "due_date": date(2026, 2, 15)},
+            ],
+        )
+        Expense.objects.create(
+            description=f"Academia {person.name}",
+            expense_type=ExpenseType.FIXED_EXPENSE,
+            total_amount=Decimal("0.00"),
+            expense_date=date(2026, 1, 1),
+            person=person,
+            is_recurring=True,
+            expected_monthly_amount=Decimal("80.00"),
+        )
+        Expense.objects.create(
+            description=f"Medico {person.name}",
+            expense_type=ExpenseType.ONE_TIME_EXPENSE,
+            total_amount=Decimal("120.00"),
+            expense_date=date(2026, 3, 5),
+            person=person,
+        )
+        offset_exp = Expense.objects.create(
+            description=f"Desconto {person.name}",
+            expense_type=ExpenseType.CARD_PURCHASE,
+            total_amount=Decimal("30.00"),
+            expense_date=date(2026, 3, 5),
+            person=person,
+            credit_card=credit_card,
+            is_installment=False,
+            is_offset=True,
+        )
+        assert offset_exp.is_offset is True
+        PersonIncome.objects.create(
+            person=person,
+            income_type=PersonIncomeType.FIXED_STIPEND,
+            fixed_amount=Decimal("40.00"),
+            start_date=date(2026, 1, 1),
+            is_active=True,
+        )
+        PersonPayment.objects.create(
+            person=person,
+            reference_month=date(2026, 2, 1),
+            amount=Decimal("150.00"),
+            payment_date=date(2026, 2, 20),
+        )
+
+        # Skip the March card installment for this person specifically.
+        march_installment = ExpenseInstallment.objects.get(
+            expense__description=f"Cartao {person.name}", installment_number=3
+        )
+        ExpenseMonthSkip.objects.create(
+            expense=march_installment.expense, reference_month=date(2026, 3, 1)
+        )
+
+    @pytest.mark.unit
+    @freeze_time("2026-03-15")
+    def test_bulk_matches_per_person_waterfall(
+        self, person_rodrigo: Person, person_tiago: Person, credit_card: CreditCard
+    ) -> None:
+        tiago_card = CreditCard.objects.create(
+            person=person_tiago, nickname="Nubank Tiago", closing_day=10, due_day=17, is_active=True
+        )
+        self._build_rich_expense_history(person_rodrigo, credit_card)
+        self._build_rich_expense_history(person_tiago, tiago_card)
+
+        expected_rodrigo = FinancialDashboardService._get_person_waterfall(person_rodrigo, 2026, 3)
+        expected_tiago = FinancialDashboardService._get_person_waterfall(person_tiago, 2026, 3)
+
+        bulk_result = FinancialDashboardService._get_person_waterfalls_bulk(
+            [person_rodrigo, person_tiago], 2026, 3
+        )
+
+        assert bulk_result[person_rodrigo.pk] == expected_rodrigo
+        assert bulk_result[person_tiago.pk] == expected_tiago
+
+    @pytest.mark.unit
+    @freeze_time("2026-03-15")
+    def test_query_count_independent_of_person_count(
+        self, person_rodrigo: Person, credit_card: CreditCard
+    ) -> None:
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        def _make_payable_person(name: str) -> Person:
+            person = Person.objects.create(name=name, relationship="Filho")
+            card = CreditCard.objects.create(
+                person=person,
+                nickname=f"Cartao {name}",
+                closing_day=15,
+                due_day=22,
+                is_active=True,
+            )
+            self._build_rich_expense_history(person, card)
+            return person
+
+        small_persons = [_make_payable_person(f"Small{i}") for i in range(2)]
+        with CaptureQueriesContext(connection) as ctx_small:
+            FinancialDashboardService._get_person_waterfalls_bulk(small_persons, 2026, 3)
+        small_count = len(ctx_small)
+
+        large_persons = [_make_payable_person(f"Large{i}") for i in range(8)]
+        with CaptureQueriesContext(connection) as ctx_large:
+            FinancialDashboardService._get_person_waterfalls_bulk(large_persons, 2026, 3)
+        large_count = len(ctx_large)
+
+        assert small_count == large_count, (
+            f"_get_person_waterfalls_bulk scales with N: {small_count} -> {large_count} "
+            "queries (per-person waterfall instead of grouped aggregation)"
+        )
+
+
 class TestGetExpenseDetail:
     """Tests for get_expense_detail — the dispatch method."""
 
@@ -1909,8 +2056,9 @@ class TestUpcomingInstallmentsEdgeCases:
     """Edge cases for get_upcoming_installments."""
 
     @pytest.mark.unit
-    @freeze_time("2026-03-15")
+    @freeze_time("2026-03-15 12:00:00")
     def test_upcoming_no_person_no_card_returns_none_fields(self) -> None:
+        # Frozen at noon UTC so today_sp() stays on 2026-03-15 (not the previous day).
         expense = Expense.objects.create(
             description="Gasto sem pessoa",
             expense_type=ExpenseType.BANK_LOAN,
@@ -1967,8 +2115,9 @@ class TestOverdueInstallmentsEdgeCases:
     """Edge cases for get_overdue_installments."""
 
     @pytest.mark.unit
-    @freeze_time("2026-03-15")
+    @freeze_time("2026-03-15 12:00:00")
     def test_overdue_no_person_no_card(self) -> None:
+        # Frozen at noon UTC so today_sp() stays on 2026-03-15 (not the previous day).
         expense = Expense.objects.create(
             description="Dívida sem pessoa",
             expense_type=ExpenseType.BANK_LOAN,
@@ -2142,3 +2291,54 @@ class TestDebtByPersonEdgeCases:
         # or if they appear, card_debt should be zero
         if rodrigo_items:
             assert rodrigo_items[0]["card_debt"] == Decimal("0.00")
+
+
+class TestDebtByPersonQueryCount:
+    """B16 #4: get_debt_by_person must run a fixed number of queries, independent of N
+    persons (grouped aggregation, not a per-person waterfall)."""
+
+    @pytest.mark.unit
+    @freeze_time("2026-03-15")
+    def test_query_count_independent_of_person_count(self) -> None:
+        from django.core.cache import cache
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        def _make_person_with_debt(name: str) -> None:
+            person = Person.objects.create(name=name, relationship="Filho")
+            card = CreditCard.objects.create(
+                person=person,
+                nickname=f"Cartao {name}",
+                closing_day=15,
+                due_day=22,
+                is_active=True,
+            )
+            _create_expense_with_installments(
+                description=f"Compra {name}",
+                expense_type=ExpenseType.CARD_PURCHASE,
+                total_amount=Decimal("100.00"),
+                person=person,
+                credit_card=card,
+                installments=[
+                    {"number": 1, "amount": Decimal("100.00"), "due_date": date(2026, 3, 22)},
+                ],
+            )
+
+        for i in range(2):
+            _make_person_with_debt(f"Person{i}")
+        with CaptureQueriesContext(connection) as ctx_small:
+            FinancialDashboardService.get_debt_by_person()
+        small_count = len(ctx_small)
+
+        for i in range(2, 8):
+            _make_person_with_debt(f"Person{i}")
+        cache.clear()
+        with CaptureQueriesContext(connection) as ctx_large:
+            FinancialDashboardService.get_debt_by_person()
+        large_count = len(ctx_large)
+
+        assert small_count == large_count, (
+            f"get_debt_by_person scales with N: {small_count} -> {large_count} queries "
+            "(per-person waterfall instead of grouped aggregation)"
+        )
+        assert large_count <= 3, f"expected <= 3 fixed queries, got {large_count}"

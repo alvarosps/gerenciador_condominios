@@ -3,6 +3,16 @@
 Cache is LocMem in tests, so invalidate_pattern does cache.clear(): invalidation is
 asserted by a probe key disappearing after the write. The finances/core prefix literals
 are locked equal here (design §11 "one char of difference silently fails").
+
+CacheManager.invalidate_pattern defers the real deletion to transaction.on_commit (P4.2 item
+(d)), which never fires inside pytest-django's per-test wrapping transaction unless flushed —
+_finance_probes_cleared() flushes pending on_commit callbacks via
+tests.utils.flush_on_commit_callbacks before checking the probes.
+
+The LocMem fallback (P4.2 item (e)) only deletes keys it registered when @cache_result wrote
+them, so a probe key must be registered the same way — tests.utils.set_tracked_cache_probe does
+that (cache.set + register), instead of a bare cache.set which invalidate_pattern would
+correctly never touch.
 """
 
 from datetime import date
@@ -35,16 +45,18 @@ from tests.factories import (
     make_person,
     make_rent_payment,
 )
+from tests.utils import flush_on_commit_callbacks, set_tracked_cache_probe
 
 pytestmark = pytest.mark.django_db
 
 
 def _set_finance_probes() -> None:
     for prefix in FINANCE_CACHE_PREFIXES:
-        cache.set(f"{prefix}:probe", "x")
+        set_tracked_cache_probe(f"{prefix}:probe")
 
 
 def _finance_probes_cleared() -> bool:
+    flush_on_commit_callbacks()
     return all(cache.get(f"{prefix}:probe") is None for prefix in FINANCE_CACHE_PREFIXES)
 
 
@@ -150,7 +162,7 @@ def test_month_snapshot_invalidates() -> None:
 
 def test_rent_payment_invalidates_finance_and_late_payment() -> None:
     rent_payment = make_rent_payment()
-    cache.set("dashboard-late-payment:probe", "x")
+    set_tracked_cache_probe("dashboard-late-payment:probe")
     _set_finance_probes()
     rent_payment.save()
     assert _finance_probes_cleared()
@@ -161,10 +173,16 @@ def test_financial_settings_invalidates_legacy_and_finance() -> None:
     settings_obj, _ = FinancialSettings.objects.get_or_create(
         pk=1, defaults={"initial_balance": Decimal(0), "initial_balance_date": date(2026, 3, 1)}
     )
-    for legacy in ("daily-control", "cash-flow", "financial-dashboard"):
-        cache.set(f"{legacy}:probe", "x")
+    # "daily-control" is a URL route name (core/urls.py), never a real @cache_result prefix —
+    # invalidate_financial_settings_cache_on_save only ever invalidates cash-flow*,
+    # financial-dashboard*, finance-* (via _invalidate_financial_caches) and
+    # dashboard-late-payment*, so it is intentionally excluded here (P4.2 item (e) made
+    # invalidation surgical: the old cache.clear() fallback used to wipe it too, incorrectly
+    # masking that it was never actually invalidated).
+    for legacy in ("cash-flow", "financial-dashboard"):
+        set_tracked_cache_probe(f"{legacy}:probe")
     _set_finance_probes()
     settings_obj.save()
     assert _finance_probes_cleared()
-    for legacy in ("daily-control", "cash-flow", "financial-dashboard"):
+    for legacy in ("cash-flow", "financial-dashboard"):
         assert cache.get(f"{legacy}:probe") is None  # legacy invalidation intact

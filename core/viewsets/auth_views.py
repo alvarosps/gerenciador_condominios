@@ -26,6 +26,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
+from twilio.base.exceptions import TwilioException
 
 from core.models import Tenant, WhatsAppVerification
 from core.permissions import IsAdminUser
@@ -35,6 +36,7 @@ from core.services.whatsapp_service import (
     send_verification_code,
 )
 from core.throttles import VerificationRateThrottle
+from core.viewsets.auth_views_cookie import _set_auth_cookies, role_for_user
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +59,21 @@ def _normalize_cpf_cnpj(value: str) -> str:
     CPF ("529.982.247-25") or its raw form must both resolve to the same identity here.
     """
     return _NON_DIGITS.sub("", value or "")
+
+
+def _split_tenant_name(name: str) -> tuple[str, str]:
+    """Split a Tenant's full name into (first_name, last_name) for the linked User.
+
+    The OTP flow never collects a User first/last name directly, so the portal header
+    (which reads ``user.first_name``) would otherwise stay blank. First token becomes
+    first_name, the remainder becomes last_name.
+    """
+    parts = name.strip().split(maxsplit=1)
+    if not parts:
+        return "", ""
+    if len(parts) == 1:
+        return parts[0], ""
+    return parts[0], parts[1]
 
 
 class WhatsAppAuthViewSet(viewsets.ViewSet):
@@ -82,8 +99,10 @@ class WhatsAppAuthViewSet(viewsets.ViewSet):
 
         Returns:
             200 with a generic message whether or not a tenant matches (no enumeration).
-            400 if cpf_cnpj is missing.
-            429 if the rate limit has been exceeded (3 codes in 15 minutes).
+            400 if cpf_cnpj is missing, the tenant's phone is invalid, or the WhatsApp send
+                fails (Twilio boundary) — a clear pt-BR message is returned in both cases.
+            429 if the rate limit has been exceeded (3 SUCCESSFUL sends in 15 minutes) — a
+                failed send is never counted, so it does not burn the caller's window.
         """
         cpf_cnpj = _normalize_cpf_cnpj(request.data.get("cpf_cnpj", ""))
         if not cpf_cnpj:
@@ -109,17 +128,31 @@ class WhatsAppAuthViewSet(viewsets.ViewSet):
             )
 
         code = generate_verification_code()
-        phone = normalize_phone_to_e164(tenant.phone)
-        expires_at = timezone.now() + timedelta(minutes=_CODE_EXPIRY_MINUTES)
+        try:
+            phone = normalize_phone_to_e164(tenant.phone)
+        except ValueError:
+            logger.warning("Invalid phone for tenant pk=%s on code request", tenant.pk)
+            return Response(
+                {"error": "Telefone cadastrado inválido. Entre em contato com o gestor."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
+        try:
+            send_verification_code(phone, code)
+        except TwilioException:
+            logger.exception("WhatsApp send failed for tenant pk=%s", tenant.pk)
+            return Response(
+                {"error": "Não foi possível enviar o código via WhatsApp. Tente novamente."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        expires_at = timezone.now() + timedelta(minutes=_CODE_EXPIRY_MINUTES)
         WhatsAppVerification.objects.create(
             cpf_cnpj=cpf_cnpj,
             code=code,
             phone=phone,
             expires_at=expires_at,
         )
-
-        send_verification_code(phone, code)
         logger.info("Verification code requested for cpf_cnpj=%s", cpf_cnpj)
 
         return Response({"detail": _GENERIC_REQUEST_DETAIL}, status=status.HTTP_200_OK)
@@ -136,7 +169,9 @@ class WhatsAppAuthViewSet(viewsets.ViewSet):
             code (str): The 6-digit OTP received via WhatsApp.
 
         Returns:
-            200 with {access, refresh} on success.
+            200 on success: sets the same HttpOnly auth cookies as the password login
+                (``_set_auth_cookies``) and returns ``{user: {id, email, first_name,
+                last_name, is_staff}}`` in the body — no tokens in the body.
             400 with a generic "Código inválido." for an unknown CPF/CNPJ, a missing pending
                 verification, or a wrong code (no enumeration).
         """
@@ -191,23 +226,44 @@ class WhatsAppAuthViewSet(viewsets.ViewSet):
             verification.save(update_fields=["is_used"])
 
             if tenant.user is None:
+                first_name, last_name = _split_tenant_name(tenant.name)
                 user = User.objects.create_user(
                     username=f"tenant_{tenant.pk}",
                     is_staff=False,
                     is_active=True,
+                    first_name=first_name,
+                    last_name=last_name,
                 )
                 tenant.user = user
                 tenant.save(update_fields=["user"])
                 logger.info("Created user account for tenant pk=%s", tenant.pk)
+            elif not tenant.user.first_name:
+                first_name, last_name = _split_tenant_name(tenant.name)
+                tenant.user.first_name = first_name
+                tenant.user.last_name = last_name
+                tenant.user.save(update_fields=["first_name", "last_name"])
+                logger.info("Backfilled name for tenant pk=%s user", tenant.pk)
 
-        refresh = RefreshToken.for_user(tenant.user)
-        return Response(
-            {
-                "access": str(refresh.access_token),
-                "refresh": str(refresh),
-            },
-            status=status.HTTP_200_OK,
+        user = tenant.user
+        refresh = RefreshToken.for_user(user)
+        response = Response(status=status.HTTP_200_OK)
+        _set_auth_cookies(
+            request,
+            response,
+            str(refresh.access_token),
+            str(refresh),
+            role=role_for_user(user),
         )
+        response.data = {
+            "user": {
+                "id": user.pk,
+                "email": user.email,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+                "is_staff": user.is_staff,
+            },
+        }
+        return response
 
 
 class SetPasswordViewSet(viewsets.ViewSet):

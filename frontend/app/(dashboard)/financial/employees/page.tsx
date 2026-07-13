@@ -4,12 +4,7 @@ import { useMemo, useCallback, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Plus, Loader2, Pencil, Trash2, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { DataTable, type Column } from '@/components/tables/data-table';
@@ -24,6 +19,7 @@ import { type EmployeePayment } from '@/lib/schemas/employee-payment.schema';
 import { useCrudPage } from '@/lib/hooks/use-crud-page';
 import { useAuthStore } from '@/store/auth-store';
 import { formatCurrency } from '@/lib/utils/formatters';
+import { getErrorMessage } from '@/lib/utils/error-handler';
 
 function ModalLoader() {
   return (
@@ -35,10 +31,8 @@ function ModalLoader() {
 
 const EmployeePaymentFormModal = dynamic(
   () =>
-    import('./_components/employee-payment-form-modal').then(
-      (mod) => mod.EmployeePaymentFormModal,
-    ),
-  { loading: () => <ModalLoader />, ssr: false },
+    import('./_components/employee-payment-form-modal').then((mod) => mod.EmployeePaymentFormModal),
+  { loading: () => <ModalLoader />, ssr: false }
 );
 
 function formatReferenceMonth(dateStr: string): string {
@@ -59,7 +53,7 @@ interface EmployeePaymentActionHandlers {
 }
 
 function createEmployeePaymentColumns(
-  handlers: EmployeePaymentActionHandlers,
+  handlers: EmployeePaymentActionHandlers
 ): Column<EmployeePayment>[] {
   return [
     {
@@ -109,8 +103,7 @@ function createEmployeePaymentColumns(
           {formatCurrency(record.base_salary + record.variable_amount)}
         </span>
       ),
-      sorter: (a, b) =>
-        a.base_salary + a.variable_amount - (b.base_salary + b.variable_amount),
+      sorter: (a, b) => a.base_salary + a.variable_amount - (b.base_salary + b.variable_amount),
     },
     {
       title: 'Faxinas',
@@ -127,9 +120,7 @@ function createEmployeePaymentColumns(
       render: (_, record) => (
         <Badge
           className={cn(
-            record.is_paid
-              ? 'bg-success/10 text-success'
-              : 'bg-warning/10 text-warning',
+            record.is_paid ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'
           )}
         >
           {record.is_paid ? 'Pago' : 'Pendente'}
@@ -140,7 +131,6 @@ function createEmployeePaymentColumns(
       title: 'Ações',
       key: 'actions',
       width: 150,
-      fixed: 'right',
       render: (_, record) => (
         <TooltipProvider>
           <div className="flex items-center gap-1">
@@ -148,7 +138,12 @@ function createEmployeePaymentColumns(
               <>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" aria-label="Editar" onClick={() => handlers.onEdit(record)}>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Editar"
+                      onClick={() => handlers.onEdit(record)}
+                    >
                       <Pencil className="h-4 w-4" />
                     </Button>
                   </TooltipTrigger>
@@ -214,7 +209,7 @@ export default function EmployeesPage() {
       crud.setItemToDelete(payment);
       if (payment.id !== undefined) crud.handleDeleteClick(payment.id);
     },
-    [crud],
+    [crud]
   );
 
   const handleMarkPaid = useCallback(
@@ -223,11 +218,11 @@ export default function EmployeesPage() {
       try {
         await markPaidMutation.mutateAsync(payment.id);
         toast.success('Pagamento marcado como pago');
-      } catch {
-        toast.error('Erro ao marcar pagamento como pago');
+      } catch (error) {
+        toast.error(getErrorMessage(error, 'Erro ao marcar pagamento como pago'));
       }
     },
-    [markPaidMutation],
+    [markPaidMutation]
   );
 
   const columns = useMemo(
@@ -247,7 +242,7 @@ export default function EmployeesPage() {
       handleMarkPaid,
       markPaidMutation.isPending,
       isAdmin,
-    ],
+    ]
   );
 
   useEffect(() => {

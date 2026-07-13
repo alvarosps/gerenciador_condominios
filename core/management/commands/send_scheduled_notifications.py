@@ -10,8 +10,8 @@ Notifications sent:
   overdue          — at 1, 5, and 15 days after the due date (if unpaid)
   contract_expiring — 30 days before the contract end date
 
-Idempotency: each notification type is sent at most once per day per user,
-enforced by is_notification_sent_today().
+Idempotency: each notification type is sent at most once per São Paulo day per user,
+enforced by is_notification_sent_on() (SP-aware — tracks the SP midnight, not UTC).
 """
 
 import calendar
@@ -21,11 +21,11 @@ from datetime import date
 from dateutil.relativedelta import relativedelta
 from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand
-from django.utils import timezone
 
 from core.models import Lease, RentPayment, Tenant
-from core.services.notification_service import create_notification, is_notification_sent_today
+from core.services.notification_service import create_notification, is_notification_sent_on
 from core.services.rent_schedule_service import RentScheduleService
+from core.services.timezone import today_sp
 
 logger = logging.getLogger(__name__)
 
@@ -53,11 +53,30 @@ def _current_reference_month(today: date) -> date:
     return today.replace(day=1)
 
 
+def _next_due_date(today: date, due_day: int) -> date:
+    """Return the next occurrence of ``due_day`` on/after ``today``.
+
+    Clamps ``due_day`` to the last valid day of each month (e.g. 31 -> Feb 28). Computed
+    by adding days/months rather than comparing the day-of-month against ``today``, so a
+    due_day of 1-3 near a month boundary correctly rolls into the next month instead of
+    silently pointing at an already-past date in the current month (which made the
+    3-day-before reminder never fire for those due days).
+    """
+    last_day_of_month = calendar.monthrange(today.year, today.month)[1]
+    this_month_due = today.replace(day=min(due_day, last_day_of_month))
+    if this_month_due >= today:
+        return this_month_due
+
+    next_month = today.replace(day=1) + relativedelta(months=1)
+    last_day_of_next_month = calendar.monthrange(next_month.year, next_month.month)[1]
+    return next_month.replace(day=min(due_day, last_day_of_next_month))
+
+
 class Command(BaseCommand):
     help = "Send scheduled payment-due and contract-expiry notifications to tenants."
 
     def handle(self, *args: str, **options: str) -> None:
-        today = timezone.now().date()
+        today = today_sp()
         sent_count = 0
 
         reference_month = _current_reference_month(today)
@@ -92,49 +111,53 @@ class Command(BaseCommand):
     ) -> int:
         """Send due_reminder, due_today, and overdue notifications. Returns count sent."""
         sent = 0
+        reference_month = _current_reference_month(today)
 
-        # Clamp due_day to the last valid day of the current month
+        # Skip due_reminder/due_today/overdue entirely once the month's rent is paid —
+        # a paid tenant should never get a reminder to pay it again.
+        if _has_rent_payment_for_month(lease, reference_month):
+            return sent
+
+        # This month's due date (clamped), used for the overdue day-count — an overdue
+        # check always references the current month's due date, never a rolled-forward one.
         last_day_of_month = calendar.monthrange(today.year, today.month)[1]
         effective_due_day = min(due_day, last_day_of_month)
+        current_month_due_date = today.replace(day=effective_due_day)
+        days_past_due = (today - current_month_due_date).days
 
-        try:
-            due_date = today.replace(day=effective_due_day)
-        except ValueError:
-            return 0
-
-        days_until_due = (due_date - today).days
-        days_past_due = (today - due_date).days
-        reference_month = _current_reference_month(today)
+        # Next occurrence of due_day on/after today — computed by adding days/months so a
+        # due_day of 1-3 near a month boundary rolls into the next month correctly instead
+        # of pointing at an already-past date in the current month.
+        next_due_date = _next_due_date(today, due_day)
+        days_until_due = (next_due_date - today).days
 
         # due_reminder: 3 days before due
         if days_until_due == _DUE_REMINDER_DAYS_BEFORE:
-            if not is_notification_sent_today(user, "due_reminder"):
+            if not is_notification_sent_on(user, "due_reminder", today):
                 create_notification(
                     recipient=user,
                     notification_type="due_reminder",
                     title="Lembrete de vencimento",
-                    body=f"Seu aluguel vence em {_DUE_REMINDER_DAYS_BEFORE} dias (dia {effective_due_day}).",
+                    body=f"Seu aluguel vence em {_DUE_REMINDER_DAYS_BEFORE} dias (dia {next_due_date.day}).",
                     data={"screen": "payments", "lease_id": lease.pk},
                 )
                 sent += 1
 
         # due_today: on the due date
         elif days_until_due == 0:
-            if not is_notification_sent_today(user, "due_today"):
+            if not is_notification_sent_on(user, "due_today", today):
                 create_notification(
                     recipient=user,
                     notification_type="due_today",
                     title="Vencimento hoje",
-                    body=f"Seu aluguel vence hoje (dia {effective_due_day}). Lembre-se de pagar!",
+                    body=f"Seu aluguel vence hoje (dia {next_due_date.day}). Lembre-se de pagar!",
                     data={"screen": "payments", "lease_id": lease.pk},
                 )
                 sent += 1
 
-        # overdue: 1, 5, or 15 days past due — only if not paid
-        elif (
-            days_past_due in _OVERDUE_CHECK_DAYS
-            and not _has_rent_payment_for_month(lease, reference_month)
-            and not is_notification_sent_today(user, "overdue")
+        # overdue: 1, 5, or 15 days past due
+        elif days_past_due in _OVERDUE_CHECK_DAYS and not is_notification_sent_on(
+            user, "overdue", today
         ):
             create_notification(
                 recipient=user,
@@ -157,8 +180,8 @@ class Command(BaseCommand):
         end_date = _contract_end_date(lease)
         days_until_end = (end_date - today).days
 
-        if days_until_end == _CONTRACT_EXPIRY_WARNING_DAYS and not is_notification_sent_today(
-            user, "contract_expiring"
+        if days_until_end == _CONTRACT_EXPIRY_WARNING_DAYS and not is_notification_sent_on(
+            user, "contract_expiring", today
         ):
             create_notification(
                 recipient=user,

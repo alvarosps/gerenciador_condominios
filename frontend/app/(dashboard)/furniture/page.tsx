@@ -31,10 +31,7 @@ import {
 import { toast } from 'sonner';
 import { DataTable, type Column } from '@/components/tables/data-table';
 import { FurnitureFormModal } from './_components/furniture-form-modal';
-import {
-  useFurniture,
-  useDeleteFurniture,
-} from '@/lib/api/hooks/use-furniture';
+import { useFurniture, useDeleteFurniture } from '@/lib/api/hooks/use-furniture';
 import { type Furniture } from '@/lib/schemas/furniture.schema';
 import { furnitureExportColumns } from '@/lib/hooks/use-export';
 import { useCrudPage } from '@/lib/hooks/use-crud-page';
@@ -51,7 +48,8 @@ export default function FurniturePage() {
     exportColumns: furnitureExportColumns,
     exportFilename: 'moveis',
     exportSheetName: 'Móveis',
-    deleteErrorMessage: 'Erro ao excluir móvel. Verifique se não há apartamentos ou inquilinos vinculados.',
+    deleteErrorMessage:
+      'Erro ao excluir móvel. Verifique se não há apartamentos ou inquilinos vinculados.',
   });
 
   const columns: Column<Furniture>[] = [
@@ -72,14 +70,9 @@ export default function FurniturePage() {
       title: 'Ações',
       key: 'actions',
       width: 150,
-      fixed: 'right',
       render: (_, record: Furniture) => (
         <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => crud.openEditModal(record)}
-          >
+          <Button variant="ghost" size="sm" onClick={() => crud.openEditModal(record)}>
             <Pencil className="h-4 w-4 mr-1" />
             Editar
           </Button>
@@ -111,9 +104,7 @@ export default function FurniturePage() {
       <div className="mb-4 flex justify-between items-center flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold">Móveis</h1>
-          <p className="text-muted-foreground mt-1">
-            Gerencie o catálogo de móveis disponíveis
-          </p>
+          <p className="text-muted-foreground mt-1">Gerencie o catálogo de móveis disponíveis</p>
         </div>
         <div className="flex gap-2">
           <DropdownMenu>
@@ -157,7 +148,8 @@ export default function FurniturePage() {
       {crud.bulkOps.hasSelection && (
         <div className="mb-4 p-4 bg-primary/5 border border-primary/20 rounded flex justify-between items-center flex-wrap gap-3">
           <span className="text-primary font-medium">
-            {crud.bulkOps.selectionCount} {crud.bulkOps.selectionCount === 1 ? 'móvel selecionado' : 'móveis selecionados'}
+            {crud.bulkOps.selectionCount}{' '}
+            {crud.bulkOps.selectionCount === 1 ? 'móvel selecionado' : 'móveis selecionados'}
           </span>
           <div className="flex gap-2">
             <Button variant="outline" onClick={crud.bulkOps.clearSelection}>
@@ -194,7 +186,9 @@ export default function FurniturePage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir móvel</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja excluir {crud.itemToDelete?.name ? `"${crud.itemToDelete.name}"` : 'este móvel'}? Esta ação não pode ser desfeita.
+              Tem certeza que deseja excluir{' '}
+              {crud.itemToDelete?.name ? `"${crud.itemToDelete.name}"` : 'este móvel'}? Esta ação
+              não pode ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -216,8 +210,8 @@ export default function FurniturePage() {
             <AlertDialogTitle>Excluir móveis selecionados</AlertDialogTitle>
             <AlertDialogDescription>
               Tem certeza que deseja excluir {crud.bulkOps.selectionCount}{' '}
-              {crud.bulkOps.selectionCount === 1 ? 'móvel' : 'móveis'}? Esta ação não pode
-              ser desfeita.
+              {crud.bulkOps.selectionCount === 1 ? 'móvel' : 'móveis'}? Esta ação não pode ser
+              desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

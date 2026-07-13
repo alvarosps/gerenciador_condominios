@@ -13,6 +13,8 @@ from typing import Any
 
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
+from django.db.models import Count, F, Sum
+from django.db.models.functions import Coalesce
 
 from core.cache import invalidate_legacy_financial_caches
 from core.models import (
@@ -27,7 +29,6 @@ from core.models import (
     PersonPaymentSchedule,
     RentPayment,
 )
-from core.services.person_payment_schedule_service import PersonPaymentScheduleService
 from core.services.rent_schedule_service import DAYS_OF_WEEK_PT, RentScheduleService
 from core.services.timezone import today_sp
 
@@ -378,13 +379,14 @@ def _collect_entries_by_day(
     )
     for inc in recurring_incomes:
         recurrence_day = min(inc.income_date.day, days_in_month)
-        # Check if received this month
-        received_this_month = Income.objects.filter(
-            pk=inc.pk,
-            is_received=True,
-            received_date__gte=month_start,
-            received_date__lt=next_month_start,
-        ).exists()
+        # Check if received this month — equivalent to the same filter against the DB, but
+        # `inc` was just fetched in this request so its own fields already reflect that state
+        # (no query needed per row, avoiding an N+1 over recurring_incomes).
+        received_this_month = (
+            inc.is_received
+            and inc.received_date is not None
+            and month_start <= inc.received_date < next_month_start
+        )
         entry = {
             "type": "income",
             "id": inc.id,
@@ -645,7 +647,7 @@ def _collect_person_schedule_exits(
     if not scheduled_person_ids:
         return
 
-    schedules = (
+    schedules = list(
         PersonPaymentSchedule.objects.filter(
             reference_month=month_start,
             person_id__in=scheduled_person_ids,
@@ -654,11 +656,32 @@ def _collect_person_schedule_exits(
         .order_by("person_id", "due_day")
     )
 
+    # Batch what `PersonPaymentScheduleService.is_schedule_paid` would otherwise compute with
+    # 2 queries per schedule row: total paid per person (1 grouped query) + cumulative expected
+    # per person up to each due_day, derived in Python from the already-fetched `schedules`
+    # (same ordering/grouping `is_schedule_paid` would query for).
+    total_paid_by_person = {
+        row["person_id"]: row["total"]
+        for row in (
+            PersonPayment.objects.filter(
+                person_id__in=scheduled_person_ids,
+                reference_month=month_start,
+            )
+            .values("person_id")
+            .annotate(total=Sum("amount"))
+        )
+    }
+
+    cumulative_expected_by_person: dict[int, Decimal] = dict.fromkeys(
+        scheduled_person_ids, Decimal("0.00")
+    )
+
     for schedule in schedules:
         day = min(schedule.due_day, days_in_month)
-        paid = PersonPaymentScheduleService.is_schedule_paid(
-            schedule.person_id, month_start, schedule.due_day
-        )
+        cumulative_expected_by_person[schedule.person_id] += schedule.amount
+        expected = cumulative_expected_by_person[schedule.person_id]
+        paid_total = total_paid_by_person.get(schedule.person_id, Decimal("0.00"))
+        paid = expected != Decimal("0.00") and paid_total >= expected
         exit_item: dict[str, Any] = {
             "type": "person_schedule",
             "id": schedule.pk,
@@ -683,23 +706,18 @@ def _get_expected_rent_total(month_start: date) -> Decimal:
 
 def _get_expected_extra_income(month_start: date, next_month_start: date) -> Decimal:
     """Total expected extra income (recurring + one-time in month)."""
-    total = Decimal("0.00")
-    # Recurring
-    recurring = Income.objects.filter(
+    recurring_total: Decimal = Income.objects.filter(
         is_recurring=True,
         expected_monthly_amount__isnull=False,
-    )
-    for inc in recurring:
-        total += inc.expected_monthly_amount or Decimal("0.00")
-    # One-time in month
-    one_time = Income.objects.filter(
+    ).aggregate(total=Coalesce(Sum("expected_monthly_amount"), Decimal("0.00")))["total"]
+
+    one_time_total: Decimal = Income.objects.filter(
         is_recurring=False,
         income_date__gte=month_start,
         income_date__lt=next_month_start,
-    )
-    for inc in one_time:
-        total += inc.amount
-    return total
+    ).aggregate(total=Coalesce(Sum("amount"), Decimal("0.00")))["total"]
+
+    return recurring_total + one_time_total
 
 
 def _get_received_rent_total(month_start: date) -> Decimal:
@@ -709,14 +727,11 @@ def _get_received_rent_total(month_start: date) -> Decimal:
 
 def _get_received_extra_income(month_start: date, next_month_start: date) -> Decimal:
     """Total received extra income for the month."""
-    total = Decimal("0.00")
-    received = Income.objects.filter(
+    total: Decimal = Income.objects.filter(
         is_received=True,
         received_date__gte=month_start,
         received_date__lt=next_month_start,
-    )
-    for inc in received:
-        total += inc.amount
+    ).aggregate(total=Coalesce(Sum("amount"), Decimal("0.00")))["total"]
     return total
 
 
@@ -730,10 +745,10 @@ def _get_expected_expenses_total(
 
     Excludes skipped expenses and expenses for persons with payment schedules.
     """
-    total = Decimal("0.00")
+    zero = Decimal("0.00")
 
     # Installments (exclude offsets, skipped, and scheduled-person expenses)
-    installments = (
+    installments_total: Decimal = (
         ExpenseInstallment.objects.filter(
             due_date__gte=month_start,
             due_date__lt=next_month_start,
@@ -741,13 +756,11 @@ def _get_expected_expenses_total(
         )
         .exclude(expense_id__in=skipped_expense_ids)
         .exclude(expense__person_id__in=scheduled_person_ids)
-        .select_related("expense")
+        .aggregate(total=Coalesce(Sum("amount"), zero))["total"]
     )
-    for inst in installments:
-        total += inst.amount
 
     # Fixed recurring (exclude offsets, respect end_date, skipped, scheduled persons)
-    fixed = (
+    fixed_total: Decimal = (
         Expense.objects.filter(
             expense_type=ExpenseType.FIXED_EXPENSE,
             is_recurring=True,
@@ -757,12 +770,11 @@ def _get_expected_expenses_total(
         .exclude(end_date__lt=month_start)
         .exclude(pk__in=skipped_expense_ids)
         .exclude(person_id__in=scheduled_person_ids)
+        .aggregate(total=Coalesce(Sum("expected_monthly_amount"), zero))["total"]
     )
-    for exp in fixed:
-        total += exp.expected_monthly_amount or Decimal("0.00")
 
     # One-time expenses
-    one_time = (
+    one_time_total: Decimal = (
         Expense.objects.filter(
             expense_type=ExpenseType.ONE_TIME_EXPENSE,
             is_offset=False,
@@ -771,12 +783,11 @@ def _get_expected_expenses_total(
         )
         .exclude(pk__in=skipped_expense_ids)
         .exclude(person_id__in=scheduled_person_ids)
+        .aggregate(total=Coalesce(Sum("total_amount"), zero))["total"]
     )
-    for exp in one_time:
-        total += exp.total_amount
 
     # Utility bills
-    utilities = (
+    utilities_total: Decimal = (
         Expense.objects.filter(
             expense_type__in=[ExpenseType.WATER_BILL, ExpenseType.ELECTRICITY_BILL],
             is_offset=False,
@@ -785,11 +796,10 @@ def _get_expected_expenses_total(
         )
         .exclude(pk__in=skipped_expense_ids)
         .exclude(person_id__in=scheduled_person_ids)
+        .aggregate(total=Coalesce(Sum("total_amount"), zero))["total"]
     )
-    for exp in utilities:
-        total += exp.total_amount
 
-    return total
+    return installments_total + fixed_total + one_time_total + utilities_total
 
 
 def _get_paid_expenses_total(
@@ -802,10 +812,10 @@ def _get_paid_expenses_total(
 
     Excludes skipped expenses and expenses for persons with payment schedules.
     """
-    total = Decimal("0.00")
+    zero = Decimal("0.00")
 
     # Paid installments
-    paid_installments = (
+    installments_total: Decimal = (
         ExpenseInstallment.objects.filter(
             due_date__gte=month_start,
             due_date__lt=next_month_start,
@@ -814,13 +824,12 @@ def _get_paid_expenses_total(
         )
         .exclude(expense_id__in=skipped_expense_ids)
         .exclude(expense__person_id__in=scheduled_person_ids)
-        .select_related("expense")
+        .aggregate(total=Coalesce(Sum("amount"), zero))["total"]
     )
-    for inst in paid_installments:
-        total += inst.amount
 
-    # Paid fixed recurring (check is_paid flag)
-    paid_fixed = (
+    # Paid fixed recurring (check is_paid flag; falls back to total_amount when
+    # expected_monthly_amount is null, same as the single-row `or` it replaces)
+    fixed_total: Decimal = (
         Expense.objects.filter(
             expense_type=ExpenseType.FIXED_EXPENSE,
             is_recurring=True,
@@ -831,12 +840,13 @@ def _get_paid_expenses_total(
         )
         .exclude(pk__in=skipped_expense_ids)
         .exclude(person_id__in=scheduled_person_ids)
+        .aggregate(
+            total=Coalesce(Sum(Coalesce(F("expected_monthly_amount"), F("total_amount"))), zero)
+        )["total"]
     )
-    for exp in paid_fixed:
-        total += exp.expected_monthly_amount or exp.total_amount
 
     # Paid one-time expenses
-    paid_one_time = (
+    one_time_total: Decimal = (
         Expense.objects.filter(
             expense_type=ExpenseType.ONE_TIME_EXPENSE,
             is_offset=False,
@@ -846,12 +856,11 @@ def _get_paid_expenses_total(
         )
         .exclude(pk__in=skipped_expense_ids)
         .exclude(person_id__in=scheduled_person_ids)
+        .aggregate(total=Coalesce(Sum("total_amount"), zero))["total"]
     )
-    for exp in paid_one_time:
-        total += exp.total_amount
 
     # Paid utility bills
-    paid_utilities = (
+    utilities_total: Decimal = (
         Expense.objects.filter(
             expense_type__in=[ExpenseType.WATER_BILL, ExpenseType.ELECTRICITY_BILL],
             is_offset=False,
@@ -861,33 +870,32 @@ def _get_paid_expenses_total(
         )
         .exclude(pk__in=skipped_expense_ids)
         .exclude(person_id__in=scheduled_person_ids)
+        .aggregate(total=Coalesce(Sum("total_amount"), zero))["total"]
     )
-    for exp in paid_utilities:
-        total += exp.total_amount
 
-    return total
+    return installments_total + fixed_total + one_time_total + utilities_total
 
 
 def _get_scheduled_persons_expected(month_start: date, scheduled_person_ids: set[int]) -> Decimal:
     """Total expected amount from person payment schedules for the month."""
     if not scheduled_person_ids:
         return Decimal("0.00")
-    schedules = PersonPaymentSchedule.objects.filter(
+    total: Decimal = PersonPaymentSchedule.objects.filter(
         reference_month=month_start,
         person_id__in=scheduled_person_ids,
-    )
-    return sum((s.amount for s in schedules), Decimal("0.00"))
+    ).aggregate(total=Coalesce(Sum("amount"), Decimal("0.00")))["total"]
+    return total
 
 
 def _get_scheduled_persons_paid(month_start: date, scheduled_person_ids: set[int]) -> Decimal:
     """Total paid amount via PersonPayment for persons with schedules in the month."""
     if not scheduled_person_ids:
         return Decimal("0.00")
-    payments = PersonPayment.objects.filter(
+    total: Decimal = PersonPayment.objects.filter(
         reference_month=month_start,
         person_id__in=scheduled_person_ids,
-    )
-    return sum((p.amount for p in payments), Decimal("0.00"))
+    ).aggregate(total=Coalesce(Sum("amount"), Decimal("0.00")))["total"]
+    return total
 
 
 def _get_overdue_totals(
@@ -897,11 +905,10 @@ def _get_overdue_totals(
     skipped_expense_ids: set[int],
 ) -> tuple[int, Decimal]:
     """Count and sum overdue items (unpaid with due_date before today)."""
-    count = 0
-    total = Decimal("0.00")
+    zero = Decimal("0.00")
 
     # Overdue installments
-    overdue_installments = (
+    installments_agg = (
         ExpenseInstallment.objects.filter(
             due_date__gte=month_start,
             due_date__lt=min(next_month_start, today),
@@ -909,28 +916,28 @@ def _get_overdue_totals(
             expense__is_offset=False,
         )
         .exclude(expense_id__in=skipped_expense_ids)
-        .select_related("expense")
+        .aggregate(count=Count("id"), total=Coalesce(Sum("amount"), zero))
     )
-    for inst in overdue_installments:
-        count += 1
-        total += inst.amount
 
     # Overdue one-time/utility expenses
-    overdue_expenses = Expense.objects.filter(
-        expense_type__in=[
-            ExpenseType.ONE_TIME_EXPENSE,
-            ExpenseType.WATER_BILL,
-            ExpenseType.ELECTRICITY_BILL,
-        ],
-        is_offset=False,
-        is_paid=False,
-        expense_date__gte=month_start,
-        expense_date__lt=min(next_month_start, today),
-    ).exclude(pk__in=skipped_expense_ids)
-    for exp in overdue_expenses:
-        count += 1
-        total += exp.total_amount
+    expenses_agg = (
+        Expense.objects.filter(
+            expense_type__in=[
+                ExpenseType.ONE_TIME_EXPENSE,
+                ExpenseType.WATER_BILL,
+                ExpenseType.ELECTRICITY_BILL,
+            ],
+            is_offset=False,
+            is_paid=False,
+            expense_date__gte=month_start,
+            expense_date__lt=min(next_month_start, today),
+        )
+        .exclude(pk__in=skipped_expense_ids)
+        .aggregate(count=Count("id"), total=Coalesce(Sum("total_amount"), zero))
+    )
 
+    count = installments_agg["count"] + expenses_agg["count"]
+    total = installments_agg["total"] + expenses_agg["total"]
     return count, total
 
 
@@ -938,18 +945,13 @@ def _get_upcoming_7_days(today: date) -> tuple[int, Decimal]:
     """Count and sum items due in the next 7 days."""
 
     end_date = today + dt.timedelta(days=7)
-    count = 0
-    total = Decimal("0.00")
 
     # Upcoming installments
-    upcoming_installments = ExpenseInstallment.objects.filter(
+    agg = ExpenseInstallment.objects.filter(
         due_date__gte=today,
         due_date__lt=end_date,
         is_paid=False,
         expense__is_offset=False,
-    )
-    for inst in upcoming_installments:
-        count += 1
-        total += inst.amount
+    ).aggregate(count=Count("id"), total=Coalesce(Sum("amount"), Decimal("0.00")))
 
-    return count, total
+    return agg["count"], agg["total"]

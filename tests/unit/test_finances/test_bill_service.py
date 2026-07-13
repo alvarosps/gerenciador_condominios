@@ -7,9 +7,17 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 
-from finances.models import Bill, BillBehavior
+from finances.models import Bill, BillBehavior, InstallmentPlanState
+from finances.services.bill_generation_service import BillGenerationService
+from finances.services.bill_payment_service import BillPaymentService
 from finances.services.bill_service import BillDraft, BillService
-from tests.factories import make_condominium
+from finances.services.installment_plan_service import InstallmentPlanService
+from tests.factories import (
+    make_bill,
+    make_bill_line_item,
+    make_condominium,
+    make_installment_plan,
+)
 
 pytestmark = pytest.mark.django_db
 
@@ -107,3 +115,66 @@ def test_user_propagated_to_bill_and_lines() -> None:
     line = bill.line_items.first()
     assert line is not None
     assert line.created_by_id == user.id
+
+
+# --- B4: a Bill with a live payment (total OR partial) cannot be deleted — unpay first ---
+
+
+def test_delete_rejects_fully_paid_bill() -> None:
+    bill = make_bill(competence_month=date(2026, 6, 1))
+    make_bill_line_item(bill=bill, amount=Decimal("300.00"))
+    BillPaymentService.pay(bill, date(2026, 6, 5))
+    with pytest.raises(ValidationError):
+        BillService.delete(bill)
+    assert Bill.objects.filter(pk=bill.pk).exists()  # not soft-deleted
+
+
+def test_delete_rejects_partially_paid_bill() -> None:
+    bill = make_bill(competence_month=date(2026, 6, 1))
+    make_bill_line_item(bill=bill, amount=Decimal("300.00"))
+    BillPaymentService.pay(bill, date(2026, 6, 5), amount=Decimal("100.00"))
+    with pytest.raises(ValidationError):
+        BillService.delete(bill)
+    assert Bill.objects.filter(pk=bill.pk).exists()
+
+
+def test_delete_allowed_after_unpay() -> None:
+    bill = make_bill(competence_month=date(2026, 6, 1))
+    make_bill_line_item(bill=bill, amount=Decimal("300.00"))
+    payment = BillPaymentService.pay(bill, date(2026, 6, 5))
+    BillPaymentService.unpay(payment)
+    BillService.delete(bill)
+    assert not Bill.objects.filter(pk=bill.pk).exists()
+
+
+def test_delete_allowed_for_unpaid_bill() -> None:
+    bill = make_bill(competence_month=date(2026, 6, 1))
+    make_bill_line_item(bill=bill, amount=Decimal("300.00"))
+    BillService.delete(bill)
+    assert not Bill.objects.filter(pk=bill.pk).exists()
+
+
+# --- B8d: deleting a Bill materialized from an Installment must revert the plan so
+# generation can recreate the parcela — otherwise it is orphaned forever ---
+
+
+def test_delete_standalone_installment_bill_reverts_plan_to_active() -> None:
+    plan = make_installment_plan(
+        embedded=False,
+        installment_count=1,
+        start_due_date=date(2026, 6, 10),
+        default_due_day=10,
+    )
+    InstallmentPlanService.materialize_schedule(plan)
+    bills = BillGenerationService.ensure_month_bills(2026, 6)
+    plan.refresh_from_db()
+    assert plan.lifecycle_state == InstallmentPlanState.MATERIALIZED
+    bill = next(b for b in bills if b.installment is not None)
+
+    BillService.delete(bill)
+
+    plan.refresh_from_db()
+    assert plan.lifecycle_state == InstallmentPlanState.ACTIVE
+    # generation can now recreate the parcela Bill for the same month
+    regenerated = BillGenerationService.ensure_month_bills(2026, 6)
+    assert any(b.installment_id == plan.installments.get().id for b in regenerated)

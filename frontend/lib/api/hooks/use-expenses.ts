@@ -1,8 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
 import { queryKeys } from '../query-keys';
+import { parseList } from '../parse-list';
 import { type Expense, expenseReadSchema } from '@/lib/schemas/expense.schema';
-import { type PaginatedResponse, extractResults } from '@/lib/types/api';
 
 export interface ExpenseFilters {
   expense_type?: string;
@@ -23,11 +23,10 @@ export function useExpenses(filters?: ExpenseFilters) {
   return useQuery({
     queryKey: queryKeys.expenses.list(cleanFilters),
     queryFn: async () => {
-      const { data } = await apiClient.get<PaginatedResponse<Expense> | Expense[]>('/expenses/', {
+      const { data } = await apiClient.get<unknown>('/expenses/', {
         params: { page_size: 10000, ...cleanFilters },
       });
-      const expenses = extractResults(data);
-      return expenses.map((expense) => expenseReadSchema.parse(expense));
+      return parseList(data, expenseReadSchema).items;
     },
   });
 }

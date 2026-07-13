@@ -20,6 +20,7 @@ from rest_framework.test import APIClient
 
 from tests.constants import TEST_PASSWORD
 from tests.factories import make_apartment, make_building, make_person
+from tests.utils import flush_on_commit_callbacks as _flush_on_commit_callbacks
 
 # Ensure test settings are applied
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "condominios_manager.settings")
@@ -66,13 +67,29 @@ def _clear_caches_between_tests():
     leak between tests unless explicitly cleared. Each LocMemCache instance captures a
     reference to its inner store dict at init, so we must clear those dicts in place (clearing
     the outer registry would orphan but not empty them).
+
+    core.cache._TRACKED_CACHE_KEYS (the registry CacheManager's LocMem fallback uses to know
+    which keys it may delete — P4.2 item (e)) is a process-global set with the same leak
+    shape, so it is cleared alongside the store dicts.
     """
     from django.core.cache.backends import locmem
+
+    import core.cache
 
     for store in locmem._caches.values():
         store.clear()
     for store in locmem._expire_info.values():
         store.clear()
+    core.cache._TRACKED_CACHE_KEYS.clear()
+
+
+@pytest.fixture
+def flush_on_commit_callbacks():
+    """Return ``tests.utils.flush_on_commit_callbacks`` — see its docstring for why this is
+    needed (P4.2 item (d): CacheManager.invalidate_pattern defers to transaction.on_commit).
+    Exposed as a fixture for tests that prefer dependency injection over a direct import.
+    """
+    return _flush_on_commit_callbacks
 
 
 @pytest.fixture(autouse=True)

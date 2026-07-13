@@ -8,8 +8,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { useUploadProof, type PaymentProof } from '@/lib/api/hooks/use-tenant-payments';
+import {
+  useUploadProof,
+  useTenantProofs,
+  type PaymentProof,
+} from '@/lib/api/hooks/use-tenant-payments';
 import { formatDate } from '@/lib/utils/formatters';
 import { getErrorMessage } from '@/lib/utils/error-handler';
 
@@ -43,7 +48,7 @@ function proofStatusBadge(status: PaymentProof['status']) {
   }
 }
 
-function UploadForm({ onUploaded }: { onUploaded: (proof: PaymentProof) => void }) {
+function UploadForm() {
   const [referenceMonth, setReferenceMonth] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
@@ -90,12 +95,12 @@ function UploadForm({ onUploaded }: { onUploaded: (proof: PaymentProof) => void 
 
     const formData = new FormData();
     formData.append('file', selectedFile);
-    formData.append('reference_month', referenceMonth);
+    // The <input type="month"> value is "YYYY-MM"; the backend DateField expects a full date.
+    formData.append('reference_month', `${referenceMonth}-01`);
 
     try {
-      const proof = await uploadProof.mutateAsync(formData);
+      await uploadProof.mutateAsync(formData);
       toast.success('Comprovante enviado com sucesso!');
-      onUploaded(proof);
       setSelectedFile(null);
       setReferenceMonth('');
       if (fileInputRef.current) {
@@ -194,17 +199,15 @@ function ProofStatusCard({ proof }: { proof: PaymentProof }) {
 }
 
 export default function TenantProofPage() {
-  const [submittedProofs, setSubmittedProofs] = useState<PaymentProof[]>([]);
-
-  const handleUploaded = (proof: PaymentProof) => {
-    setSubmittedProofs((prev) => [proof, ...prev]);
-  };
+  const { data: proofs, isLoading, isError } = useTenantProofs();
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Comprovante de Pagamento</h1>
-        <p className="text-muted-foreground mt-1">Envie o comprovante do seu pagamento de aluguel</p>
+        <p className="text-muted-foreground mt-1">
+          Envie o comprovante do seu pagamento de aluguel
+        </p>
       </div>
 
       <Alert>
@@ -216,21 +219,28 @@ export default function TenantProofPage() {
         </AlertDescription>
       </Alert>
 
-      <UploadForm onUploaded={handleUploaded} />
+      <UploadForm />
 
-      {submittedProofs.length > 0 ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Comprovantes Enviados</CardTitle>
-            <CardDescription>Status dos comprovantes enviados nesta sessão</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {submittedProofs.map((proof) => (
-              <ProofStatusCard key={proof.id} proof={proof} />
-            ))}
-          </CardContent>
-        </Card>
-      ) : null}
+      <Card>
+        <CardHeader>
+          <CardTitle>Comprovantes Enviados</CardTitle>
+          <CardDescription>Status dos comprovantes enviados</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="space-y-3">
+              <Skeleton className="h-12 w-full" />
+              <Skeleton className="h-12 w-full" />
+            </div>
+          ) : isError ? (
+            <p className="text-sm text-destructive">Erro ao carregar comprovantes.</p>
+          ) : proofs && proofs.length > 0 ? (
+            proofs.map((proof) => <ProofStatusCard key={proof.id} proof={proof} />)
+          ) : (
+            <p className="text-sm text-muted-foreground">Nenhum comprovante enviado ainda.</p>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

@@ -9,14 +9,13 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DeleteConfirmDialog } from '@/components/shared/delete-confirm-dialog';
 import { toast } from 'sonner';
-import {
-  useExpenseDetail,
-} from '@/lib/api/hooks/use-financial-dashboard';
+import { useExpenseDetail } from '@/lib/api/hooks/use-financial-dashboard';
 import type { ExpenseDetailItem } from '@/lib/api/hooks/use-financial-dashboard';
 import { queryKeys } from '@/lib/api/query-keys';
 import { useMarkInstallmentPaid } from '@/lib/api/hooks/use-expense-installments';
 import { useMarkExpensePaid } from '@/lib/api/hooks/use-expenses';
 import { formatMonthYear, getDefaultExpenseDate, MONTH_ABBR } from '@/lib/utils/formatters';
+import { getErrorMessage } from '@/lib/utils/error-handler';
 import { apiClient } from '@/lib/api/client';
 import { DetailHeader } from './_components/detail-header';
 import { ExpenseAccordion } from './_components/expense-accordion';
@@ -65,7 +64,9 @@ function ExpenseDetailContent() {
 
   const [editTarget, setEditTarget] = useState<ExpenseDetailItem | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ExpenseDetailItem | null>(null);
-  const [employeeEditTarget, setEmployeeEditTarget] = useState<Record<string, unknown> | null>(null);
+  const [employeeEditTarget, setEmployeeEditTarget] = useState<Record<string, unknown> | null>(
+    null
+  );
   const [isCreating, setIsCreating] = useState(false);
   const [isCreatingNextMonth, setIsCreatingNextMonth] = useState(false);
 
@@ -90,14 +91,17 @@ function ExpenseDetailContent() {
         await markExpensePaid.mutateAsync(item.expense_id);
       }
       toast.success(`"${item.description}" marcada como paga`);
-    } catch {
-      toast.error('Erro ao marcar como paga');
+    } catch (error) {
+      toast.error(getErrorMessage(error, 'Erro ao marcar como paga'));
     }
   };
 
   const handleSaved = async () => {
     await queryClient.invalidateQueries({ queryKey: queryKeys.financialDashboard.all });
     await queryClient.invalidateQueries({ queryKey: queryKeys.expenses.all });
+    await queryClient.invalidateQueries({ queryKey: queryKeys.expenseInstallments.all });
+    await queryClient.invalidateQueries({ queryKey: queryKeys.cashFlow.all });
+    await queryClient.invalidateQueries({ queryKey: queryKeys.dailyControl.all });
   };
 
   const handleDelete = async () => {
@@ -105,8 +109,8 @@ function ExpenseDetailContent() {
     try {
       await apiClient.delete(`/expenses/${deleteTarget.expense_id}/`);
       toast.success('Despesa excluída com sucesso');
-    } catch {
-      toast.error('Erro ao excluir despesa');
+    } catch (error) {
+      toast.error(getErrorMessage(error, 'Erro ao excluir despesa'));
     } finally {
       setDeleteTarget(null);
       await queryClient.invalidateQueries({ queryKey: queryKeys.financialDashboard.all });
@@ -134,10 +138,7 @@ function ExpenseDetailContent() {
     );
   }
 
-  const title =
-    type === 'person'
-      ? (data.person_name ?? 'Pessoa')
-      : (LABELS[type] ?? type);
+  const title = type === 'person' ? (data.person_name ?? 'Pessoa') : (LABELS[type] ?? type);
 
   const total = data.total ?? 0;
 
@@ -247,7 +248,10 @@ function ExpenseDetailContent() {
           {UTILITY_TYPES.includes(type) &&
             (data.by_building ?? []).map((building) => {
               // Map bill/debt items, preserving expense_id/installment_id when available from API
-              const mapToDetail = (item: Record<string, unknown>, idx: number): ExpenseDetailItem => ({
+              const mapToDetail = (
+                item: Record<string, unknown>,
+                idx: number
+              ): ExpenseDetailItem => ({
                 expense_id: (item.expense_id as number) ?? 0,
                 installment_id: (item.installment_id as number) ?? null,
                 description: typeof item.description === 'string' ? item.description : '',
@@ -260,7 +264,12 @@ function ExpenseDetailContent() {
                 category_color: (item.category_color as string) ?? null,
                 subcategory_id: null,
                 subcategory_name: null,
-                notes: typeof item.notes === 'string' ? item.notes : (item.installment !== null && item.installment !== undefined ? `${item.installment as number}` : String(idx)),
+                notes:
+                  typeof item.notes === 'string'
+                    ? item.notes
+                    : item.installment !== null && item.installment !== undefined
+                      ? `${item.installment as number}`
+                      : String(idx),
               });
 
               const debts = building.debt_installments ?? [];
@@ -268,15 +277,18 @@ function ExpenseDetailContent() {
 
               // When a building has both bills and debt installments,
               // the debt is already included in the bill value — show it as a note
-              const debtNote = debts.length > 0 && bills.length > 0
-                ? debts.map((d) => {
-                    const rec = d as unknown as Record<string, unknown>;
-                    const desc = typeof rec.description === 'string' ? rec.description : '';
-                    const inst = rec.installment as string | undefined;
-                    const amt = Number(rec.amount ?? 0);
-                    return `${desc} ${inst ?? ''} (R$${amt.toFixed(2).replace('.', ',')})`;
-                  }).join('; ')
-                : null;
+              const debtNote =
+                debts.length > 0 && bills.length > 0
+                  ? debts
+                      .map((d) => {
+                        const rec = d as unknown as Record<string, unknown>;
+                        const desc = typeof rec.description === 'string' ? rec.description : '';
+                        const inst = rec.installment as string | undefined;
+                        const amt = Number(rec.amount ?? 0);
+                        return `${desc} ${inst ?? ''} (R$${amt.toFixed(2).replace('.', ',')})`;
+                      })
+                      .join('; ')
+                  : null;
 
               const billItems = bills.map((bill, i) => {
                 const item = mapToDetail(bill as unknown as Record<string, unknown>, i);
@@ -287,9 +299,12 @@ function ExpenseDetailContent() {
               });
 
               // Only show debt items as standalone rows when there are no bills
-              const debtItems = bills.length === 0
-                ? debts.map((item, i) => mapToDetail(item as unknown as Record<string, unknown>, i))
-                : [];
+              const debtItems =
+                bills.length === 0
+                  ? debts.map((item, i) =>
+                      mapToDetail(item as unknown as Record<string, unknown>, i)
+                    )
+                  : [];
 
               const allItems = [...billItems, ...debtItems];
               const hasEditableItems = allItems.some((item) => item.expense_id > 0);

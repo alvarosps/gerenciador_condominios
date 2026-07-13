@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
 import { queryKeys } from '../query-keys';
+import { parseList } from '../parse-list';
 import { type Employee, employeeSchema } from '@/lib/schemas/finances/employee.schema';
-import { type PaginatedResponse, extractResults } from '@/lib/types/api';
 
 const ENDPOINT = '/finances/employees/';
 
@@ -25,10 +25,10 @@ export function useEmployees(filters?: EmployeeFilters) {
   return useQuery({
     queryKey: queryKeys.finances.employees.list(params),
     queryFn: async () => {
-      const { data } = await apiClient.get<PaginatedResponse<Employee> | Employee[]>(ENDPOINT, {
+      const { data } = await apiClient.get<unknown>(ENDPOINT, {
         params: { page_size: 10000, ...params },
       });
-      return extractResults(data).map((employee) => employeeSchema.parse(employee));
+      return parseList(data, employeeSchema).items;
     },
   });
 }
@@ -64,12 +64,7 @@ export function useUpdateEmployee() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (data: Partial<Employee> & { id: number }) => {
-      const {
-        condominium: _condominium,
-        person: _person,
-        lease: _lease,
-        ...updateData
-      } = data;
+      const { condominium: _condominium, person: _person, lease: _lease, ...updateData } = data;
       const response = await apiClient.patch<Employee>(`${ENDPOINT}${data.id}/`, updateData);
       return response.data;
     },

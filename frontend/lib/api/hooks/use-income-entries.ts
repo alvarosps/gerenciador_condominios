@@ -1,34 +1,34 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
 import { queryKeys } from '../query-keys';
+import { parseList } from '../parse-list';
 import {
   incomeEntrySchema,
   type IncomeEntry,
   type IncomeEntryWrite,
   type IncomeEntryFilters,
 } from '@/lib/schemas/finances/income-entry.schema';
-import { type PaginatedResponse, extractResults } from '@/lib/types/api';
 
 export function useIncomeEntries(filters?: IncomeEntryFilters) {
   const cleanFilters = filters
     ? Object.fromEntries(
-        Object.entries(filters).filter(([, v]) => v !== undefined).map(([k, v]) => {
-          // Send booleans as literal strings so Django filters correctly
-          if (typeof v === 'boolean') return [k, v ? 'true' : 'false'];
-          return [k, v];
-        }),
+        Object.entries(filters)
+          .filter(([, v]) => v !== undefined)
+          .map(([k, v]) => {
+            // Send booleans as literal strings so Django filters correctly
+            if (typeof v === 'boolean') return [k, v ? 'true' : 'false'];
+            return [k, v];
+          })
       )
     : {};
 
   return useQuery({
     queryKey: queryKeys.finances.incomeEntries.list(cleanFilters),
     queryFn: async () => {
-      const { data } = await apiClient.get<PaginatedResponse<IncomeEntry> | IncomeEntry[]>(
-        '/finances/income-entries/',
-        { params: { page_size: 10000, ...cleanFilters } },
-      );
-      const items = extractResults(data);
-      return items.map((item) => incomeEntrySchema.parse(item));
+      const { data } = await apiClient.get<unknown>('/finances/income-entries/', {
+        params: { page_size: 10000, ...cleanFilters },
+      });
+      return parseList(data, incomeEntrySchema).items;
     },
   });
 }

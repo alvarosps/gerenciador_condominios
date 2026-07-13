@@ -116,7 +116,7 @@ npm run lint && npm run type-check            # ESLint + TypeScript
 - Lease actions: `generate_contract/`, `calculate_late_fee/`, `change_due_date/`
 - Templates: `/api/templates/current/`, `save/`, `backups/`, `restore/`, `preview/`
 - Dashboard: `financial_summary/`, `late_payment_summary/`, `lease_metrics/`, `tenant_statistics/`, `building_statistics/`
-- Export: `/api/{resource}/export/excel/`, `/api/{resource}/export/csv/`
+- Export: client-side (sem rotas de API) — `frontend/lib/hooks/use-export.ts` gera xlsx/csv no browser a partir dos dados já carregados
 - **Condomínio (`finances/`) — `/api/finances/` (ATUAL):** `finance-categories`, `billing-accounts`, `bills`, `bill-skips`, `payments`, `installment-plans`, `installments`, `employees`, `reserves`, `reserve-movements`, `income-entries`, `condo-month-closes`, `finance-dashboard`, `finance-cash-flow`. Actions: `bills/{id}/{pay,suspend}/`, `bills/{bulk_pay,generate_month,create_with_lines,parse_invoice}/`, `condo-month-closes/{close,reopen}/`, `finance-dashboard/{overview,monthly_balance,iptu_alerts,overdue,combined_calendar}`, `finance-cash-flow/projection`.
 - Financeiro PESSOAL (LEGADO/DEPRECATED — remoção em P7): `persons`, `credit-cards`, `expense-categories`, `expenses`, `expense-installments`, `incomes`, `rent-payments`, `employee-payments`, `person-incomes`, `person-payments`, `financial-settings`; `financial-dashboard/*`; `cash-flow/*`; `daily-control/*`.
 

@@ -96,7 +96,10 @@ export function useMarkItemPaid() {
 
   return useMutation({
     mutationFn: async (request: MarkPaidRequest) => {
-      const { data } = await apiClient.post<{ success: boolean }>('/daily-control/mark_paid/', request);
+      const { data } = await apiClient.post<{ success: boolean }>(
+        '/daily-control/mark_paid/',
+        request
+      );
       return data;
     },
     onSuccess: () => {
@@ -104,6 +107,10 @@ export function useMarkItemPaid() {
       void queryClient.invalidateQueries({ queryKey: queryKeys.expenses.all });
       void queryClient.invalidateQueries({ queryKey: queryKeys.financialDashboard.all });
       void queryClient.invalidateQueries({ queryKey: queryKeys.cashFlow.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.expenseInstallments.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.incomes.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.personPayments.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.personPaymentSchedules.all });
     },
   });
 }

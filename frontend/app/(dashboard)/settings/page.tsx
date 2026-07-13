@@ -3,13 +3,7 @@
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -34,10 +28,7 @@ import { toast } from 'sonner';
 import { PushToggle } from '@/components/notifications/push-toggle';
 import { useLandlord, useUpdateLandlord } from '@/lib/api/hooks/use-landlord';
 import { useUpdateProfile, useChangePassword } from '@/lib/api/hooks/use-settings';
-import {
-  landlordFormSchema,
-  type LandlordFormData,
-} from '@/lib/schemas/landlord.schema';
+import { landlordFormSchema, type LandlordFormData } from '@/lib/schemas/landlord.schema';
 import {
   profileFormSchema,
   changePasswordFormSchema,
@@ -46,6 +37,7 @@ import {
 } from '@/lib/schemas/settings';
 import { useAuthStore } from '@/store/auth-store';
 import { MARITAL_STATUS_OPTIONS } from '@/lib/utils/constants';
+import { getErrorMessage } from '@/lib/utils/error-handler';
 
 export default function SettingsPage() {
   const { user, setUser } = useAuthStore();
@@ -132,8 +124,8 @@ export default function SettingsPage() {
       const updated = await updateProfileMutation.mutateAsync(values);
       setUser(updated);
       toast.success('Perfil atualizado com sucesso');
-    } catch {
-      toast.error('Erro ao atualizar perfil');
+    } catch (error) {
+      toast.error(getErrorMessage(error, 'Erro ao atualizar perfil'));
     }
   };
 
@@ -145,8 +137,8 @@ export default function SettingsPage() {
       });
       toast.success('Senha alterada com sucesso');
       passwordForm.reset();
-    } catch {
-      toast.error('Erro ao alterar senha. Verifique sua senha atual.');
+    } catch (error) {
+      toast.error(getErrorMessage(error, 'Erro ao alterar senha. Verifique sua senha atual.'));
     }
   };
 
@@ -154,8 +146,8 @@ export default function SettingsPage() {
     try {
       await updateMutation.mutateAsync(data);
       toast.success('Configurações salvas com sucesso!');
-    } catch {
-      toast.error('Erro ao salvar configurações');
+    } catch (error) {
+      toast.error(getErrorMessage(error, 'Erro ao salvar configurações'));
     }
   };
 
@@ -354,9 +346,7 @@ export default function SettingsPage() {
               <User className="h-5 w-5" />
               Dados Pessoais
             </CardTitle>
-            <CardDescription>
-              Informações do locador que aparecerão nos contratos
-            </CardDescription>
+            <CardDescription>Informações do locador que aparecerão nos contratos</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4 md:grid-cols-2">
             <div className="md:col-span-2">
@@ -375,11 +365,7 @@ export default function SettingsPage() {
 
             <div>
               <Label htmlFor="cpf_cnpj">CPF/CNPJ *</Label>
-              <Input
-                id="cpf_cnpj"
-                {...form.register('cpf_cnpj')}
-                placeholder="000.000.000-00"
-              />
+              <Input id="cpf_cnpj" {...form.register('cpf_cnpj')} placeholder="000.000.000-00" />
               {form.formState.errors.cpf_cnpj && (
                 <p className="text-sm text-destructive mt-1">
                   {form.formState.errors.cpf_cnpj.message}

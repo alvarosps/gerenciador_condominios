@@ -8,24 +8,39 @@ Use this by setting: DJANGO_SETTINGS_MODULE=condominios_manager.settings_product
 from datetime import timedelta
 from typing import Any, cast
 
-# pyrefly: ignore [missing-import]
 import dj_database_url
 import sentry_sdk
 from decouple import config
+from django.core.exceptions import ImproperlyConfigured
 from sentry_sdk.integrations.django import DjangoIntegration
 
-from .settings import *  # noqa: F403
-from .settings import (
-    ALLOWED_HOSTS,
-    BASE_DIR,
-    CACHES,
-    DATABASES,
-    MIDDLEWARE,
-    REST_FRAMEWORK,
-    SIMPLE_JWT,
-    SPECTACULAR_SETTINGS,
-    TEMPLATES,
-)
+from condominios_manager import settings as base_settings
+
+# CRITICAL: without REDIS_URL, settings.py silently falls back to LocMemCache — which is
+# per-process, so the DRF throttle (incl. the 10/minute auth rate) never actually limits
+# anything across gunicorn workers. Fail startup loudly instead of degrading silently.
+if not config("REDIS_URL", default=""):
+    _missing_redis_url_msg = (
+        "REDIS_URL is required in production: without it, rate limiting (including the "
+        "10/minute auth throttle) silently falls back to an in-memory, per-process cache "
+        "and is never actually enforced across workers."
+    )
+    raise ImproperlyConfigured(_missing_redis_url_msg)
+
+# Layer production settings on top of the base module: every uppercase (Django-settings)
+# attribute is inherited as-is unless overridden below. Avoids `from .settings import *`
+# (which would require a blanket `noqa: F403`/`pyrefly: ignore` — forbidden in this repo).
+globals().update({name: value for name, value in vars(base_settings).items() if name.isupper()})
+
+ALLOWED_HOSTS = base_settings.ALLOWED_HOSTS
+BASE_DIR = base_settings.BASE_DIR
+CACHES = base_settings.CACHES
+DATABASES = base_settings.DATABASES
+MIDDLEWARE = base_settings.MIDDLEWARE
+REST_FRAMEWORK = base_settings.REST_FRAMEWORK
+SIMPLE_JWT = base_settings.SIMPLE_JWT
+SPECTACULAR_SETTINGS = base_settings.SPECTACULAR_SETTINGS
+TEMPLATES = base_settings.TEMPLATES
 
 # ============================================================
 # SECURITY SETTINGS
@@ -108,10 +123,13 @@ db_from_env = dj_database_url.config(conn_max_age=600, ssl_require=True)
 if db_from_env:
     DATABASES["default"].update(db_from_env)
 
-DATABASES["default"]["OPTIONS"] = {
-    "connect_timeout": 10,
-    "options": "-c statement_timeout=30000",  # 30 seconds
-}
+_db_options = cast(dict[str, Any], DATABASES["default"].setdefault("OPTIONS", {}))
+_db_options.update(
+    {
+        "connect_timeout": 10,
+        "options": "-c statement_timeout=30000",  # 30 seconds
+    }
+)
 
 # ============================================================
 # EMAIL CONFIGURATION
@@ -138,9 +156,9 @@ MANAGERS = ADMINS
 
 # Django configures logging during setup(); the RotatingFileHandlers below open their
 # streams immediately, so the directory must exist or setup() raises FileNotFoundError
-# (e.g. on a fresh Render container with no logs/ dir). Create it up front — same as
-# logging_config.py. On ephemeral PaaS filesystems these files are transient; the console
-# handler (captured by the platform) and Sentry are the durable error sinks.
+# (e.g. on a fresh Render container with no logs/ dir). On ephemeral PaaS filesystems these
+# files are transient; the console handler (captured by the platform) and Sentry are the
+# durable error sinks.
 (BASE_DIR / "logs").mkdir(parents=True, exist_ok=True)
 
 LOGGING = {
@@ -210,6 +228,18 @@ LOGGING = {
         },
         "core": {
             "handlers": ["console", "file", "error_file"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        # Used by core/middleware/logging_middleware.py for request/response and
+        # slow-request (>1s) logging. Console output is captured by the platform (Render).
+        "access": {
+            "handlers": ["console", "file"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "performance": {
+            "handlers": ["console", "file"],
             "level": "INFO",
             "propagate": False,
         },
@@ -286,15 +316,16 @@ SPECTACULAR_SETTINGS["SERVERS"] = [
 # ADDITIONAL PRODUCTION SETTINGS
 # ============================================================
 
-# Disable browsable API in production
-REST_FRAMEWORK["DEFAULT_RENDERER_CLASSES"] = [
-    "rest_framework.renderers.JSONRenderer",
-]
-
-# Increase JWT token security
+# Increase JWT token security — shorter default lifetime than base settings.py, but still
+# configurable via the same env vars settings.py reads (JWT_ACCESS_TOKEN_LIFETIME_MINUTES /
+# JWT_REFRESH_TOKEN_LIFETIME_DAYS), so prod can be tuned without editing code.
 SIMPLE_JWT.update(
     {
-        "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),  # Shorter in production
-        "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+        "ACCESS_TOKEN_LIFETIME": timedelta(
+            minutes=config("JWT_ACCESS_TOKEN_LIFETIME_MINUTES", default=15, cast=int)
+        ),
+        "REFRESH_TOKEN_LIFETIME": timedelta(
+            days=config("JWT_REFRESH_TOKEN_LIFETIME_DAYS", default=7, cast=int)
+        ),
     }
 )

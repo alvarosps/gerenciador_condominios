@@ -10,17 +10,13 @@ class CustomPageNumberPagination(PageNumberPagination):
 
     Query parameters:
     - page: Page number (default: 1)
-    - page_size: Number of items per page (default: 20, max: 500)
+    - page_size: Number of items per page (default: 20, max: 10000)
+
+    The 10000 cap matches the project's "show all" convention (small-scale system; large pages
+    are intentional, not a bug) — 28+ frontend hooks request page_size=10000 to render every row
+    in one page (e.g. Contas grouped per building).
     """
 
     page_size = 20
     page_size_query_param = "page_size"
-    max_page_size = 500
-
-
-class LargePageNumberPagination(CustomPageNumberPagination):
-    """Same paginated ``{results, count}`` envelope, but with a high cap for "show all" list
-    endpoints (e.g. Contas, grouped per building) that render every row and rely on the
-    ``page_size=10000`` convention. Keeps the response SHAPE — clients still get ``results``."""
-
     max_page_size = 10000

@@ -143,9 +143,13 @@ class TestBuildingViewSet:
         assert response.status_code == status.HTTP_200_OK
         assert building.id in get_ids(response)
 
-    def test_list_buildings_regular_user(self, regular_authenticated_api_client, building):
+    def test_list_buildings_regular_user_forbidden(
+        self, regular_authenticated_api_client, building
+    ):
+        # BuildingViewSet is admin-only (B1): the tenant portal is isolated under /api/tenant/*
+        # and must never expose the full building portfolio to a non-staff user.
         response = regular_authenticated_api_client.get("/api/buildings/")
-        assert response.status_code == status.HTTP_200_OK
+        assert response.status_code == status.HTTP_403_FORBIDDEN
 
     def test_list_buildings_unauthenticated(self, api_client):
         response = api_client.get("/api/buildings/")
@@ -197,6 +201,14 @@ class TestBuildingViewSet:
         response = authenticated_api_client.delete(f"/api/buildings/{b.id}/")
         assert response.status_code == status.HTTP_204_NO_CONTENT
 
+    def test_search_by_name(self, authenticated_api_client, building, building2):
+        # A1: GlobalSearch sends ?search= to /api/buildings/ — must actually filter (SearchFilter).
+        response = authenticated_api_client.get("/api/buildings/?search=Core Views 2")
+        assert response.status_code == status.HTTP_200_OK
+        ids = get_ids(response)
+        assert building2.id in ids
+        assert building.id not in ids
+
 
 # ---------------------------------------------------------------------------
 # FurnitureViewSet
@@ -228,6 +240,20 @@ class TestFurnitureViewSet:
     def test_list_furniture_unauthenticated(self, api_client):
         response = api_client.get("/api/furnitures/")
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_search_by_name(self, authenticated_api_client, furniture, admin_user):
+        # A1: GlobalSearch sends ?search= to /api/furnitures/ — must actually filter.
+        other = Furniture.objects.create(
+            name="Sofá Views Test",
+            description="Sofá 3 lugares",
+            created_by=admin_user,
+            updated_by=admin_user,
+        )
+        response = authenticated_api_client.get("/api/furnitures/?search=Fogão")
+        assert response.status_code == status.HTTP_200_OK
+        ids = get_ids(response)
+        assert furniture.id in ids
+        assert other.id not in ids
 
 
 # ---------------------------------------------------------------------------
@@ -316,6 +342,41 @@ class TestApartmentViewSet:
         response = authenticated_api_client.get(f"/api/apartments/{apartment.id}/")
         assert response.status_code == status.HTTP_200_OK
         assert response.data["number"] == apartment.number
+
+    def test_search_by_number(self, authenticated_api_client, apartment, apartment_expensive):
+        # A1: GlobalSearch sends ?search= to /api/apartments/ — must actually filter (number).
+        response = authenticated_api_client.get(f"/api/apartments/?search={apartment.number}")
+        assert response.status_code == status.HTTP_200_OK
+        ids = get_ids(response)
+        assert apartment.id in ids
+        assert apartment_expensive.id not in ids
+
+    def test_search_by_building_name(self, authenticated_api_client, apartment, admin_user):
+        # A1: search also reaches building__name so an address/building search still finds it.
+        # DRF's SearchFilter splits the search value into whitespace-delimited terms and ANDs
+        # them across an OR'd icontains per search_field, so a distinct single-word building
+        # name (no shared words/substrings with apartment's own building or number) is used to
+        # avoid an accidental cross-match.
+        other_building = Building.objects.create(
+            street_number=950,
+            name="Zzyzx",
+            address="Rua Zzyzx, 950",
+            created_by=admin_user,
+            updated_by=admin_user,
+        )
+        other_apartment = Apartment.objects.create(
+            building=other_building,
+            number=777,
+            rental_value=Decimal("1100.00"),
+            cleaning_fee=Decimal("100.00"),
+            max_tenants=1,
+            created_by=admin_user,
+        )
+        response = authenticated_api_client.get("/api/apartments/?search=Zzyzx")
+        assert response.status_code == status.HTTP_200_OK
+        ids = get_ids(response)
+        assert other_apartment.id in ids
+        assert apartment.id not in ids
 
 
 # ---------------------------------------------------------------------------
@@ -441,6 +502,33 @@ class TestLeaseViewSetFilters:
 
     def test_filter_by_responsible_tenant_id(self, authenticated_api_client, lease, tenant):
         response = authenticated_api_client.get(f"/api/leases/?responsible_tenant_id={tenant.id}")
+        assert response.status_code == status.HTTP_200_OK
+        assert lease.id in get_ids(response)
+
+    def test_search_by_responsible_tenant_name(
+        self, authenticated_api_client, lease, tenant, tenant2, apartment_expensive, admin_user
+    ):
+        # A1: GlobalSearch sends ?search= to /api/leases/ — must actually filter (tenant name).
+        # other_lease uses a DIFFERENT apartment: unique_active_lease_per_apartment forbids two
+        # active leases on the same apartment.
+        other_lease = Lease.objects.create(
+            apartment=apartment_expensive,
+            responsible_tenant=tenant2,
+            start_date=date(2026, 2, 1),
+            validity_months=12,
+            tag_fee=Decimal("50.00"),
+            rental_value=Decimal("3000.00"),
+            created_by=admin_user,
+            updated_by=admin_user,
+        )
+        response = authenticated_api_client.get(f"/api/leases/?search={tenant.name}")
+        assert response.status_code == status.HTTP_200_OK
+        ids = get_ids(response)
+        assert lease.id in ids
+        assert other_lease.id not in ids
+
+    def test_search_by_apartment_number(self, authenticated_api_client, lease, apartment):
+        response = authenticated_api_client.get(f"/api/leases/?search={apartment.number}")
         assert response.status_code == status.HTTP_200_OK
         assert lease.id in get_ids(response)
 

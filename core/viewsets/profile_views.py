@@ -2,7 +2,7 @@
 User profile management views.
 
 Endpoints:
-    PATCH /api/auth/me/update/ — update first_name / last_name
+    PATCH /api/auth/me/update/ — update first_name / last_name / phone (tenants only)
     POST  /api/auth/change-password/ — change password (validates old password)
 """
 
@@ -18,6 +18,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 
+from core.services.whatsapp_service import normalize_phone_to_e164
+
 logger = logging.getLogger(__name__)
 
 
@@ -25,24 +27,28 @@ logger = logging.getLogger(__name__)
 @permission_classes([IsAuthenticated])
 def update_profile(request: Request) -> Response:
     """
-    Update the authenticated user's first_name and last_name.
+    Update the authenticated user's first_name / last_name, and — for tenants — phone.
 
     PATCH /api/auth/me/update/
 
     Body (all optional):
         first_name (str)
         last_name  (str)
+        phone (str): The tenant's WhatsApp/OTP channel. Only applies to a user with a
+            linked ``tenant_profile``; normalized to E.164 before saving on the Tenant.
 
     Returns:
         200 with updated profile fields.
-        400 if no valid field is provided.
+        400 if no valid field is provided, or phone is sent by a non-tenant user or fails
+            E.164 normalization.
     """
     user = cast(User, request.user)
 
     first_name: str | None = request.data.get("first_name")
     last_name: str | None = request.data.get("last_name")
+    phone: str | None = request.data.get("phone")
 
-    if first_name is None and last_name is None:
+    if first_name is None and last_name is None and phone is None:
         return Response(
             {"error": "Nenhum campo para atualizar foi enviado."},
             status=status.HTTP_400_BAD_REQUEST,
@@ -58,8 +64,31 @@ def update_profile(request: Request) -> Response:
         user.last_name = str(last_name)
         update_fields.append("last_name")
 
-    user.save(update_fields=update_fields)
-    logger.info("Profile updated for user pk=%s fields=%s", user.pk, update_fields)
+    if phone is not None:
+        tenant = getattr(user, "tenant_profile", None)
+        if tenant is None:
+            return Response(
+                {"error": "Apenas inquilinos podem atualizar o telefone."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            normalized_phone = normalize_phone_to_e164(str(phone))
+        except ValueError:
+            return Response(
+                {"error": "Telefone inválido."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        tenant.phone = normalized_phone
+        tenant.save(update_fields=["phone"])
+
+    if update_fields:
+        user.save(update_fields=update_fields)
+    logger.info(
+        "Profile updated for user pk=%s fields=%s phone_updated=%s",
+        user.pk,
+        update_fields,
+        phone is not None,
+    )
 
     return Response(
         {

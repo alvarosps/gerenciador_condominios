@@ -8,6 +8,11 @@ export const apiClient = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8008/api',
   timeout: REQUEST_TIMEOUT_MS,
   withCredentials: true,
+  // Axios reads the csrftoken cookie (set by the backend on cookie-auth login/refresh) and
+  // echoes it back as X-CSRFToken on same-origin requests — required by
+  // CookieJWTAuthentication.enforce_csrf on the backend for cookie-authenticated writes.
+  xsrfCookieName: 'csrftoken',
+  xsrfHeaderName: 'X-CSRFToken',
   headers: {
     'Content-Type': 'application/json',
   },
@@ -15,27 +20,12 @@ export const apiClient = axios.create({
 
 /**
  * Response interceptor - Handle 401 errors by refreshing the HttpOnly cookie token
+ *
+ * Note: responses are passed through unmodified — paginated list endpoints keep the raw DRF
+ * envelope (`{count, next, previous, results}`); consumers parse it via `lib/api/parse-list.ts`.
  */
 apiClient.interceptors.response.use(
-  (response) => {
-    // Detect Django REST Framework paginated response
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any
-    const data: any = response.data;
-    if (
-      data &&
-      typeof data === 'object' &&
-      !Array.isArray(data) &&
-      'results' in data &&
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      Array.isArray(data.results) &&
-      'count' in data
-    ) {
-      // Unwrap the results array so the rest of the application gets what it expects
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-      response.data = data.results;
-    }
-    return response;
-  },
+  (response) => response,
   async (error: AxiosError & { config?: InternalAxiosRequestConfig & { _retry?: boolean } }) => {
     const originalRequest = error.config;
 

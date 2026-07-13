@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { Copy, Check, Loader2, AlertCircle, TrendingDown } from 'lucide-react';
+import Link from 'next/link';
+import { Copy, Check, Loader2, AlertCircle, TrendingDown, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -62,7 +63,11 @@ function PixSection() {
             <div className="flex items-center gap-2">
               <code className="flex-1 rounded-md bg-muted p-3 text-xs break-all">{pixPayload}</code>
               <Button variant="outline" size="icon" onClick={() => void handleCopy()}>
-                {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+                {copied ? (
+                  <Check className="h-4 w-4 text-green-500" />
+                ) : (
+                  <Copy className="h-4 w-4" />
+                )}
               </Button>
             </div>
             <Button variant="outline" className="w-full" onClick={() => void handleGenerate()}>
@@ -85,6 +90,25 @@ function PixSection() {
             )}
           </Button>
         )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function ProofUploadCard() {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Enviar Comprovante</CardTitle>
+        <CardDescription>Envie o comprovante do seu pagamento de aluguel</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Button asChild className="w-full">
+          <Link href="/tenant/payments/proof">
+            <Upload className="h-4 w-4 mr-2" />
+            Enviar comprovante
+          </Link>
+        </Button>
       </CardContent>
     </Card>
   );
@@ -219,6 +243,8 @@ export default function TenantPaymentsPage() {
       </div>
 
       <PixSection />
+
+      <ProofUploadCard />
 
       <Separator />
 

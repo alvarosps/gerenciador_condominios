@@ -13,7 +13,7 @@
 **Roadmap**: `prompts/ROADMAP.md` (seção "Contas de serviço / parser / IPTU")
 **Total de Sessões**: 9 (56–64)
 **Branch**: `feat/condo-utility-bills` (a partir de `master`)
-**Status**: **FEATURE COMPLETA (local) + REVISÃO FINAL** — Sessões **56–64** + **14 achados de revisão adversarial corrigidos** (ver nota "Revisão final" abaixo), gate verde no branch `feat/condo-utility-bills`. Falta só o **seed em PROD** (passo manual pós-deploy — runbook na nota da S64).
+**Status**: **FEATURE COMPLETA + SHIPPED** — Sessões **56–64** + **14 achados de revisão adversarial corrigidos** (ver nota "Revisão final" abaixo). Mergeada (PR #13) e deployada; **seed em PROD executado em 2026-06-09** (runbook abaixo cumprido).
 **Decisões de produto** (design §2): contas tipadas (`account_type` water/electricity/iptu/internet/generic) + identidade (inscrição/UC/medidor/titular/endereço cadastrado); **statements 1:1 só leituras** (dinheiro = `BillLineItem`, fonte única); **parser DMAE+CEEE em memória, SEM anexar o PDF** (upload→lê→insere); refactor `InstallmentPlan.linked_billing_account → billing_account`; IPTU = conta-registro (não auto-gera) + planos avulsos + dívida diferida; **alerta IPTU = banner load-bearing + push best-effort agregado SP-aware**; seed das parcelas de abertura com `competence_month=2026-06`; "Atrasados" inclui IPTU (banner = drill-down). Prod = última alteração (após deploy).
 
 | # | Sessão | Camada | Status | Arquivo |
@@ -100,7 +100,7 @@
 - **Decisões**: (1) inventário **por conta** (Apêndice A) é canônico — 3 luz / 3 IPTU (não 4/4 da linha-resumo do prompt). (2) Bill de parcela de abertura seta `Bill.installment` (materializado como o caminho S41, `competence_month=2026-06`, due_date real) — `create_with_lines` não suporta `installment`; **nenhum service alterado**. (3) Bill de parcela **não** seta `billing_account` (colidiria na `unique_active_bill_per_account_month`); vínculo IPTU via `installment.plan.billing_account`; só a **dívida diferida** carrega `billing_account`. (4) Valores das parcelas via `_split_amount(saldo, count)`; termo 992269 sem saldo original → `total_amount`=restante (9+10). (5) Estado de pagamento "a confirmar" registrado em `_premissas` (sem chute).
 - **Gate (in-place)**: `ruff`/`mypy core/ finances/`/`pyright` limpos; **15 novos** ✓ (100% cov do comando); regressão **finances 430** verde. Zero suppressions.
 
-### ⚠️ RUNBOOK — seed em PRODUÇÃO (passo manual pós-deploy, NÃO automatizado)
+### ⚠️ RUNBOOK — seed em PRODUÇÃO (executado em 2026-06-09; passo manual pós-deploy, NÃO automatizado)
 Após o merge de `feat/condo-utility-bills` e o deploy (migrations `finances 0004–0006` + `core 0049` aplicadas em prod):
 1. **Backup prod** (pegar a connection string no Supabase Dashboard → Connect; NÃO ler `.env`): `pg_dump "<prod-uri>" --schema=public --no-owner --no-acl -F p -f backups/backup_PROD_<ts>.sql`.
 2. **Confirmar migrations aplicadas** em prod (`finances` 0006 + `core` 0049). *(Lembrete: prod `django_migrations` estava em 0046; a 0047 foi aplicada out-of-band — conferir o estado real antes.)*
@@ -131,12 +131,12 @@ Revisão completa do diff `master..feat/condo-utility-bills` (97 arquivos). Acha
 **Roadmap**: `prompts/ROADMAP.md` (seção "Fluxo Novo inquilino + contrato")
 **Total de Sessões**: 5 (51–55)
 **Branch sugerida**: `feat/tenant-lease-onboarding` (a partir de `master`)
-**Status**: **prompts escritos (51–55)** — nenhuma sessão executada.
+**Status**: **S51 mergeada** (PR #10, `feat/tenant-lease-onboarding`, 2026-06-08) — correções de raiz (disponibilidade apto + captura dependentes/auditoria + guard locador) em produção. **S52-55 seguem pendentes** (endpoint transacional + wizard FE não executados; não confirmar status sem re-verificar `prompts/`).
 **Decisões de produto** (design §3): inquilino **enxuto + opcionais**; **1 ou 2 inquilinos** (2º = dependente residente criado junto); **endpoint transacional novo** (reusável pelo mobile, Plano 2); `email`/`phone_alternate` **removidos da UI** (eram descartados pelo backend). Sem migração/RLS; sem regra "1 contrato ativo por inquilino".
 
 | # | Sessão | Camada | Status | Arquivo |
 |---|--------|--------|--------|---------|
-| 51 | Correções de raiz (disponibilidade apto + captura dependentes/auditoria + guard locador) | BE | pendente | `prompts/51-onboarding-backend-root-fixes.md` |
+| 51 | Correções de raiz (disponibilidade apto + captura dependentes/auditoria + guard locador) | BE | **concluída** (PR #10) | `prompts/51-onboarding-backend-root-fixes.md` |
 | 52 | Endpoint transacional `POST /api/onboarding/tenant-lease/` (service+serializer+view+rota) | BE | pendente | `prompts/52-onboarding-backend-endpoint.md` |
 | 53 | Extração DRY (derivações/date/resident-dependent) + remoção email/phone_alternate | FE | pendente | `prompts/53-onboarding-frontend-shared-extraction.md` |
 | 54 | Wizard combinado + `useOnboardTenantLease` + schema | FE | pendente | `prompts/54-onboarding-frontend-wizard.md` |

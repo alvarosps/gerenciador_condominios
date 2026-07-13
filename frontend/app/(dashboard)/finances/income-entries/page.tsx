@@ -36,9 +36,8 @@ function ModalLoader() {
 }
 
 const IncomeEntryFormModal = dynamic(
-  () =>
-    import('./_components/income-entry-form-modal').then((mod) => mod.IncomeEntryFormModal),
-  { loading: () => <ModalLoader />, ssr: false },
+  () => import('./_components/income-entry-form-modal').then((mod) => mod.IncomeEntryFormModal),
+  { loading: () => <ModalLoader />, ssr: false }
 );
 
 function createColumns(handlers: {
@@ -79,9 +78,7 @@ function createColumns(handlers: {
       render: (_, rec) => {
         if (!rec.category) return <span className="text-muted-foreground">-</span>;
         return (
-          <Badge
-            style={{ backgroundColor: `${rec.category.color}20`, color: rec.category.color }}
-          >
+          <Badge style={{ backgroundColor: `${rec.category.color}20`, color: rec.category.color }}>
             {rec.category.name}
           </Badge>
         );
@@ -95,7 +92,7 @@ function createColumns(handlers: {
         <Badge
           className={cn(
             'inline-flex items-center gap-1',
-            rec.is_received ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning',
+            rec.is_received ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'
           )}
         >
           {rec.is_received ? <CheckCircle2 className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
@@ -109,11 +106,15 @@ function createColumns(handlers: {
             title: 'Ações',
             key: 'actions',
             width: 120,
-            fixed: 'right' as const,
             isActions: true,
             render: (_: unknown, rec: IncomeEntry) => (
               <div className="flex gap-1">
-                <Button variant="ghost" size="icon" aria-label="Editar" onClick={() => handlers.onEdit(rec)}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Editar"
+                  onClick={() => handlers.onEdit(rec)}
+                >
                   <Pencil className="h-4 w-4" />
                 </Button>
                 <Button
@@ -155,7 +156,7 @@ export default function IncomeEntriesPage() {
       crud.setItemToDelete(entry);
       if (entry.id !== undefined) crud.handleDeleteClick(entry.id);
     },
-    [crud],
+    [crud]
   );
 
   const columns = useMemo(
@@ -166,13 +167,19 @@ export default function IncomeEntriesPage() {
         isDeleting: crud.isDeleting,
         isStaff,
       }),
-    [crud.openEditModal, handleDelete, crud.isDeleting, isStaff],
+    [crud.openEditModal, handleDelete, crud.isDeleting, isStaff]
   );
 
   const hasActiveFilters = Object.values(filters).some((v) => v !== undefined && v !== '');
 
   const clearFilters = () => {
-    setFilters({ building_id: undefined, category_id: undefined, is_received: undefined, date_from: undefined, date_to: undefined });
+    setFilters({
+      building_id: undefined,
+      category_id: undefined,
+      is_received: undefined,
+      date_from: undefined,
+      date_to: undefined,
+    });
   };
 
   useEffect(() => {

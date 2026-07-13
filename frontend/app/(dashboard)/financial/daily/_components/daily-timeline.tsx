@@ -25,7 +25,8 @@ import type {
   MarkPaidRequest,
 } from '@/lib/api/hooks/use-daily-control';
 import { useCreateExpenseMonthSkip } from '@/lib/api/hooks/use-expense-month-skips';
-import { formatCurrency, formatDate } from '@/lib/utils/formatters';
+import { formatCurrency, formatDate, isDateStringBeforeToday } from '@/lib/utils/formatters';
+import { getErrorMessage } from '@/lib/utils/error-handler';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { PersonPayModal } from './person-pay-modal';
@@ -50,11 +51,7 @@ interface Props {
 function isOverdueExit(exit: DailyExit, dateStr: string): boolean {
   if (exit.paid) return false;
   if (!exit.due) return false;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const exitDate = new Date(dateStr);
-  exitDate.setHours(0, 0, 0, 0);
-  return exitDate < today;
+  return isDateStringBeforeToday(dateStr);
 }
 
 function getItemStatus(
@@ -143,8 +140,8 @@ function SkipButton({ exitId, description, referenceMonth, isPending }: SkipButt
     try {
       await createSkipMutation.mutateAsync({ expense_id: exitId, reference_month: referenceMonth });
       toast.success(`"${description}" não será cobrado neste mês`);
-    } catch {
-      toast.error('Erro ao pular cobrança');
+    } catch (error) {
+      toast.error(getErrorMessage(error, 'Erro ao pular cobrança'));
     }
   };
 
@@ -443,8 +440,8 @@ export function DailyTimeline({
       try {
         await markPaidMutation.mutateAsync(req);
         toast.success('Item marcado como pago');
-      } catch {
-        toast.error('Erro ao marcar item como pago');
+      } catch (error) {
+        toast.error(getErrorMessage(error, 'Erro ao marcar item como pago'));
       }
     },
     [markPaidMutation]

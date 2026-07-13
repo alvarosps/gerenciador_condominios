@@ -6,9 +6,22 @@ import { server } from '@/tests/mocks/server';
 import { useAuthStore } from '@/store/auth-store';
 import MonthClosePage from '../page';
 import { createMockCondoMonthClose } from '@/tests/mocks/data/finances';
+import { formatReferenceMonth } from '@/lib/utils/finances';
 import { toast } from 'sonner';
 
 const API_BASE = 'http://localhost:8008/api';
+
+/** Previous calendar month relative to "now", mirroring the page's own default. */
+function previousMonth(): { year: number; month: number } {
+  const now = new Date();
+  const year = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
+  const month = now.getMonth() === 0 ? 12 : now.getMonth();
+  return { year, month };
+}
+
+function referenceMonthLabel(year: number, month: number): string {
+  return formatReferenceMonth(`${year}-${String(month).padStart(2, '0')}-01`);
+}
 
 // Real hooks (useCondoMonthCloses / useCloseMonth / useReopenMonth) hit MSW; the real auth store
 // drives staff gating. `toast` is the global sonner mock from tests/setup.ts.
@@ -80,7 +93,7 @@ describe('MonthClosePage', () => {
 
     // DataTable renders both desktop and mobile views — use getAllByRole
     await waitFor(() => {
-      expect(screen.getAllByRole('button', { name: /Fechar mês/i }).length).toBeGreaterThan(0);
+      expect(screen.getAllByRole('button', { name: 'Fechar' }).length).toBeGreaterThan(0);
     });
 
     await waitForQueriesToSettle(queryClient);
@@ -93,7 +106,7 @@ describe('MonthClosePage', () => {
     const { queryClient } = renderWithProviders(<MonthClosePage />);
 
     await waitFor(() => {
-      expect(screen.getAllByRole('button', { name: /Reabrir mês/i }).length).toBeGreaterThan(0);
+      expect(screen.getAllByRole('button', { name: 'Reabrir' }).length).toBeGreaterThan(0);
     });
 
     await waitForQueriesToSettle(queryClient);
@@ -112,8 +125,8 @@ describe('MonthClosePage', () => {
     await waitFor(() => {
       expect(screen.getAllByText(/maio de 2026/i).length).toBeGreaterThan(0);
     });
-    expect(screen.queryByRole('button', { name: /Fechar mês/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Reabrir mês/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Fechar' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Reabrir' })).not.toBeInTheDocument();
 
     await waitForQueriesToSettle(queryClient);
   });
@@ -127,12 +140,12 @@ describe('MonthClosePage', () => {
     const { queryClient } = renderWithProviders(<MonthClosePage />);
 
     await waitFor(() => {
-      expect(screen.getAllByRole('button', { name: /Fechar mês/i }).length).toBeGreaterThan(0);
+      expect(screen.getAllByRole('button', { name: 'Fechar' }).length).toBeGreaterThan(0);
     });
 
-    // Click the first instance (both desktop and mobile render the button)
-    const [firstButton] = screen.getAllByRole('button', { name: /Fechar mês/i });
-    if (!firstButton) throw new Error('Fechar mês button not found');
+    // Click the first instance (both desktop and mobile render the row's "Fechar" button)
+    const [firstButton] = screen.getAllByRole('button', { name: 'Fechar' });
+    if (!firstButton) throw new Error('Fechar button not found');
     fireEvent.click(firstButton);
 
     await waitFor(() => {
@@ -151,7 +164,7 @@ describe('MonthClosePage', () => {
 
     renderWithProviders(<MonthClosePage />);
 
-    const [openBtn] = await screen.findAllByRole('button', { name: /Fechar mês/i });
+    const [openBtn] = await screen.findAllByRole('button', { name: 'Fechar' });
     if (!openBtn) throw new Error('open button not found');
     fireEvent.click(openBtn);
     const dialog = await screen.findByRole('alertdialog');
@@ -179,7 +192,7 @@ describe('MonthClosePage', () => {
 
     renderWithProviders(<MonthClosePage />);
 
-    const [openBtn] = await screen.findAllByRole('button', { name: /Fechar mês/i });
+    const [openBtn] = await screen.findAllByRole('button', { name: 'Fechar' });
     if (!openBtn) throw new Error('open button not found');
     fireEvent.click(openBtn);
     const dialog = await screen.findByRole('alertdialog');
@@ -191,5 +204,59 @@ describe('MonthClosePage', () => {
         'Feche os meses anteriores antes de fechar este mês.'
       )
     );
+  });
+
+  it('shows the header month-close control for staff, defaulting to the previous month', async () => {
+    setStaff(true);
+    setCloses([]);
+    const { year, month } = previousMonth();
+
+    renderWithProviders(<MonthClosePage />);
+
+    expect(await screen.findByText(referenceMonthLabel(year, month))).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Fechar mês' })).toBeInTheDocument();
+  });
+
+  it('does not show the header month-close control for non-staff', async () => {
+    setStaff(false);
+    setCloses([]);
+
+    renderWithProviders(<MonthClosePage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Fechamento Mensal')).toBeInTheDocument();
+    });
+    expect(screen.queryByRole('button', { name: 'Fechar mês' })).not.toBeInTheDocument();
+  });
+
+  it('opens the confirm dialog for a month with no existing record (first-time close)', async () => {
+    setStaff(true);
+    setCloses([]);
+    const { year, month } = previousMonth();
+
+    renderWithProviders(<MonthClosePage />);
+
+    const headerButton = await screen.findByRole('button', { name: 'Fechar mês' });
+    fireEvent.click(headerButton);
+
+    const dialog = await screen.findByRole('alertdialog');
+    expect(within(dialog).getByRole('heading')).toHaveTextContent(referenceMonthLabel(year, month));
+  });
+
+  it('closing via the header control for a month with no record posts {year,month} for that competence', async () => {
+    setStaff(true);
+    const bodies = spyClose();
+    setCloses([]);
+    const { year, month } = previousMonth();
+
+    renderWithProviders(<MonthClosePage />);
+
+    const headerButton = await screen.findByRole('button', { name: 'Fechar mês' });
+    fireEvent.click(headerButton);
+    const dialog = await screen.findByRole('alertdialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Fechar mês' }));
+
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect(bodies[0]).toMatchObject({ year, month });
   });
 });

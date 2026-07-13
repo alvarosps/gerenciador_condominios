@@ -31,10 +31,7 @@ import {
 import { toast } from 'sonner';
 import { DataTable, type Column } from '@/components/tables/data-table';
 import { BuildingFormModal } from './_components/building-form-modal';
-import {
-  useBuildings,
-  useDeleteBuilding,
-} from '@/lib/api/hooks/use-buildings';
+import { useBuildings, useDeleteBuilding } from '@/lib/api/hooks/use-buildings';
 import { type Building } from '@/lib/schemas/building.schema';
 import { buildingExportColumns } from '@/lib/hooks/use-export';
 import { useCrudPage } from '@/lib/hooks/use-crud-page';
@@ -77,14 +74,9 @@ export default function BuildingsPage() {
       title: 'Ações',
       key: 'actions',
       width: 150,
-      fixed: 'right',
       render: (_, record: Building) => (
         <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => crud.openEditModal(record)}
-          >
+          <Button variant="ghost" size="sm" onClick={() => crud.openEditModal(record)}>
             <Pencil className="h-4 w-4 mr-1" />
             Editar
           </Button>
@@ -116,9 +108,7 @@ export default function BuildingsPage() {
       <div className="mb-4 flex justify-between items-center flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold">Prédios</h1>
-          <p className="text-muted-foreground mt-1">
-            Gerencie os prédios do condomínio
-          </p>
+          <p className="text-muted-foreground mt-1">Gerencie os prédios do condomínio</p>
         </div>
         <div className="flex gap-2">
           <DropdownMenu>
@@ -162,7 +152,8 @@ export default function BuildingsPage() {
       {crud.bulkOps.hasSelection && (
         <div className="mb-4 p-4 bg-primary/5 border border-primary/20 rounded flex justify-between items-center flex-wrap gap-3">
           <span className="text-primary font-medium">
-            {crud.bulkOps.selectionCount} {crud.bulkOps.selectionCount === 1 ? 'prédio selecionado' : 'prédios selecionados'}
+            {crud.bulkOps.selectionCount}{' '}
+            {crud.bulkOps.selectionCount === 1 ? 'prédio selecionado' : 'prédios selecionados'}
           </span>
           <div className="flex gap-2">
             <Button variant="outline" onClick={crud.bulkOps.clearSelection}>
@@ -199,7 +190,9 @@ export default function BuildingsPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir prédio</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja excluir {crud.itemToDelete?.name ? `"${crud.itemToDelete.name}"` : 'este prédio'}? Esta ação não pode ser desfeita.
+              Tem certeza que deseja excluir{' '}
+              {crud.itemToDelete?.name ? `"${crud.itemToDelete.name}"` : 'este prédio'}? Esta ação
+              não pode ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -221,8 +214,8 @@ export default function BuildingsPage() {
             <AlertDialogTitle>Excluir prédios selecionados</AlertDialogTitle>
             <AlertDialogDescription>
               Tem certeza que deseja excluir {crud.bulkOps.selectionCount}{' '}
-              {crud.bulkOps.selectionCount === 1 ? 'prédio' : 'prédios'}? Esta ação não pode
-              ser desfeita.
+              {crud.bulkOps.selectionCount === 1 ? 'prédio' : 'prédios'}? Esta ação não pode ser
+              desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

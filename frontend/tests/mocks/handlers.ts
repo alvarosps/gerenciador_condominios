@@ -324,6 +324,20 @@ const tenantHandlers = [
     tenants.splice(index, 1);
     return new HttpResponse(null, { status: 204 });
   }),
+
+  // Partially update tenant (lease-form-modal / tenant-lease-modal PATCH due_day + dependents)
+  http.patch(`${API_BASE}/tenants/:id/`, async ({ params, request }) => {
+    await delay(100);
+    const id = Number(params.id);
+    const data = (await request.json()) as Partial<(typeof tenants)[0]>;
+    const index = tenants.findIndex((t) => t.id === id);
+    const existing = tenants[index];
+    if (index === -1 || !existing) {
+      return new HttpResponse(null, { status: 404 });
+    }
+    tenants[index] = Object.assign({}, existing, data);
+    return HttpResponse.json(tenants[index]);
+  }),
 ];
 
 /**
@@ -457,6 +471,44 @@ const leaseHandlers = [
       new_due_day: data.new_due_day,
       adjustment_fee: Math.abs(data.new_due_day - oldDueDay) * 50,
     });
+  }),
+
+  // Partially update lease
+  http.patch(`${API_BASE}/leases/:id/`, async ({ params, request }) => {
+    await delay(100);
+    const id = Number(params.id);
+    const data = (await request.json()) as Partial<(typeof leases)[0]>;
+    const index = leases.findIndex((l) => l.id === id);
+    const existingLease = leases[index];
+    if (index === -1 || !existingLease) {
+      return new HttpResponse(null, { status: 404 });
+    }
+    leases[index] = Object.assign({}, existingLease, data);
+    return HttpResponse.json(leases[index]);
+  }),
+
+  // Transfer lease to a different apartment
+  http.post(`${API_BASE}/leases/:id/transfer/`, async ({ params }) => {
+    await delay(100);
+    const id = Number(params.id);
+    const lease = leases.find((l) => l.id === id);
+    if (!lease) {
+      return new HttpResponse(null, { status: 404 });
+    }
+    const newLease = createMockLease({ ...lease, id: leases.length + 1 });
+    leases.push(newLease);
+    return HttpResponse.json(newLease, { status: 201 });
+  }),
+
+  // Terminate lease
+  http.post(`${API_BASE}/leases/:id/terminate/`, async ({ params }) => {
+    await delay(100);
+    const id = Number(params.id);
+    const lease = leases.find((l) => l.id === id);
+    if (!lease) {
+      return new HttpResponse(null, { status: 404 });
+    }
+    return HttpResponse.json({ detail: 'Lease terminated successfully' });
   }),
 ];
 
@@ -2114,6 +2166,64 @@ const tenantPortalHandlers = [
         building_name: '836',
         building_address: 'Rua das Flores, 836',
       },
+    });
+  }),
+
+  // Update the authenticated user's profile (first_name/last_name/phone)
+  http.patch(`${API_BASE}/auth/me/update/`, async () => {
+    await delay(50);
+    return HttpResponse.json({
+      id: 10,
+      email: '',
+      first_name: 'João',
+      last_name: 'Silva',
+      is_staff: false,
+    });
+  }),
+
+  // Rent payment history
+  http.get(`${API_BASE}/tenant/payments/`, async () => {
+    await delay(50);
+    return HttpResponse.json({ count: 0, next: null, previous: null, results: [] });
+  }),
+
+  // Rent adjustment history
+  http.get(`${API_BASE}/tenant/rent-adjustments/`, async () => {
+    await delay(50);
+    return HttpResponse.json([]);
+  }),
+
+  // Payment proof list (P4)
+  http.get(`${API_BASE}/tenant/payments/proof/`, async () => {
+    await delay(50);
+    return HttpResponse.json({ count: 0, next: null, previous: null, results: [] });
+  }),
+
+  // Payment proof upload
+  http.post(`${API_BASE}/tenant/payments/proof/`, async () => {
+    await delay(100);
+    return HttpResponse.json(
+      {
+        id: 1,
+        lease: 1,
+        reference_month: '2026-03-01',
+        file: 'http://localhost:8008/media/payment_proofs/2026/03/proof.png',
+        pix_code: '',
+        status: 'pending',
+        reviewed_at: null,
+        rejection_reason: '',
+        created_at: '2026-03-01T10:00:00Z',
+      },
+      { status: 201 }
+    );
+  }),
+
+  // Contract PDF download
+  http.get(`${API_BASE}/tenant/contract/`, async () => {
+    await delay(50);
+    return new HttpResponse(new Blob(['%PDF-1.4 test'], { type: 'application/pdf' }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/pdf' },
     });
   }),
 ];

@@ -24,7 +24,7 @@ The same layering applies to BOTH Django apps: `core/` (property + legacy person
 ## API & Serializers (DRF)
 - Serializer dual pattern — read: nested (`building = BuildingSerializer(read_only=True)`); write: `_id` via `PrimaryKeyRelatedField(write_only=True, source='building')`; M2M write uses `_ids` (`furniture_ids`, `tenant_ids`).
 - ViewSets: `ModelViewSet` for CRUD; `@action(detail=True)` for instance actions, `@action(detail=False)` for collection; business logic stays in services, never in the viewset.
-- Responses: list endpoints are paginated with a `results` array; errors use DRF standard shape (`detail`, `non_field_errors`, field-level errors); export via `/export/excel/` and `/export/csv/` on each resource.
+- Responses: list endpoints are paginated with a `results` array; errors use DRF standard shape (`detail`, `non_field_errors`, field-level errors); export is client-side only (`frontend/lib/hooks/use-export.ts` generates xlsx/csv in the browser) — no backend export routes exist.
 - URLs: plural resources (`buildings/`, `apartments/`, `tenants/`, `leases/`, `furnitures/`); custom actions use underscores (`generate_contract/`, `calculate_late_fee/`, `change_due_date/`).
 
 ## Frontend Layers

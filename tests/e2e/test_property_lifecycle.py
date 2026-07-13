@@ -153,8 +153,9 @@ class TestPropertyLifecycleE2E:
         assert lease_detail.data["contract_generated"] is True
 
         # Step 6: Calculate late fee with frozen time past due date
-        # due_day=10, freeze to day 15 of the same month — 5 days late
-        with freeze_time("2025-02-15"):
+        # due_day=10, freeze to day 15 of the same month — 5 days late.
+        # Frozen at noon UTC so today_sp() stays on 2025-02-15 (not the previous day).
+        with freeze_time("2025-02-15 12:00:00"):
             late_fee_resp = client.get(f"/api/leases/{lease_id}/calculate_late_fee/")
             assert late_fee_resp.status_code == status.HTTP_200_OK
             # Should be late because day 15 > due_day 10
@@ -656,7 +657,7 @@ class TestSoftDeleteCascadeBehavior:
         )
 
         # Create lease so we can verify it survives tenant soft delete
-        Lease.objects.create(
+        lease = Lease.objects.create(
             apartment=apt,
             responsible_tenant=tenant,
             start_date=date(2024, 1, 1),
@@ -665,7 +666,13 @@ class TestSoftDeleteCascadeBehavior:
             rental_value=Decimal("1000.00"),
         )
 
-        # Soft delete the tenant via API
+        # B14: a tenant responsible for an active lease cannot be deleted until the lease
+        # is terminated first.
+        blocked_delete_resp = client.delete(f"/api/tenants/{tenant.pk}/")
+        assert blocked_delete_resp.status_code == status.HTTP_400_BAD_REQUEST
+        lease.delete()
+
+        # Soft delete the tenant via API — now allowed since the lease is terminated
         delete_resp = client.delete(f"/api/tenants/{tenant.pk}/")
         assert delete_resp.status_code == status.HTTP_204_NO_CONTENT
 
@@ -746,12 +753,13 @@ class TestAuthAndPermissionWorkflow:
                 f"Expected 401 for unauthenticated GET {url}, got {resp.status_code}"
             )
 
-    def test_non_admin_read_only_on_property_endpoints(
+    def test_non_admin_forbidden_on_property_endpoints(
         self, admin_user, regular_user, sample_building_data
     ):
         """
-        Regular authenticated user can READ buildings, apartments, tenants, leases.
-        Regular user CANNOT CREATE/UPDATE/DELETE (403).
+        Regular authenticated (non-tenant) user CANNOT read or write buildings/apartments
+        (B1: admin-only — the tenant portal is isolated under /api/tenant/*).
+        Regular user CANNOT CREATE/UPDATE/DELETE tenants (403) either.
         Admin user can do everything.
         """
         admin_client = APIClient()
@@ -768,12 +776,12 @@ class TestAuthAndPermissionWorkflow:
         assert building_resp.status_code == status.HTTP_201_CREATED
         building_id = building_resp.data["id"]
 
-        # Non-admin can READ
+        # Non-admin CANNOT read (B1: buildings are admin-only)
         read_resp = non_admin.get("/api/buildings/")
-        assert read_resp.status_code == status.HTTP_200_OK
+        assert read_resp.status_code == status.HTTP_403_FORBIDDEN
 
         detail_resp = non_admin.get(f"/api/buildings/{building_id}/")
-        assert detail_resp.status_code == status.HTTP_200_OK
+        assert detail_resp.status_code == status.HTTP_403_FORBIDDEN
 
         # Non-admin CANNOT create
         create_resp = non_admin.post(
@@ -805,9 +813,9 @@ class TestAuthAndPermissionWorkflow:
         assert apt_resp.status_code == status.HTTP_201_CREATED
         apt_id = apt_resp.data["id"]
 
-        # Non-admin can read apartments
+        # Non-admin CANNOT read apartments (B1: admin-only, owner PII protection)
         apt_read = non_admin.get("/api/apartments/")
-        assert apt_read.status_code == status.HTTP_200_OK
+        assert apt_read.status_code == status.HTTP_403_FORBIDDEN
 
         # Non-admin cannot delete apartments
         apt_delete = non_admin.delete(f"/api/apartments/{apt_id}/")

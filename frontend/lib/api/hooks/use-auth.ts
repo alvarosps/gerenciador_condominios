@@ -102,10 +102,16 @@ export function useLogout() {
 }
 
 /**
- * Hook to get current user profile
+ * Hook to get current user profile.
+ *
+ * Enabled both when a user is already known (revalidation) and when the session was
+ * restored from an HttpOnly auth cookie but the Zustand store hasn't been populated yet
+ * (e.g. a fresh tab after login) — the latter is what lets `MainLayout` bootstrap `user`
+ * via TanStack Query instead of an untracked one-off fetch.
  */
 export function useCurrentUser() {
   const user = useAuthStore((state) => state.user);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
   return useQuery({
     queryKey: queryKeys.currentUser.all,
@@ -113,7 +119,7 @@ export function useCurrentUser() {
       const { data } = await apiClient.get<User>('/auth/me/');
       return data;
     },
-    enabled: Boolean(user),
+    enabled: Boolean(user) || isAuthenticated,
     placeholderData: user ?? undefined,
   });
 }

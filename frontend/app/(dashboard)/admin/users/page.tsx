@@ -54,8 +54,7 @@ export default function AdminUsersPage() {
     {
       title: 'Nome',
       key: 'full_name',
-      render: (_, record) =>
-        [record.first_name, record.last_name].filter(Boolean).join(' ') || '-',
+      render: (_, record) => [record.first_name, record.last_name].filter(Boolean).join(' ') || '-',
     },
     {
       title: 'Email',
@@ -94,7 +93,6 @@ export default function AdminUsersPage() {
       title: 'Ações',
       key: 'actions',
       width: 150,
-      fixed: 'right',
       render: (_, record) => (
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="sm" onClick={() => crud.openEditModal(record)}>
@@ -144,12 +142,7 @@ export default function AdminUsersPage() {
         </Alert>
       )}
 
-      <DataTable<AdminUser>
-        columns={columns}
-        dataSource={users}
-        loading={isLoading}
-        rowKey="id"
-      />
+      <DataTable<AdminUser> columns={columns} dataSource={users} loading={isLoading} rowKey="id" />
 
       <UserFormModal open={crud.isModalOpen} user={crud.editingItem} onClose={crud.closeModal} />
 

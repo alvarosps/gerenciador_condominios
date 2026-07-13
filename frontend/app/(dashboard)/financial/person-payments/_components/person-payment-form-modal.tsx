@@ -37,6 +37,7 @@ import {
 import { usePersons } from '@/lib/api/hooks/use-persons';
 import type { PersonPayment } from '@/lib/schemas/person-payment.schema';
 import { handleError } from '@/lib/utils/error-handler';
+import { getTodayLocalISO } from '@/lib/utils/formatters';
 
 interface Props {
   open: boolean;
@@ -55,10 +56,6 @@ const personPaymentFormSchema = z.object({
 });
 
 type PersonPaymentFormValues = z.infer<typeof personPaymentFormSchema>;
-
-function getTodayISO(): string {
-  return new Date().toISOString().split('T')[0] ?? '';
-}
 
 function getCurrentMonth(): string {
   const now = new Date();
@@ -84,7 +81,7 @@ export function PersonPaymentFormModal({
       person_id: defaultPersonId ?? 0,
       reference_month: defaultReferenceMonth ?? getCurrentMonth(),
       amount: 0,
-      payment_date: getTodayISO(),
+      payment_date: getTodayLocalISO(),
       notes: '',
     },
   });
@@ -106,7 +103,7 @@ export function PersonPaymentFormModal({
         person_id: defaultPersonId ?? 0,
         reference_month: defaultReferenceMonth ?? getCurrentMonth(),
         amount: 0,
-        payment_date: getTodayISO(),
+        payment_date: getTodayLocalISO(),
         notes: '',
       });
     }
@@ -144,9 +141,7 @@ export function PersonPaymentFormModal({
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>
-            {personPayment ? 'Editar Pagamento' : 'Registrar Pagamento'}
-          </DialogTitle>
+          <DialogTitle>{personPayment ? 'Editar Pagamento' : 'Registrar Pagamento'}</DialogTitle>
         </DialogHeader>
 
         <Form {...form}>
@@ -255,10 +250,7 @@ export function PersonPaymentFormModal({
               <Button type="button" variant="outline" onClick={handleClose}>
                 Cancelar
               </Button>
-              <Button
-                type="submit"
-                disabled={createMutation.isPending || updateMutation.isPending}
-              >
+              <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
                 {personPayment ? 'Atualizar' : 'Registrar'}
               </Button>
             </DialogFooter>

@@ -236,8 +236,11 @@ class BillQuerySet(models.QuerySet["Bill"]):
             ).values("total"),
             output_field=_MONEY,
         )
+        # payment__is_deleted=False: a soft-deleted Payment's allocation must not count (the
+        # forward FK join does not apply Payment's default manager) — symmetric to
+        # CondoBalanceService._caixa_outflow (B10b).
         paid_subquery = Subquery(
-            PaymentAllocation.objects.filter(bill=OuterRef("pk"))
+            PaymentAllocation.objects.filter(bill=OuterRef("pk"), payment__is_deleted=False)
             .values("bill")
             .annotate(paid=Coalesce(Sum("amount"), _ZERO_MONEY))
             .values("paid"),
@@ -340,6 +343,14 @@ class Bill(AuditMixin, SoftDeleteMixin, models.Model):
     class Meta:
         default_manager_name = "objects"
         ordering = ["-competence_month", "due_date"]
+        indexes = [
+            # Overdue lookups: is_overdue = due_date < today AND lifecycle_state == active.
+            models.Index(fields=["lifecycle_state", "due_date"], name="bill_state_due_idx"),
+            # Monthly-competence queries (dashboard/generation), usually scoped to active bills.
+            models.Index(
+                fields=["competence_month", "lifecycle_state"], name="bill_competence_state_idx"
+            ),
+        ]
         constraints = [
             models.UniqueConstraint(
                 fields=["billing_account", "competence_month"],
@@ -607,6 +618,9 @@ class Installment(AuditMixin, SoftDeleteMixin, models.Model):
     class Meta:
         default_manager_name = "objects"
         ordering = ["due_date", "number"]
+        indexes = [
+            models.Index(fields=["due_date"], name="finance_inst_due_date_idx"),
+        ]
         constraints = [
             models.UniqueConstraint(
                 fields=["plan", "number"],

@@ -15,10 +15,45 @@ from finances.models import (
     InstallmentPlan,
     InstallmentPlanState,
 )
+from finances.services.bill_lifecycle_service import BillLifecycleService
+from finances.services.bill_payment_service import BillPaymentService
 from finances.services.installment_plan_service import InstallmentPlanService, _split_amount
-from tests.factories import make_bill, make_bill_line_item, make_billing_account
+from tests.factories import (
+    make_bill,
+    make_bill_line_item,
+    make_billing_account,
+    make_installment,
+    make_installment_plan,
+)
 
 pytestmark = pytest.mark.django_db
+
+
+# --- B5: materialize_schedule (used by the create-via-API path, InstallmentPlanViewSet) ---
+
+
+def test_materialize_schedule_creates_installments_summing_to_total() -> None:
+    plan = make_installment_plan(
+        total_amount=Decimal("1200.00"),
+        installment_count=12,
+        start_due_date=date(2026, 7, 10),
+        default_due_day=10,
+    )
+    InstallmentPlanService.materialize_schedule(plan)
+    installments = list(plan.installments.order_by("number"))
+    assert len(installments) == 12
+    assert sum(i.amount for i in installments) == Decimal("1200.00")
+    assert installments[0].due_date == date(2026, 7, 10)
+    assert installments[1].due_date == date(2026, 8, 10)
+
+
+def test_materialize_schedule_is_idempotent_when_already_materialized() -> None:
+    plan = make_installment_plan(installment_count=1)
+    make_installment(plan=plan, number=1)
+    before = list(plan.installments.values_list("id", flat=True))
+    InstallmentPlanService.materialize_schedule(plan)
+    after = list(plan.installments.values_list("id", flat=True))
+    assert before == after  # no duplicate materialization
 
 
 def _iptu_account(condominium=None) -> BillingAccount:
@@ -215,3 +250,33 @@ def test_convert_deferred_rejects_non_iptu_billing_account() -> None:
         )
     assert "billing_account" in exc.value.message_dict
     assert InstallmentPlan.objects.count() == 0
+
+
+# --- B9: convert_deferred must parcel amount_remaining (total - already paid), not amount_total ---
+
+
+@freeze_time("2026-06-15")
+def test_convert_deferred_parcels_only_remaining_after_partial_payment() -> None:
+    account = _iptu_account()
+    bill = make_bill(
+        condominium=account.condominium,
+        behavior="one_time",
+        lifecycle_state=BillLifecycleState.ACTIVE,  # pay requires ACTIVE
+        billing_account=account,
+    )
+    make_bill_line_item(bill=bill, amount=Decimal("1200.00"))
+    BillPaymentService.pay(bill, date(2026, 6, 1), amount=Decimal("200.00"))  # partial payment
+    BillLifecycleService.set_state(
+        bill, BillLifecycleState.DEFERRED
+    )  # allowed: defer, not paid-blocked
+
+    plan = InstallmentPlanService.convert_deferred(
+        deferred_bill=bill,
+        installment_count=10,
+        start_due_date=date(2026, 7, 10),
+        default_due_day=10,
+    )
+    # remaining = 1200 - 200 = 1000, NOT the full 1200 (would double-charge the paid part)
+    assert plan.total_amount == Decimal("1000.00")
+    installments = list(plan.installments.order_by("number"))
+    assert sum(i.amount for i in installments) == Decimal("1000.00")
