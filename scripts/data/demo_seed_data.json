@@ -1,0 +1,7181 @@
+{
+  "_meta": {
+    "generated_at": "2026-07-13",
+    "description": "Dataset de demo exaustivo para gerenciador_condominios — locação de kitnets em Porto Alegre-RS. Escala real de uso: 3 prédios, 34 kitnets, 30 locações (28 ativas + 2 encerradas), 30 inquilinos fictícios com CPFs válidos, 18 meses de histórico de aluguel (jan/2025-jun/2026), módulo condominial (água DMAE, luz CEEE Equatorial, IPTU POA, internet, folha do zelador, reserva).",
+    "sources": {
+      "ipca_ibge": [
+        "https://www.dadosdemercado.com.br/indices/ipca",
+        "https://www.idinheiro.com.br/tabelas/tabela-ipca/",
+        "https://www.debit.com.br/tabelas/ipca-indice-nacional-de-precos-ao-consumidor-amplo",
+        "https://www.ibge.gov.br/estatisticas/economicas/precos-e-custos/9256-indice-nacional-de-precos-ao-consumidor-amplo.html",
+        "https://www.cnnbrasil.com.br/economia/macroeconomia/inflacao-ibge-ipca-12-junho-2026/",
+        "https://www.quintoandar.com.br/guias/dados-indices/ipca-acumulado-reajuste-de-aluguel-2026/"
+      ],
+      "aluguel_kitnet_poa": [
+        "https://www.quintoandar.com.br/alugar/imovel/centro-historico-porto-alegre-rs-brasil/kitnet",
+        "https://www.quintoandar.com.br/alugar/imovel/cidade-baixa-porto-alegre-rs-brasil/kitnet",
+        "https://www.quintoandar.com.br/alugar/imovel/porto-alegre-rs-brasil/kitnet"
+      ],
+      "agua_dmae": [
+        "https://prefeitura.poa.br/dmae/noticias/dmae-atualiza-tarifas-de-agua-e-esgoto-partir-desta-segunda-feira",
+        "https://dopaonlineupload.procempa.com.br/dopaonlineupload/5606_ce_528225_1.pdf"
+      ],
+      "luz_ceee_equatorial": [
+        "https://ceee.equatorialenergia.com.br/tarifas-e-custos",
+        "https://sul21.com.br/noticias/geral/2025/11/conta-de-luz-vai-subir-2176-para-clientes-residenciais-da-ceee-equatorial-a-partir-de-novembro/"
+      ],
+      "iptu_porto_alegre": [
+        "https://prefeitura.poa.br/smf/iptu",
+        "https://prefeitura.poa.br/smf/noticias/pagamento-do-iptu-2026-com-desconto-pode-ser-feito-ate-9-de-fevereiro",
+        "https://sul21.com.br/noticias/geral/2026/02/porto-alegre-guias-da-primeira-parcela-do-iptu-2026-ja-podem-ser-emitidas/"
+      ],
+      "salario_zelador_poa": [
+        "https://www.salario.com.br/profissao/zelador-de-edifico-cbo-514120/porto-alegre-rs/",
+        "https://br.indeed.com/career/diarista/salaries/Porto-Alegre--RS"
+      ],
+      "ruas_bairros_poa": [
+        "https://destinosdosul.com/2023/08/25/antigos-nomes-das-ruas-do-centro-historico-de-porto-alegre/",
+        "https://pt.wikipedia.org/wiki/Santana_(Porto_Alegre)"
+      ]
+    },
+    "calibration_notes": {
+      "ipca": "Série jan/2025-jun/2026 (18 meses) cruzada entre 2 fontes independentes (dadosdemercado.com.br e idinheiro.com.br) com concordância total mês a mês; acumulado 12m jun/2026 (4,64%) bate com a divulgação oficial IBGE (10/07/2026). 12 meses adicionais de 2024 incluídos para permitir cálculo de acumulado de 12m em reajustes cujo aniversário cai no início da janela 2025. IPCAIndex.value é uma série de número-índice ENCADEADA (não um valor absoluto pesquisado) ancorada em jun/2026=7660.9483201823 e multiplicada retroativamente pelas variações mensais reais — o serviço de reajuste (RentAdjustmentService) usa apenas a RAZÃO entre dois pontos da série, então o anchor absoluto não afeta a corretude dos reajustes calculados.",
+      "aluguel": "Faixas por prédio calibradas a partir das médias reais de mercado por bairro (QuintoAndar 2026): Centro Histórico R$1.000-3.250 (média R$1.740) -> usamos R$950-1.450 (unidades pequenas/kitnets simples, abaixo da média de studios maiores do portal); Cidade Baixa R$1.100-2.616 (média R$2.040) -> usamos R$1.150-1.750; Santana sem dado direto, usamos faixa intermediária R$1.000-1.500 consistente com a média geral de POA (R$730-3.800, média R$1.561).",
+      "agua_dmae": "Tarifa R$5,18/m3 até 22/02/2026, R$5,50/m3 a partir de 23/02/2026 (+6,21%, decreto municipal). Consumo de área comum de prédio pequeno de kitnets estimado 19-26 m3/mês por prédio (12 ou 10 unidades) com variação leve mês a mês.",
+      "luz_ceee": "Tarifa residencial +21,76% a partir de nov/2025 (aprovado ANEEL). Usamos R$0,92/kWh pré-nov/2025 e R$1,12/kWh pós-nov/2025 (estimativa com tributos embutidos) para o consumo de área comum (iluminação de corredor, bomba d'água). Sazonalidade: consumo elevado ~35% em jun/jul/ago (inverno gaúcho, aquecedores/iluminação mais cedo).",
+      "iptu_poa": "Valor venal anual base estimado por prédio pequeno (R$2.210-2.890 conforme bairro), corrigido +4,68% em 2026 (correção IPTU 2026 divulgada pela prefeitura). Parcelamento em 10x sem juros a partir de março, conforme calendário oficial 2026.",
+      "salario_zelador": "Salário base R$2.100/mês (mediana pesquisada: R$2.017-2.224 para 'Zelador de Edifício' em Porto Alegre, 44h semanais). Modelado como funcionário com salary-offset: aluguel da própria kitnet compensado no pagamento (lease is_salary_offset=true), mais um pequeno variável por faxina de kitnet vago.",
+      "cpf_geracao": "CPFs gerados algoritmicamente: 9 dígitos base sequenciais e distintos (evitando todos-iguais, que a validação rejeita), dígitos verificadores calculados pelo mesmo algoritmo módulo-11 de core/validators/brazilian.py (peso decrescente 10..2, resto<2 => 0, senão 11-resto), aplicado duas vezes (DV1 sobre os 9 primeiros dígitos, DV2 sobre os 10 primeiros incluindo DV1). Todos os 30 CPFs foram validados programaticamente contra essa mesma lógica antes de serem incluídos no dataset."
+    },
+    "scale_inventory": {
+      "buildings": 3,
+      "apartments": 34,
+      "tenants": 30,
+      "dependents": 5,
+      "leases_total": 30,
+      "leases_active": 28,
+      "leases_ended": 2,
+      "apartments_vacant_no_history": 4,
+      "rent_adjustments": 10,
+      "rent_payments": 475,
+      "ipca_index_months": 30,
+      "payment_proofs": 6,
+      "water_bills": 54,
+      "electricity_bills": 54,
+      "internet_bills": 54,
+      "iptu_terms": 6,
+      "employee_payments": 18,
+      "reserve_movements": 8,
+      "finance_categories": 10,
+      "users": 4
+    }
+  },
+  "buildings": [
+    {
+      "street_number": 1247,
+      "name": "Residencial Riachuelo",
+      "address": "Rua Riachuelo, 1247 - Centro Histórico, Porto Alegre - RS",
+      "neighborhood": "Centro Histórico"
+    },
+    {
+      "street_number": 588,
+      "name": "Residencial João Alfredo",
+      "address": "Rua João Alfredo, 588 - Cidade Baixa, Porto Alegre - RS",
+      "neighborhood": "Cidade Baixa"
+    },
+    {
+      "street_number": 2310,
+      "name": "Residencial Santana",
+      "address": "Rua Santana, 2310 - Santana, Porto Alegre - RS",
+      "neighborhood": "Santana"
+    }
+  ],
+  "apartments": [
+    {
+      "building_street_number": 1247,
+      "number": 101,
+      "rental_value": "950.00",
+      "rental_value_double": "1215.00",
+      "cleaning_fee": "120.00",
+      "max_tenants": 2,
+      "furnitures": [
+        "Cama de solteiro",
+        "Cama de casal",
+        "Guarda-roupa 2 portas",
+        "Fogão 4 bocas",
+        "Geladeira",
+        "Micro-ondas",
+        "Mesa com 2 cadeiras",
+        "Sofá 2 lugares",
+        "Ventilador de teto"
+      ]
+    },
+    {
+      "building_street_number": 1247,
+      "number": 102,
+      "rental_value": "995.00",
+      "rental_value_double": "1275.00",
+      "cleaning_fee": "120.00",
+      "max_tenants": 2,
+      "furnitures": [
+        "Cama de solteiro",
+        "Cama de casal",
+        "Guarda-roupa 2 portas",
+        "Fogão 4 bocas",
+        "Geladeira",
+        "Micro-ondas"
+      ]
+    },
+    {
+      "building_street_number": 1247,
+      "number": 103,
+      "rental_value": "1040.00",
+      "rental_value_double": "1330.00",
+      "cleaning_fee": "120.00",
+      "max_tenants": 2,
+      "furnitures": [
+        "Cama de solteiro",
+        "Cama de casal",
+        "Guarda-roupa 2 portas",
+        "Fogão 4 bocas",
+        "Geladeira",
+        "Micro-ondas"
+      ]
+    },
+    {
+      "building_street_number": 1247,
+      "number": 104,
+      "rental_value": "1085.00",
+      "rental_value_double": "1390.00",
+      "cleaning_fee": "120.00",
+      "max_tenants": 2,
+      "furnitures": [
+        "Cama de solteiro",
+        "Cama de casal",
+        "Guarda-roupa 2 portas",
+        "Fogão 4 bocas",
+        "Geladeira",
+        "Micro-ondas",
+        "Mesa com 2 cadeiras",
+        "Sofá 2 lugares",
+        "Ventilador de teto"
+      ]
+    },
+    {
+      "building_street_number": 1247,
+      "number": 105,
+      "rental_value": "1130.00",
+      "rental_value_double": "1445.00",
+      "cleaning_fee": "120.00",
+      "max_tenants": 2,
+      "furnitures": [
+        "Cama de solteiro",
+        "Cama de casal",
+        "Guarda-roupa 2 portas",
+        "Fogão 4 bocas",
+        "Geladeira",
+        "Micro-ondas"
+      ]
+    },
+    {
+      "building_street_number": 1247,
+      "number": 106,
+      "rental_value": "1175.00",
+      "rental_value_double": "1505.00",
+      "cleaning_fee": "120.00",
+      "max_tenants": 2,
+      "furnitures": [
+        "Cama de solteiro",
+        "Cama de casal",
+        "Guarda-roupa 2 portas",
+        "Fogão 4 bocas",
+        "Geladeira",
+        "Micro-ondas"
+      ]
+    },
+    {
+      "building_street_number": 1247,
+      "number": 201,
+      "rental_value": "1225.00",
+      "rental_value_double": "1570.00",
+      "cleaning_fee": "120.00",
+      "max_tenants": 2,
+      "furnitures": [
+        "Cama de solteiro",
+        "Cama de casal",
+        "Guarda-roupa 2 portas",
+        "Fogão 4 bocas",
+        "Geladeira",
+        "Micro-ondas",
+        "Mesa com 2 cadeiras",
+        "Sofá 2 lugares",
+        "Ventilador de teto"
+      ]
+    },
+    {
+      "building_street_number": 1247,
+      "number": 202,
+      "rental_value": "1270.00",
+      "rental_value_double": "1625.00",
+      "cleaning_fee": "120.00",
+      "max_tenants": 2,
+      "furnitures": [
+        "Cama de solteiro",
+        "Cama de casal",
+        "Guarda-roupa 2 portas",
+        "Fogão 4 bocas",
+        "Geladeira",
+        "Micro-ondas"
+      ]
+    },
+    {
+      "building_street_number": 1247,
+      "number": 203,
+      "rental_value": "1315.00",
+      "rental_value_double": "1685.00",
+      "cleaning_fee": "120.00",
+      "max_tenants": 2,
+      "furnitures": [
+        "Cama de solteiro",
+        "Cama de casal",
+        "Guarda-roupa 2 portas",
+        "Fogão 4 bocas",
+        "Geladeira",
+        "Micro-ondas"
+      ]
+    },
+    {
+      "building_street_number": 1247,
+      "number": 204,
+      "rental_value": "1360.00",
+      "rental_value_double": "1740.00",
+      "cleaning_fee": "120.00",
+      "max_tenants": 2,
+      "furnitures": [
+        "Cama de solteiro",
+        "Cama de casal",
+        "Guarda-roupa 2 portas",
+        "Fogão 4 bocas",
+        "Geladeira",
+        "Micro-ondas",
+        "Mesa com 2 cadeiras",
+        "Sofá 2 lugares",
+        "Ventilador de teto"
+      ]
+    },
+    {
+      "building_street_number": 1247,
+      "number": 205,
+      "rental_value": "1405.00",
+      "rental_value_double": "1800.00",
+      "cleaning_fee": "120.00",
+      "max_tenants": 2,
+      "furnitures": [
+        "Cama de solteiro",
+        "Cama de casal",
+        "Guarda-roupa 2 portas",
+        "Fogão 4 bocas",
+        "Geladeira",
+        "Micro-ondas"
+      ]
+    },
+    {
+      "building_street_number": 1247,
+      "number": 206,
+      "rental_value": "1450.00",
+      "rental_value_double": "1855.00",
+      "cleaning_fee": "120.00",
+      "max_tenants": 2,
+      "furnitures": [
+        "Cama de solteiro",
+        "Cama de casal",
+        "Guarda-roupa 2 portas",
+        "Fogão 4 bocas",
+        "Geladeira",
+        "Micro-ondas"
+      ]
+    },
+    {
+      "building_street_number": 588,
+      "number": 101,
+      "rental_value": "1150.00",
+      "rental_value_double": "1470.00",
+      "cleaning_fee": "120.00",
+      "max_tenants": 2,
+      "furnitures": [
+        "Cama de solteiro",
+        "Cama de casal",
+        "Guarda-roupa 2 portas",
+        "Fogão 4 bocas",
+        "Geladeira",
+        "Micro-ondas",
+        "Mesa com 2 cadeiras",
+        "Sofá 2 lugares",
+        "Ventilador de teto"
+      ]
+    },
+    {
+      "building_street_number": 588,
+      "number": 102,
+      "rental_value": "1205.00",
+      "rental_value_double": "1540.00",
+      "cleaning_fee": "120.00",
+      "max_tenants": 2,
+      "furnitures": [
+        "Cama de solteiro",
+        "Cama de casal",
+        "Guarda-roupa 2 portas",
+        "Fogão 4 bocas",
+        "Geladeira",
+        "Micro-ondas"
+      ]
+    },
+    {
+      "building_street_number": 588,
+      "number": 103,
+      "rental_value": "1260.00",
+      "rental_value_double": "1615.00",
+      "cleaning_fee": "120.00",
+      "max_tenants": 2,
+      "furnitures": [
+        "Cama de solteiro",
+        "Cama de casal",
+        "Guarda-roupa 2 portas",
+        "Fogão 4 bocas",
+        "Geladeira",
+        "Micro-ondas"
+      ]
+    },
+    {
+      "building_street_number": 588,
+      "number": 104,
+      "rental_value": "1315.00",
+      "rental_value_double": "1685.00",
+      "cleaning_fee": "120.00",
+      "max_tenants": 2,
+      "furnitures": [
+        "Cama de solteiro",
+        "Cama de casal",
+        "Guarda-roupa 2 portas",
+        "Fogão 4 bocas",
+        "Geladeira",
+        "Micro-ondas",
+        "Mesa com 2 cadeiras",
+        "Sofá 2 lugares",
+        "Ventilador de teto"
+      ]
+    },
+    {
+      "building_street_number": 588,
+      "number": 105,
+      "rental_value": "1370.00",
+      "rental_value_double": "1755.00",
+      "cleaning_fee": "120.00",
+      "max_tenants": 2,
+      "furnitures": [
+        "Cama de solteiro",
+        "Cama de casal",
+        "Guarda-roupa 2 portas",
+        "Fogão 4 bocas",
+        "Geladeira",
+        "Micro-ondas"
+      ]
+    },
+    {
+      "building_street_number": 588,
+      "number": 106,
+      "rental_value": "1425.00",
+      "rental_value_double": "1825.00",
+      "cleaning_fee": "120.00",
+      "max_tenants": 2,
+      "furnitures": [
+        "Cama de solteiro",
+        "Cama de casal",
+        "Guarda-roupa 2 portas",
+        "Fogão 4 bocas",
+        "Geladeira",
+        "Micro-ondas"
+      ]
+    },
+    {
+      "building_street_number": 588,
+      "number": 201,
+      "rental_value": "1475.00",
+      "rental_value_double": "1890.00",
+      "cleaning_fee": "120.00",
+      "max_tenants": 2,
+      "furnitures": [
+        "Cama de solteiro",
+        "Cama de casal",
+        "Guarda-roupa 2 portas",
+        "Fogão 4 bocas",
+        "Geladeira",
+        "Micro-ondas",
+        "Mesa com 2 cadeiras",
+        "Sofá 2 lugares",
+        "Ventilador de teto"
+      ]
+    },
+    {
+      "building_street_number": 588,
+      "number": 202,
+      "rental_value": "1530.00",
+      "rental_value_double": "1960.00",
+      "cleaning_fee": "120.00",
+      "max_tenants": 2,
+      "furnitures": [
+        "Cama de solteiro",
+        "Cama de casal",
+        "Guarda-roupa 2 portas",
+        "Fogão 4 bocas",
+        "Geladeira",
+        "Micro-ondas"
+      ]
+    },
+    {
+      "building_street_number": 588,
+      "number": 203,
+      "rental_value": "1585.00",
+      "rental_value_double": "2030.00",
+      "cleaning_fee": "120.00",
+      "max_tenants": 2,
+      "furnitures": [
+        "Cama de solteiro",
+        "Cama de casal",
+        "Guarda-roupa 2 portas",
+        "Fogão 4 bocas",
+        "Geladeira",
+        "Micro-ondas"
+      ]
+    },
+    {
+      "building_street_number": 588,
+      "number": 204,
+      "rental_value": "1640.00",
+      "rental_value_double": "2100.00",
+      "cleaning_fee": "120.00",
+      "max_tenants": 2,
+      "furnitures": [
+        "Cama de solteiro",
+        "Cama de casal",
+        "Guarda-roupa 2 portas",
+        "Fogão 4 bocas",
+        "Geladeira",
+        "Micro-ondas",
+        "Mesa com 2 cadeiras",
+        "Sofá 2 lugares",
+        "Ventilador de teto"
+      ]
+    },
+    {
+      "building_street_number": 588,
+      "number": 205,
+      "rental_value": "1695.00",
+      "rental_value_double": "2170.00",
+      "cleaning_fee": "120.00",
+      "max_tenants": 2,
+      "furnitures": [
+        "Cama de solteiro",
+        "Cama de casal",
+        "Guarda-roupa 2 portas",
+        "Fogão 4 bocas",
+        "Geladeira",
+        "Micro-ondas"
+      ]
+    },
+    {
+      "building_street_number": 588,
+      "number": 206,
+      "rental_value": "1750.00",
+      "rental_value_double": "2240.00",
+      "cleaning_fee": "120.00",
+      "max_tenants": 2,
+      "furnitures": [
+        "Cama de solteiro",
+        "Cama de casal",
+        "Guarda-roupa 2 portas",
+        "Fogão 4 bocas",
+        "Geladeira",
+        "Micro-ondas"
+      ]
+    },
+    {
+      "building_street_number": 2310,
+      "number": 101,
+      "rental_value": "1000.00",
+      "rental_value_double": "1280.00",
+      "cleaning_fee": "120.00",
+      "max_tenants": 2,
+      "furnitures": [
+        "Cama de solteiro",
+        "Cama de casal",
+        "Guarda-roupa 2 portas",
+        "Fogão 4 bocas",
+        "Geladeira",
+        "Micro-ondas",
+        "Mesa com 2 cadeiras",
+        "Sofá 2 lugares",
+        "Ventilador de teto"
+      ]
+    },
+    {
+      "building_street_number": 2310,
+      "number": 102,
+      "rental_value": "1055.00",
+      "rental_value_double": "1350.00",
+      "cleaning_fee": "120.00",
+      "max_tenants": 2,
+      "furnitures": [
+        "Cama de solteiro",
+        "Cama de casal",
+        "Guarda-roupa 2 portas",
+        "Fogão 4 bocas",
+        "Geladeira",
+        "Micro-ondas"
+      ]
+    },
+    {
+      "building_street_number": 2310,
+      "number": 103,
+      "rental_value": "1110.00",
+      "rental_value_double": "1420.00",
+      "cleaning_fee": "120.00",
+      "max_tenants": 2,
+      "furnitures": [
+        "Cama de solteiro",
+        "Cama de casal",
+        "Guarda-roupa 2 portas",
+        "Fogão 4 bocas",
+        "Geladeira",
+        "Micro-ondas"
+      ]
+    },
+    {
+      "building_street_number": 2310,
+      "number": 104,
+      "rental_value": "1165.00",
+      "rental_value_double": "1490.00",
+      "cleaning_fee": "120.00",
+      "max_tenants": 2,
+      "furnitures": [
+        "Cama de solteiro",
+        "Cama de casal",
+        "Guarda-roupa 2 portas",
+        "Fogão 4 bocas",
+        "Geladeira",
+        "Micro-ondas",
+        "Mesa com 2 cadeiras",
+        "Sofá 2 lugares",
+        "Ventilador de teto"
+      ]
+    },
+    {
+      "building_street_number": 2310,
+      "number": 105,
+      "rental_value": "1220.00",
+      "rental_value_double": "1560.00",
+      "cleaning_fee": "120.00",
+      "max_tenants": 2,
+      "furnitures": [
+        "Cama de solteiro",
+        "Cama de casal",
+        "Guarda-roupa 2 portas",
+        "Fogão 4 bocas",
+        "Geladeira",
+        "Micro-ondas"
+      ]
+    },
+    {
+      "building_street_number": 2310,
+      "number": 201,
+      "rental_value": "1280.00",
+      "rental_value_double": "1640.00",
+      "cleaning_fee": "120.00",
+      "max_tenants": 2,
+      "furnitures": [
+        "Cama de solteiro",
+        "Cama de casal",
+        "Guarda-roupa 2 portas",
+        "Fogão 4 bocas",
+        "Geladeira",
+        "Micro-ondas"
+      ]
+    },
+    {
+      "building_street_number": 2310,
+      "number": 202,
+      "rental_value": "1335.00",
+      "rental_value_double": "1710.00",
+      "cleaning_fee": "120.00",
+      "max_tenants": 2,
+      "furnitures": [
+        "Cama de solteiro",
+        "Cama de casal",
+        "Guarda-roupa 2 portas",
+        "Fogão 4 bocas",
+        "Geladeira",
+        "Micro-ondas",
+        "Mesa com 2 cadeiras",
+        "Sofá 2 lugares",
+        "Ventilador de teto"
+      ]
+    },
+    {
+      "building_street_number": 2310,
+      "number": 203,
+      "rental_value": "1390.00",
+      "rental_value_double": "1780.00",
+      "cleaning_fee": "120.00",
+      "max_tenants": 2,
+      "furnitures": [
+        "Cama de solteiro",
+        "Cama de casal",
+        "Guarda-roupa 2 portas",
+        "Fogão 4 bocas",
+        "Geladeira",
+        "Micro-ondas"
+      ]
+    },
+    {
+      "building_street_number": 2310,
+      "number": 204,
+      "rental_value": "1445.00",
+      "rental_value_double": "1850.00",
+      "cleaning_fee": "120.00",
+      "max_tenants": 2,
+      "furnitures": [
+        "Cama de solteiro",
+        "Cama de casal",
+        "Guarda-roupa 2 portas",
+        "Fogão 4 bocas",
+        "Geladeira",
+        "Micro-ondas"
+      ]
+    },
+    {
+      "building_street_number": 2310,
+      "number": 205,
+      "rental_value": "1500.00",
+      "rental_value_double": "1920.00",
+      "cleaning_fee": "120.00",
+      "max_tenants": 2,
+      "furnitures": [
+        "Cama de solteiro",
+        "Cama de casal",
+        "Guarda-roupa 2 portas",
+        "Fogão 4 bocas",
+        "Geladeira",
+        "Micro-ondas",
+        "Mesa com 2 cadeiras",
+        "Sofá 2 lugares",
+        "Ventilador de teto"
+      ]
+    }
+  ],
+  "tenants": [
+    {
+      "id_ref": "tenant_01",
+      "name": "Marcelo Souza Martins",
+      "cpf_cnpj": "160.260.650-16",
+      "is_company": false,
+      "phone": "(51) 91000-1000",
+      "marital_status": "Solteiro(a)",
+      "profession": "Analista de Sistemas",
+      "due_day": 5,
+      "has_dependent": true
+    },
+    {
+      "id_ref": "tenant_02",
+      "name": "Camila Oliveira Rocha",
+      "cpf_cnpj": "348.621.595-75",
+      "is_company": false,
+      "phone": "(51) 91037-1073",
+      "marital_status": "Casado(a)",
+      "profession": "Professor(a)",
+      "due_day": 10,
+      "has_dependent": false
+    },
+    {
+      "id_ref": "tenant_03",
+      "name": "Rodrigo Costa Dias",
+      "cpf_cnpj": "518.728.120-82",
+      "is_company": false,
+      "phone": "(51) 91074-1146",
+      "marital_status": "Divorciado(a)",
+      "profession": "Enfermeiro(a)",
+      "due_day": 15,
+      "has_dependent": false
+    },
+    {
+      "id_ref": "tenant_04",
+      "name": "Fernanda Pereira Nunes",
+      "cpf_cnpj": "330.201.745-62",
+      "is_company": false,
+      "phone": "(51) 91111-1219",
+      "marital_status": "Viúvo(a)",
+      "profession": "Comerciante",
+      "due_day": 20,
+      "has_dependent": false
+    },
+    {
+      "id_ref": "tenant_05",
+      "name": "Bruno Almeida Teixeira",
+      "cpf_cnpj": "733.114.870-28",
+      "is_company": false,
+      "phone": "(51) 91148-1292",
+      "marital_status": "União Estável",
+      "profession": "Motorista de Aplicativo",
+      "due_day": 5,
+      "has_dependent": false
+    },
+    {
+      "id_ref": "tenant_06",
+      "name": "Juliana Ribeiro Correia",
+      "cpf_cnpj": "181.205.495-54",
+      "is_company": false,
+      "phone": "(51) 91185-1365",
+      "marital_status": "Solteiro(a)",
+      "profession": "Estudante Universitário(a)",
+      "due_day": 10,
+      "has_dependent": false
+    },
+    {
+      "id_ref": "tenant_07",
+      "name": "Diego Carvalho Cardoso",
+      "cpf_cnpj": "310.283.620-80",
+      "is_company": false,
+      "phone": "(51) 91222-1438",
+      "marital_status": "Casado(a)",
+      "profession": "Autônomo(a)",
+      "due_day": 15,
+      "has_dependent": true
+    },
+    {
+      "id_ref": "tenant_08",
+      "name": "Patricia Gomes Barbosa",
+      "cpf_cnpj": "143.799.245-56",
+      "is_company": false,
+      "phone": "(51) 91259-1511",
+      "marital_status": "Divorciado(a)",
+      "profession": "Auxiliar Administrativo",
+      "due_day": 20,
+      "has_dependent": false
+    },
+    {
+      "id_ref": "tenant_09",
+      "name": "Felipe Martins Freitas",
+      "cpf_cnpj": "877.002.370-00",
+      "is_company": false,
+      "phone": "(51) 91296-1584",
+      "marital_status": "Viúvo(a)",
+      "profession": "Técnico em Enfermagem",
+      "due_day": 5,
+      "has_dependent": false
+    },
+    {
+      "id_ref": "tenant_10",
+      "name": "Aline Rocha Machado",
+      "cpf_cnpj": "796.142.995-68",
+      "is_company": false,
+      "phone": "(51) 91333-1657",
+      "marital_status": "União Estável",
+      "profession": "Designer Gráfico",
+      "due_day": 10,
+      "has_dependent": false
+    },
+    {
+      "id_ref": "tenant_11",
+      "name": "Gustavo Dias Moraes",
+      "cpf_cnpj": "182.471.120-43",
+      "is_company": false,
+      "phone": "(51) 91370-1730",
+      "marital_status": "Solteiro(a)",
+      "profession": "Vendedor(a)",
+      "due_day": 15,
+      "has_dependent": false
+    },
+    {
+      "id_ref": "tenant_12",
+      "name": "Bianca Nunes Pinto",
+      "cpf_cnpj": "592.236.745-57",
+      "is_company": false,
+      "phone": "(51) 91407-1803",
+      "marital_status": "Casado(a)",
+      "profession": "Cozinheiro(a)",
+      "due_day": 20,
+      "has_dependent": false
+    },
+    {
+      "id_ref": "tenant_13",
+      "name": "Leandro Teixeira Fagundes",
+      "cpf_cnpj": "356.689.870-86",
+      "is_company": false,
+      "phone": "(51) 91444-1876",
+      "marital_status": "Divorciado(a)",
+      "profession": "Recepcionista",
+      "due_day": 5,
+      "has_dependent": true
+    },
+    {
+      "id_ref": "tenant_14",
+      "name": "Carolina Correia Bittencourt",
+      "cpf_cnpj": "782.080.495-57",
+      "is_company": false,
+      "phone": "(51) 91481-1949",
+      "marital_status": "Viúvo(a)",
+      "profession": "Eletricista",
+      "due_day": 10,
+      "has_dependent": false
+    },
+    {
+      "id_ref": "tenant_15",
+      "name": "Vinicius Cardoso Xavier",
+      "cpf_cnpj": "349.658.620-66",
+      "is_company": false,
+      "phone": "(51) 91518-2022",
+      "marital_status": "União Estável",
+      "profession": "Contador(a)",
+      "due_day": 15,
+      "has_dependent": false
+    },
+    {
+      "id_ref": "tenant_16",
+      "name": "Vanessa Barbosa Lopes",
+      "cpf_cnpj": "115.674.245-54",
+      "is_company": false,
+      "phone": "(51) 91555-2095",
+      "marital_status": "Solteiro(a)",
+      "profession": "Analista de Sistemas",
+      "due_day": 20,
+      "has_dependent": false
+    },
+    {
+      "id_ref": "tenant_17",
+      "name": "Eduardo Freitas Vieira",
+      "cpf_cnpj": "511.377.370-00",
+      "is_company": false,
+      "phone": "(51) 91592-2168",
+      "marital_status": "Casado(a)",
+      "profession": "Professor(a)",
+      "due_day": 5,
+      "has_dependent": false
+    },
+    {
+      "id_ref": "tenant_18",
+      "name": "Priscila Machado Azevedo",
+      "cpf_cnpj": "543.017.995-75",
+      "is_company": false,
+      "phone": "(51) 91629-2241",
+      "marital_status": "Divorciado(a)",
+      "profession": "Enfermeiro(a)",
+      "due_day": 10,
+      "has_dependent": false
+    },
+    {
+      "id_ref": "tenant_19",
+      "name": "Rafael Moraes Brum",
+      "cpf_cnpj": "391.846.120-37",
+      "is_company": false,
+      "phone": "(51) 91666-2314",
+      "marital_status": "Viúvo(a)",
+      "profession": "Comerciante",
+      "due_day": 15,
+      "has_dependent": true
+    },
+    {
+      "id_ref": "tenant_20",
+      "name": "Renata Pinto Cunha",
+      "cpf_cnpj": "114.111.745-26",
+      "is_company": false,
+      "phone": "(51) 91703-2387",
+      "marital_status": "União Estável",
+      "profession": "Motorista de Aplicativo",
+      "due_day": 20,
+      "has_dependent": false
+    },
+    {
+      "id_ref": "tenant_21",
+      "name": "Thiago Fagundes Duarte",
+      "cpf_cnpj": "441.064.870-55",
+      "is_company": false,
+      "phone": "(51) 91740-2460",
+      "marital_status": "Solteiro(a)",
+      "profession": "Estudante Universitário(a)",
+      "due_day": 5,
+      "has_dependent": false
+    },
+    {
+      "id_ref": "tenant_22",
+      "name": "Simone Bittencourt Espindola",
+      "cpf_cnpj": "178.955.495-02",
+      "is_company": false,
+      "phone": "(51) 91777-2533",
+      "marital_status": "Casado(a)",
+      "profession": "Autônomo(a)",
+      "due_day": 10,
+      "has_dependent": false
+    },
+    {
+      "id_ref": "tenant_23",
+      "name": "Anderson Xavier Souza",
+      "cpf_cnpj": "209.033.620-07",
+      "is_company": false,
+      "phone": "(51) 91814-2606",
+      "marital_status": "Divorciado(a)",
+      "profession": "Auxiliar Administrativo",
+      "due_day": 15,
+      "has_dependent": false
+    },
+    {
+      "id_ref": "tenant_24",
+      "name": "Tatiane Lopes Oliveira",
+      "cpf_cnpj": "887.549.245-02",
+      "is_company": false,
+      "phone": "(51) 91851-2679",
+      "marital_status": "Viúvo(a)",
+      "profession": "Técnico em Enfermagem",
+      "due_day": 20,
+      "has_dependent": false
+    },
+    {
+      "id_ref": "tenant_25",
+      "name": "Fabio Vieira Costa",
+      "cpf_cnpj": "145.752.370-19",
+      "is_company": false,
+      "phone": "(51) 91888-2752",
+      "marital_status": "União Estável",
+      "profession": "Designer Gráfico",
+      "due_day": 5,
+      "has_dependent": true
+    },
+    {
+      "id_ref": "tenant_26",
+      "name": "Luciana Azevedo Pereira",
+      "cpf_cnpj": "289.892.995-60",
+      "is_company": false,
+      "phone": "(51) 91925-2825",
+      "marital_status": "Solteiro(a)",
+      "profession": "Vendedor(a)",
+      "due_day": 10,
+      "has_dependent": false
+    },
+    {
+      "id_ref": "tenant_27",
+      "name": "Ricardo Brum Almeida",
+      "cpf_cnpj": "701.221.120-24",
+      "is_company": false,
+      "phone": "(51) 91962-2898",
+      "marital_status": "Casado(a)",
+      "profession": "Cozinheiro(a)",
+      "due_day": 15,
+      "has_dependent": false
+    },
+    {
+      "id_ref": "tenant_28",
+      "name": "Daniela Cunha Ribeiro",
+      "cpf_cnpj": "535.986.745-03",
+      "is_company": false,
+      "phone": "(51) 91999-2971",
+      "marital_status": "Divorciado(a)",
+      "profession": "Recepcionista",
+      "due_day": 20,
+      "has_dependent": false
+    },
+    {
+      "id_ref": "tenant_29",
+      "name": "Fernando Duarte Carvalho",
+      "cpf_cnpj": "525.439.870-10",
+      "is_company": false,
+      "phone": "(51) 92036-3044",
+      "marital_status": "Viúvo(a)",
+      "profession": "Eletricista",
+      "due_day": 5,
+      "has_dependent": false
+    },
+    {
+      "id_ref": "tenant_30",
+      "name": "Marina Espindola Gomes",
+      "cpf_cnpj": "275.830.495-39",
+      "is_company": false,
+      "phone": "(51) 92073-3117",
+      "marital_status": "União Estável",
+      "profession": "Contador(a)",
+      "due_day": 10,
+      "has_dependent": false
+    }
+  ],
+  "dependents": [
+    {
+      "tenant_ref": "tenant_01",
+      "name": "Dependente de Marcelo",
+      "phone": "(51) 91000-1000",
+      "cpf_cnpj": ""
+    },
+    {
+      "tenant_ref": "tenant_07",
+      "name": "Dependente de Diego",
+      "phone": "(51) 91222-1438",
+      "cpf_cnpj": ""
+    },
+    {
+      "tenant_ref": "tenant_13",
+      "name": "Dependente de Leandro",
+      "phone": "(51) 91444-1876",
+      "cpf_cnpj": ""
+    },
+    {
+      "tenant_ref": "tenant_19",
+      "name": "Dependente de Rafael",
+      "phone": "(51) 91666-2314",
+      "cpf_cnpj": ""
+    },
+    {
+      "tenant_ref": "tenant_25",
+      "name": "Dependente de Fabio",
+      "phone": "(51) 91888-2752",
+      "cpf_cnpj": ""
+    }
+  ],
+  "leases": [
+    {
+      "id_ref": "lease_01",
+      "apartment_building": 1247,
+      "apartment_number": 101,
+      "responsible_tenant_ref": "tenant_01",
+      "tenant_refs": [
+        "tenant_01"
+      ],
+      "number_of_tenants": 1,
+      "start_date": "2023-03-01",
+      "validity_months": 30,
+      "tag_fee": "20.00",
+      "rental_value": "950.00",
+      "deposit_amount": "950.00",
+      "cleaning_fee_paid": true,
+      "tag_deposit_paid": true,
+      "contract_generated": true,
+      "contract_signed": true,
+      "interfone_configured": true,
+      "prepaid_until": "2026-09-30",
+      "is_salary_offset": false,
+      "last_rent_increase_date": null,
+      "is_ended": false,
+      "end_date": null
+    },
+    {
+      "id_ref": "lease_02",
+      "apartment_building": 1247,
+      "apartment_number": 102,
+      "responsible_tenant_ref": "tenant_02",
+      "tenant_refs": [
+        "tenant_02"
+      ],
+      "number_of_tenants": 1,
+      "start_date": "2023-06-01",
+      "validity_months": 30,
+      "tag_fee": "20.00",
+      "rental_value": "995.00",
+      "deposit_amount": "995.00",
+      "cleaning_fee_paid": true,
+      "tag_deposit_paid": true,
+      "contract_generated": true,
+      "contract_signed": true,
+      "interfone_configured": true,
+      "prepaid_until": null,
+      "is_salary_offset": true,
+      "last_rent_increase_date": null,
+      "is_ended": false,
+      "end_date": null
+    },
+    {
+      "id_ref": "lease_03",
+      "apartment_building": 1247,
+      "apartment_number": 103,
+      "responsible_tenant_ref": "tenant_03",
+      "tenant_refs": [
+        "tenant_03"
+      ],
+      "number_of_tenants": 1,
+      "start_date": "2023-09-01",
+      "validity_months": 30,
+      "tag_fee": "20.00",
+      "rental_value": "1040.00",
+      "deposit_amount": "1040.00",
+      "cleaning_fee_paid": true,
+      "tag_deposit_paid": true,
+      "contract_generated": true,
+      "contract_signed": true,
+      "interfone_configured": true,
+      "prepaid_until": null,
+      "is_salary_offset": false,
+      "last_rent_increase_date": null,
+      "is_ended": false,
+      "end_date": null
+    },
+    {
+      "id_ref": "lease_04",
+      "apartment_building": 1247,
+      "apartment_number": 104,
+      "responsible_tenant_ref": "tenant_04",
+      "tenant_refs": [
+        "tenant_04"
+      ],
+      "number_of_tenants": 1,
+      "start_date": "2024-01-01",
+      "validity_months": 30,
+      "tag_fee": "20.00",
+      "rental_value": "1085.00",
+      "deposit_amount": "1085.00",
+      "cleaning_fee_paid": true,
+      "tag_deposit_paid": true,
+      "contract_generated": true,
+      "contract_signed": true,
+      "interfone_configured": true,
+      "prepaid_until": null,
+      "is_salary_offset": false,
+      "last_rent_increase_date": "2025-01-01",
+      "is_ended": false,
+      "end_date": null
+    },
+    {
+      "id_ref": "lease_05",
+      "apartment_building": 1247,
+      "apartment_number": 105,
+      "responsible_tenant_ref": "tenant_05",
+      "tenant_refs": [
+        "tenant_05"
+      ],
+      "number_of_tenants": 1,
+      "start_date": "2024-03-01",
+      "validity_months": 30,
+      "tag_fee": "20.00",
+      "rental_value": "1130.00",
+      "deposit_amount": "1130.00",
+      "cleaning_fee_paid": true,
+      "tag_deposit_paid": true,
+      "contract_generated": true,
+      "contract_signed": true,
+      "interfone_configured": true,
+      "prepaid_until": null,
+      "is_salary_offset": false,
+      "last_rent_increase_date": "2025-03-01",
+      "is_ended": false,
+      "end_date": null
+    },
+    {
+      "id_ref": "lease_06",
+      "apartment_building": 1247,
+      "apartment_number": 106,
+      "responsible_tenant_ref": "tenant_06",
+      "tenant_refs": [
+        "tenant_06"
+      ],
+      "number_of_tenants": 1,
+      "start_date": "2024-05-01",
+      "validity_months": 30,
+      "tag_fee": "20.00",
+      "rental_value": "1175.00",
+      "deposit_amount": "1175.00",
+      "cleaning_fee_paid": true,
+      "tag_deposit_paid": true,
+      "contract_generated": true,
+      "contract_signed": true,
+      "interfone_configured": true,
+      "prepaid_until": null,
+      "is_salary_offset": false,
+      "last_rent_increase_date": "2025-05-01",
+      "is_ended": false,
+      "end_date": null
+    },
+    {
+      "id_ref": "lease_07",
+      "apartment_building": 1247,
+      "apartment_number": 201,
+      "responsible_tenant_ref": "tenant_07",
+      "tenant_refs": [
+        "tenant_07"
+      ],
+      "number_of_tenants": 1,
+      "start_date": "2024-07-01",
+      "validity_months": 30,
+      "tag_fee": "20.00",
+      "rental_value": "1225.00",
+      "deposit_amount": "1225.00",
+      "cleaning_fee_paid": true,
+      "tag_deposit_paid": true,
+      "contract_generated": true,
+      "contract_signed": true,
+      "interfone_configured": true,
+      "prepaid_until": null,
+      "is_salary_offset": false,
+      "last_rent_increase_date": "2025-07-01",
+      "is_ended": false,
+      "end_date": null
+    },
+    {
+      "id_ref": "lease_08",
+      "apartment_building": 1247,
+      "apartment_number": 202,
+      "responsible_tenant_ref": "tenant_08",
+      "tenant_refs": [
+        "tenant_08"
+      ],
+      "number_of_tenants": 1,
+      "start_date": "2024-09-01",
+      "validity_months": 30,
+      "tag_fee": "20.00",
+      "rental_value": "1270.00",
+      "deposit_amount": "1270.00",
+      "cleaning_fee_paid": true,
+      "tag_deposit_paid": true,
+      "contract_generated": true,
+      "contract_signed": true,
+      "interfone_configured": true,
+      "prepaid_until": null,
+      "is_salary_offset": false,
+      "last_rent_increase_date": "2025-09-01",
+      "is_ended": false,
+      "end_date": null
+    },
+    {
+      "id_ref": "lease_09",
+      "apartment_building": 1247,
+      "apartment_number": 203,
+      "responsible_tenant_ref": "tenant_09",
+      "tenant_refs": [
+        "tenant_09"
+      ],
+      "number_of_tenants": 1,
+      "start_date": "2024-11-01",
+      "validity_months": 30,
+      "tag_fee": "20.00",
+      "rental_value": "1315.00",
+      "deposit_amount": "1315.00",
+      "cleaning_fee_paid": true,
+      "tag_deposit_paid": true,
+      "contract_generated": true,
+      "contract_signed": true,
+      "interfone_configured": true,
+      "prepaid_until": null,
+      "is_salary_offset": false,
+      "last_rent_increase_date": "2025-11-01",
+      "is_ended": false,
+      "end_date": null
+    },
+    {
+      "id_ref": "lease_10",
+      "apartment_building": 1247,
+      "apartment_number": 204,
+      "responsible_tenant_ref": "tenant_10",
+      "tenant_refs": [
+        "tenant_10"
+      ],
+      "number_of_tenants": 1,
+      "start_date": "2025-01-01",
+      "validity_months": 30,
+      "tag_fee": "20.00",
+      "rental_value": "1360.00",
+      "deposit_amount": "1360.00",
+      "cleaning_fee_paid": true,
+      "tag_deposit_paid": true,
+      "contract_generated": true,
+      "contract_signed": true,
+      "interfone_configured": true,
+      "prepaid_until": null,
+      "is_salary_offset": false,
+      "last_rent_increase_date": "2026-01-01",
+      "is_ended": false,
+      "end_date": null
+    },
+    {
+      "id_ref": "lease_11",
+      "apartment_building": 1247,
+      "apartment_number": 205,
+      "responsible_tenant_ref": "tenant_11",
+      "tenant_refs": [
+        "tenant_11"
+      ],
+      "number_of_tenants": 1,
+      "start_date": "2025-02-01",
+      "validity_months": 30,
+      "tag_fee": "20.00",
+      "rental_value": "1405.00",
+      "deposit_amount": "1405.00",
+      "cleaning_fee_paid": true,
+      "tag_deposit_paid": true,
+      "contract_generated": true,
+      "contract_signed": true,
+      "interfone_configured": true,
+      "prepaid_until": null,
+      "is_salary_offset": false,
+      "last_rent_increase_date": "2026-02-01",
+      "is_ended": false,
+      "end_date": null
+    },
+    {
+      "id_ref": "lease_12",
+      "apartment_building": 588,
+      "apartment_number": 101,
+      "responsible_tenant_ref": "tenant_12",
+      "tenant_refs": [
+        "tenant_12"
+      ],
+      "number_of_tenants": 1,
+      "start_date": "2025-04-01",
+      "validity_months": 30,
+      "tag_fee": "20.00",
+      "rental_value": "1150.00",
+      "deposit_amount": "1150.00",
+      "cleaning_fee_paid": true,
+      "tag_deposit_paid": true,
+      "contract_generated": true,
+      "contract_signed": true,
+      "interfone_configured": true,
+      "prepaid_until": null,
+      "is_salary_offset": false,
+      "last_rent_increase_date": "2026-04-01",
+      "is_ended": false,
+      "end_date": null
+    },
+    {
+      "id_ref": "lease_13",
+      "apartment_building": 588,
+      "apartment_number": 102,
+      "responsible_tenant_ref": "tenant_13",
+      "tenant_refs": [
+        "tenant_13"
+      ],
+      "number_of_tenants": 1,
+      "start_date": "2023-03-01",
+      "validity_months": 30,
+      "tag_fee": "20.00",
+      "rental_value": "1205.00",
+      "deposit_amount": "1205.00",
+      "cleaning_fee_paid": true,
+      "tag_deposit_paid": true,
+      "contract_generated": true,
+      "contract_signed": true,
+      "interfone_configured": true,
+      "prepaid_until": null,
+      "is_salary_offset": false,
+      "last_rent_increase_date": null,
+      "is_ended": false,
+      "end_date": null
+    },
+    {
+      "id_ref": "lease_14",
+      "apartment_building": 588,
+      "apartment_number": 103,
+      "responsible_tenant_ref": "tenant_14",
+      "tenant_refs": [
+        "tenant_14"
+      ],
+      "number_of_tenants": 1,
+      "start_date": "2023-06-01",
+      "validity_months": 30,
+      "tag_fee": "20.00",
+      "rental_value": "1260.00",
+      "deposit_amount": "1260.00",
+      "cleaning_fee_paid": true,
+      "tag_deposit_paid": true,
+      "contract_generated": true,
+      "contract_signed": true,
+      "interfone_configured": true,
+      "prepaid_until": null,
+      "is_salary_offset": false,
+      "last_rent_increase_date": null,
+      "is_ended": false,
+      "end_date": null
+    },
+    {
+      "id_ref": "lease_15",
+      "apartment_building": 588,
+      "apartment_number": 104,
+      "responsible_tenant_ref": "tenant_15",
+      "tenant_refs": [
+        "tenant_15"
+      ],
+      "number_of_tenants": 1,
+      "start_date": "2023-09-01",
+      "validity_months": 30,
+      "tag_fee": "20.00",
+      "rental_value": "1315.00",
+      "deposit_amount": "1315.00",
+      "cleaning_fee_paid": true,
+      "tag_deposit_paid": true,
+      "contract_generated": true,
+      "contract_signed": true,
+      "interfone_configured": true,
+      "prepaid_until": null,
+      "is_salary_offset": false,
+      "last_rent_increase_date": null,
+      "is_ended": false,
+      "end_date": null
+    },
+    {
+      "id_ref": "lease_16",
+      "apartment_building": 588,
+      "apartment_number": 105,
+      "responsible_tenant_ref": "tenant_16",
+      "tenant_refs": [
+        "tenant_16"
+      ],
+      "number_of_tenants": 1,
+      "start_date": "2024-01-01",
+      "validity_months": 30,
+      "tag_fee": "20.00",
+      "rental_value": "1370.00",
+      "deposit_amount": "1370.00",
+      "cleaning_fee_paid": true,
+      "tag_deposit_paid": true,
+      "contract_generated": true,
+      "contract_signed": true,
+      "interfone_configured": true,
+      "prepaid_until": null,
+      "is_salary_offset": false,
+      "last_rent_increase_date": "2025-01-01",
+      "is_ended": false,
+      "end_date": null
+    },
+    {
+      "id_ref": "lease_17",
+      "apartment_building": 588,
+      "apartment_number": 106,
+      "responsible_tenant_ref": "tenant_17",
+      "tenant_refs": [
+        "tenant_17"
+      ],
+      "number_of_tenants": 1,
+      "start_date": "2024-03-01",
+      "validity_months": 30,
+      "tag_fee": "20.00",
+      "rental_value": "1425.00",
+      "deposit_amount": "1425.00",
+      "cleaning_fee_paid": true,
+      "tag_deposit_paid": true,
+      "contract_generated": true,
+      "contract_signed": true,
+      "interfone_configured": true,
+      "prepaid_until": null,
+      "is_salary_offset": false,
+      "last_rent_increase_date": null,
+      "is_ended": false,
+      "end_date": null
+    },
+    {
+      "id_ref": "lease_18",
+      "apartment_building": 588,
+      "apartment_number": 201,
+      "responsible_tenant_ref": "tenant_18",
+      "tenant_refs": [
+        "tenant_18"
+      ],
+      "number_of_tenants": 1,
+      "start_date": "2024-05-01",
+      "validity_months": 30,
+      "tag_fee": "20.00",
+      "rental_value": "1475.00",
+      "deposit_amount": "1475.00",
+      "cleaning_fee_paid": true,
+      "tag_deposit_paid": true,
+      "contract_generated": true,
+      "contract_signed": true,
+      "interfone_configured": true,
+      "prepaid_until": null,
+      "is_salary_offset": false,
+      "last_rent_increase_date": null,
+      "is_ended": false,
+      "end_date": null
+    },
+    {
+      "id_ref": "lease_19",
+      "apartment_building": 588,
+      "apartment_number": 202,
+      "responsible_tenant_ref": "tenant_19",
+      "tenant_refs": [
+        "tenant_19"
+      ],
+      "number_of_tenants": 1,
+      "start_date": "2024-07-01",
+      "validity_months": 30,
+      "tag_fee": "20.00",
+      "rental_value": "1530.00",
+      "deposit_amount": "1530.00",
+      "cleaning_fee_paid": true,
+      "tag_deposit_paid": true,
+      "contract_generated": true,
+      "contract_signed": true,
+      "interfone_configured": true,
+      "prepaid_until": null,
+      "is_salary_offset": false,
+      "last_rent_increase_date": null,
+      "is_ended": false,
+      "end_date": null
+    },
+    {
+      "id_ref": "lease_20",
+      "apartment_building": 588,
+      "apartment_number": 203,
+      "responsible_tenant_ref": "tenant_20",
+      "tenant_refs": [
+        "tenant_20"
+      ],
+      "number_of_tenants": 1,
+      "start_date": "2024-09-01",
+      "validity_months": 30,
+      "tag_fee": "20.00",
+      "rental_value": "1585.00",
+      "deposit_amount": "1585.00",
+      "cleaning_fee_paid": true,
+      "tag_deposit_paid": true,
+      "contract_generated": true,
+      "contract_signed": true,
+      "interfone_configured": true,
+      "prepaid_until": null,
+      "is_salary_offset": false,
+      "last_rent_increase_date": null,
+      "is_ended": false,
+      "end_date": null
+    },
+    {
+      "id_ref": "lease_21",
+      "apartment_building": 588,
+      "apartment_number": 204,
+      "responsible_tenant_ref": "tenant_21",
+      "tenant_refs": [
+        "tenant_21"
+      ],
+      "number_of_tenants": 1,
+      "start_date": "2024-11-01",
+      "validity_months": 30,
+      "tag_fee": "20.00",
+      "rental_value": "1640.00",
+      "deposit_amount": "1640.00",
+      "cleaning_fee_paid": true,
+      "tag_deposit_paid": true,
+      "contract_generated": true,
+      "contract_signed": true,
+      "interfone_configured": true,
+      "prepaid_until": null,
+      "is_salary_offset": false,
+      "last_rent_increase_date": null,
+      "is_ended": false,
+      "end_date": null
+    },
+    {
+      "id_ref": "lease_22",
+      "apartment_building": 588,
+      "apartment_number": 205,
+      "responsible_tenant_ref": "tenant_22",
+      "tenant_refs": [
+        "tenant_22"
+      ],
+      "number_of_tenants": 1,
+      "start_date": "2025-01-01",
+      "validity_months": 30,
+      "tag_fee": "20.00",
+      "rental_value": "1695.00",
+      "deposit_amount": "1695.00",
+      "cleaning_fee_paid": true,
+      "tag_deposit_paid": true,
+      "contract_generated": true,
+      "contract_signed": true,
+      "interfone_configured": true,
+      "prepaid_until": null,
+      "is_salary_offset": false,
+      "last_rent_increase_date": null,
+      "is_ended": false,
+      "end_date": null
+    },
+    {
+      "id_ref": "lease_23",
+      "apartment_building": 2310,
+      "apartment_number": 101,
+      "responsible_tenant_ref": "tenant_23",
+      "tenant_refs": [
+        "tenant_23"
+      ],
+      "number_of_tenants": 1,
+      "start_date": "2025-02-01",
+      "validity_months": 30,
+      "tag_fee": "20.00",
+      "rental_value": "1000.00",
+      "deposit_amount": "1000.00",
+      "cleaning_fee_paid": true,
+      "tag_deposit_paid": true,
+      "contract_generated": true,
+      "contract_signed": true,
+      "interfone_configured": true,
+      "prepaid_until": null,
+      "is_salary_offset": false,
+      "last_rent_increase_date": null,
+      "is_ended": false,
+      "end_date": null
+    },
+    {
+      "id_ref": "lease_24",
+      "apartment_building": 2310,
+      "apartment_number": 102,
+      "responsible_tenant_ref": "tenant_24",
+      "tenant_refs": [
+        "tenant_24"
+      ],
+      "number_of_tenants": 1,
+      "start_date": "2025-04-01",
+      "validity_months": 30,
+      "tag_fee": "20.00",
+      "rental_value": "1055.00",
+      "deposit_amount": "1055.00",
+      "cleaning_fee_paid": true,
+      "tag_deposit_paid": true,
+      "contract_generated": true,
+      "contract_signed": true,
+      "interfone_configured": true,
+      "prepaid_until": null,
+      "is_salary_offset": false,
+      "last_rent_increase_date": null,
+      "is_ended": false,
+      "end_date": null
+    },
+    {
+      "id_ref": "lease_25",
+      "apartment_building": 2310,
+      "apartment_number": 103,
+      "responsible_tenant_ref": "tenant_25",
+      "tenant_refs": [
+        "tenant_25"
+      ],
+      "number_of_tenants": 1,
+      "start_date": "2023-03-01",
+      "validity_months": 30,
+      "tag_fee": "20.00",
+      "rental_value": "1110.00",
+      "deposit_amount": "1110.00",
+      "cleaning_fee_paid": true,
+      "tag_deposit_paid": true,
+      "contract_generated": true,
+      "contract_signed": true,
+      "interfone_configured": true,
+      "prepaid_until": null,
+      "is_salary_offset": false,
+      "last_rent_increase_date": null,
+      "is_ended": false,
+      "end_date": null
+    },
+    {
+      "id_ref": "lease_26",
+      "apartment_building": 2310,
+      "apartment_number": 104,
+      "responsible_tenant_ref": "tenant_26",
+      "tenant_refs": [
+        "tenant_26"
+      ],
+      "number_of_tenants": 1,
+      "start_date": "2023-06-01",
+      "validity_months": 30,
+      "tag_fee": "20.00",
+      "rental_value": "1165.00",
+      "deposit_amount": "1165.00",
+      "cleaning_fee_paid": true,
+      "tag_deposit_paid": true,
+      "contract_generated": true,
+      "contract_signed": true,
+      "interfone_configured": true,
+      "prepaid_until": null,
+      "is_salary_offset": false,
+      "last_rent_increase_date": null,
+      "is_ended": false,
+      "end_date": null
+    },
+    {
+      "id_ref": "lease_27",
+      "apartment_building": 2310,
+      "apartment_number": 105,
+      "responsible_tenant_ref": "tenant_27",
+      "tenant_refs": [
+        "tenant_27"
+      ],
+      "number_of_tenants": 1,
+      "start_date": "2023-09-01",
+      "validity_months": 30,
+      "tag_fee": "20.00",
+      "rental_value": "1220.00",
+      "deposit_amount": "1220.00",
+      "cleaning_fee_paid": true,
+      "tag_deposit_paid": true,
+      "contract_generated": true,
+      "contract_signed": true,
+      "interfone_configured": true,
+      "prepaid_until": null,
+      "is_salary_offset": false,
+      "last_rent_increase_date": null,
+      "is_ended": false,
+      "end_date": null
+    },
+    {
+      "id_ref": "lease_28",
+      "apartment_building": 2310,
+      "apartment_number": 201,
+      "responsible_tenant_ref": "tenant_28",
+      "tenant_refs": [
+        "tenant_28"
+      ],
+      "number_of_tenants": 1,
+      "start_date": "2024-01-01",
+      "validity_months": 30,
+      "tag_fee": "20.00",
+      "rental_value": "1280.00",
+      "deposit_amount": "1280.00",
+      "cleaning_fee_paid": true,
+      "tag_deposit_paid": true,
+      "contract_generated": true,
+      "contract_signed": true,
+      "interfone_configured": true,
+      "prepaid_until": null,
+      "is_salary_offset": false,
+      "last_rent_increase_date": null,
+      "is_ended": false,
+      "end_date": null
+    },
+    {
+      "id_ref": "lease_29",
+      "apartment_building": 1247,
+      "apartment_number": 206,
+      "responsible_tenant_ref": "tenant_29",
+      "tenant_refs": [
+        "tenant_29"
+      ],
+      "number_of_tenants": 1,
+      "start_date": "2023-02-01",
+      "validity_months": 30,
+      "tag_fee": "20.00",
+      "rental_value": "1450.00",
+      "deposit_amount": "1450.00",
+      "cleaning_fee_paid": true,
+      "tag_deposit_paid": true,
+      "contract_generated": true,
+      "contract_signed": true,
+      "interfone_configured": true,
+      "prepaid_until": null,
+      "is_salary_offset": false,
+      "last_rent_increase_date": null,
+      "is_ended": true,
+      "end_date": "2025-06-30"
+    },
+    {
+      "id_ref": "lease_30",
+      "apartment_building": 588,
+      "apartment_number": 206,
+      "responsible_tenant_ref": "tenant_30",
+      "tenant_refs": [
+        "tenant_30"
+      ],
+      "number_of_tenants": 1,
+      "start_date": "2023-08-01",
+      "validity_months": 30,
+      "tag_fee": "20.00",
+      "rental_value": "1750.00",
+      "deposit_amount": "1750.00",
+      "cleaning_fee_paid": true,
+      "tag_deposit_paid": true,
+      "contract_generated": true,
+      "contract_signed": true,
+      "interfone_configured": true,
+      "prepaid_until": null,
+      "is_salary_offset": false,
+      "last_rent_increase_date": null,
+      "is_ended": true,
+      "end_date": "2025-09-30"
+    }
+  ],
+  "ipca_index": [
+    {
+      "reference_month": "2024-01-01",
+      "value": "6809.3308806020742",
+      "monthly_variation_pct": "0.42"
+    },
+    {
+      "reference_month": "2024-02-01",
+      "value": "6865.8483269110714",
+      "monthly_variation_pct": "0.83"
+    },
+    {
+      "reference_month": "2024-03-01",
+      "value": "6876.8336842341291",
+      "monthly_variation_pct": "0.16"
+    },
+    {
+      "reference_month": "2024-04-01",
+      "value": "6902.9656522342188",
+      "monthly_variation_pct": "0.38"
+    },
+    {
+      "reference_month": "2024-05-01",
+      "value": "6934.7192942344962",
+      "monthly_variation_pct": "0.46"
+    },
+    {
+      "reference_month": "2024-06-01",
+      "value": "6949.2822047523886",
+      "monthly_variation_pct": "0.21"
+    },
+    {
+      "reference_month": "2024-07-01",
+      "value": "6975.6894771304477",
+      "monthly_variation_pct": "0.38"
+    },
+    {
+      "reference_month": "2024-08-01",
+      "value": "6974.2943392350216",
+      "monthly_variation_pct": "-0.02"
+    },
+    {
+      "reference_month": "2024-09-01",
+      "value": "7004.9812343276557",
+      "monthly_variation_pct": "0.44"
+    },
+    {
+      "reference_month": "2024-10-01",
+      "value": "7044.2091292398906",
+      "monthly_variation_pct": "0.56"
+    },
+    {
+      "reference_month": "2024-11-01",
+      "value": "7071.6815448439262",
+      "monthly_variation_pct": "0.39"
+    },
+    {
+      "reference_month": "2024-12-01",
+      "value": "7108.4542888771146",
+      "monthly_variation_pct": "0.52"
+    },
+    {
+      "reference_month": "2025-01-01",
+      "value": "7119.8278157393180",
+      "monthly_variation_pct": "0.16"
+    },
+    {
+      "reference_month": "2025-02-01",
+      "value": "7213.0975601255030",
+      "monthly_variation_pct": "1.31"
+    },
+    {
+      "reference_month": "2025-03-01",
+      "value": "7253.4909064622058",
+      "monthly_variation_pct": "0.56"
+    },
+    {
+      "reference_month": "2025-04-01",
+      "value": "7284.6809173599933",
+      "monthly_variation_pct": "0.43"
+    },
+    {
+      "reference_month": "2025-05-01",
+      "value": "7303.6210877451293",
+      "monthly_variation_pct": "0.26"
+    },
+    {
+      "reference_month": "2025-06-01",
+      "value": "7321.1497783557176",
+      "monthly_variation_pct": "0.24"
+    },
+    {
+      "reference_month": "2025-07-01",
+      "value": "7340.1847677794425",
+      "monthly_variation_pct": "0.26"
+    },
+    {
+      "reference_month": "2025-08-01",
+      "value": "7332.1105645348851",
+      "monthly_variation_pct": "-0.11"
+    },
+    {
+      "reference_month": "2025-09-01",
+      "value": "7367.3046952446526",
+      "monthly_variation_pct": "0.48"
+    },
+    {
+      "reference_month": "2025-10-01",
+      "value": "7373.9352694703727",
+      "monthly_variation_pct": "0.09"
+    },
+    {
+      "reference_month": "2025-11-01",
+      "value": "7387.2083529554194",
+      "monthly_variation_pct": "0.18"
+    },
+    {
+      "reference_month": "2025-12-01",
+      "value": "7411.5861405201723",
+      "monthly_variation_pct": "0.33"
+    },
+    {
+      "reference_month": "2026-01-01",
+      "value": "7436.0443747838889",
+      "monthly_variation_pct": "0.33"
+    },
+    {
+      "reference_month": "2026-02-01",
+      "value": "7488.0966854073761",
+      "monthly_variation_pct": "0.70"
+    },
+    {
+      "reference_month": "2026-03-01",
+      "value": "7553.9919362389610",
+      "monthly_variation_pct": "0.88"
+    },
+    {
+      "reference_month": "2026-04-01",
+      "value": "7604.6036822117620",
+      "monthly_variation_pct": "0.67"
+    },
+    {
+      "reference_month": "2026-05-01",
+      "value": "7648.7103835685903",
+      "monthly_variation_pct": "0.58"
+    },
+    {
+      "reference_month": "2026-06-01",
+      "value": "7660.9483201823000",
+      "monthly_variation_pct": "0.16"
+    }
+  ],
+  "rent_adjustments": [
+    {
+      "lease_ref": "lease_04",
+      "adjustment_date": "2025-01-01",
+      "percentage": "4.61",
+      "previous_value": "1085.00",
+      "new_value": "1135.00",
+      "apartment_updated": true
+    },
+    {
+      "lease_ref": "lease_05",
+      "adjustment_date": "2025-03-01",
+      "percentage": "5.31",
+      "previous_value": "1130.00",
+      "new_value": "1190.00",
+      "apartment_updated": true
+    },
+    {
+      "lease_ref": "lease_06",
+      "adjustment_date": "2025-05-01",
+      "percentage": "5.53",
+      "previous_value": "1175.00",
+      "new_value": "1240.00",
+      "apartment_updated": true
+    },
+    {
+      "lease_ref": "lease_07",
+      "adjustment_date": "2025-07-01",
+      "percentage": "5.31",
+      "previous_value": "1225.00",
+      "new_value": "1290.00",
+      "apartment_updated": true
+    },
+    {
+      "lease_ref": "lease_08",
+      "adjustment_date": "2025-09-01",
+      "percentage": "5.12",
+      "previous_value": "1270.00",
+      "new_value": "1335.00",
+      "apartment_updated": true
+    },
+    {
+      "lease_ref": "lease_09",
+      "adjustment_date": "2025-11-01",
+      "percentage": "4.56",
+      "previous_value": "1315.00",
+      "new_value": "1375.00",
+      "apartment_updated": true
+    },
+    {
+      "lease_ref": "lease_10",
+      "adjustment_date": "2026-01-01",
+      "percentage": "4.41",
+      "previous_value": "1360.00",
+      "new_value": "1420.00",
+      "apartment_updated": true
+    },
+    {
+      "lease_ref": "lease_11",
+      "adjustment_date": "2026-02-01",
+      "percentage": "3.91",
+      "previous_value": "1405.00",
+      "new_value": "1460.00",
+      "apartment_updated": true
+    },
+    {
+      "lease_ref": "lease_12",
+      "adjustment_date": "2026-04-01",
+      "percentage": "4.35",
+      "previous_value": "1150.00",
+      "new_value": "1200.00",
+      "apartment_updated": true
+    },
+    {
+      "lease_ref": "lease_16",
+      "adjustment_date": "2025-01-01",
+      "percentage": "4.38",
+      "previous_value": "1370.00",
+      "new_value": "1430.00",
+      "apartment_updated": true
+    }
+  ],
+  "rent_payments": [
+    {
+      "lease_ref": "lease_03",
+      "reference_month": "2025-01-01",
+      "amount_paid": "1040.00",
+      "payment_date": "2025-01-20",
+      "notes": "Pagamento em atraso reincidente"
+    },
+    {
+      "lease_ref": "lease_03",
+      "reference_month": "2025-02-01",
+      "amount_paid": "1040.00",
+      "payment_date": "2025-02-25",
+      "notes": "Pagamento em atraso reincidente"
+    },
+    {
+      "lease_ref": "lease_03",
+      "reference_month": "2025-03-01",
+      "amount_paid": "1040.00",
+      "payment_date": "2025-03-30",
+      "notes": "Pagamento em atraso reincidente"
+    },
+    {
+      "lease_ref": "lease_03",
+      "reference_month": "2025-04-01",
+      "amount_paid": "1040.00",
+      "payment_date": "2025-04-20",
+      "notes": "Pagamento em atraso reincidente"
+    },
+    {
+      "lease_ref": "lease_03",
+      "reference_month": "2025-05-01",
+      "amount_paid": "1040.00",
+      "payment_date": "2025-05-25",
+      "notes": "Pagamento em atraso reincidente"
+    },
+    {
+      "lease_ref": "lease_03",
+      "reference_month": "2025-06-01",
+      "amount_paid": "1040.00",
+      "payment_date": "2025-06-30",
+      "notes": "Pagamento em atraso reincidente"
+    },
+    {
+      "lease_ref": "lease_03",
+      "reference_month": "2025-07-01",
+      "amount_paid": "1040.00",
+      "payment_date": "2025-07-20",
+      "notes": "Pagamento em atraso reincidente"
+    },
+    {
+      "lease_ref": "lease_03",
+      "reference_month": "2025-08-01",
+      "amount_paid": "1040.00",
+      "payment_date": "2025-08-25",
+      "notes": "Pagamento em atraso reincidente"
+    },
+    {
+      "lease_ref": "lease_03",
+      "reference_month": "2025-09-01",
+      "amount_paid": "1040.00",
+      "payment_date": "2025-09-30",
+      "notes": "Pagamento em atraso reincidente"
+    },
+    {
+      "lease_ref": "lease_03",
+      "reference_month": "2025-10-01",
+      "amount_paid": "1040.00",
+      "payment_date": "2025-10-20",
+      "notes": "Pagamento em atraso reincidente"
+    },
+    {
+      "lease_ref": "lease_03",
+      "reference_month": "2025-11-01",
+      "amount_paid": "1040.00",
+      "payment_date": "2025-11-25",
+      "notes": "Pagamento em atraso reincidente"
+    },
+    {
+      "lease_ref": "lease_03",
+      "reference_month": "2025-12-01",
+      "amount_paid": "1040.00",
+      "payment_date": "2025-12-30",
+      "notes": "Pagamento em atraso reincidente"
+    },
+    {
+      "lease_ref": "lease_03",
+      "reference_month": "2026-01-01",
+      "amount_paid": "1040.00",
+      "payment_date": "2026-01-20",
+      "notes": "Pagamento em atraso reincidente"
+    },
+    {
+      "lease_ref": "lease_03",
+      "reference_month": "2026-02-01",
+      "amount_paid": "1040.00",
+      "payment_date": "2026-02-25",
+      "notes": "Pagamento em atraso reincidente"
+    },
+    {
+      "lease_ref": "lease_03",
+      "reference_month": "2026-03-01",
+      "amount_paid": "1040.00",
+      "payment_date": "2026-03-30",
+      "notes": "Pagamento em atraso reincidente"
+    },
+    {
+      "lease_ref": "lease_03",
+      "reference_month": "2026-04-01",
+      "amount_paid": "1040.00",
+      "payment_date": "2026-04-20",
+      "notes": "Pagamento em atraso reincidente"
+    },
+    {
+      "lease_ref": "lease_03",
+      "reference_month": "2026-05-01",
+      "amount_paid": "1040.00",
+      "payment_date": "2026-05-25",
+      "notes": "Pagamento em atraso reincidente"
+    },
+    {
+      "lease_ref": "lease_03",
+      "reference_month": "2026-06-01",
+      "amount_paid": "1040.00",
+      "payment_date": "2026-06-30",
+      "notes": "Pagamento em atraso reincidente"
+    },
+    {
+      "lease_ref": "lease_04",
+      "reference_month": "2025-01-01",
+      "amount_paid": "1135.00",
+      "payment_date": "2025-01-25",
+      "notes": "Pagamento em atraso reincidente"
+    },
+    {
+      "lease_ref": "lease_04",
+      "reference_month": "2025-02-01",
+      "amount_paid": "1135.00",
+      "payment_date": "2025-03-02",
+      "notes": "Pagamento em atraso reincidente"
+    },
+    {
+      "lease_ref": "lease_04",
+      "reference_month": "2025-03-01",
+      "amount_paid": "1135.00",
+      "payment_date": "2025-04-04",
+      "notes": "Pagamento em atraso reincidente"
+    },
+    {
+      "lease_ref": "lease_04",
+      "reference_month": "2025-04-01",
+      "amount_paid": "1135.00",
+      "payment_date": "2025-04-25",
+      "notes": "Pagamento em atraso reincidente"
+    },
+    {
+      "lease_ref": "lease_04",
+      "reference_month": "2025-05-01",
+      "amount_paid": "1135.00",
+      "payment_date": "2025-05-30",
+      "notes": "Pagamento em atraso reincidente"
+    },
+    {
+      "lease_ref": "lease_04",
+      "reference_month": "2025-06-01",
+      "amount_paid": "1135.00",
+      "payment_date": "2025-07-05",
+      "notes": "Pagamento em atraso reincidente"
+    },
+    {
+      "lease_ref": "lease_04",
+      "reference_month": "2025-07-01",
+      "amount_paid": "1135.00",
+      "payment_date": "2025-07-25",
+      "notes": "Pagamento em atraso reincidente"
+    },
+    {
+      "lease_ref": "lease_04",
+      "reference_month": "2025-08-01",
+      "amount_paid": "1135.00",
+      "payment_date": "2025-08-30",
+      "notes": "Pagamento em atraso reincidente"
+    },
+    {
+      "lease_ref": "lease_04",
+      "reference_month": "2025-09-01",
+      "amount_paid": "1135.00",
+      "payment_date": "2025-10-05",
+      "notes": "Pagamento em atraso reincidente"
+    },
+    {
+      "lease_ref": "lease_04",
+      "reference_month": "2025-10-01",
+      "amount_paid": "1135.00",
+      "payment_date": "2025-10-25",
+      "notes": "Pagamento em atraso reincidente"
+    },
+    {
+      "lease_ref": "lease_04",
+      "reference_month": "2025-11-01",
+      "amount_paid": "1135.00",
+      "payment_date": "2025-11-30",
+      "notes": "Pagamento em atraso reincidente"
+    },
+    {
+      "lease_ref": "lease_04",
+      "reference_month": "2025-12-01",
+      "amount_paid": "1135.00",
+      "payment_date": "2026-01-04",
+      "notes": "Pagamento em atraso reincidente"
+    },
+    {
+      "lease_ref": "lease_04",
+      "reference_month": "2026-01-01",
+      "amount_paid": "1135.00",
+      "payment_date": "2026-01-25",
+      "notes": "Pagamento em atraso reincidente"
+    },
+    {
+      "lease_ref": "lease_04",
+      "reference_month": "2026-02-01",
+      "amount_paid": "1135.00",
+      "payment_date": "2026-03-02",
+      "notes": "Pagamento em atraso reincidente"
+    },
+    {
+      "lease_ref": "lease_04",
+      "reference_month": "2026-03-01",
+      "amount_paid": "1135.00",
+      "payment_date": "2026-04-04",
+      "notes": "Pagamento em atraso reincidente"
+    },
+    {
+      "lease_ref": "lease_04",
+      "reference_month": "2026-04-01",
+      "amount_paid": "1135.00",
+      "payment_date": "2026-04-25",
+      "notes": "Pagamento em atraso reincidente"
+    },
+    {
+      "lease_ref": "lease_04",
+      "reference_month": "2026-05-01",
+      "amount_paid": "1135.00",
+      "payment_date": "2026-05-30",
+      "notes": "Pagamento em atraso reincidente"
+    },
+    {
+      "lease_ref": "lease_04",
+      "reference_month": "2026-06-01",
+      "amount_paid": "1135.00",
+      "payment_date": "2026-07-05",
+      "notes": "Pagamento em atraso reincidente"
+    },
+    {
+      "lease_ref": "lease_05",
+      "reference_month": "2025-01-01",
+      "amount_paid": "1130.00",
+      "payment_date": "2025-01-10",
+      "notes": "Pagamento em atraso reincidente"
+    },
+    {
+      "lease_ref": "lease_05",
+      "reference_month": "2025-02-01",
+      "amount_paid": "1130.00",
+      "payment_date": "2025-02-15",
+      "notes": "Pagamento em atraso reincidente"
+    },
+    {
+      "lease_ref": "lease_05",
+      "reference_month": "2025-03-01",
+      "amount_paid": "1190.00",
+      "payment_date": "2025-03-20",
+      "notes": "Pagamento em atraso reincidente"
+    },
+    {
+      "lease_ref": "lease_05",
+      "reference_month": "2025-04-01",
+      "amount_paid": "1190.00",
+      "payment_date": "2025-04-10",
+      "notes": "Pagamento em atraso reincidente"
+    },
+    {
+      "lease_ref": "lease_05",
+      "reference_month": "2025-05-01",
+      "amount_paid": "1190.00",
+      "payment_date": "2025-05-15",
+      "notes": "Pagamento em atraso reincidente"
+    },
+    {
+      "lease_ref": "lease_05",
+      "reference_month": "2025-06-01",
+      "amount_paid": "1190.00",
+      "payment_date": "2025-06-20",
+      "notes": "Pagamento em atraso reincidente"
+    },
+    {
+      "lease_ref": "lease_05",
+      "reference_month": "2025-07-01",
+      "amount_paid": "1190.00",
+      "payment_date": "2025-07-10",
+      "notes": "Pagamento em atraso reincidente"
+    },
+    {
+      "lease_ref": "lease_05",
+      "reference_month": "2025-08-01",
+      "amount_paid": "1190.00",
+      "payment_date": "2025-08-15",
+      "notes": "Pagamento em atraso reincidente"
+    },
+    {
+      "lease_ref": "lease_05",
+      "reference_month": "2025-09-01",
+      "amount_paid": "1190.00",
+      "payment_date": "2025-09-20",
+      "notes": "Pagamento em atraso reincidente"
+    },
+    {
+      "lease_ref": "lease_05",
+      "reference_month": "2025-10-01",
+      "amount_paid": "1190.00",
+      "payment_date": "2025-10-10",
+      "notes": "Pagamento em atraso reincidente"
+    },
+    {
+      "lease_ref": "lease_05",
+      "reference_month": "2025-11-01",
+      "amount_paid": "1190.00",
+      "payment_date": "2025-11-15",
+      "notes": "Pagamento em atraso reincidente"
+    },
+    {
+      "lease_ref": "lease_05",
+      "reference_month": "2025-12-01",
+      "amount_paid": "1190.00",
+      "payment_date": "2025-12-20",
+      "notes": "Pagamento em atraso reincidente"
+    },
+    {
+      "lease_ref": "lease_05",
+      "reference_month": "2026-01-01",
+      "amount_paid": "1190.00",
+      "payment_date": "2026-01-10",
+      "notes": "Pagamento em atraso reincidente"
+    },
+    {
+      "lease_ref": "lease_05",
+      "reference_month": "2026-02-01",
+      "amount_paid": "1190.00",
+      "payment_date": "2026-02-15",
+      "notes": "Pagamento em atraso reincidente"
+    },
+    {
+      "lease_ref": "lease_05",
+      "reference_month": "2026-03-01",
+      "amount_paid": "1190.00",
+      "payment_date": "2026-03-20",
+      "notes": "Pagamento em atraso reincidente"
+    },
+    {
+      "lease_ref": "lease_05",
+      "reference_month": "2026-04-01",
+      "amount_paid": "1190.00",
+      "payment_date": "2026-04-10",
+      "notes": "Pagamento em atraso reincidente"
+    },
+    {
+      "lease_ref": "lease_05",
+      "reference_month": "2026-05-01",
+      "amount_paid": "1190.00",
+      "payment_date": "2026-05-15",
+      "notes": "Pagamento em atraso reincidente"
+    },
+    {
+      "lease_ref": "lease_05",
+      "reference_month": "2026-06-01",
+      "amount_paid": "1190.00",
+      "payment_date": "2026-06-20",
+      "notes": "Pagamento em atraso reincidente"
+    },
+    {
+      "lease_ref": "lease_06",
+      "reference_month": "2025-01-01",
+      "amount_paid": "1175.00",
+      "payment_date": "2025-01-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_06",
+      "reference_month": "2025-02-01",
+      "amount_paid": "1175.00",
+      "payment_date": "2025-02-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_06",
+      "reference_month": "2025-03-01",
+      "amount_paid": "1175.00",
+      "payment_date": "2025-03-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_06",
+      "reference_month": "2025-04-01",
+      "amount_paid": "1175.00",
+      "payment_date": "2025-04-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_06",
+      "reference_month": "2025-05-01",
+      "amount_paid": "1240.00",
+      "payment_date": "2025-05-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_06",
+      "reference_month": "2025-06-01",
+      "amount_paid": "1240.00",
+      "payment_date": "2025-06-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_06",
+      "reference_month": "2025-07-01",
+      "amount_paid": "1240.00",
+      "payment_date": "2025-07-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_06",
+      "reference_month": "2025-08-01",
+      "amount_paid": "1240.00",
+      "payment_date": "2025-08-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_06",
+      "reference_month": "2025-09-01",
+      "amount_paid": "1240.00",
+      "payment_date": "2025-09-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_06",
+      "reference_month": "2025-10-01",
+      "amount_paid": "1240.00",
+      "payment_date": "2025-10-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_06",
+      "reference_month": "2025-11-01",
+      "amount_paid": "1240.00",
+      "payment_date": "2025-11-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_06",
+      "reference_month": "2025-12-01",
+      "amount_paid": "1240.00",
+      "payment_date": "2025-12-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_06",
+      "reference_month": "2026-01-01",
+      "amount_paid": "1240.00",
+      "payment_date": "2026-01-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_06",
+      "reference_month": "2026-02-01",
+      "amount_paid": "1240.00",
+      "payment_date": "2026-02-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_06",
+      "reference_month": "2026-03-01",
+      "amount_paid": "1240.00",
+      "payment_date": "2026-03-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_06",
+      "reference_month": "2026-04-01",
+      "amount_paid": "1240.00",
+      "payment_date": "2026-04-12",
+      "notes": "Pagamento com pequeno atraso"
+    },
+    {
+      "lease_ref": "lease_06",
+      "reference_month": "2026-05-01",
+      "amount_paid": "1240.00",
+      "payment_date": "2026-05-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_06",
+      "reference_month": "2026-06-01",
+      "amount_paid": "1240.00",
+      "payment_date": "2026-06-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_07",
+      "reference_month": "2025-01-01",
+      "amount_paid": "1225.00",
+      "payment_date": "2025-01-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_07",
+      "reference_month": "2025-02-01",
+      "amount_paid": "1225.00",
+      "payment_date": "2025-02-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_07",
+      "reference_month": "2025-03-01",
+      "amount_paid": "1225.00",
+      "payment_date": "2025-03-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_07",
+      "reference_month": "2025-04-01",
+      "amount_paid": "1225.00",
+      "payment_date": "2025-04-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_07",
+      "reference_month": "2025-05-01",
+      "amount_paid": "1225.00",
+      "payment_date": "2025-05-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_07",
+      "reference_month": "2025-06-01",
+      "amount_paid": "1225.00",
+      "payment_date": "2025-06-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_07",
+      "reference_month": "2025-07-01",
+      "amount_paid": "1290.00",
+      "payment_date": "2025-07-17",
+      "notes": "Pagamento com pequeno atraso"
+    },
+    {
+      "lease_ref": "lease_07",
+      "reference_month": "2025-08-01",
+      "amount_paid": "1290.00",
+      "payment_date": "2025-08-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_07",
+      "reference_month": "2025-09-01",
+      "amount_paid": "1290.00",
+      "payment_date": "2025-09-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_07",
+      "reference_month": "2025-10-01",
+      "amount_paid": "1290.00",
+      "payment_date": "2025-10-14",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_07",
+      "reference_month": "2025-11-01",
+      "amount_paid": "1290.00",
+      "payment_date": "2025-11-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_07",
+      "reference_month": "2025-12-01",
+      "amount_paid": "1290.00",
+      "payment_date": "2025-12-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_07",
+      "reference_month": "2026-01-01",
+      "amount_paid": "1290.00",
+      "payment_date": "2026-01-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_07",
+      "reference_month": "2026-02-01",
+      "amount_paid": "1290.00",
+      "payment_date": "2026-02-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_07",
+      "reference_month": "2026-03-01",
+      "amount_paid": "1290.00",
+      "payment_date": "2026-03-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_07",
+      "reference_month": "2026-04-01",
+      "amount_paid": "1290.00",
+      "payment_date": "2026-04-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_07",
+      "reference_month": "2026-05-01",
+      "amount_paid": "1290.00",
+      "payment_date": "2026-05-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_07",
+      "reference_month": "2026-06-01",
+      "amount_paid": "1290.00",
+      "payment_date": "2026-06-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_08",
+      "reference_month": "2025-01-01",
+      "amount_paid": "1270.00",
+      "payment_date": "2025-01-19",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_08",
+      "reference_month": "2025-02-01",
+      "amount_paid": "1270.00",
+      "payment_date": "2025-02-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_08",
+      "reference_month": "2025-03-01",
+      "amount_paid": "1270.00",
+      "payment_date": "2025-03-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_08",
+      "reference_month": "2025-04-01",
+      "amount_paid": "1270.00",
+      "payment_date": "2025-04-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_08",
+      "reference_month": "2025-05-01",
+      "amount_paid": "1270.00",
+      "payment_date": "2025-05-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_08",
+      "reference_month": "2025-06-01",
+      "amount_paid": "1270.00",
+      "payment_date": "2025-06-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_08",
+      "reference_month": "2025-07-01",
+      "amount_paid": "1270.00",
+      "payment_date": "2025-07-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_08",
+      "reference_month": "2025-08-01",
+      "amount_paid": "1270.00",
+      "payment_date": "2025-08-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_08",
+      "reference_month": "2025-09-01",
+      "amount_paid": "1335.00",
+      "payment_date": "2025-09-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_08",
+      "reference_month": "2025-10-01",
+      "amount_paid": "1335.00",
+      "payment_date": "2025-10-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_08",
+      "reference_month": "2025-11-01",
+      "amount_paid": "1335.00",
+      "payment_date": "2025-11-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_08",
+      "reference_month": "2025-12-01",
+      "amount_paid": "1335.00",
+      "payment_date": "2025-12-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_08",
+      "reference_month": "2026-01-01",
+      "amount_paid": "1335.00",
+      "payment_date": "2026-01-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_08",
+      "reference_month": "2026-02-01",
+      "amount_paid": "1335.00",
+      "payment_date": "2026-02-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_08",
+      "reference_month": "2026-03-01",
+      "amount_paid": "1335.00",
+      "payment_date": "2026-03-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_08",
+      "reference_month": "2026-04-01",
+      "amount_paid": "1335.00",
+      "payment_date": "2026-04-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_08",
+      "reference_month": "2026-05-01",
+      "amount_paid": "1335.00",
+      "payment_date": "2026-05-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_08",
+      "reference_month": "2026-06-01",
+      "amount_paid": "1335.00",
+      "payment_date": "2026-06-22",
+      "notes": "Pagamento com pequeno atraso"
+    },
+    {
+      "lease_ref": "lease_09",
+      "reference_month": "2025-01-01",
+      "amount_paid": "1315.00",
+      "payment_date": "2025-01-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_09",
+      "reference_month": "2025-02-01",
+      "amount_paid": "1315.00",
+      "payment_date": "2025-02-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_09",
+      "reference_month": "2025-03-01",
+      "amount_paid": "1315.00",
+      "payment_date": "2025-03-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_09",
+      "reference_month": "2025-04-01",
+      "amount_paid": "1315.00",
+      "payment_date": "2025-04-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_09",
+      "reference_month": "2025-05-01",
+      "amount_paid": "1315.00",
+      "payment_date": "2025-05-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_09",
+      "reference_month": "2025-06-01",
+      "amount_paid": "1315.00",
+      "payment_date": "2025-06-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_09",
+      "reference_month": "2025-07-01",
+      "amount_paid": "1315.00",
+      "payment_date": "2025-07-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_09",
+      "reference_month": "2025-08-01",
+      "amount_paid": "1315.00",
+      "payment_date": "2025-08-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_09",
+      "reference_month": "2025-09-01",
+      "amount_paid": "1315.00",
+      "payment_date": "2025-09-07",
+      "notes": "Pagamento com pequeno atraso"
+    },
+    {
+      "lease_ref": "lease_09",
+      "reference_month": "2025-10-01",
+      "amount_paid": "1315.00",
+      "payment_date": "2025-10-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_09",
+      "reference_month": "2025-11-01",
+      "amount_paid": "1375.00",
+      "payment_date": "2025-11-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_09",
+      "reference_month": "2025-12-01",
+      "amount_paid": "1375.00",
+      "payment_date": "2025-12-04",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_09",
+      "reference_month": "2026-01-01",
+      "amount_paid": "1375.00",
+      "payment_date": "2026-01-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_09",
+      "reference_month": "2026-02-01",
+      "amount_paid": "1375.00",
+      "payment_date": "2026-02-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_09",
+      "reference_month": "2026-03-01",
+      "amount_paid": "1375.00",
+      "payment_date": "2026-03-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_09",
+      "reference_month": "2026-04-01",
+      "amount_paid": "1375.00",
+      "payment_date": "2026-04-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_09",
+      "reference_month": "2026-05-01",
+      "amount_paid": "1375.00",
+      "payment_date": "2026-05-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_09",
+      "reference_month": "2026-06-01",
+      "amount_paid": "1375.00",
+      "payment_date": "2026-06-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_10",
+      "reference_month": "2025-01-01",
+      "amount_paid": "1360.00",
+      "payment_date": "2025-01-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_10",
+      "reference_month": "2025-02-01",
+      "amount_paid": "1360.00",
+      "payment_date": "2025-02-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_10",
+      "reference_month": "2025-03-01",
+      "amount_paid": "1360.00",
+      "payment_date": "2025-03-09",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_10",
+      "reference_month": "2025-04-01",
+      "amount_paid": "1360.00",
+      "payment_date": "2025-04-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_10",
+      "reference_month": "2025-05-01",
+      "amount_paid": "1360.00",
+      "payment_date": "2025-05-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_10",
+      "reference_month": "2025-06-01",
+      "amount_paid": "1360.00",
+      "payment_date": "2025-06-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_10",
+      "reference_month": "2025-07-01",
+      "amount_paid": "1360.00",
+      "payment_date": "2025-07-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_10",
+      "reference_month": "2025-08-01",
+      "amount_paid": "1360.00",
+      "payment_date": "2025-08-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_10",
+      "reference_month": "2025-09-01",
+      "amount_paid": "1360.00",
+      "payment_date": "2025-09-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_10",
+      "reference_month": "2025-10-01",
+      "amount_paid": "1360.00",
+      "payment_date": "2025-10-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_10",
+      "reference_month": "2025-11-01",
+      "amount_paid": "1360.00",
+      "payment_date": "2025-11-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_10",
+      "reference_month": "2025-12-01",
+      "amount_paid": "1360.00",
+      "payment_date": "2025-12-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_10",
+      "reference_month": "2026-01-01",
+      "amount_paid": "1420.00",
+      "payment_date": "2026-01-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_10",
+      "reference_month": "2026-02-01",
+      "amount_paid": "1420.00",
+      "payment_date": "2026-02-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_10",
+      "reference_month": "2026-03-01",
+      "amount_paid": "1420.00",
+      "payment_date": "2026-03-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_10",
+      "reference_month": "2026-04-01",
+      "amount_paid": "1420.00",
+      "payment_date": "2026-04-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_10",
+      "reference_month": "2026-05-01",
+      "amount_paid": "1420.00",
+      "payment_date": "2026-05-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_10",
+      "reference_month": "2026-06-01",
+      "amount_paid": "1420.00",
+      "payment_date": "2026-06-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_11",
+      "reference_month": "2025-02-01",
+      "amount_paid": "1405.00",
+      "payment_date": "2025-02-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_11",
+      "reference_month": "2025-03-01",
+      "amount_paid": "1405.00",
+      "payment_date": "2025-03-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_11",
+      "reference_month": "2025-04-01",
+      "amount_paid": "1405.00",
+      "payment_date": "2025-04-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_11",
+      "reference_month": "2025-05-01",
+      "amount_paid": "1405.00",
+      "payment_date": "2025-05-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_11",
+      "reference_month": "2025-06-01",
+      "amount_paid": "1405.00",
+      "payment_date": "2025-06-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_11",
+      "reference_month": "2025-07-01",
+      "amount_paid": "1405.00",
+      "payment_date": "2025-07-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_11",
+      "reference_month": "2025-08-01",
+      "amount_paid": "1405.00",
+      "payment_date": "2025-08-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_11",
+      "reference_month": "2025-09-01",
+      "amount_paid": "1405.00",
+      "payment_date": "2025-09-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_11",
+      "reference_month": "2025-10-01",
+      "amount_paid": "1405.00",
+      "payment_date": "2025-10-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_11",
+      "reference_month": "2025-11-01",
+      "amount_paid": "1405.00",
+      "payment_date": "2025-11-17",
+      "notes": "Pagamento com pequeno atraso"
+    },
+    {
+      "lease_ref": "lease_11",
+      "reference_month": "2025-12-01",
+      "amount_paid": "1405.00",
+      "payment_date": "2025-12-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_11",
+      "reference_month": "2026-01-01",
+      "amount_paid": "1405.00",
+      "payment_date": "2026-01-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_11",
+      "reference_month": "2026-02-01",
+      "amount_paid": "1460.00",
+      "payment_date": "2026-02-14",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_11",
+      "reference_month": "2026-03-01",
+      "amount_paid": "1460.00",
+      "payment_date": "2026-03-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_11",
+      "reference_month": "2026-04-01",
+      "amount_paid": "1460.00",
+      "payment_date": "2026-04-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_11",
+      "reference_month": "2026-05-01",
+      "amount_paid": "1460.00",
+      "payment_date": "2026-05-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_11",
+      "reference_month": "2026-06-01",
+      "amount_paid": "1460.00",
+      "payment_date": "2026-06-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_12",
+      "reference_month": "2025-04-01",
+      "amount_paid": "1150.00",
+      "payment_date": "2025-04-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_12",
+      "reference_month": "2025-05-01",
+      "amount_paid": "1150.00",
+      "payment_date": "2025-05-19",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_12",
+      "reference_month": "2025-06-01",
+      "amount_paid": "1150.00",
+      "payment_date": "2025-06-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_12",
+      "reference_month": "2025-07-01",
+      "amount_paid": "1150.00",
+      "payment_date": "2025-07-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_12",
+      "reference_month": "2025-08-01",
+      "amount_paid": "1150.00",
+      "payment_date": "2025-08-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_12",
+      "reference_month": "2025-09-01",
+      "amount_paid": "1150.00",
+      "payment_date": "2025-09-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_12",
+      "reference_month": "2025-10-01",
+      "amount_paid": "1150.00",
+      "payment_date": "2025-10-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_12",
+      "reference_month": "2025-11-01",
+      "amount_paid": "1150.00",
+      "payment_date": "2025-11-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_12",
+      "reference_month": "2025-12-01",
+      "amount_paid": "1150.00",
+      "payment_date": "2025-12-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_12",
+      "reference_month": "2026-01-01",
+      "amount_paid": "1150.00",
+      "payment_date": "2026-01-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_12",
+      "reference_month": "2026-02-01",
+      "amount_paid": "1150.00",
+      "payment_date": "2026-02-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_12",
+      "reference_month": "2026-03-01",
+      "amount_paid": "1150.00",
+      "payment_date": "2026-03-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_12",
+      "reference_month": "2026-04-01",
+      "amount_paid": "1200.00",
+      "payment_date": "2026-04-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_12",
+      "reference_month": "2026-05-01",
+      "amount_paid": "1200.00",
+      "payment_date": "2026-05-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_12",
+      "reference_month": "2026-06-01",
+      "amount_paid": "1200.00",
+      "payment_date": "2026-06-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_13",
+      "reference_month": "2025-01-01",
+      "amount_paid": "1205.00",
+      "payment_date": "2025-01-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_13",
+      "reference_month": "2025-02-01",
+      "amount_paid": "1205.00",
+      "payment_date": "2025-02-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_13",
+      "reference_month": "2025-03-01",
+      "amount_paid": "1205.00",
+      "payment_date": "2025-03-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_13",
+      "reference_month": "2025-04-01",
+      "amount_paid": "1205.00",
+      "payment_date": "2025-04-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_13",
+      "reference_month": "2025-05-01",
+      "amount_paid": "1205.00",
+      "payment_date": "2025-05-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_13",
+      "reference_month": "2025-06-01",
+      "amount_paid": "1205.00",
+      "payment_date": "2025-06-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_13",
+      "reference_month": "2025-07-01",
+      "amount_paid": "1205.00",
+      "payment_date": "2025-07-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_13",
+      "reference_month": "2025-08-01",
+      "amount_paid": "1205.00",
+      "payment_date": "2025-08-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_13",
+      "reference_month": "2025-09-01",
+      "amount_paid": "1205.00",
+      "payment_date": "2025-09-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_13",
+      "reference_month": "2025-10-01",
+      "amount_paid": "1205.00",
+      "payment_date": "2025-10-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_13",
+      "reference_month": "2025-11-01",
+      "amount_paid": "1205.00",
+      "payment_date": "2025-11-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_13",
+      "reference_month": "2025-12-01",
+      "amount_paid": "1205.00",
+      "payment_date": "2025-12-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_13",
+      "reference_month": "2026-01-01",
+      "amount_paid": "1205.00",
+      "payment_date": "2026-01-07",
+      "notes": "Pagamento com pequeno atraso"
+    },
+    {
+      "lease_ref": "lease_13",
+      "reference_month": "2026-02-01",
+      "amount_paid": "1205.00",
+      "payment_date": "2026-02-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_13",
+      "reference_month": "2026-03-01",
+      "amount_paid": "1205.00",
+      "payment_date": "2026-03-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_13",
+      "reference_month": "2026-04-01",
+      "amount_paid": "1205.00",
+      "payment_date": "2026-04-04",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_13",
+      "reference_month": "2026-05-01",
+      "amount_paid": "1205.00",
+      "payment_date": "2026-05-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_13",
+      "reference_month": "2026-06-01",
+      "amount_paid": "1205.00",
+      "payment_date": "2026-06-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_14",
+      "reference_month": "2025-01-01",
+      "amount_paid": "1260.00",
+      "payment_date": "2025-01-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_14",
+      "reference_month": "2025-02-01",
+      "amount_paid": "1260.00",
+      "payment_date": "2025-02-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_14",
+      "reference_month": "2025-03-01",
+      "amount_paid": "1260.00",
+      "payment_date": "2025-03-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_14",
+      "reference_month": "2025-04-01",
+      "amount_paid": "1260.00",
+      "payment_date": "2025-04-12",
+      "notes": "Pagamento com pequeno atraso"
+    },
+    {
+      "lease_ref": "lease_14",
+      "reference_month": "2025-05-01",
+      "amount_paid": "1260.00",
+      "payment_date": "2025-05-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_14",
+      "reference_month": "2025-06-01",
+      "amount_paid": "1260.00",
+      "payment_date": "2025-06-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_14",
+      "reference_month": "2025-07-01",
+      "amount_paid": "1260.00",
+      "payment_date": "2025-07-09",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_14",
+      "reference_month": "2025-08-01",
+      "amount_paid": "1260.00",
+      "payment_date": "2025-08-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_14",
+      "reference_month": "2025-09-01",
+      "amount_paid": "1260.00",
+      "payment_date": "2025-09-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_14",
+      "reference_month": "2025-10-01",
+      "amount_paid": "1260.00",
+      "payment_date": "2025-10-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_14",
+      "reference_month": "2025-11-01",
+      "amount_paid": "1260.00",
+      "payment_date": "2025-11-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_14",
+      "reference_month": "2025-12-01",
+      "amount_paid": "1260.00",
+      "payment_date": "2025-12-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_14",
+      "reference_month": "2026-01-01",
+      "amount_paid": "1260.00",
+      "payment_date": "2026-01-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_14",
+      "reference_month": "2026-02-01",
+      "amount_paid": "1260.00",
+      "payment_date": "2026-02-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_14",
+      "reference_month": "2026-03-01",
+      "amount_paid": "1260.00",
+      "payment_date": "2026-03-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_14",
+      "reference_month": "2026-04-01",
+      "amount_paid": "1260.00",
+      "payment_date": "2026-04-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_14",
+      "reference_month": "2026-05-01",
+      "amount_paid": "1260.00",
+      "payment_date": "2026-05-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_14",
+      "reference_month": "2026-06-01",
+      "amount_paid": "1260.00",
+      "payment_date": "2026-06-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_15",
+      "reference_month": "2025-01-01",
+      "amount_paid": "1315.00",
+      "payment_date": "2025-01-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_15",
+      "reference_month": "2025-02-01",
+      "amount_paid": "1315.00",
+      "payment_date": "2025-02-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_15",
+      "reference_month": "2025-03-01",
+      "amount_paid": "1315.00",
+      "payment_date": "2025-03-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_15",
+      "reference_month": "2025-04-01",
+      "amount_paid": "1315.00",
+      "payment_date": "2025-04-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_15",
+      "reference_month": "2025-05-01",
+      "amount_paid": "1315.00",
+      "payment_date": "2025-05-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_15",
+      "reference_month": "2025-06-01",
+      "amount_paid": "1315.00",
+      "payment_date": "2025-06-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_15",
+      "reference_month": "2025-07-01",
+      "amount_paid": "1315.00",
+      "payment_date": "2025-07-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_15",
+      "reference_month": "2025-08-01",
+      "amount_paid": "1315.00",
+      "payment_date": "2025-08-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_15",
+      "reference_month": "2025-09-01",
+      "amount_paid": "1315.00",
+      "payment_date": "2025-09-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_15",
+      "reference_month": "2025-10-01",
+      "amount_paid": "1315.00",
+      "payment_date": "2025-10-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_15",
+      "reference_month": "2025-11-01",
+      "amount_paid": "1315.00",
+      "payment_date": "2025-11-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_15",
+      "reference_month": "2025-12-01",
+      "amount_paid": "1315.00",
+      "payment_date": "2025-12-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_15",
+      "reference_month": "2026-01-01",
+      "amount_paid": "1315.00",
+      "payment_date": "2026-01-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_15",
+      "reference_month": "2026-02-01",
+      "amount_paid": "1315.00",
+      "payment_date": "2026-02-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_15",
+      "reference_month": "2026-03-01",
+      "amount_paid": "1315.00",
+      "payment_date": "2026-03-17",
+      "notes": "Pagamento com pequeno atraso"
+    },
+    {
+      "lease_ref": "lease_15",
+      "reference_month": "2026-04-01",
+      "amount_paid": "1315.00",
+      "payment_date": "2026-04-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_15",
+      "reference_month": "2026-05-01",
+      "amount_paid": "1315.00",
+      "payment_date": "2026-05-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_15",
+      "reference_month": "2026-06-01",
+      "amount_paid": "1315.00",
+      "payment_date": "2026-06-14",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_16",
+      "reference_month": "2025-01-01",
+      "amount_paid": "1430.00",
+      "payment_date": "2025-01-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_16",
+      "reference_month": "2025-02-01",
+      "amount_paid": "1430.00",
+      "payment_date": "2025-02-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_16",
+      "reference_month": "2025-03-01",
+      "amount_paid": "1430.00",
+      "payment_date": "2025-03-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_16",
+      "reference_month": "2025-04-01",
+      "amount_paid": "1430.00",
+      "payment_date": "2025-04-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_16",
+      "reference_month": "2025-05-01",
+      "amount_paid": "1430.00",
+      "payment_date": "2025-05-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_16",
+      "reference_month": "2025-06-01",
+      "amount_paid": "1430.00",
+      "payment_date": "2025-06-22",
+      "notes": "Pagamento com pequeno atraso"
+    },
+    {
+      "lease_ref": "lease_16",
+      "reference_month": "2025-07-01",
+      "amount_paid": "1430.00",
+      "payment_date": "2025-07-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_16",
+      "reference_month": "2025-08-01",
+      "amount_paid": "1430.00",
+      "payment_date": "2025-08-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_16",
+      "reference_month": "2025-09-01",
+      "amount_paid": "1430.00",
+      "payment_date": "2025-09-19",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_16",
+      "reference_month": "2025-10-01",
+      "amount_paid": "1430.00",
+      "payment_date": "2025-10-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_16",
+      "reference_month": "2025-11-01",
+      "amount_paid": "1430.00",
+      "payment_date": "2025-11-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_16",
+      "reference_month": "2025-12-01",
+      "amount_paid": "1430.00",
+      "payment_date": "2025-12-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_16",
+      "reference_month": "2026-01-01",
+      "amount_paid": "1430.00",
+      "payment_date": "2026-01-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_16",
+      "reference_month": "2026-02-01",
+      "amount_paid": "1430.00",
+      "payment_date": "2026-02-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_16",
+      "reference_month": "2026-03-01",
+      "amount_paid": "1430.00",
+      "payment_date": "2026-03-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_16",
+      "reference_month": "2026-04-01",
+      "amount_paid": "1430.00",
+      "payment_date": "2026-04-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_16",
+      "reference_month": "2026-05-01",
+      "amount_paid": "1430.00",
+      "payment_date": "2026-05-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_16",
+      "reference_month": "2026-06-01",
+      "amount_paid": "1430.00",
+      "payment_date": "2026-06-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_17",
+      "reference_month": "2025-01-01",
+      "amount_paid": "1425.00",
+      "payment_date": "2025-01-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_17",
+      "reference_month": "2025-02-01",
+      "amount_paid": "1425.00",
+      "payment_date": "2025-02-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_17",
+      "reference_month": "2025-03-01",
+      "amount_paid": "1425.00",
+      "payment_date": "2025-03-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_17",
+      "reference_month": "2025-04-01",
+      "amount_paid": "1425.00",
+      "payment_date": "2025-04-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_17",
+      "reference_month": "2025-05-01",
+      "amount_paid": "1425.00",
+      "payment_date": "2025-05-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_17",
+      "reference_month": "2025-06-01",
+      "amount_paid": "1425.00",
+      "payment_date": "2025-06-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_17",
+      "reference_month": "2025-07-01",
+      "amount_paid": "1425.00",
+      "payment_date": "2025-07-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_17",
+      "reference_month": "2025-08-01",
+      "amount_paid": "1425.00",
+      "payment_date": "2025-08-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_17",
+      "reference_month": "2025-09-01",
+      "amount_paid": "1425.00",
+      "payment_date": "2025-09-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_17",
+      "reference_month": "2025-10-01",
+      "amount_paid": "1425.00",
+      "payment_date": "2025-10-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_17",
+      "reference_month": "2025-11-01",
+      "amount_paid": "1425.00",
+      "payment_date": "2025-11-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_17",
+      "reference_month": "2025-12-01",
+      "amount_paid": "1425.00",
+      "payment_date": "2025-12-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_17",
+      "reference_month": "2026-01-01",
+      "amount_paid": "1425.00",
+      "payment_date": "2026-01-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_17",
+      "reference_month": "2026-02-01",
+      "amount_paid": "1425.00",
+      "payment_date": "2026-02-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_17",
+      "reference_month": "2026-03-01",
+      "amount_paid": "1425.00",
+      "payment_date": "2026-03-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_17",
+      "reference_month": "2026-04-01",
+      "amount_paid": "1425.00",
+      "payment_date": "2026-04-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_17",
+      "reference_month": "2026-05-01",
+      "amount_paid": "1425.00",
+      "payment_date": "2026-05-07",
+      "notes": "Pagamento com pequeno atraso"
+    },
+    {
+      "lease_ref": "lease_17",
+      "reference_month": "2026-06-01",
+      "amount_paid": "1425.00",
+      "payment_date": "2026-06-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_18",
+      "reference_month": "2025-01-01",
+      "amount_paid": "1475.00",
+      "payment_date": "2025-01-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_18",
+      "reference_month": "2025-02-01",
+      "amount_paid": "1475.00",
+      "payment_date": "2025-02-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_18",
+      "reference_month": "2025-03-01",
+      "amount_paid": "1475.00",
+      "payment_date": "2025-03-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_18",
+      "reference_month": "2025-04-01",
+      "amount_paid": "1475.00",
+      "payment_date": "2025-04-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_18",
+      "reference_month": "2025-05-01",
+      "amount_paid": "1475.00",
+      "payment_date": "2025-05-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_18",
+      "reference_month": "2025-06-01",
+      "amount_paid": "1475.00",
+      "payment_date": "2025-06-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_18",
+      "reference_month": "2025-07-01",
+      "amount_paid": "1475.00",
+      "payment_date": "2025-07-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_18",
+      "reference_month": "2025-08-01",
+      "amount_paid": "1475.00",
+      "payment_date": "2025-08-12",
+      "notes": "Pagamento com pequeno atraso"
+    },
+    {
+      "lease_ref": "lease_18",
+      "reference_month": "2025-09-01",
+      "amount_paid": "1475.00",
+      "payment_date": "2025-09-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_18",
+      "reference_month": "2025-10-01",
+      "amount_paid": "1475.00",
+      "payment_date": "2025-10-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_18",
+      "reference_month": "2025-11-01",
+      "amount_paid": "1475.00",
+      "payment_date": "2025-11-09",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_18",
+      "reference_month": "2025-12-01",
+      "amount_paid": "1475.00",
+      "payment_date": "2025-12-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_18",
+      "reference_month": "2026-01-01",
+      "amount_paid": "1475.00",
+      "payment_date": "2026-01-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_18",
+      "reference_month": "2026-02-01",
+      "amount_paid": "1475.00",
+      "payment_date": "2026-02-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_18",
+      "reference_month": "2026-03-01",
+      "amount_paid": "1475.00",
+      "payment_date": "2026-03-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_18",
+      "reference_month": "2026-04-01",
+      "amount_paid": "1475.00",
+      "payment_date": "2026-04-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_18",
+      "reference_month": "2026-05-01",
+      "amount_paid": "1475.00",
+      "payment_date": "2026-05-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_18",
+      "reference_month": "2026-06-01",
+      "amount_paid": "1475.00",
+      "payment_date": "2026-06-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_19",
+      "reference_month": "2025-01-01",
+      "amount_paid": "1530.00",
+      "payment_date": "2025-01-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_19",
+      "reference_month": "2025-02-01",
+      "amount_paid": "1530.00",
+      "payment_date": "2025-02-14",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_19",
+      "reference_month": "2025-03-01",
+      "amount_paid": "1530.00",
+      "payment_date": "2025-03-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_19",
+      "reference_month": "2025-04-01",
+      "amount_paid": "1530.00",
+      "payment_date": "2025-04-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_19",
+      "reference_month": "2025-05-01",
+      "amount_paid": "1530.00",
+      "payment_date": "2025-05-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_19",
+      "reference_month": "2025-06-01",
+      "amount_paid": "1530.00",
+      "payment_date": "2025-06-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_19",
+      "reference_month": "2025-07-01",
+      "amount_paid": "1530.00",
+      "payment_date": "2025-07-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_19",
+      "reference_month": "2025-08-01",
+      "amount_paid": "1530.00",
+      "payment_date": "2025-08-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_19",
+      "reference_month": "2025-09-01",
+      "amount_paid": "1530.00",
+      "payment_date": "2025-09-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_19",
+      "reference_month": "2025-10-01",
+      "amount_paid": "1530.00",
+      "payment_date": "2025-10-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_19",
+      "reference_month": "2025-11-01",
+      "amount_paid": "1530.00",
+      "payment_date": "2025-11-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_19",
+      "reference_month": "2025-12-01",
+      "amount_paid": "1530.00",
+      "payment_date": "2025-12-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_19",
+      "reference_month": "2026-01-01",
+      "amount_paid": "1530.00",
+      "payment_date": "2026-01-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_19",
+      "reference_month": "2026-02-01",
+      "amount_paid": "1530.00",
+      "payment_date": "2026-02-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_19",
+      "reference_month": "2026-03-01",
+      "amount_paid": "1530.00",
+      "payment_date": "2026-03-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_19",
+      "reference_month": "2026-04-01",
+      "amount_paid": "1530.00",
+      "payment_date": "2026-04-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_19",
+      "reference_month": "2026-05-01",
+      "amount_paid": "1530.00",
+      "payment_date": "2026-05-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_19",
+      "reference_month": "2026-06-01",
+      "amount_paid": "1530.00",
+      "payment_date": "2026-06-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_20",
+      "reference_month": "2025-01-01",
+      "amount_paid": "1585.00",
+      "payment_date": "2025-01-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_20",
+      "reference_month": "2025-02-01",
+      "amount_paid": "1585.00",
+      "payment_date": "2025-02-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_20",
+      "reference_month": "2025-03-01",
+      "amount_paid": "1585.00",
+      "payment_date": "2025-03-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_20",
+      "reference_month": "2025-04-01",
+      "amount_paid": "1585.00",
+      "payment_date": "2025-04-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_20",
+      "reference_month": "2025-05-01",
+      "amount_paid": "1585.00",
+      "payment_date": "2025-05-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_20",
+      "reference_month": "2025-06-01",
+      "amount_paid": "1585.00",
+      "payment_date": "2025-06-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_20",
+      "reference_month": "2025-07-01",
+      "amount_paid": "1585.00",
+      "payment_date": "2025-07-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_20",
+      "reference_month": "2025-08-01",
+      "amount_paid": "1585.00",
+      "payment_date": "2025-08-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_20",
+      "reference_month": "2025-09-01",
+      "amount_paid": "1585.00",
+      "payment_date": "2025-09-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_20",
+      "reference_month": "2025-10-01",
+      "amount_paid": "1585.00",
+      "payment_date": "2025-10-22",
+      "notes": "Pagamento com pequeno atraso"
+    },
+    {
+      "lease_ref": "lease_20",
+      "reference_month": "2025-11-01",
+      "amount_paid": "1585.00",
+      "payment_date": "2025-11-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_20",
+      "reference_month": "2025-12-01",
+      "amount_paid": "1585.00",
+      "payment_date": "2025-12-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_20",
+      "reference_month": "2026-01-01",
+      "amount_paid": "1585.00",
+      "payment_date": "2026-01-19",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_20",
+      "reference_month": "2026-02-01",
+      "amount_paid": "1585.00",
+      "payment_date": "2026-02-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_20",
+      "reference_month": "2026-03-01",
+      "amount_paid": "1585.00",
+      "payment_date": "2026-03-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_20",
+      "reference_month": "2026-04-01",
+      "amount_paid": "1585.00",
+      "payment_date": "2026-04-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_20",
+      "reference_month": "2026-05-01",
+      "amount_paid": "1585.00",
+      "payment_date": "2026-05-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_20",
+      "reference_month": "2026-06-01",
+      "amount_paid": "1585.00",
+      "payment_date": "2026-06-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_21",
+      "reference_month": "2025-01-01",
+      "amount_paid": "1640.00",
+      "payment_date": "2025-01-07",
+      "notes": "Pagamento com pequeno atraso"
+    },
+    {
+      "lease_ref": "lease_21",
+      "reference_month": "2025-02-01",
+      "amount_paid": "1640.00",
+      "payment_date": "2025-02-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_21",
+      "reference_month": "2025-03-01",
+      "amount_paid": "1640.00",
+      "payment_date": "2025-03-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_21",
+      "reference_month": "2025-04-01",
+      "amount_paid": "1640.00",
+      "payment_date": "2025-04-04",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_21",
+      "reference_month": "2025-05-01",
+      "amount_paid": "1640.00",
+      "payment_date": "2025-05-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_21",
+      "reference_month": "2025-06-01",
+      "amount_paid": "1640.00",
+      "payment_date": "2025-06-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_21",
+      "reference_month": "2025-07-01",
+      "amount_paid": "1640.00",
+      "payment_date": "2025-07-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_21",
+      "reference_month": "2025-08-01",
+      "amount_paid": "1640.00",
+      "payment_date": "2025-08-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_21",
+      "reference_month": "2025-09-01",
+      "amount_paid": "1640.00",
+      "payment_date": "2025-09-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_21",
+      "reference_month": "2025-10-01",
+      "amount_paid": "1640.00",
+      "payment_date": "2025-10-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_21",
+      "reference_month": "2025-11-01",
+      "amount_paid": "1640.00",
+      "payment_date": "2025-11-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_21",
+      "reference_month": "2025-12-01",
+      "amount_paid": "1640.00",
+      "payment_date": "2025-12-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_21",
+      "reference_month": "2026-01-01",
+      "amount_paid": "1640.00",
+      "payment_date": "2026-01-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_21",
+      "reference_month": "2026-02-01",
+      "amount_paid": "1640.00",
+      "payment_date": "2026-02-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_21",
+      "reference_month": "2026-03-01",
+      "amount_paid": "1640.00",
+      "payment_date": "2026-03-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_21",
+      "reference_month": "2026-04-01",
+      "amount_paid": "1640.00",
+      "payment_date": "2026-04-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_21",
+      "reference_month": "2026-05-01",
+      "amount_paid": "1640.00",
+      "payment_date": "2026-05-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_21",
+      "reference_month": "2026-06-01",
+      "amount_paid": "1640.00",
+      "payment_date": "2026-06-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_22",
+      "reference_month": "2025-01-01",
+      "amount_paid": "1695.00",
+      "payment_date": "2025-01-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_22",
+      "reference_month": "2025-02-01",
+      "amount_paid": "1695.00",
+      "payment_date": "2025-02-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_22",
+      "reference_month": "2025-03-01",
+      "amount_paid": "1695.00",
+      "payment_date": "2025-03-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_22",
+      "reference_month": "2025-04-01",
+      "amount_paid": "1695.00",
+      "payment_date": "2025-04-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_22",
+      "reference_month": "2025-05-01",
+      "amount_paid": "1695.00",
+      "payment_date": "2025-05-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_22",
+      "reference_month": "2025-06-01",
+      "amount_paid": "1695.00",
+      "payment_date": "2025-06-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_22",
+      "reference_month": "2025-07-01",
+      "amount_paid": "1695.00",
+      "payment_date": "2025-07-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_22",
+      "reference_month": "2025-08-01",
+      "amount_paid": "1695.00",
+      "payment_date": "2025-08-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_22",
+      "reference_month": "2025-09-01",
+      "amount_paid": "1695.00",
+      "payment_date": "2025-09-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_22",
+      "reference_month": "2025-10-01",
+      "amount_paid": "1695.00",
+      "payment_date": "2025-10-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_22",
+      "reference_month": "2025-11-01",
+      "amount_paid": "1695.00",
+      "payment_date": "2025-11-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_22",
+      "reference_month": "2025-12-01",
+      "amount_paid": "1695.00",
+      "payment_date": "2025-12-12",
+      "notes": "Pagamento com pequeno atraso"
+    },
+    {
+      "lease_ref": "lease_22",
+      "reference_month": "2026-01-01",
+      "amount_paid": "1695.00",
+      "payment_date": "2026-01-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_22",
+      "reference_month": "2026-02-01",
+      "amount_paid": "1695.00",
+      "payment_date": "2026-02-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_22",
+      "reference_month": "2026-03-01",
+      "amount_paid": "1695.00",
+      "payment_date": "2026-03-09",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_22",
+      "reference_month": "2026-04-01",
+      "amount_paid": "1695.00",
+      "payment_date": "2026-04-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_22",
+      "reference_month": "2026-05-01",
+      "amount_paid": "1695.00",
+      "payment_date": "2026-05-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_22",
+      "reference_month": "2026-06-01",
+      "amount_paid": "1695.00",
+      "payment_date": "2026-06-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_23",
+      "reference_month": "2025-02-01",
+      "amount_paid": "1000.00",
+      "payment_date": "2025-02-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_23",
+      "reference_month": "2025-03-01",
+      "amount_paid": "1000.00",
+      "payment_date": "2025-03-17",
+      "notes": "Pagamento com pequeno atraso"
+    },
+    {
+      "lease_ref": "lease_23",
+      "reference_month": "2025-04-01",
+      "amount_paid": "1000.00",
+      "payment_date": "2025-04-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_23",
+      "reference_month": "2025-05-01",
+      "amount_paid": "1000.00",
+      "payment_date": "2025-05-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_23",
+      "reference_month": "2025-06-01",
+      "amount_paid": "1000.00",
+      "payment_date": "2025-06-14",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_23",
+      "reference_month": "2025-07-01",
+      "amount_paid": "1000.00",
+      "payment_date": "2025-07-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_23",
+      "reference_month": "2025-08-01",
+      "amount_paid": "1000.00",
+      "payment_date": "2025-08-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_23",
+      "reference_month": "2025-09-01",
+      "amount_paid": "1000.00",
+      "payment_date": "2025-09-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_23",
+      "reference_month": "2025-10-01",
+      "amount_paid": "1000.00",
+      "payment_date": "2025-10-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_23",
+      "reference_month": "2025-11-01",
+      "amount_paid": "1000.00",
+      "payment_date": "2025-11-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_23",
+      "reference_month": "2025-12-01",
+      "amount_paid": "1000.00",
+      "payment_date": "2025-12-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_23",
+      "reference_month": "2026-01-01",
+      "amount_paid": "1000.00",
+      "payment_date": "2026-01-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_23",
+      "reference_month": "2026-02-01",
+      "amount_paid": "1000.00",
+      "payment_date": "2026-02-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_23",
+      "reference_month": "2026-03-01",
+      "amount_paid": "1000.00",
+      "payment_date": "2026-03-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_23",
+      "reference_month": "2026-04-01",
+      "amount_paid": "1000.00",
+      "payment_date": "2026-04-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_23",
+      "reference_month": "2026-05-01",
+      "amount_paid": "1000.00",
+      "payment_date": "2026-05-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_23",
+      "reference_month": "2026-06-01",
+      "amount_paid": "1000.00",
+      "payment_date": "2026-06-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_24",
+      "reference_month": "2025-04-01",
+      "amount_paid": "1055.00",
+      "payment_date": "2025-04-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_24",
+      "reference_month": "2025-05-01",
+      "amount_paid": "1055.00",
+      "payment_date": "2025-05-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_24",
+      "reference_month": "2025-06-01",
+      "amount_paid": "1055.00",
+      "payment_date": "2025-06-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_24",
+      "reference_month": "2025-07-01",
+      "amount_paid": "1055.00",
+      "payment_date": "2025-07-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_24",
+      "reference_month": "2025-08-01",
+      "amount_paid": "1055.00",
+      "payment_date": "2025-08-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_24",
+      "reference_month": "2025-09-01",
+      "amount_paid": "1055.00",
+      "payment_date": "2025-09-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_24",
+      "reference_month": "2025-10-01",
+      "amount_paid": "1055.00",
+      "payment_date": "2025-10-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_24",
+      "reference_month": "2025-11-01",
+      "amount_paid": "1055.00",
+      "payment_date": "2025-11-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_24",
+      "reference_month": "2025-12-01",
+      "amount_paid": "1055.00",
+      "payment_date": "2025-12-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_24",
+      "reference_month": "2026-01-01",
+      "amount_paid": "1055.00",
+      "payment_date": "2026-01-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_24",
+      "reference_month": "2026-02-01",
+      "amount_paid": "1055.00",
+      "payment_date": "2026-02-22",
+      "notes": "Pagamento com pequeno atraso"
+    },
+    {
+      "lease_ref": "lease_24",
+      "reference_month": "2026-03-01",
+      "amount_paid": "1055.00",
+      "payment_date": "2026-03-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_24",
+      "reference_month": "2026-04-01",
+      "amount_paid": "1055.00",
+      "payment_date": "2026-04-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_24",
+      "reference_month": "2026-05-01",
+      "amount_paid": "1055.00",
+      "payment_date": "2026-05-19",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_24",
+      "reference_month": "2026-06-01",
+      "amount_paid": "1055.00",
+      "payment_date": "2026-06-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_25",
+      "reference_month": "2025-01-01",
+      "amount_paid": "1110.00",
+      "payment_date": "2025-01-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_25",
+      "reference_month": "2025-02-01",
+      "amount_paid": "1110.00",
+      "payment_date": "2025-02-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_25",
+      "reference_month": "2025-03-01",
+      "amount_paid": "1110.00",
+      "payment_date": "2025-03-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_25",
+      "reference_month": "2025-04-01",
+      "amount_paid": "1110.00",
+      "payment_date": "2025-04-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_25",
+      "reference_month": "2025-05-01",
+      "amount_paid": "1110.00",
+      "payment_date": "2025-05-07",
+      "notes": "Pagamento com pequeno atraso"
+    },
+    {
+      "lease_ref": "lease_25",
+      "reference_month": "2025-06-01",
+      "amount_paid": "1110.00",
+      "payment_date": "2025-06-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_25",
+      "reference_month": "2025-07-01",
+      "amount_paid": "1110.00",
+      "payment_date": "2025-07-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_25",
+      "reference_month": "2025-08-01",
+      "amount_paid": "1110.00",
+      "payment_date": "2025-08-04",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_25",
+      "reference_month": "2025-09-01",
+      "amount_paid": "1110.00",
+      "payment_date": "2025-09-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_25",
+      "reference_month": "2025-10-01",
+      "amount_paid": "1110.00",
+      "payment_date": "2025-10-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_25",
+      "reference_month": "2025-11-01",
+      "amount_paid": "1110.00",
+      "payment_date": "2025-11-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_25",
+      "reference_month": "2025-12-01",
+      "amount_paid": "1110.00",
+      "payment_date": "2025-12-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_25",
+      "reference_month": "2026-01-01",
+      "amount_paid": "1110.00",
+      "payment_date": "2026-01-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_25",
+      "reference_month": "2026-02-01",
+      "amount_paid": "1110.00",
+      "payment_date": "2026-02-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_25",
+      "reference_month": "2026-03-01",
+      "amount_paid": "1110.00",
+      "payment_date": "2026-03-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_25",
+      "reference_month": "2026-04-01",
+      "amount_paid": "1110.00",
+      "payment_date": "2026-04-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_25",
+      "reference_month": "2026-05-01",
+      "amount_paid": "1110.00",
+      "payment_date": "2026-05-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_25",
+      "reference_month": "2026-06-01",
+      "amount_paid": "1110.00",
+      "payment_date": "2026-06-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_26",
+      "reference_month": "2025-01-01",
+      "amount_paid": "1165.00",
+      "payment_date": "2025-01-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_26",
+      "reference_month": "2025-02-01",
+      "amount_paid": "1165.00",
+      "payment_date": "2025-02-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_26",
+      "reference_month": "2025-03-01",
+      "amount_paid": "1165.00",
+      "payment_date": "2025-03-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_26",
+      "reference_month": "2025-04-01",
+      "amount_paid": "1165.00",
+      "payment_date": "2025-04-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_26",
+      "reference_month": "2025-05-01",
+      "amount_paid": "1165.00",
+      "payment_date": "2025-05-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_26",
+      "reference_month": "2025-06-01",
+      "amount_paid": "1165.00",
+      "payment_date": "2025-06-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_26",
+      "reference_month": "2025-07-01",
+      "amount_paid": "1165.00",
+      "payment_date": "2025-07-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_26",
+      "reference_month": "2025-08-01",
+      "amount_paid": "1165.00",
+      "payment_date": "2025-08-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_26",
+      "reference_month": "2025-09-01",
+      "amount_paid": "1165.00",
+      "payment_date": "2025-09-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_26",
+      "reference_month": "2025-10-01",
+      "amount_paid": "1165.00",
+      "payment_date": "2025-10-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_26",
+      "reference_month": "2025-11-01",
+      "amount_paid": "1165.00",
+      "payment_date": "2025-11-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_26",
+      "reference_month": "2025-12-01",
+      "amount_paid": "1165.00",
+      "payment_date": "2025-12-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_26",
+      "reference_month": "2026-01-01",
+      "amount_paid": "1165.00",
+      "payment_date": "2026-01-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_26",
+      "reference_month": "2026-02-01",
+      "amount_paid": "1165.00",
+      "payment_date": "2026-02-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_26",
+      "reference_month": "2026-03-01",
+      "amount_paid": "1165.00",
+      "payment_date": "2026-03-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_26",
+      "reference_month": "2026-04-01",
+      "amount_paid": "1165.00",
+      "payment_date": "2026-04-12",
+      "notes": "Pagamento com pequeno atraso"
+    },
+    {
+      "lease_ref": "lease_26",
+      "reference_month": "2026-05-01",
+      "amount_paid": "1165.00",
+      "payment_date": "2026-05-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_26",
+      "reference_month": "2026-06-01",
+      "amount_paid": "1165.00",
+      "payment_date": "2026-06-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_27",
+      "reference_month": "2025-01-01",
+      "amount_paid": "1220.00",
+      "payment_date": "2025-01-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_27",
+      "reference_month": "2025-02-01",
+      "amount_paid": "1220.00",
+      "payment_date": "2025-02-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_27",
+      "reference_month": "2025-03-01",
+      "amount_paid": "1220.00",
+      "payment_date": "2025-03-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_27",
+      "reference_month": "2025-04-01",
+      "amount_paid": "1220.00",
+      "payment_date": "2025-04-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_27",
+      "reference_month": "2025-05-01",
+      "amount_paid": "1220.00",
+      "payment_date": "2025-05-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_27",
+      "reference_month": "2025-06-01",
+      "amount_paid": "1220.00",
+      "payment_date": "2025-06-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_27",
+      "reference_month": "2025-07-01",
+      "amount_paid": "1220.00",
+      "payment_date": "2025-07-17",
+      "notes": "Pagamento com pequeno atraso"
+    },
+    {
+      "lease_ref": "lease_27",
+      "reference_month": "2025-08-01",
+      "amount_paid": "1220.00",
+      "payment_date": "2025-08-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_27",
+      "reference_month": "2025-09-01",
+      "amount_paid": "1220.00",
+      "payment_date": "2025-09-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_27",
+      "reference_month": "2025-10-01",
+      "amount_paid": "1220.00",
+      "payment_date": "2025-10-14",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_27",
+      "reference_month": "2025-11-01",
+      "amount_paid": "1220.00",
+      "payment_date": "2025-11-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_27",
+      "reference_month": "2025-12-01",
+      "amount_paid": "1220.00",
+      "payment_date": "2025-12-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_27",
+      "reference_month": "2026-01-01",
+      "amount_paid": "1220.00",
+      "payment_date": "2026-01-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_27",
+      "reference_month": "2026-02-01",
+      "amount_paid": "1220.00",
+      "payment_date": "2026-02-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_27",
+      "reference_month": "2026-03-01",
+      "amount_paid": "1220.00",
+      "payment_date": "2026-03-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_27",
+      "reference_month": "2026-04-01",
+      "amount_paid": "1220.00",
+      "payment_date": "2026-04-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_27",
+      "reference_month": "2026-05-01",
+      "amount_paid": "1220.00",
+      "payment_date": "2026-05-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_27",
+      "reference_month": "2026-06-01",
+      "amount_paid": "1220.00",
+      "payment_date": "2026-06-15",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_28",
+      "reference_month": "2025-01-01",
+      "amount_paid": "1280.00",
+      "payment_date": "2025-01-19",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_28",
+      "reference_month": "2025-02-01",
+      "amount_paid": "1280.00",
+      "payment_date": "2025-02-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_28",
+      "reference_month": "2025-03-01",
+      "amount_paid": "1280.00",
+      "payment_date": "2025-03-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_28",
+      "reference_month": "2025-04-01",
+      "amount_paid": "1280.00",
+      "payment_date": "2025-04-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_28",
+      "reference_month": "2025-05-01",
+      "amount_paid": "1280.00",
+      "payment_date": "2025-05-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_28",
+      "reference_month": "2025-06-01",
+      "amount_paid": "1280.00",
+      "payment_date": "2025-06-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_28",
+      "reference_month": "2025-07-01",
+      "amount_paid": "1280.00",
+      "payment_date": "2025-07-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_28",
+      "reference_month": "2025-08-01",
+      "amount_paid": "1280.00",
+      "payment_date": "2025-08-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_28",
+      "reference_month": "2025-09-01",
+      "amount_paid": "1280.00",
+      "payment_date": "2025-09-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_28",
+      "reference_month": "2025-10-01",
+      "amount_paid": "1280.00",
+      "payment_date": "2025-10-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_28",
+      "reference_month": "2025-11-01",
+      "amount_paid": "1280.00",
+      "payment_date": "2025-11-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_28",
+      "reference_month": "2025-12-01",
+      "amount_paid": "1280.00",
+      "payment_date": "2025-12-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_28",
+      "reference_month": "2026-01-01",
+      "amount_paid": "1280.00",
+      "payment_date": "2026-01-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_28",
+      "reference_month": "2026-02-01",
+      "amount_paid": "1280.00",
+      "payment_date": "2026-02-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_28",
+      "reference_month": "2026-03-01",
+      "amount_paid": "1280.00",
+      "payment_date": "2026-03-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_28",
+      "reference_month": "2026-04-01",
+      "amount_paid": "1280.00",
+      "payment_date": "2026-04-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_28",
+      "reference_month": "2026-05-01",
+      "amount_paid": "1280.00",
+      "payment_date": "2026-05-20",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_28",
+      "reference_month": "2026-06-01",
+      "amount_paid": "1280.00",
+      "payment_date": "2026-06-22",
+      "notes": "Pagamento com pequeno atraso"
+    },
+    {
+      "lease_ref": "lease_29",
+      "reference_month": "2025-01-01",
+      "amount_paid": "1450.00",
+      "payment_date": "2025-01-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_29",
+      "reference_month": "2025-02-01",
+      "amount_paid": "1450.00",
+      "payment_date": "2025-02-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_29",
+      "reference_month": "2025-03-01",
+      "amount_paid": "1450.00",
+      "payment_date": "2025-03-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_29",
+      "reference_month": "2025-04-01",
+      "amount_paid": "1450.00",
+      "payment_date": "2025-04-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_29",
+      "reference_month": "2025-05-01",
+      "amount_paid": "1450.00",
+      "payment_date": "2025-05-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_29",
+      "reference_month": "2025-06-01",
+      "amount_paid": "1450.00",
+      "payment_date": "2025-06-05",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_30",
+      "reference_month": "2025-01-01",
+      "amount_paid": "1750.00",
+      "payment_date": "2025-01-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_30",
+      "reference_month": "2025-02-01",
+      "amount_paid": "1750.00",
+      "payment_date": "2025-02-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_30",
+      "reference_month": "2025-03-01",
+      "amount_paid": "1750.00",
+      "payment_date": "2025-03-09",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_30",
+      "reference_month": "2025-04-01",
+      "amount_paid": "1750.00",
+      "payment_date": "2025-04-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_30",
+      "reference_month": "2025-05-01",
+      "amount_paid": "1750.00",
+      "payment_date": "2025-05-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_30",
+      "reference_month": "2025-06-01",
+      "amount_paid": "1750.00",
+      "payment_date": "2025-06-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_30",
+      "reference_month": "2025-07-01",
+      "amount_paid": "1750.00",
+      "payment_date": "2025-07-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_30",
+      "reference_month": "2025-08-01",
+      "amount_paid": "1750.00",
+      "payment_date": "2025-08-10",
+      "notes": ""
+    },
+    {
+      "lease_ref": "lease_30",
+      "reference_month": "2025-09-01",
+      "amount_paid": "1750.00",
+      "payment_date": "2025-09-10",
+      "notes": ""
+    }
+  ],
+  "payment_proofs": [
+    {
+      "lease_ref": "lease_01",
+      "reference_month": "2026-06-01",
+      "pix_code": "00020126360014BR.GOV.BCB.PIX0114demo00005204000053039865802BR5913GESTOR DEMO6009PORTOALEGRE62070503***6304ABCD",
+      "status": "pending",
+      "rejection_reason": ""
+    },
+    {
+      "lease_ref": "lease_02",
+      "reference_month": "2026-06-01",
+      "pix_code": "00020126360014BR.GOV.BCB.PIX0114demo00015204000053039865802BR5913GESTOR DEMO6009PORTOALEGRE62070503***6304ABCD",
+      "status": "pending",
+      "rejection_reason": ""
+    },
+    {
+      "lease_ref": "lease_06",
+      "reference_month": "2026-06-01",
+      "pix_code": "00020126360014BR.GOV.BCB.PIX0114demo00025204000053039865802BR5913GESTOR DEMO6009PORTOALEGRE62070503***6304ABCD",
+      "status": "approved",
+      "rejection_reason": ""
+    },
+    {
+      "lease_ref": "lease_07",
+      "reference_month": "2026-06-01",
+      "pix_code": "00020126360014BR.GOV.BCB.PIX0114demo00035204000053039865802BR5913GESTOR DEMO6009PORTOALEGRE62070503***6304ABCD",
+      "status": "approved",
+      "rejection_reason": ""
+    },
+    {
+      "lease_ref": "lease_08",
+      "reference_month": "2026-06-01",
+      "pix_code": "00020126360014BR.GOV.BCB.PIX0114demo00045204000053039865802BR5913GESTOR DEMO6009PORTOALEGRE62070503***6304ABCD",
+      "status": "approved",
+      "rejection_reason": ""
+    },
+    {
+      "lease_ref": "lease_09",
+      "reference_month": "2026-06-01",
+      "pix_code": "00020126360014BR.GOV.BCB.PIX0114demo00055204000053039865802BR5913GESTOR DEMO6009PORTOALEGRE62070503***6304ABCD",
+      "status": "rejected",
+      "rejection_reason": "Comprovante ilegível — valor não confere com o aluguel do mês."
+    }
+  ],
+  "condo_finance": {
+    "categories": [
+      {
+        "name": "Água",
+        "color": "#3B82F6",
+        "parent": null,
+        "sort_order": 1
+      },
+      {
+        "name": "Luz",
+        "color": "#F59E0B",
+        "parent": null,
+        "sort_order": 2
+      },
+      {
+        "name": "IPTU",
+        "color": "#EF4444",
+        "parent": null,
+        "sort_order": 3
+      },
+      {
+        "name": "Internet",
+        "color": "#8B5CF6",
+        "parent": null,
+        "sort_order": 4
+      },
+      {
+        "name": "Manutenção",
+        "color": "#10B981",
+        "parent": null,
+        "sort_order": 5
+      },
+      {
+        "name": "Reparo Hidráulico",
+        "color": "#10B981",
+        "parent": "Manutenção",
+        "sort_order": 1
+      },
+      {
+        "name": "Pintura",
+        "color": "#10B981",
+        "parent": "Manutenção",
+        "sort_order": 2
+      },
+      {
+        "name": "Elétrica",
+        "color": "#10B981",
+        "parent": "Manutenção",
+        "sort_order": 3
+      },
+      {
+        "name": "Folha de Pagamento",
+        "color": "#EC4899",
+        "parent": null,
+        "sort_order": 6
+      },
+      {
+        "name": "Limpeza",
+        "color": "#06B6D4",
+        "parent": null,
+        "sort_order": 7
+      }
+    ],
+    "water_bills": [
+      {
+        "building_street_number": 1247,
+        "competence_month": "2025-01-01",
+        "due_date": "2025-01-10",
+        "consumo_m3": 21,
+        "amount": "108.78"
+      },
+      {
+        "building_street_number": 1247,
+        "competence_month": "2025-02-01",
+        "due_date": "2025-02-10",
+        "consumo_m3": 22,
+        "amount": "113.96"
+      },
+      {
+        "building_street_number": 1247,
+        "competence_month": "2025-03-01",
+        "due_date": "2025-03-10",
+        "consumo_m3": 23,
+        "amount": "119.14"
+      },
+      {
+        "building_street_number": 1247,
+        "competence_month": "2025-04-01",
+        "due_date": "2025-04-10",
+        "consumo_m3": 24,
+        "amount": "124.32"
+      },
+      {
+        "building_street_number": 1247,
+        "competence_month": "2025-05-01",
+        "due_date": "2025-05-10",
+        "consumo_m3": 21,
+        "amount": "108.78"
+      },
+      {
+        "building_street_number": 1247,
+        "competence_month": "2025-06-01",
+        "due_date": "2025-06-10",
+        "consumo_m3": 22,
+        "amount": "113.96"
+      },
+      {
+        "building_street_number": 1247,
+        "competence_month": "2025-07-01",
+        "due_date": "2025-07-10",
+        "consumo_m3": 23,
+        "amount": "119.14"
+      },
+      {
+        "building_street_number": 1247,
+        "competence_month": "2025-08-01",
+        "due_date": "2025-08-10",
+        "consumo_m3": 24,
+        "amount": "124.32"
+      },
+      {
+        "building_street_number": 1247,
+        "competence_month": "2025-09-01",
+        "due_date": "2025-09-10",
+        "consumo_m3": 21,
+        "amount": "108.78"
+      },
+      {
+        "building_street_number": 1247,
+        "competence_month": "2025-10-01",
+        "due_date": "2025-10-10",
+        "consumo_m3": 22,
+        "amount": "113.96"
+      },
+      {
+        "building_street_number": 1247,
+        "competence_month": "2025-11-01",
+        "due_date": "2025-11-10",
+        "consumo_m3": 23,
+        "amount": "119.14"
+      },
+      {
+        "building_street_number": 1247,
+        "competence_month": "2025-12-01",
+        "due_date": "2025-12-10",
+        "consumo_m3": 24,
+        "amount": "124.32"
+      },
+      {
+        "building_street_number": 1247,
+        "competence_month": "2026-01-01",
+        "due_date": "2026-01-10",
+        "consumo_m3": 21,
+        "amount": "108.78"
+      },
+      {
+        "building_street_number": 1247,
+        "competence_month": "2026-02-01",
+        "due_date": "2026-02-10",
+        "consumo_m3": 22,
+        "amount": "121.00"
+      },
+      {
+        "building_street_number": 1247,
+        "competence_month": "2026-03-01",
+        "due_date": "2026-03-10",
+        "consumo_m3": 23,
+        "amount": "126.50"
+      },
+      {
+        "building_street_number": 1247,
+        "competence_month": "2026-04-01",
+        "due_date": "2026-04-10",
+        "consumo_m3": 24,
+        "amount": "132.00"
+      },
+      {
+        "building_street_number": 1247,
+        "competence_month": "2026-05-01",
+        "due_date": "2026-05-10",
+        "consumo_m3": 21,
+        "amount": "115.50"
+      },
+      {
+        "building_street_number": 1247,
+        "competence_month": "2026-06-01",
+        "due_date": "2026-06-10",
+        "consumo_m3": 22,
+        "amount": "121.00"
+      },
+      {
+        "building_street_number": 588,
+        "competence_month": "2025-01-01",
+        "due_date": "2025-01-10",
+        "consumo_m3": 25,
+        "amount": "129.50"
+      },
+      {
+        "building_street_number": 588,
+        "competence_month": "2025-02-01",
+        "due_date": "2025-02-10",
+        "consumo_m3": 26,
+        "amount": "134.68"
+      },
+      {
+        "building_street_number": 588,
+        "competence_month": "2025-03-01",
+        "due_date": "2025-03-10",
+        "consumo_m3": 27,
+        "amount": "139.86"
+      },
+      {
+        "building_street_number": 588,
+        "competence_month": "2025-04-01",
+        "due_date": "2025-04-10",
+        "consumo_m3": 28,
+        "amount": "145.04"
+      },
+      {
+        "building_street_number": 588,
+        "competence_month": "2025-05-01",
+        "due_date": "2025-05-10",
+        "consumo_m3": 25,
+        "amount": "129.50"
+      },
+      {
+        "building_street_number": 588,
+        "competence_month": "2025-06-01",
+        "due_date": "2025-06-10",
+        "consumo_m3": 26,
+        "amount": "134.68"
+      },
+      {
+        "building_street_number": 588,
+        "competence_month": "2025-07-01",
+        "due_date": "2025-07-10",
+        "consumo_m3": 27,
+        "amount": "139.86"
+      },
+      {
+        "building_street_number": 588,
+        "competence_month": "2025-08-01",
+        "due_date": "2025-08-10",
+        "consumo_m3": 28,
+        "amount": "145.04"
+      },
+      {
+        "building_street_number": 588,
+        "competence_month": "2025-09-01",
+        "due_date": "2025-09-10",
+        "consumo_m3": 25,
+        "amount": "129.50"
+      },
+      {
+        "building_street_number": 588,
+        "competence_month": "2025-10-01",
+        "due_date": "2025-10-10",
+        "consumo_m3": 26,
+        "amount": "134.68"
+      },
+      {
+        "building_street_number": 588,
+        "competence_month": "2025-11-01",
+        "due_date": "2025-11-10",
+        "consumo_m3": 27,
+        "amount": "139.86"
+      },
+      {
+        "building_street_number": 588,
+        "competence_month": "2025-12-01",
+        "due_date": "2025-12-10",
+        "consumo_m3": 28,
+        "amount": "145.04"
+      },
+      {
+        "building_street_number": 588,
+        "competence_month": "2026-01-01",
+        "due_date": "2026-01-10",
+        "consumo_m3": 25,
+        "amount": "129.50"
+      },
+      {
+        "building_street_number": 588,
+        "competence_month": "2026-02-01",
+        "due_date": "2026-02-10",
+        "consumo_m3": 26,
+        "amount": "143.00"
+      },
+      {
+        "building_street_number": 588,
+        "competence_month": "2026-03-01",
+        "due_date": "2026-03-10",
+        "consumo_m3": 27,
+        "amount": "148.50"
+      },
+      {
+        "building_street_number": 588,
+        "competence_month": "2026-04-01",
+        "due_date": "2026-04-10",
+        "consumo_m3": 28,
+        "amount": "154.00"
+      },
+      {
+        "building_street_number": 588,
+        "competence_month": "2026-05-01",
+        "due_date": "2026-05-10",
+        "consumo_m3": 25,
+        "amount": "137.50"
+      },
+      {
+        "building_street_number": 588,
+        "competence_month": "2026-06-01",
+        "due_date": "2026-06-10",
+        "consumo_m3": 26,
+        "amount": "143.00"
+      },
+      {
+        "building_street_number": 2310,
+        "competence_month": "2025-01-01",
+        "due_date": "2025-01-10",
+        "consumo_m3": 18,
+        "amount": "93.24"
+      },
+      {
+        "building_street_number": 2310,
+        "competence_month": "2025-02-01",
+        "due_date": "2025-02-10",
+        "consumo_m3": 19,
+        "amount": "98.42"
+      },
+      {
+        "building_street_number": 2310,
+        "competence_month": "2025-03-01",
+        "due_date": "2025-03-10",
+        "consumo_m3": 20,
+        "amount": "103.60"
+      },
+      {
+        "building_street_number": 2310,
+        "competence_month": "2025-04-01",
+        "due_date": "2025-04-10",
+        "consumo_m3": 21,
+        "amount": "108.78"
+      },
+      {
+        "building_street_number": 2310,
+        "competence_month": "2025-05-01",
+        "due_date": "2025-05-10",
+        "consumo_m3": 18,
+        "amount": "93.24"
+      },
+      {
+        "building_street_number": 2310,
+        "competence_month": "2025-06-01",
+        "due_date": "2025-06-10",
+        "consumo_m3": 19,
+        "amount": "98.42"
+      },
+      {
+        "building_street_number": 2310,
+        "competence_month": "2025-07-01",
+        "due_date": "2025-07-10",
+        "consumo_m3": 20,
+        "amount": "103.60"
+      },
+      {
+        "building_street_number": 2310,
+        "competence_month": "2025-08-01",
+        "due_date": "2025-08-10",
+        "consumo_m3": 21,
+        "amount": "108.78"
+      },
+      {
+        "building_street_number": 2310,
+        "competence_month": "2025-09-01",
+        "due_date": "2025-09-10",
+        "consumo_m3": 18,
+        "amount": "93.24"
+      },
+      {
+        "building_street_number": 2310,
+        "competence_month": "2025-10-01",
+        "due_date": "2025-10-10",
+        "consumo_m3": 19,
+        "amount": "98.42"
+      },
+      {
+        "building_street_number": 2310,
+        "competence_month": "2025-11-01",
+        "due_date": "2025-11-10",
+        "consumo_m3": 20,
+        "amount": "103.60"
+      },
+      {
+        "building_street_number": 2310,
+        "competence_month": "2025-12-01",
+        "due_date": "2025-12-10",
+        "consumo_m3": 21,
+        "amount": "108.78"
+      },
+      {
+        "building_street_number": 2310,
+        "competence_month": "2026-01-01",
+        "due_date": "2026-01-10",
+        "consumo_m3": 18,
+        "amount": "93.24"
+      },
+      {
+        "building_street_number": 2310,
+        "competence_month": "2026-02-01",
+        "due_date": "2026-02-10",
+        "consumo_m3": 19,
+        "amount": "104.50"
+      },
+      {
+        "building_street_number": 2310,
+        "competence_month": "2026-03-01",
+        "due_date": "2026-03-10",
+        "consumo_m3": 20,
+        "amount": "110.00"
+      },
+      {
+        "building_street_number": 2310,
+        "competence_month": "2026-04-01",
+        "due_date": "2026-04-10",
+        "consumo_m3": 21,
+        "amount": "115.50"
+      },
+      {
+        "building_street_number": 2310,
+        "competence_month": "2026-05-01",
+        "due_date": "2026-05-10",
+        "consumo_m3": 18,
+        "amount": "99.00"
+      },
+      {
+        "building_street_number": 2310,
+        "competence_month": "2026-06-01",
+        "due_date": "2026-06-10",
+        "consumo_m3": 19,
+        "amount": "104.50"
+      }
+    ],
+    "electricity_bills": [
+      {
+        "building_street_number": 1247,
+        "competence_month": "2025-01-01",
+        "due_date": "2025-01-10",
+        "consumo_kwh": 180,
+        "amount": "165.60"
+      },
+      {
+        "building_street_number": 1247,
+        "competence_month": "2025-02-01",
+        "due_date": "2025-02-10",
+        "consumo_kwh": 185,
+        "amount": "170.20"
+      },
+      {
+        "building_street_number": 1247,
+        "competence_month": "2025-03-01",
+        "due_date": "2025-03-10",
+        "consumo_kwh": 190,
+        "amount": "174.80"
+      },
+      {
+        "building_street_number": 1247,
+        "competence_month": "2025-04-01",
+        "due_date": "2025-04-10",
+        "consumo_kwh": 180,
+        "amount": "165.60"
+      },
+      {
+        "building_street_number": 1247,
+        "competence_month": "2025-05-01",
+        "due_date": "2025-05-10",
+        "consumo_kwh": 185,
+        "amount": "170.20"
+      },
+      {
+        "building_street_number": 1247,
+        "competence_month": "2025-06-01",
+        "due_date": "2025-06-10",
+        "consumo_kwh": 253,
+        "amount": "232.76"
+      },
+      {
+        "building_street_number": 1247,
+        "competence_month": "2025-07-01",
+        "due_date": "2025-07-10",
+        "consumo_kwh": 243,
+        "amount": "223.56"
+      },
+      {
+        "building_street_number": 1247,
+        "competence_month": "2025-08-01",
+        "due_date": "2025-08-10",
+        "consumo_kwh": 248,
+        "amount": "228.16"
+      },
+      {
+        "building_street_number": 1247,
+        "competence_month": "2025-09-01",
+        "due_date": "2025-09-10",
+        "consumo_kwh": 190,
+        "amount": "174.80"
+      },
+      {
+        "building_street_number": 1247,
+        "competence_month": "2025-10-01",
+        "due_date": "2025-10-10",
+        "consumo_kwh": 180,
+        "amount": "165.60"
+      },
+      {
+        "building_street_number": 1247,
+        "competence_month": "2025-11-01",
+        "due_date": "2025-11-10",
+        "consumo_kwh": 185,
+        "amount": "207.20"
+      },
+      {
+        "building_street_number": 1247,
+        "competence_month": "2025-12-01",
+        "due_date": "2025-12-10",
+        "consumo_kwh": 190,
+        "amount": "212.80"
+      },
+      {
+        "building_street_number": 1247,
+        "competence_month": "2026-01-01",
+        "due_date": "2026-01-10",
+        "consumo_kwh": 180,
+        "amount": "201.60"
+      },
+      {
+        "building_street_number": 1247,
+        "competence_month": "2026-02-01",
+        "due_date": "2026-02-10",
+        "consumo_kwh": 185,
+        "amount": "207.20"
+      },
+      {
+        "building_street_number": 1247,
+        "competence_month": "2026-03-01",
+        "due_date": "2026-03-10",
+        "consumo_kwh": 190,
+        "amount": "212.80"
+      },
+      {
+        "building_street_number": 1247,
+        "competence_month": "2026-04-01",
+        "due_date": "2026-04-10",
+        "consumo_kwh": 180,
+        "amount": "201.60"
+      },
+      {
+        "building_street_number": 1247,
+        "competence_month": "2026-05-01",
+        "due_date": "2026-05-10",
+        "consumo_kwh": 185,
+        "amount": "207.20"
+      },
+      {
+        "building_street_number": 1247,
+        "competence_month": "2026-06-01",
+        "due_date": "2026-06-10",
+        "consumo_kwh": 253,
+        "amount": "283.36"
+      },
+      {
+        "building_street_number": 588,
+        "competence_month": "2025-01-01",
+        "due_date": "2025-01-10",
+        "consumo_kwh": 210,
+        "amount": "193.20"
+      },
+      {
+        "building_street_number": 588,
+        "competence_month": "2025-02-01",
+        "due_date": "2025-02-10",
+        "consumo_kwh": 215,
+        "amount": "197.80"
+      },
+      {
+        "building_street_number": 588,
+        "competence_month": "2025-03-01",
+        "due_date": "2025-03-10",
+        "consumo_kwh": 220,
+        "amount": "202.40"
+      },
+      {
+        "building_street_number": 588,
+        "competence_month": "2025-04-01",
+        "due_date": "2025-04-10",
+        "consumo_kwh": 210,
+        "amount": "193.20"
+      },
+      {
+        "building_street_number": 588,
+        "competence_month": "2025-05-01",
+        "due_date": "2025-05-10",
+        "consumo_kwh": 215,
+        "amount": "197.80"
+      },
+      {
+        "building_street_number": 588,
+        "competence_month": "2025-06-01",
+        "due_date": "2025-06-10",
+        "consumo_kwh": 293,
+        "amount": "269.56"
+      },
+      {
+        "building_street_number": 588,
+        "competence_month": "2025-07-01",
+        "due_date": "2025-07-10",
+        "consumo_kwh": 283,
+        "amount": "260.36"
+      },
+      {
+        "building_street_number": 588,
+        "competence_month": "2025-08-01",
+        "due_date": "2025-08-10",
+        "consumo_kwh": 288,
+        "amount": "264.96"
+      },
+      {
+        "building_street_number": 588,
+        "competence_month": "2025-09-01",
+        "due_date": "2025-09-10",
+        "consumo_kwh": 220,
+        "amount": "202.40"
+      },
+      {
+        "building_street_number": 588,
+        "competence_month": "2025-10-01",
+        "due_date": "2025-10-10",
+        "consumo_kwh": 210,
+        "amount": "193.20"
+      },
+      {
+        "building_street_number": 588,
+        "competence_month": "2025-11-01",
+        "due_date": "2025-11-10",
+        "consumo_kwh": 215,
+        "amount": "240.80"
+      },
+      {
+        "building_street_number": 588,
+        "competence_month": "2025-12-01",
+        "due_date": "2025-12-10",
+        "consumo_kwh": 220,
+        "amount": "246.40"
+      },
+      {
+        "building_street_number": 588,
+        "competence_month": "2026-01-01",
+        "due_date": "2026-01-10",
+        "consumo_kwh": 210,
+        "amount": "235.20"
+      },
+      {
+        "building_street_number": 588,
+        "competence_month": "2026-02-01",
+        "due_date": "2026-02-10",
+        "consumo_kwh": 215,
+        "amount": "240.80"
+      },
+      {
+        "building_street_number": 588,
+        "competence_month": "2026-03-01",
+        "due_date": "2026-03-10",
+        "consumo_kwh": 220,
+        "amount": "246.40"
+      },
+      {
+        "building_street_number": 588,
+        "competence_month": "2026-04-01",
+        "due_date": "2026-04-10",
+        "consumo_kwh": 210,
+        "amount": "235.20"
+      },
+      {
+        "building_street_number": 588,
+        "competence_month": "2026-05-01",
+        "due_date": "2026-05-10",
+        "consumo_kwh": 215,
+        "amount": "240.80"
+      },
+      {
+        "building_street_number": 588,
+        "competence_month": "2026-06-01",
+        "due_date": "2026-06-10",
+        "consumo_kwh": 293,
+        "amount": "328.16"
+      },
+      {
+        "building_street_number": 2310,
+        "competence_month": "2025-01-01",
+        "due_date": "2025-01-10",
+        "consumo_kwh": 150,
+        "amount": "138.00"
+      },
+      {
+        "building_street_number": 2310,
+        "competence_month": "2025-02-01",
+        "due_date": "2025-02-10",
+        "consumo_kwh": 155,
+        "amount": "142.60"
+      },
+      {
+        "building_street_number": 2310,
+        "competence_month": "2025-03-01",
+        "due_date": "2025-03-10",
+        "consumo_kwh": 160,
+        "amount": "147.20"
+      },
+      {
+        "building_street_number": 2310,
+        "competence_month": "2025-04-01",
+        "due_date": "2025-04-10",
+        "consumo_kwh": 150,
+        "amount": "138.00"
+      },
+      {
+        "building_street_number": 2310,
+        "competence_month": "2025-05-01",
+        "due_date": "2025-05-10",
+        "consumo_kwh": 155,
+        "amount": "142.60"
+      },
+      {
+        "building_street_number": 2310,
+        "competence_month": "2025-06-01",
+        "due_date": "2025-06-10",
+        "consumo_kwh": 212,
+        "amount": "195.04"
+      },
+      {
+        "building_street_number": 2310,
+        "competence_month": "2025-07-01",
+        "due_date": "2025-07-10",
+        "consumo_kwh": 202,
+        "amount": "185.84"
+      },
+      {
+        "building_street_number": 2310,
+        "competence_month": "2025-08-01",
+        "due_date": "2025-08-10",
+        "consumo_kwh": 207,
+        "amount": "190.44"
+      },
+      {
+        "building_street_number": 2310,
+        "competence_month": "2025-09-01",
+        "due_date": "2025-09-10",
+        "consumo_kwh": 160,
+        "amount": "147.20"
+      },
+      {
+        "building_street_number": 2310,
+        "competence_month": "2025-10-01",
+        "due_date": "2025-10-10",
+        "consumo_kwh": 150,
+        "amount": "138.00"
+      },
+      {
+        "building_street_number": 2310,
+        "competence_month": "2025-11-01",
+        "due_date": "2025-11-10",
+        "consumo_kwh": 155,
+        "amount": "173.60"
+      },
+      {
+        "building_street_number": 2310,
+        "competence_month": "2025-12-01",
+        "due_date": "2025-12-10",
+        "consumo_kwh": 160,
+        "amount": "179.20"
+      },
+      {
+        "building_street_number": 2310,
+        "competence_month": "2026-01-01",
+        "due_date": "2026-01-10",
+        "consumo_kwh": 150,
+        "amount": "168.00"
+      },
+      {
+        "building_street_number": 2310,
+        "competence_month": "2026-02-01",
+        "due_date": "2026-02-10",
+        "consumo_kwh": 155,
+        "amount": "173.60"
+      },
+      {
+        "building_street_number": 2310,
+        "competence_month": "2026-03-01",
+        "due_date": "2026-03-10",
+        "consumo_kwh": 160,
+        "amount": "179.20"
+      },
+      {
+        "building_street_number": 2310,
+        "competence_month": "2026-04-01",
+        "due_date": "2026-04-10",
+        "consumo_kwh": 150,
+        "amount": "168.00"
+      },
+      {
+        "building_street_number": 2310,
+        "competence_month": "2026-05-01",
+        "due_date": "2026-05-10",
+        "consumo_kwh": 155,
+        "amount": "173.60"
+      },
+      {
+        "building_street_number": 2310,
+        "competence_month": "2026-06-01",
+        "due_date": "2026-06-10",
+        "consumo_kwh": 212,
+        "amount": "237.44"
+      }
+    ],
+    "internet_bills": [
+      {
+        "building_street_number": 1247,
+        "competence_month": "2025-01-01",
+        "due_date": "2025-01-15",
+        "amount": "99.90"
+      },
+      {
+        "building_street_number": 1247,
+        "competence_month": "2025-02-01",
+        "due_date": "2025-02-15",
+        "amount": "99.90"
+      },
+      {
+        "building_street_number": 1247,
+        "competence_month": "2025-03-01",
+        "due_date": "2025-03-15",
+        "amount": "99.90"
+      },
+      {
+        "building_street_number": 1247,
+        "competence_month": "2025-04-01",
+        "due_date": "2025-04-15",
+        "amount": "99.90"
+      },
+      {
+        "building_street_number": 1247,
+        "competence_month": "2025-05-01",
+        "due_date": "2025-05-15",
+        "amount": "99.90"
+      },
+      {
+        "building_street_number": 1247,
+        "competence_month": "2025-06-01",
+        "due_date": "2025-06-15",
+        "amount": "99.90"
+      },
+      {
+        "building_street_number": 1247,
+        "competence_month": "2025-07-01",
+        "due_date": "2025-07-15",
+        "amount": "99.90"
+      },
+      {
+        "building_street_number": 1247,
+        "competence_month": "2025-08-01",
+        "due_date": "2025-08-15",
+        "amount": "99.90"
+      },
+      {
+        "building_street_number": 1247,
+        "competence_month": "2025-09-01",
+        "due_date": "2025-09-15",
+        "amount": "99.90"
+      },
+      {
+        "building_street_number": 1247,
+        "competence_month": "2025-10-01",
+        "due_date": "2025-10-15",
+        "amount": "99.90"
+      },
+      {
+        "building_street_number": 1247,
+        "competence_month": "2025-11-01",
+        "due_date": "2025-11-15",
+        "amount": "99.90"
+      },
+      {
+        "building_street_number": 1247,
+        "competence_month": "2025-12-01",
+        "due_date": "2025-12-15",
+        "amount": "99.90"
+      },
+      {
+        "building_street_number": 1247,
+        "competence_month": "2026-01-01",
+        "due_date": "2026-01-15",
+        "amount": "99.90"
+      },
+      {
+        "building_street_number": 1247,
+        "competence_month": "2026-02-01",
+        "due_date": "2026-02-15",
+        "amount": "99.90"
+      },
+      {
+        "building_street_number": 1247,
+        "competence_month": "2026-03-01",
+        "due_date": "2026-03-15",
+        "amount": "99.90"
+      },
+      {
+        "building_street_number": 1247,
+        "competence_month": "2026-04-01",
+        "due_date": "2026-04-15",
+        "amount": "99.90"
+      },
+      {
+        "building_street_number": 1247,
+        "competence_month": "2026-05-01",
+        "due_date": "2026-05-15",
+        "amount": "99.90"
+      },
+      {
+        "building_street_number": 1247,
+        "competence_month": "2026-06-01",
+        "due_date": "2026-06-15",
+        "amount": "99.90"
+      },
+      {
+        "building_street_number": 588,
+        "competence_month": "2025-01-01",
+        "due_date": "2025-01-15",
+        "amount": "109.90"
+      },
+      {
+        "building_street_number": 588,
+        "competence_month": "2025-02-01",
+        "due_date": "2025-02-15",
+        "amount": "109.90"
+      },
+      {
+        "building_street_number": 588,
+        "competence_month": "2025-03-01",
+        "due_date": "2025-03-15",
+        "amount": "109.90"
+      },
+      {
+        "building_street_number": 588,
+        "competence_month": "2025-04-01",
+        "due_date": "2025-04-15",
+        "amount": "109.90"
+      },
+      {
+        "building_street_number": 588,
+        "competence_month": "2025-05-01",
+        "due_date": "2025-05-15",
+        "amount": "109.90"
+      },
+      {
+        "building_street_number": 588,
+        "competence_month": "2025-06-01",
+        "due_date": "2025-06-15",
+        "amount": "109.90"
+      },
+      {
+        "building_street_number": 588,
+        "competence_month": "2025-07-01",
+        "due_date": "2025-07-15",
+        "amount": "109.90"
+      },
+      {
+        "building_street_number": 588,
+        "competence_month": "2025-08-01",
+        "due_date": "2025-08-15",
+        "amount": "109.90"
+      },
+      {
+        "building_street_number": 588,
+        "competence_month": "2025-09-01",
+        "due_date": "2025-09-15",
+        "amount": "109.90"
+      },
+      {
+        "building_street_number": 588,
+        "competence_month": "2025-10-01",
+        "due_date": "2025-10-15",
+        "amount": "109.90"
+      },
+      {
+        "building_street_number": 588,
+        "competence_month": "2025-11-01",
+        "due_date": "2025-11-15",
+        "amount": "109.90"
+      },
+      {
+        "building_street_number": 588,
+        "competence_month": "2025-12-01",
+        "due_date": "2025-12-15",
+        "amount": "109.90"
+      },
+      {
+        "building_street_number": 588,
+        "competence_month": "2026-01-01",
+        "due_date": "2026-01-15",
+        "amount": "109.90"
+      },
+      {
+        "building_street_number": 588,
+        "competence_month": "2026-02-01",
+        "due_date": "2026-02-15",
+        "amount": "109.90"
+      },
+      {
+        "building_street_number": 588,
+        "competence_month": "2026-03-01",
+        "due_date": "2026-03-15",
+        "amount": "109.90"
+      },
+      {
+        "building_street_number": 588,
+        "competence_month": "2026-04-01",
+        "due_date": "2026-04-15",
+        "amount": "109.90"
+      },
+      {
+        "building_street_number": 588,
+        "competence_month": "2026-05-01",
+        "due_date": "2026-05-15",
+        "amount": "109.90"
+      },
+      {
+        "building_street_number": 588,
+        "competence_month": "2026-06-01",
+        "due_date": "2026-06-15",
+        "amount": "109.90"
+      },
+      {
+        "building_street_number": 2310,
+        "competence_month": "2025-01-01",
+        "due_date": "2025-01-15",
+        "amount": "89.90"
+      },
+      {
+        "building_street_number": 2310,
+        "competence_month": "2025-02-01",
+        "due_date": "2025-02-15",
+        "amount": "89.90"
+      },
+      {
+        "building_street_number": 2310,
+        "competence_month": "2025-03-01",
+        "due_date": "2025-03-15",
+        "amount": "89.90"
+      },
+      {
+        "building_street_number": 2310,
+        "competence_month": "2025-04-01",
+        "due_date": "2025-04-15",
+        "amount": "89.90"
+      },
+      {
+        "building_street_number": 2310,
+        "competence_month": "2025-05-01",
+        "due_date": "2025-05-15",
+        "amount": "89.90"
+      },
+      {
+        "building_street_number": 2310,
+        "competence_month": "2025-06-01",
+        "due_date": "2025-06-15",
+        "amount": "89.90"
+      },
+      {
+        "building_street_number": 2310,
+        "competence_month": "2025-07-01",
+        "due_date": "2025-07-15",
+        "amount": "89.90"
+      },
+      {
+        "building_street_number": 2310,
+        "competence_month": "2025-08-01",
+        "due_date": "2025-08-15",
+        "amount": "89.90"
+      },
+      {
+        "building_street_number": 2310,
+        "competence_month": "2025-09-01",
+        "due_date": "2025-09-15",
+        "amount": "89.90"
+      },
+      {
+        "building_street_number": 2310,
+        "competence_month": "2025-10-01",
+        "due_date": "2025-10-15",
+        "amount": "89.90"
+      },
+      {
+        "building_street_number": 2310,
+        "competence_month": "2025-11-01",
+        "due_date": "2025-11-15",
+        "amount": "89.90"
+      },
+      {
+        "building_street_number": 2310,
+        "competence_month": "2025-12-01",
+        "due_date": "2025-12-15",
+        "amount": "89.90"
+      },
+      {
+        "building_street_number": 2310,
+        "competence_month": "2026-01-01",
+        "due_date": "2026-01-15",
+        "amount": "89.90"
+      },
+      {
+        "building_street_number": 2310,
+        "competence_month": "2026-02-01",
+        "due_date": "2026-02-15",
+        "amount": "89.90"
+      },
+      {
+        "building_street_number": 2310,
+        "competence_month": "2026-03-01",
+        "due_date": "2026-03-15",
+        "amount": "89.90"
+      },
+      {
+        "building_street_number": 2310,
+        "competence_month": "2026-04-01",
+        "due_date": "2026-04-15",
+        "amount": "89.90"
+      },
+      {
+        "building_street_number": 2310,
+        "competence_month": "2026-05-01",
+        "due_date": "2026-05-15",
+        "amount": "89.90"
+      },
+      {
+        "building_street_number": 2310,
+        "competence_month": "2026-06-01",
+        "due_date": "2026-06-15",
+        "amount": "89.90"
+      }
+    ],
+    "iptu_terms": [
+      {
+        "building_street_number": 1247,
+        "year": 2025,
+        "total_amount": "2480.00",
+        "installment_count": 10,
+        "installments": [
+          {
+            "number": 1,
+            "due_date": "2025-03-09",
+            "amount": "248.00"
+          },
+          {
+            "number": 2,
+            "due_date": "2025-04-09",
+            "amount": "248.00"
+          },
+          {
+            "number": 3,
+            "due_date": "2025-05-09",
+            "amount": "248.00"
+          },
+          {
+            "number": 4,
+            "due_date": "2025-06-09",
+            "amount": "248.00"
+          },
+          {
+            "number": 5,
+            "due_date": "2025-07-09",
+            "amount": "248.00"
+          },
+          {
+            "number": 6,
+            "due_date": "2025-08-09",
+            "amount": "248.00"
+          },
+          {
+            "number": 7,
+            "due_date": "2025-09-09",
+            "amount": "248.00"
+          },
+          {
+            "number": 8,
+            "due_date": "2025-10-09",
+            "amount": "248.00"
+          },
+          {
+            "number": 9,
+            "due_date": "2025-11-09",
+            "amount": "248.00"
+          },
+          {
+            "number": 10,
+            "due_date": "2025-12-09",
+            "amount": "248.00"
+          }
+        ]
+      },
+      {
+        "building_street_number": 1247,
+        "year": 2026,
+        "total_amount": "2596.06",
+        "installment_count": 10,
+        "installments": [
+          {
+            "number": 1,
+            "due_date": "2026-03-09",
+            "amount": "259.61"
+          },
+          {
+            "number": 2,
+            "due_date": "2026-04-09",
+            "amount": "259.61"
+          },
+          {
+            "number": 3,
+            "due_date": "2026-05-09",
+            "amount": "259.61"
+          },
+          {
+            "number": 4,
+            "due_date": "2026-06-09",
+            "amount": "259.61"
+          },
+          {
+            "number": 5,
+            "due_date": "2026-07-09",
+            "amount": "259.61"
+          },
+          {
+            "number": 6,
+            "due_date": "2026-08-09",
+            "amount": "259.61"
+          },
+          {
+            "number": 7,
+            "due_date": "2026-09-09",
+            "amount": "259.61"
+          },
+          {
+            "number": 8,
+            "due_date": "2026-10-09",
+            "amount": "259.61"
+          },
+          {
+            "number": 9,
+            "due_date": "2026-11-09",
+            "amount": "259.61"
+          },
+          {
+            "number": 10,
+            "due_date": "2026-12-09",
+            "amount": "259.57"
+          }
+        ]
+      },
+      {
+        "building_street_number": 588,
+        "year": 2025,
+        "total_amount": "2890.00",
+        "installment_count": 10,
+        "installments": [
+          {
+            "number": 1,
+            "due_date": "2025-03-09",
+            "amount": "289.00"
+          },
+          {
+            "number": 2,
+            "due_date": "2025-04-09",
+            "amount": "289.00"
+          },
+          {
+            "number": 3,
+            "due_date": "2025-05-09",
+            "amount": "289.00"
+          },
+          {
+            "number": 4,
+            "due_date": "2025-06-09",
+            "amount": "289.00"
+          },
+          {
+            "number": 5,
+            "due_date": "2025-07-09",
+            "amount": "289.00"
+          },
+          {
+            "number": 6,
+            "due_date": "2025-08-09",
+            "amount": "289.00"
+          },
+          {
+            "number": 7,
+            "due_date": "2025-09-09",
+            "amount": "289.00"
+          },
+          {
+            "number": 8,
+            "due_date": "2025-10-09",
+            "amount": "289.00"
+          },
+          {
+            "number": 9,
+            "due_date": "2025-11-09",
+            "amount": "289.00"
+          },
+          {
+            "number": 10,
+            "due_date": "2025-12-09",
+            "amount": "289.00"
+          }
+        ]
+      },
+      {
+        "building_street_number": 588,
+        "year": 2026,
+        "total_amount": "3025.25",
+        "installment_count": 10,
+        "installments": [
+          {
+            "number": 1,
+            "due_date": "2026-03-09",
+            "amount": "302.53"
+          },
+          {
+            "number": 2,
+            "due_date": "2026-04-09",
+            "amount": "302.53"
+          },
+          {
+            "number": 3,
+            "due_date": "2026-05-09",
+            "amount": "302.53"
+          },
+          {
+            "number": 4,
+            "due_date": "2026-06-09",
+            "amount": "302.53"
+          },
+          {
+            "number": 5,
+            "due_date": "2026-07-09",
+            "amount": "302.53"
+          },
+          {
+            "number": 6,
+            "due_date": "2026-08-09",
+            "amount": "302.53"
+          },
+          {
+            "number": 7,
+            "due_date": "2026-09-09",
+            "amount": "302.53"
+          },
+          {
+            "number": 8,
+            "due_date": "2026-10-09",
+            "amount": "302.53"
+          },
+          {
+            "number": 9,
+            "due_date": "2026-11-09",
+            "amount": "302.53"
+          },
+          {
+            "number": 10,
+            "due_date": "2026-12-09",
+            "amount": "302.48"
+          }
+        ]
+      },
+      {
+        "building_street_number": 2310,
+        "year": 2025,
+        "total_amount": "2210.00",
+        "installment_count": 10,
+        "installments": [
+          {
+            "number": 1,
+            "due_date": "2025-03-09",
+            "amount": "221.00"
+          },
+          {
+            "number": 2,
+            "due_date": "2025-04-09",
+            "amount": "221.00"
+          },
+          {
+            "number": 3,
+            "due_date": "2025-05-09",
+            "amount": "221.00"
+          },
+          {
+            "number": 4,
+            "due_date": "2025-06-09",
+            "amount": "221.00"
+          },
+          {
+            "number": 5,
+            "due_date": "2025-07-09",
+            "amount": "221.00"
+          },
+          {
+            "number": 6,
+            "due_date": "2025-08-09",
+            "amount": "221.00"
+          },
+          {
+            "number": 7,
+            "due_date": "2025-09-09",
+            "amount": "221.00"
+          },
+          {
+            "number": 8,
+            "due_date": "2025-10-09",
+            "amount": "221.00"
+          },
+          {
+            "number": 9,
+            "due_date": "2025-11-09",
+            "amount": "221.00"
+          },
+          {
+            "number": 10,
+            "due_date": "2025-12-09",
+            "amount": "221.00"
+          }
+        ]
+      },
+      {
+        "building_street_number": 2310,
+        "year": 2026,
+        "total_amount": "2313.43",
+        "installment_count": 10,
+        "installments": [
+          {
+            "number": 1,
+            "due_date": "2026-03-09",
+            "amount": "231.34"
+          },
+          {
+            "number": 2,
+            "due_date": "2026-04-09",
+            "amount": "231.34"
+          },
+          {
+            "number": 3,
+            "due_date": "2026-05-09",
+            "amount": "231.34"
+          },
+          {
+            "number": 4,
+            "due_date": "2026-06-09",
+            "amount": "231.34"
+          },
+          {
+            "number": 5,
+            "due_date": "2026-07-09",
+            "amount": "231.34"
+          },
+          {
+            "number": 6,
+            "due_date": "2026-08-09",
+            "amount": "231.34"
+          },
+          {
+            "number": 7,
+            "due_date": "2026-09-09",
+            "amount": "231.34"
+          },
+          {
+            "number": 8,
+            "due_date": "2026-10-09",
+            "amount": "231.34"
+          },
+          {
+            "number": 9,
+            "due_date": "2026-11-09",
+            "amount": "231.34"
+          },
+          {
+            "number": 10,
+            "due_date": "2026-12-09",
+            "amount": "231.37"
+          }
+        ]
+      }
+    ],
+    "employee": {
+      "name": "Raimundo Nonato da Silveira",
+      "role": "Zelador",
+      "payment_type": "mixed",
+      "base_salary": "2100.00",
+      "default_due_day": 5,
+      "lease_ref_salary_offset": "lease_02",
+      "payments": [
+        {
+          "reference_month": "2025-01-01",
+          "base_salary": "2100.00",
+          "variable_amount": "45.00",
+          "rent_offset": "995.00",
+          "cleaning_count": 1,
+          "payment_date": "2025-01-05",
+          "is_paid": true
+        },
+        {
+          "reference_month": "2025-02-01",
+          "base_salary": "2100.00",
+          "variable_amount": "0.00",
+          "rent_offset": "995.00",
+          "cleaning_count": 0,
+          "payment_date": "2025-02-05",
+          "is_paid": true
+        },
+        {
+          "reference_month": "2025-03-01",
+          "base_salary": "2100.00",
+          "variable_amount": "0.00",
+          "rent_offset": "995.00",
+          "cleaning_count": 0,
+          "payment_date": "2025-03-05",
+          "is_paid": true
+        },
+        {
+          "reference_month": "2025-04-01",
+          "base_salary": "2100.00",
+          "variable_amount": "45.00",
+          "rent_offset": "995.00",
+          "cleaning_count": 1,
+          "payment_date": "2025-04-05",
+          "is_paid": true
+        },
+        {
+          "reference_month": "2025-05-01",
+          "base_salary": "2100.00",
+          "variable_amount": "0.00",
+          "rent_offset": "995.00",
+          "cleaning_count": 0,
+          "payment_date": "2025-05-05",
+          "is_paid": true
+        },
+        {
+          "reference_month": "2025-06-01",
+          "base_salary": "2100.00",
+          "variable_amount": "0.00",
+          "rent_offset": "995.00",
+          "cleaning_count": 0,
+          "payment_date": "2025-06-05",
+          "is_paid": true
+        },
+        {
+          "reference_month": "2025-07-01",
+          "base_salary": "2100.00",
+          "variable_amount": "45.00",
+          "rent_offset": "995.00",
+          "cleaning_count": 1,
+          "payment_date": "2025-07-05",
+          "is_paid": true
+        },
+        {
+          "reference_month": "2025-08-01",
+          "base_salary": "2100.00",
+          "variable_amount": "0.00",
+          "rent_offset": "995.00",
+          "cleaning_count": 0,
+          "payment_date": "2025-08-05",
+          "is_paid": true
+        },
+        {
+          "reference_month": "2025-09-01",
+          "base_salary": "2100.00",
+          "variable_amount": "0.00",
+          "rent_offset": "995.00",
+          "cleaning_count": 0,
+          "payment_date": "2025-09-05",
+          "is_paid": true
+        },
+        {
+          "reference_month": "2025-10-01",
+          "base_salary": "2100.00",
+          "variable_amount": "45.00",
+          "rent_offset": "995.00",
+          "cleaning_count": 1,
+          "payment_date": "2025-10-05",
+          "is_paid": true
+        },
+        {
+          "reference_month": "2025-11-01",
+          "base_salary": "2100.00",
+          "variable_amount": "0.00",
+          "rent_offset": "995.00",
+          "cleaning_count": 0,
+          "payment_date": "2025-11-05",
+          "is_paid": true
+        },
+        {
+          "reference_month": "2025-12-01",
+          "base_salary": "2100.00",
+          "variable_amount": "0.00",
+          "rent_offset": "995.00",
+          "cleaning_count": 0,
+          "payment_date": "2025-12-05",
+          "is_paid": true
+        },
+        {
+          "reference_month": "2026-01-01",
+          "base_salary": "2100.00",
+          "variable_amount": "45.00",
+          "rent_offset": "995.00",
+          "cleaning_count": 1,
+          "payment_date": "2026-01-05",
+          "is_paid": true
+        },
+        {
+          "reference_month": "2026-02-01",
+          "base_salary": "2100.00",
+          "variable_amount": "0.00",
+          "rent_offset": "995.00",
+          "cleaning_count": 0,
+          "payment_date": "2026-02-05",
+          "is_paid": true
+        },
+        {
+          "reference_month": "2026-03-01",
+          "base_salary": "2100.00",
+          "variable_amount": "0.00",
+          "rent_offset": "995.00",
+          "cleaning_count": 0,
+          "payment_date": "2026-03-05",
+          "is_paid": true
+        },
+        {
+          "reference_month": "2026-04-01",
+          "base_salary": "2100.00",
+          "variable_amount": "45.00",
+          "rent_offset": "995.00",
+          "cleaning_count": 1,
+          "payment_date": "2026-04-05",
+          "is_paid": true
+        },
+        {
+          "reference_month": "2026-05-01",
+          "base_salary": "2100.00",
+          "variable_amount": "0.00",
+          "rent_offset": "995.00",
+          "cleaning_count": 0,
+          "payment_date": "2026-05-05",
+          "is_paid": true
+        },
+        {
+          "reference_month": "2026-06-01",
+          "base_salary": "2100.00",
+          "variable_amount": "0.00",
+          "rent_offset": "995.00",
+          "cleaning_count": 0,
+          "payment_date": "2026-06-05",
+          "is_paid": true
+        }
+      ]
+    },
+    "reserve": {
+      "name": "Reserva Condomínio Kitnets POA",
+      "movements": [
+        {
+          "kind": "deposit",
+          "amount": "800.00",
+          "movement_date": "2025-02-10",
+          "reference": "Aporte inicial reserva",
+          "notes": "Constituição do fundo de reserva do condomínio"
+        },
+        {
+          "kind": "deposit",
+          "amount": "500.00",
+          "movement_date": "2025-05-12",
+          "reference": "Aporte trimestral",
+          "notes": "Sobra de caixa Q1/2025"
+        },
+        {
+          "kind": "withdrawal",
+          "amount": "620.00",
+          "movement_date": "2025-07-03",
+          "reference": "Reparo hidráulico 1247",
+          "notes": "Conserto de vazamento na coluna de água do Residencial Riachuelo"
+        },
+        {
+          "kind": "deposit",
+          "amount": "450.00",
+          "movement_date": "2025-08-15",
+          "reference": "Aporte trimestral",
+          "notes": "Sobra de caixa Q2/2025"
+        },
+        {
+          "kind": "withdrawal",
+          "amount": "980.00",
+          "movement_date": "2025-10-22",
+          "reference": "Pintura fachada 588",
+          "notes": "Pintura da fachada do Residencial João Alfredo"
+        },
+        {
+          "kind": "deposit",
+          "amount": "600.00",
+          "movement_date": "2025-11-18",
+          "reference": "Aporte trimestral",
+          "notes": "Sobra de caixa Q3/2025"
+        },
+        {
+          "kind": "withdrawal",
+          "amount": "350.00",
+          "movement_date": "2026-03-09",
+          "reference": "Troca de fechadura interfone 2310",
+          "notes": "Manutenção do interfone do Residencial Santana"
+        },
+        {
+          "kind": "deposit",
+          "amount": "700.00",
+          "movement_date": "2026-05-20",
+          "reference": "Aporte trimestral",
+          "notes": "Sobra de caixa Q1/2026"
+        }
+      ]
+    }
+  },
+  "users": [
+    {
+      "id_ref": "user_admin",
+      "username": "gestor.demo",
+      "email": "gestor.demo@demo.local",
+      "first_name": "Gestor",
+      "last_name": "Demo",
+      "is_staff": true,
+      "is_superuser": true,
+      "password": "DemoAdmin!2026",
+      "role": "admin"
+    },
+    {
+      "id_ref": "user_tenant_pontual",
+      "username": "inquilino.pontual",
+      "email": "inquilino.pontual@demo.local",
+      "first_name": "Juliana",
+      "last_name": "Ribeiro Correia",
+      "is_staff": false,
+      "is_superuser": false,
+      "password": "DemoTenant!2026",
+      "role": "tenant",
+      "tenant_ref": "tenant_06",
+      "note": "Inquilino pontual — sempre paga em dia"
+    },
+    {
+      "id_ref": "user_tenant_atrasado",
+      "username": "inquilino.atrasado",
+      "email": "inquilino.atrasado@demo.local",
+      "first_name": "Rodrigo",
+      "last_name": "Costa Dias",
+      "is_staff": false,
+      "is_superuser": false,
+      "password": "DemoTenant!2026",
+      "role": "tenant",
+      "tenant_ref": "tenant_03",
+      "note": "Inquilino atrasado crônico — paga com 5 a 15 dias de atraso"
+    },
+    {
+      "id_ref": "user_tenant_onboarding",
+      "username": "inquilino.onboarding",
+      "email": "inquilino.onboarding@demo.local",
+      "first_name": "Onboarding",
+      "last_name": "Sem Locação",
+      "is_staff": false,
+      "is_superuser": false,
+      "password": "DemoTenant!2026",
+      "role": "tenant",
+      "tenant_ref": null,
+      "note": "Usuário tenant sem lease ativa — fluxo de onboarding/primeiro acesso"
+    }
+  ]
+}
