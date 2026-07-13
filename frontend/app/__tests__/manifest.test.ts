@@ -14,7 +14,7 @@ describe('PWA web manifest', () => {
 
   it('uses the documented theme HEX colors derived from the OKLCH tokens', () => {
     expect(result.theme_color).toBe('#008c6c');
-    expect(result.background_color).toBe('#fbfbfc');
+    expect(result.background_color).toBe('#f9fafb');
   });
 
   it('declares at least two PNG icons including 192 and a 512 maskable', () => {

@@ -6,6 +6,7 @@ import { Plus, Pencil, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { DataTable, type Column } from '@/components/tables/data-table';
 import { DeleteConfirmDialog } from '@/components/shared/delete-confirm-dialog';
+import { PageHeader } from '@/components/layouts/page-header';
 import { CategoryFormModal } from './_components/category-form-modal';
 import {
   useExpenseCategories,
@@ -172,20 +173,18 @@ export default function CategoriesPage() {
 
   return (
     <div>
-      <div className="mb-4 flex justify-between items-center flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">Categorias de Despesas</h1>
-          <p className="text-muted-foreground mt-1">
-            Gerencie as categorias e subcategorias de despesas
-          </p>
-        </div>
-        {isAdmin && (
-          <Button onClick={crud.openCreateModal}>
-            <Plus className="h-4 w-4 mr-2" />
-            Nova Categoria
-          </Button>
-        )}
-      </div>
+      <PageHeader
+        title="Categorias de Despesas"
+        description="Gerencie as categorias e subcategorias de despesas"
+        actions={
+          isAdmin && (
+            <Button onClick={crud.openCreateModal}>
+              <Plus className="h-4 w-4 mr-2" />
+              Nova Categoria
+            </Button>
+          )
+        }
+      />
 
       <DataTable<FlatCategory>
         columns={columns}

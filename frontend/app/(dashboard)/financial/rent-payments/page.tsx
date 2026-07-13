@@ -17,6 +17,7 @@ import { toast } from 'sonner';
 import { DataTable } from '@/components/tables/data-table';
 import type { Column } from '@/components/tables/data-table';
 import { DeleteConfirmDialog } from '@/components/shared/delete-confirm-dialog';
+import { PageHeader } from '@/components/layouts/page-header';
 import { useRentPayments, useDeleteRentPayment } from '@/lib/api/hooks/use-rent-payments';
 import { useBuildings } from '@/lib/api/hooks/use-buildings';
 import { useApartments } from '@/lib/api/hooks/use-apartments';
@@ -191,35 +192,35 @@ export default function RentPaymentsPage() {
 
   return (
     <div>
-      <div className="mb-4 flex justify-between items-center flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">Pagamentos de Aluguel</h1>
-          <p className="text-muted-foreground mt-1">Gerencie os pagamentos de aluguel recebidos</p>
-        </div>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={() =>
-              filteredPayments.length > 0 &&
-              exportToExcel(
-                filteredPayments as Record<string, unknown>[],
-                rentPaymentExportColumns,
-                { filename: 'pagamentos_aluguel' }
-              )
-            }
-            disabled={isExporting || filteredPayments.length === 0}
-          >
-            <Download className="h-4 w-4 mr-2" />
-            Exportar
-          </Button>
-          {isAdmin && (
-            <Button onClick={crud.openCreateModal}>
-              <Plus className="h-4 w-4 mr-2" />
-              Registrar Pagamento
+      <PageHeader
+        title="Pagamentos de Aluguel"
+        description="Gerencie os pagamentos de aluguel recebidos"
+        actions={
+          <>
+            <Button
+              variant="outline"
+              onClick={() =>
+                filteredPayments.length > 0 &&
+                exportToExcel(
+                  filteredPayments as Record<string, unknown>[],
+                  rentPaymentExportColumns,
+                  { filename: 'pagamentos_aluguel' }
+                )
+              }
+              disabled={isExporting || filteredPayments.length === 0}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Exportar
             </Button>
-          )}
-        </div>
-      </div>
+            {isAdmin && (
+              <Button onClick={crud.openCreateModal}>
+                <Plus className="h-4 w-4 mr-2" />
+                Registrar Pagamento
+              </Button>
+            )}
+          </>
+        }
+      />
 
       <Card className="mb-4 p-4">
         <div className="flex gap-4 flex-wrap items-end">

@@ -4,6 +4,7 @@ import { useState, useCallback } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { PageHeader } from '@/components/layouts/page-header';
 import { useMonthlyPurchases } from '@/lib/api/hooks/use-monthly-purchases';
 import { formatCurrency, MONTH_NAMES } from '@/lib/utils/formatters';
 import { PurchaseSummaryCards } from './_components/purchase-summary-cards';
@@ -45,26 +46,23 @@ export default function MonthlyPurchasesPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">Compras do Mês</h1>
-          <p className="text-muted-foreground mt-1">
-            Novas compras e despesas registradas no período
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" onClick={goToPrevMonth} aria-label="Mês anterior">
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <span className="text-lg font-semibold min-w-[160px] text-center">
-            {monthLabel} {year}
-          </span>
-          <Button variant="outline" size="icon" onClick={goToNextMonth} aria-label="Próximo mês">
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        title="Compras do Mês"
+        description="Novas compras e despesas registradas no período"
+        actions={
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="icon" onClick={goToPrevMonth} aria-label="Mês anterior">
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-lg font-semibold min-w-[160px] text-center">
+              {monthLabel} {year}
+            </span>
+            <Button variant="outline" size="icon" onClick={goToNextMonth} aria-label="Próximo mês">
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        }
+      />
 
       {/* Total badge */}
       {isLoading ? (

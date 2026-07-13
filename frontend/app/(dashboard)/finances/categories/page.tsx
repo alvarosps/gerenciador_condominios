@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { DataTable, type Column } from '@/components/tables/data-table';
 import { DeleteConfirmDialog } from '@/components/shared/delete-confirm-dialog';
+import { PageHeader } from '@/components/layouts/page-header';
 import {
   useDeleteFinanceCategory,
   useFinanceCategories,
@@ -97,20 +98,18 @@ export default function FinanceCategoriesPage() {
 
   return (
     <div>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">Categorias</h1>
-          <p className="mt-1 text-muted-foreground">
-            Classificação opcional das contas do condomínio (distinta do tipo de conta)
-          </p>
-        </div>
-        {isAdmin && (
-          <Button onClick={crud.openCreateModal}>
-            <Plus className="mr-2 h-4 w-4" />
-            Nova Categoria
-          </Button>
-        )}
-      </div>
+      <PageHeader
+        title="Categorias"
+        description="Classificação opcional das contas do condomínio (distinta do tipo de conta)"
+        actions={
+          isAdmin && (
+            <Button onClick={crud.openCreateModal}>
+              <Plus className="mr-2 h-4 w-4" />
+              Nova Categoria
+            </Button>
+          )
+        }
+      />
 
       {!isLoading && (categories?.length ?? 0) === 0 ? (
         <p className="rounded-md border-2 border-dashed py-12 text-center text-sm text-muted-foreground">

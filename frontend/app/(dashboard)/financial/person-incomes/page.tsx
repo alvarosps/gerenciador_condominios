@@ -17,6 +17,7 @@ import { toast } from 'sonner';
 import { DataTable } from '@/components/tables/data-table';
 import type { Column } from '@/components/tables/data-table';
 import { DeleteConfirmDialog } from '@/components/shared/delete-confirm-dialog';
+import { PageHeader } from '@/components/layouts/page-header';
 import {
   usePersonIncomes,
   useDeletePersonIncome,
@@ -210,20 +211,18 @@ export default function PersonIncomesPage() {
 
   return (
     <div>
-      <div className="mb-4 flex justify-between items-center flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">Rendimentos por Pessoa</h1>
-          <p className="text-muted-foreground mt-1">
-            Gerencie o que cada pessoa tem direito a receber mensalmente
-          </p>
-        </div>
-        {isAdmin && (
-          <Button onClick={crud.openCreateModal}>
-            <Plus className="h-4 w-4 mr-2" />
-            Novo Rendimento
-          </Button>
-        )}
-      </div>
+      <PageHeader
+        title="Rendimentos por Pessoa"
+        description="Gerencie o que cada pessoa tem direito a receber mensalmente"
+        actions={
+          isAdmin && (
+            <Button onClick={crud.openCreateModal}>
+              <Plus className="h-4 w-4 mr-2" />
+              Novo Rendimento
+            </Button>
+          )
+        }
+      />
 
       {/* Filters */}
       <Card className="mb-4 p-4">

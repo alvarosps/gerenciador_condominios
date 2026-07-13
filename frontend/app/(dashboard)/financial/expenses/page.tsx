@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { PageHeader } from '@/components/layouts/page-header';
 import { useDashboardSummary } from '@/lib/api/hooks/use-financial-dashboard';
 import { useAuthStore } from '@/store/auth-store';
 import { formatCurrency, getDefaultExpenseDate, MONTH_ABBR } from '@/lib/utils/formatters';
@@ -31,10 +32,7 @@ export default function ExpensesPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Despesas</h1>
-        <p className="text-muted-foreground mt-1">Gerencie despesas mensais</p>
-      </div>
+      <PageHeader title="Despesas" description="Gerencie despesas mensais" />
 
       <Tabs defaultValue="despesas">
         <TabsList>
@@ -49,7 +47,10 @@ export default function ExpensesPage() {
                 <MonthNavigator
                   year={year}
                   month={month}
-                  onMonthChange={(y, m) => { setYear(y); setMonth(m); }}
+                  onMonthChange={(y, m) => {
+                    setYear(y);
+                    setMonth(m);
+                  }}
                 />
                 <div className="flex items-center gap-3">
                   {data && (
@@ -66,7 +67,11 @@ export default function ExpensesPage() {
                         <Plus className="h-4 w-4 mr-2" />
                         Nova Despesa ({currentMonthAbbr})
                       </Button>
-                      <Button size="sm" variant="outline" onClick={() => setIsCreatingNextMonth(true)}>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setIsCreatingNextMonth(true)}
+                      >
                         <Plus className="h-4 w-4 mr-2" />
                         Nova Despesa ({nextMonthAbbr})
                       </Button>

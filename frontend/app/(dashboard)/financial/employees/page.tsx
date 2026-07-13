@@ -9,6 +9,7 @@ import { Plus, Loader2, Pencil, Trash2, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { DataTable, type Column } from '@/components/tables/data-table';
 import { DeleteConfirmDialog } from '@/components/shared/delete-confirm-dialog';
+import { PageHeader } from '@/components/layouts/page-header';
 import { cn } from '@/lib/utils';
 import {
   useEmployeePayments,
@@ -253,19 +254,18 @@ export default function EmployeesPage() {
 
   return (
     <div>
-      {/* Header */}
-      <div className="mb-4 flex justify-between items-center flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">Funcionários</h1>
-          <p className="text-muted-foreground mt-1">Gerencie pagamentos de funcionários</p>
-        </div>
-        {isAdmin && (
-          <Button onClick={crud.openCreateModal}>
-            <Plus className="h-4 w-4 mr-2" />
-            Novo Pagamento
-          </Button>
-        )}
-      </div>
+      <PageHeader
+        title="Funcionários"
+        description="Gerencie pagamentos de funcionários"
+        actions={
+          isAdmin && (
+            <Button onClick={crud.openCreateModal}>
+              <Plus className="h-4 w-4 mr-2" />
+              Novo Pagamento
+            </Button>
+          )
+        }
+      />
 
       {/* Data Table */}
       <DataTable<EmployeePayment>

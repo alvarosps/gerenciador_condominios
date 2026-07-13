@@ -5,6 +5,7 @@ import { Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Loading } from '@/components/shared/loading';
+import { PageHeader } from '@/components/layouts/page-header';
 import { useCashFlowProjection } from '@/lib/api/hooks/use-cash-flow';
 import {
   useSimulation,
@@ -27,7 +28,11 @@ export default function SimulatorPage() {
   const [isAddingScenario, setIsAddingScenario] = useState(false);
   const [simulationResult, setSimulationResult] = useState<SimulationResult | null>(null);
 
-  const { data: baseProjection, isLoading: isLoadingBase, error: baseError } = useCashFlowProjection({ months: 12 });
+  const {
+    data: baseProjection,
+    isLoading: isLoadingBase,
+    error: baseError,
+  } = useCashFlowProjection({ months: 12 });
   const simulation = useSimulation();
   const mutateRef = useRef(simulation.mutate);
   mutateRef.current = simulation.mutate;
@@ -66,7 +71,7 @@ export default function SimulatorPage() {
   if (isLoadingBase) {
     return (
       <div className="space-y-6">
-        <h1 className="text-3xl font-bold">Simulador Financeiro</h1>
+        <PageHeader title="Simulador Financeiro" />
         <Loading />
       </div>
     );
@@ -75,7 +80,7 @@ export default function SimulatorPage() {
   if (baseError || !baseProjection) {
     return (
       <div className="space-y-6">
-        <h1 className="text-3xl font-bold">Simulador Financeiro</h1>
+        <PageHeader title="Simulador Financeiro" />
         <p className="text-center text-muted-foreground py-8">
           Erro ao carregar projeção base. Verifique se há dados financeiros cadastrados.
         </p>
@@ -85,13 +90,10 @@ export default function SimulatorPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold">Simulador Financeiro</h1>
+      <PageHeader title="Simulador Financeiro" />
 
       {/* Comparison Chart — full width */}
-      <ComparisonChart
-        base={baseProjection}
-        simulated={simulationResult?.simulated}
-      />
+      <ComparisonChart base={baseProjection} simulated={simulationResult?.simulated} />
 
       {/* Bottom section: scenarios sidebar + impact/table */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
@@ -111,11 +113,7 @@ export default function SimulatorPage() {
             </p>
           ) : (
             displayScenarios.map((display) => (
-              <ScenarioCard
-                key={display.id}
-                scenario={display}
-                onRemove={handleRemoveScenario}
-              />
+              <ScenarioCard key={display.id} scenario={display} onRemove={handleRemoveScenario} />
             ))
           )}
 

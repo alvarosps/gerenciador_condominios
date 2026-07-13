@@ -18,6 +18,7 @@ import {
 import { Plus, Pencil, Trash2, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { DataTable, type Column } from '@/components/tables/data-table';
+import { PageHeader } from '@/components/layouts/page-header';
 import { UserFormModal } from './_components/user-form-modal';
 import { useAdminUsers, useDeleteAdminUser } from '@/lib/api/hooks/use-users';
 import { useAuthStore } from '@/store/auth-store';
@@ -121,16 +122,16 @@ export default function AdminUsersPage() {
 
   return (
     <div>
-      <div className="mb-4 flex justify-between items-center flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">Usuários</h1>
-          <p className="text-muted-foreground mt-1">Gerencie os usuários do sistema</p>
-        </div>
-        <Button onClick={crud.openCreateModal}>
-          <Plus className="h-4 w-4 mr-2" />
-          Novo Usuário
-        </Button>
-      </div>
+      <PageHeader
+        title="Usuários"
+        description="Gerencie os usuários do sistema"
+        actions={
+          <Button onClick={crud.openCreateModal}>
+            <Plus className="h-4 w-4 mr-2" />
+            Novo Usuário
+          </Button>
+        }
+      />
 
       {error && !users && (
         <Alert variant="destructive" className="mb-4">

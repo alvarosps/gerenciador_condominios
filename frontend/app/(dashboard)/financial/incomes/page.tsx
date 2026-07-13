@@ -18,6 +18,7 @@ import { Plus, Loader2, Pencil, Trash2, CheckCircle, Download } from 'lucide-rea
 import { toast } from 'sonner';
 import { DataTable, type Column } from '@/components/tables/data-table';
 import { DeleteConfirmDialog } from '@/components/shared/delete-confirm-dialog';
+import { PageHeader } from '@/components/layouts/page-header';
 import { cn } from '@/lib/utils';
 import {
   useIncomes,
@@ -273,32 +274,31 @@ export default function IncomesPage() {
 
   return (
     <div>
-      {/* Header */}
-      <div className="mb-4 flex justify-between items-center flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">Receitas</h1>
-          <p className="text-muted-foreground mt-1">Gerencie receitas e recebimentos</p>
-        </div>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={() =>
-              incomes &&
-              exportToExcel(incomes as Record<string, unknown>[], incomeExportColumns, {
-                filename: 'receitas',
-              })
-            }
-            disabled={isExporting || !incomes?.length}
-          >
-            <Download className="h-4 w-4 mr-2" />
-            Exportar
-          </Button>
-          <Button onClick={crud.openCreateModal}>
-            <Plus className="h-4 w-4 mr-2" />
-            Nova Receita
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        title="Receitas"
+        description="Gerencie receitas e recebimentos"
+        actions={
+          <>
+            <Button
+              variant="outline"
+              onClick={() =>
+                incomes &&
+                exportToExcel(incomes as Record<string, unknown>[], incomeExportColumns, {
+                  filename: 'receitas',
+                })
+              }
+              disabled={isExporting || !incomes?.length}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Exportar
+            </Button>
+            <Button onClick={crud.openCreateModal}>
+              <Plus className="h-4 w-4 mr-2" />
+              Nova Receita
+            </Button>
+          </>
+        }
+      />
 
       {/* Filters */}
       <Card className="mb-4">

@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { screen, within } from '@testing-library/react';
 import { renderWithProviders } from '@/tests/test-utils';
 import { DataTable, type Column } from '../data-table';
@@ -93,5 +93,41 @@ describe('DataTable responsive table/cards', () => {
 
     const bodyCell = screen.getAllByText('11999990000')[0]?.closest('td');
     expect(bodyCell).toHaveClass('text-right');
+  });
+});
+
+describe('DataTable loading state', () => {
+  it('renders the real header with skeleton rows instead of a spinner', () => {
+    const { container } = renderWithProviders(
+      <DataTable dataSource={[]} columns={baseColumns} rowKey="id" loading />
+    );
+
+    expect(screen.getByRole('columnheader', { name: 'Nome' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Telefone' })).toBeInTheDocument();
+    expect(container.querySelectorAll('.animate-pulse').length).toBeGreaterThan(0);
+    expect(container.querySelector('.animate-spin')).toBeNull();
+  });
+
+  it('marks the loading container as busy for assistive tech', () => {
+    const { container } = renderWithProviders(
+      <DataTable dataSource={[]} columns={baseColumns} rowKey="id" loading />
+    );
+    const busyContainer = container.querySelector('[aria-busy="true"]');
+    expect(busyContainer).not.toBeNull();
+    expect(busyContainer).toHaveAttribute('aria-live', 'polite');
+  });
+
+  it('renders skeleton rows for the row-selection checkbox column when enabled', () => {
+    renderWithProviders(
+      <DataTable
+        dataSource={[]}
+        columns={baseColumns}
+        rowKey="id"
+        loading
+        rowSelection={{ selectedRowKeys: [], onChange: vi.fn() }}
+      />
+    );
+    // Header checkbox column has no accessible checkbox while loading (no data to select).
+    expect(screen.queryByLabelText('Selecionar todos')).toBeNull();
   });
 });

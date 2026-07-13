@@ -26,6 +26,7 @@ import { Separator } from '@/components/ui/separator';
 import { Loader2, Save, User, MapPin, Phone, TrendingUp, KeyRound, Bell } from 'lucide-react';
 import { toast } from 'sonner';
 import { PushToggle } from '@/components/notifications/push-toggle';
+import { PageHeader } from '@/components/layouts/page-header';
 import { useLandlord, useUpdateLandlord } from '@/lib/api/hooks/use-landlord';
 import { useUpdateProfile, useChangePassword } from '@/lib/api/hooks/use-settings';
 import { landlordFormSchema, type LandlordFormData } from '@/lib/schemas/landlord.schema';
@@ -163,12 +164,10 @@ export default function SettingsPage() {
 
   return (
     <div className="max-w-4xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold">Configurações</h1>
-        <p className="text-muted-foreground mt-1">
-          Gerencie seu perfil e as informações do locador
-        </p>
-      </div>
+      <PageHeader
+        title="Configurações"
+        description="Gerencie seu perfil e as informações do locador"
+      />
 
       {/* Account section */}
       <Card className="mb-6">

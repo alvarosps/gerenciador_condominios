@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { DataTable, type Column } from '@/components/tables/data-table';
 import { StatCard } from '@/components/ui/stat-card';
 import { AmountDisplay } from '@/components/ui/amount-display';
+import { PageHeader } from '@/components/layouts/page-header';
 import { useReserves } from '@/lib/api/hooks/use-reserves';
 import { useReserveMovements } from '@/lib/api/hooks/use-reserve-movements';
 import { useAuthStore } from '@/store/auth-store';
@@ -49,7 +50,7 @@ function movementColumns(): Column<ReserveMovement>[] {
             'inline-flex items-center gap-1',
             rec.kind === 'deposit'
               ? 'bg-success/10 text-success'
-              : 'bg-destructive/10 text-destructive',
+              : 'bg-destructive/10 text-destructive'
           )}
         >
           {rec.kind === 'deposit' ? (
@@ -77,9 +78,7 @@ function movementColumns(): Column<ReserveMovement>[] {
       title: 'Vínculo',
       key: 'bill',
       render: (_, rec) =>
-        typeof rec.bill === 'number'
-          ? `Pagamento de conta #${rec.bill}`
-          : 'Transferência (caixa)',
+        typeof rec.bill === 'number' ? `Pagamento de conta #${rec.bill}` : 'Transferência (caixa)',
     },
     {
       title: 'Referência',
@@ -114,12 +113,7 @@ export default function ReservePage() {
 
   return (
     <div>
-      <div className="mb-4 flex justify-between items-center flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">Reservas do Condomínio</h1>
-          <p className="text-muted-foreground mt-1">Gerencie os fundos de reserva</p>
-        </div>
-      </div>
+      <PageHeader title="Reservas do Condomínio" description="Gerencie os fundos de reserva" />
 
       {/* Reserve balance cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 mb-6">
@@ -146,19 +140,11 @@ export default function ReservePage() {
               )}
               {isStaff && (
                 <div className="flex gap-2 mt-3">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setDepositTarget(reserve)}
-                  >
+                  <Button size="sm" variant="outline" onClick={() => setDepositTarget(reserve)}>
                     <ArrowDownCircle className="h-3 w-3 mr-1" />
                     Depositar
                   </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setWithdrawTarget(reserve)}
-                  >
+                  <Button size="sm" variant="outline" onClick={() => setWithdrawTarget(reserve)}>
                     <ArrowUpCircle className="h-3 w-3 mr-1" />
                     Sacar
                   </Button>

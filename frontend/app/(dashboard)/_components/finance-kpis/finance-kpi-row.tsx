@@ -1,21 +1,19 @@
 'use client';
 
 import { DollarSign, PiggyBank, TrendingUp, AlertTriangle, Scale } from 'lucide-react';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent } from '@/components/ui/card';
 import { StatCard } from '@/components/ui/stat-card';
 import { AmountDisplay } from '@/components/ui/amount-display';
 import { useFinanceOverview } from '@/lib/api/hooks/use-finance-balance';
 import { formatCurrency, formatMonthYear } from '@/lib/utils/formatters';
 
+const KPI_CARD_COUNT = 5;
+
 function KpiSkeleton() {
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-      {Array.from({ length: 5 }).map((_, i) => (
-        <div key={i} className="rounded-xl border bg-card shadow p-6 space-y-2">
-          <Skeleton className="h-3 w-20" />
-          <Skeleton className="h-8 w-32" />
-        </div>
+      {Array.from({ length: KPI_CARD_COUNT }, (_, i) => (
+        <StatCard key={i} label="" value="" loading />
       ))}
     </div>
   );
@@ -83,7 +81,12 @@ export function FinanceKpiRow({ year, month, buildingId }: Props) {
       />
       <StatCard
         label="Atrasados"
-        value={<AmountDisplay amount={data.overdue_bills_total} tone={overdueBillsNum > 0 ? 'destructive' : 'muted'} />}
+        value={
+          <AmountDisplay
+            amount={data.overdue_bills_total}
+            tone={overdueBillsNum > 0 ? 'destructive' : 'muted'}
+          />
+        }
         icon={<AlertTriangle className="h-4 w-4" />}
         tone={overdueBillsNum > 0 ? 'destructive' : 'muted'}
         subLabel={overdueSubLabel}

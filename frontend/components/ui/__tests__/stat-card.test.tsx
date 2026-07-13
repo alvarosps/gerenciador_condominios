@@ -13,21 +13,21 @@ describe('StatCard', () => {
 
   it('renders the icon when provided', () => {
     renderWithProviders(
-      <StatCard label="Reserva" value="R$ 5.000,00" icon={<DollarSign data-testid="icon" />} />,
+      <StatCard label="Reserva" value="R$ 5.000,00" icon={<DollarSign data-testid="icon" />} />
     );
     expect(screen.getByTestId('icon')).toBeInTheDocument();
   });
 
   it('renders the subLabel when provided', () => {
     renderWithProviders(
-      <StatCard label="Atrasados" value="R$ 300,00" subLabel="2 faturas em atraso" />,
+      <StatCard label="Atrasados" value="R$ 300,00" subLabel="2 faturas em atraso" />
     );
     expect(screen.getByText('2 faturas em atraso')).toBeInTheDocument();
   });
 
   it('applies success tone class to value', () => {
     const { container } = renderWithProviders(
-      <StatCard label="Saldo" value="R$ 1.000,00" tone="success" />,
+      <StatCard label="Saldo" value="R$ 1.000,00" tone="success" />
     );
     const valueEl = container.querySelector('.text-success');
     expect(valueEl).toBeInTheDocument();
@@ -35,7 +35,7 @@ describe('StatCard', () => {
 
   it('applies destructive tone class to value', () => {
     const { container } = renderWithProviders(
-      <StatCard label="Dívida" value="R$ 500,00" tone="destructive" />,
+      <StatCard label="Dívida" value="R$ 500,00" tone="destructive" />
     );
     const valueEl = container.querySelector('.text-destructive');
     expect(valueEl).toBeInTheDocument();
@@ -45,5 +45,21 @@ describe('StatCard', () => {
     renderWithProviders(<StatCard label="Resultado" value="R$ 2.000,00" />);
     expect(screen.getByText('Resultado')).toBeInTheDocument();
     expect(screen.getByText('R$ 2.000,00')).toBeInTheDocument();
+  });
+
+  it('renders a skeleton instead of the label/value when loading', () => {
+    const { container } = renderWithProviders(
+      <StatCard label="Caixa" value="R$ 15.000,00" loading />
+    );
+    expect(screen.queryByText('Caixa')).not.toBeInTheDocument();
+    expect(screen.queryByText('R$ 15.000,00')).not.toBeInTheDocument();
+    expect(container.querySelectorAll('.animate-pulse').length).toBeGreaterThan(0);
+  });
+
+  it('marks the loading card as busy for assistive tech', () => {
+    const { container } = renderWithProviders(
+      <StatCard label="Caixa" value="R$ 15.000,00" loading />
+    );
+    expect(container.querySelector('[aria-busy="true"]')).not.toBeNull();
   });
 });
