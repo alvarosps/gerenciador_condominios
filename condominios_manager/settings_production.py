@@ -5,27 +5,28 @@ This file extends the base settings with production-specific configuration.
 Use this by setting: DJANGO_SETTINGS_MODULE=condominios_manager.settings_production
 """
 
+import warnings
 from datetime import timedelta
 from typing import Any, cast
 
 import dj_database_url
 import sentry_sdk
 from decouple import config
-from django.core.exceptions import ImproperlyConfigured
 from sentry_sdk.integrations.django import DjangoIntegration
 
 from condominios_manager import settings as base_settings
 
-# CRITICAL: without REDIS_URL, settings.py silently falls back to LocMemCache — which is
-# per-process, so the DRF throttle (incl. the 10/minute auth rate) never actually limits
-# anything across gunicorn workers. Fail startup loudly instead of degrading silently.
+# Without REDIS_URL, settings.py falls back to LocMemCache — per-process, so the DRF throttle
+# (incl. the 10/minute auth rate) is not enforced across gunicorn workers and the cache is not
+# shared. Redis is OPTIONAL in production by explicit owner decision (2026-07-13): warn loudly
+# on startup instead of refusing to boot.
 if not config("REDIS_URL", default=""):
     _missing_redis_url_msg = (
-        "REDIS_URL is required in production: without it, rate limiting (including the "
-        "10/minute auth throttle) silently falls back to an in-memory, per-process cache "
-        "and is never actually enforced across workers."
+        "REDIS_URL is not set: rate limiting (including the 10/minute auth throttle) falls "
+        "back to an in-memory, per-process cache and is not enforced across workers. Set "
+        "REDIS_URL when a Redis instance becomes available."
     )
-    raise ImproperlyConfigured(_missing_redis_url_msg)
+    warnings.warn(_missing_redis_url_msg, RuntimeWarning, stacklevel=1)
 
 # Layer production settings on top of the base module: every uppercase (Django-settings)
 # attribute is inherited as-is unless overridden below. Avoids `from .settings import *`
