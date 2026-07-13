@@ -234,3 +234,43 @@ class TestTransferLease:
                 },
                 user=staff_user,
             )
+
+    def test_transfer_nonexistent_apartment_raises_value_error(
+        self, active_lease, tenant, staff_user
+    ):
+        """B19(a): a nonexistent target apartment_id must be a clean ValueError (-> 400 at
+        the API layer), not an uncaught IntegrityError/DoesNotExist (-> 500)."""
+        with pytest.raises(ValueError, match="not found"):
+            transfer_lease(
+                lease_id=active_lease.id,
+                payload={
+                    "apartment_id": 999999,
+                    "responsible_tenant_id": tenant.id,
+                    "tenant_ids": [tenant.id],
+                    "start_date": "2026-01-01",
+                    "validity_months": 12,
+                    "tag_fee": 50,
+                },
+                user=staff_user,
+            )
+
+    def test_transfer_soft_deleted_apartment_raises_value_error(
+        self, active_lease, new_apt, tenant, staff_user
+    ):
+        """B19(a): a soft-deleted target apartment must be rejected like a nonexistent
+        one — validated against the default (with_deleted-excluding) queryset."""
+        new_apt.delete()
+
+        with pytest.raises(ValueError, match="not found"):
+            transfer_lease(
+                lease_id=active_lease.id,
+                payload={
+                    "apartment_id": new_apt.id,
+                    "responsible_tenant_id": tenant.id,
+                    "tenant_ids": [tenant.id],
+                    "start_date": "2026-01-01",
+                    "validity_months": 12,
+                    "tag_fee": 50,
+                },
+                user=staff_user,
+            )

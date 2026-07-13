@@ -6,7 +6,7 @@ from typing import Any
 from django.db import transaction
 from django.utils import timezone
 
-from core.models import Lease, Tenant
+from core.models import Apartment, Lease, Tenant
 
 
 @transaction.atomic
@@ -51,6 +51,12 @@ def transfer_lease(lease_id: int, payload: dict[str, Any], user: Any) -> Lease:
 
     if validity_months <= 0:
         msg = "validity_months must be positive"
+        raise ValueError(msg)
+
+    # Apartment.objects (default manager) excludes soft-deleted apartments, so this also
+    # rejects a soft-deleted target apartment, not just a nonexistent one.
+    if not Apartment.objects.filter(pk=new_apartment_id).exists():
+        msg = f"Apartment {new_apartment_id} not found"
         raise ValueError(msg)
 
     if Lease.objects.filter(apartment_id=new_apartment_id).exists():

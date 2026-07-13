@@ -119,6 +119,31 @@ class TestExpenseServiceGenerateInstallments:
         assert amounts == [Decimal("33.33"), Decimal("33.33"), Decimal("33.34")]
         assert sum(amounts) == Decimal("100.00")
 
+    def test_last_installment_never_negative_for_tiny_total(self, admin_user):
+        """B15(d) regression: rounding the base UP (ROUND_HALF_UP) on a tiny total split
+        across many installments could push the last installment negative
+        (0.05 / 9 -> base=0.01, last=0.05-0.01*8=-0.03). The base must round DOWN so the
+        last installment absorbs the (non-negative) residual instead — mirrors
+        finances/services/installment_plan_service.py::_split_amount.
+        """
+        expense = make_expense(
+            user=admin_user,
+            total_amount=Decimal("0.05"),
+            is_installment=True,
+            total_installments=9,
+        )
+        ExpenseService.generate_installments(
+            expense=expense, start_date=date(2026, 1, 10), user=admin_user
+        )
+        amounts = list(
+            ExpenseInstallment.objects.filter(expense=expense)
+            .order_by("installment_number")
+            .values_list("amount", flat=True)
+        )
+        assert amounts == [Decimal("0.00")] * 8 + [Decimal("0.05")]
+        assert all(amount >= Decimal("0.00") for amount in amounts)
+        assert sum(amounts) == Decimal("0.05")
+
     def test_clamps_due_day_31_in_february(self, admin_user):
         card = make_credit_card(user=admin_user, due_day=31)
         expense = make_expense(

@@ -11,7 +11,6 @@ from typing import Any
 
 from django.db.models import Count, Q, Sum
 from django.db.models.functions import Coalesce
-from django.utils import timezone
 
 from core.cache import cache_result
 from core.models import (
@@ -31,6 +30,7 @@ from core.models import (
     PersonIncomeType,
     PersonPayment,
 )
+from core.services.timezone import today_sp
 
 from .cash_flow_service import MONTHS_IN_YEAR, CashFlowService
 from .date_calculator import DateCalculatorService
@@ -59,7 +59,7 @@ class FinancialDashboardService:
         Return financial overview with current month balance, debts,
         monthly obligations/income, and months until break-even.
         """
-        today = timezone.now().date()
+        today = today_sp()
         year, month = today.year, today.month
 
         # Current month via CashFlowService
@@ -125,7 +125,7 @@ class FinancialDashboardService:
     @cache_result(timeout=120, key_prefix="financial-dashboard-debt-person")
     def get_debt_by_person() -> list[dict[str, Any]]:
         """Return debt breakdown per person: card debt, loan debt, monthly amounts."""
-        today = timezone.now().date()
+        today = today_sp()
         month_start = date(today.year, today.month, 1)
         next_month = DateCalculatorService.next_month_start(today.year, today.month)
 
@@ -246,7 +246,7 @@ class FinancialDashboardService:
     @cache_result(timeout=120, key_prefix="financial-dashboard-upcoming")
     def get_upcoming_installments(days: int = 30) -> list[dict[str, Any]]:
         """Return unpaid installments due within the next N days, ordered by due_date."""
-        today = timezone.now().date()
+        today = today_sp()
         end_date = today + timedelta(days=days)
 
         installments = (
@@ -282,7 +282,7 @@ class FinancialDashboardService:
     @cache_result(timeout=120, key_prefix="financial-dashboard-overdue")
     def get_overdue_installments() -> list[dict[str, Any]]:
         """Return unpaid installments with due_date before today, ordered by due_date."""
-        today = timezone.now().date()
+        today = today_sp()
 
         installments = (
             ExpenseInstallment.objects.filter(
@@ -1534,7 +1534,7 @@ class FinancialDashboardService:
         month_start: date,
     ) -> list[dict[str, Any]]:
         """Collect unpaid installments with due_date before month_start for a given expense type."""
-        today = timezone.now().date()
+        today = today_sp()
         overdue_qs = (
             ExpenseInstallment.objects.filter(
                 due_date__lt=month_start,

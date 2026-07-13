@@ -103,6 +103,44 @@ class TestTenantMe:
         assert "lease" not in response.data
         assert "apartment" not in response.data
 
+    def test_multiple_leases_deterministically_picks_most_recent(
+        self, tenant_client, tenant_user, admin_user
+    ):
+        """B19(c): a tenant responsible for 2+ non-deleted leases (one per apartment)
+        must deterministically get the one with the most recent start_date, not
+        whichever unordered .first() happens to return."""
+        tenant, _, first_lease = tenant_user
+        building = make_building(
+            street_number=501,
+            user=admin_user,
+            name="Test Building Tenant 2",
+            address="Rua Teste 501",
+        )
+        newer_apartment = make_apartment(
+            building=building,
+            number=601,
+            user=admin_user,
+            rental_value=Decimal("1800.00"),
+            cleaning_fee=Decimal("150.00"),
+            max_tenants=1,
+        )
+        newer_lease = make_lease(
+            apartment=newer_apartment,
+            tenant=tenant,
+            user=admin_user,
+            start_date=first_lease.start_date + timezone.timedelta(days=1),
+            validity_months=12,
+            rental_value=Decimal("1800.00"),
+            number_of_tenants=1,
+        )
+        newer_lease.tenants.add(tenant)
+
+        response = tenant_client.get("/api/tenant/me/")
+
+        assert response.status_code == 200
+        assert response.data["lease"]["id"] == newer_lease.id
+        assert response.data["apartment"]["id"] == newer_apartment.id
+
 
 @pytest.mark.integration
 @pytest.mark.django_db

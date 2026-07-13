@@ -42,6 +42,7 @@ from .services.lease_creation_service import LeaseCreationService
 from .services.lease_service import change_tenant_due_day, terminate_lease, transfer_lease
 from .services.rent_adjustment_service import RentAdjustmentService
 from .services.rent_schedule_service import RentScheduleService
+from .services.timezone import today_sp
 from .validators import validate_tenant_deletable
 
 logger = logging.getLogger(__name__)
@@ -510,12 +511,27 @@ class LeaseViewSet(viewsets.ModelViewSet):
 
         Permissions: Tenant (only their lease) or Admin
 
-        Skips the fee when the month's rent is already paid, clamps the due day to the
-        current month (so due_day 31 in February becomes Feb 28), and delegates the
-        real-date arithmetic to FeeCalculatorService.
+        Honors an optional ``payment_date`` query param (ISO ``YYYY-MM-DD``) as "today"
+        for the calculation, falling back to ``today_sp()`` when absent. Skips the fee
+        when the month's rent is already paid, when the lease is not collectible for the
+        month per ``RentScheduleService`` (prepaid/salary-offset/owner), clamps the due
+        day to the current month (so due_day 31 in February becomes Feb 28), uses the
+        effective rental value (with any active rent adjustment applied), and delegates
+        the real-date arithmetic to FeeCalculatorService.
         """
         lease = self.get_object()
-        today = timezone.now().date()
+
+        payment_date_str = request.query_params.get("payment_date")
+        if payment_date_str:
+            try:
+                today = date.fromisoformat(payment_date_str)
+            except ValueError:
+                return Response(
+                    {"error": "Data de pagamento inválida."}, status=status.HTTP_400_BAD_REQUEST
+                )
+        else:
+            today = today_sp()
+
         reference_month = today.replace(day=1)
 
         already_paid = RentPayment.objects.filter(
@@ -524,13 +540,23 @@ class LeaseViewSet(viewsets.ModelViewSet):
         if already_paid:
             return Response({"message": "Aluguel já pago neste mês."}, status=status.HTTP_200_OK)
 
+        if not (
+            RentScheduleService.collectible_leases(reference_month).filter(pk=lease.pk).exists()
+        ):
+            return Response(
+                {"late_fee": Decimal("0.00"), "reason": "não cobrável — prepago"},
+                status=status.HTTP_200_OK,
+            )
+
         clamped_due = RentScheduleService.clamp_due_day(
             lease.responsible_tenant.due_day, today.year, today.month
         )
         due_date = date(today.year, today.month, clamped_due)
 
+        effective_rental_value = RentScheduleService.effective_rental_value(lease, reference_month)
+
         result = FeeCalculatorService.calculate_late_fee(
-            rental_value=lease.rental_value,
+            rental_value=effective_rental_value,
             due_date=due_date,
             current_date=today,
         )

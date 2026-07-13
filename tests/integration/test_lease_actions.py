@@ -194,18 +194,31 @@ class TestChangeDueDate:
         response = authenticated_api_client.post(url, {"new_due_day": 32}, format="json")
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
+    def test_change_due_date_same_day_returns_400(self, authenticated_api_client, lease, tenant):
+        """T1: new_due_day == current due_day must be rejected before any fee is
+        calculated — it must never charge ~1 month's fee for a no-op change."""
+        url = self.url_template.format(pk=lease.pk)
+        response = authenticated_api_client.post(
+            url, {"new_due_day": tenant.due_day}, format="json"
+        )
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "igual ao atual" in response.data["error"].lower()
+        tenant.refresh_from_db()
+        assert tenant.due_day == 10
+
 
 @pytest.mark.integration
 @pytest.mark.django_db
 class TestCalculateLateFee:
     url_template = "/api/leases/{pk}/calculate_late_fee/"
 
-    @freeze_time("2026-03-15")
+    @freeze_time("2026-03-15 12:00:00")
     def test_calculates_fee_from_correct_sources(
         self, authenticated_api_client, lease, apartment, tenant
     ):
         """calculate_late_fee must use apartment.rental_value and tenant.due_day."""
-        # Tenant.due_day=10, today=2026-03-15 → 5 days late
+        # Tenant.due_day=10, today=2026-03-15 (SP) → 5 days late.
+        # Frozen at noon UTC so today_sp() stays on the same calendar day.
         url = self.url_template.format(pk=lease.pk)
         response = authenticated_api_client.get(url)
 
@@ -229,11 +242,14 @@ class TestCalculateLateFee:
             str(response.data.get("late_fee", 0))
         ) == Decimal("0.00")
 
-    @freeze_time("2026-03-15")
+    @freeze_time("2026-03-15 12:00:00")
     def test_overdue_current_month_no_payment(
         self, authenticated_api_client, lease, apartment, tenant
     ):
-        """Overdue with no RentPayment for the month → 200 with positive fee."""
+        """Overdue with no RentPayment for the month → 200 with positive fee.
+
+        Frozen at noon UTC so today_sp() stays on the same calendar day.
+        """
         assert not RentPayment.objects.filter(
             lease=lease, reference_month=date(2026, 3, 1)
         ).exists()
@@ -290,6 +306,70 @@ class TestCalculateLateFee:
         # today=Feb 20, clamped due=Feb 28 → not late yet, but crucially no 500.
         assert response.status_code == status.HTTP_200_OK
         assert "message" in response.data
+
+    @freeze_time("2026-01-01")
+    def test_honors_payment_date_query_param(
+        self, authenticated_api_client, lease, apartment, tenant
+    ):
+        """B11(a): the frontend-supplied payment_date must be used as "today", not
+        the server clock (today_sp())."""
+        # Server "today" is frozen at 2026-01-01 (not late for a March due date), but the
+        # caller-supplied payment_date is 2026-03-15 → 5 days late on due_day=10.
+        url = self.url_template.format(pk=lease.pk)
+        response = authenticated_api_client.get(url, {"payment_date": "2026-03-15"})
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["late_days"] == 5
+        assert Decimal(str(response.data["late_fee"])) == Decimal("12.50")
+
+    def test_invalid_payment_date_returns_400(self, authenticated_api_client, lease):
+        url = self.url_template.format(pk=lease.pk)
+        response = authenticated_api_client.get(url, {"payment_date": "not-a-date"})
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "error" in response.data
+
+    @freeze_time("2026-03-15 12:00:00")
+    def test_uses_effective_rental_value_with_pending_adjustment(
+        self, authenticated_api_client, lease, apartment, tenant
+    ):
+        """B11(b): calculate_late_fee must use the effective rental value (with any
+        active rent adjustment applied), not the raw lease.rental_value.
+
+        Frozen at noon UTC so today_sp() stays on the same calendar day.
+        """
+        # Pending adjustment already active for March (pending date in the past).
+        lease.pending_rental_value = Decimal("1800.00")
+        lease.pending_rental_value_date = date(2026, 2, 1)
+        lease.save()
+
+        url = self.url_template.format(pk=lease.pk)
+        response = authenticated_api_client.get(url)
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["late_days"] == 5
+        # Fee based on the effective (pending) value 1800, not the raw 1500:
+        # 5 * 0.05 * (1800 / 30) = 5 * 0.05 * 60 = 15.00
+        assert Decimal(str(response.data["late_fee"])) == Decimal("15.00")
+
+    @freeze_time("2026-03-15 12:00:00")
+    def test_non_collectible_month_returns_zero_fee_with_reason(
+        self, authenticated_api_client, lease, tenant
+    ):
+        """B11(c): a lease that is not collectible for the reference month (prepaid)
+        must return a zero fee with an explanatory reason, not a positive late fee.
+
+        Frozen at noon UTC so today_sp() stays on the same calendar day.
+        """
+        lease.prepaid_until = date(2026, 4, 30)
+        lease.save()
+
+        url = self.url_template.format(pk=lease.pk)
+        response = authenticated_api_client.get(url)
+
+        assert response.status_code == status.HTTP_200_OK
+        assert Decimal(str(response.data["late_fee"])) == Decimal("0.00")
+        assert response.data["reason"] == "não cobrável — prepago"
 
 
 @pytest.fixture
@@ -433,3 +513,44 @@ class TestTransferLease:
         )
         assert response.status_code == status.HTTP_201_CREATED
         assert response.data["apartment"]["id"] == target.pk
+
+    def test_transfer_nonexistent_apartment_id_returns_400_not_500(
+        self, authenticated_api_client, lease, tenant
+    ):
+        """B19(a): a nonexistent target apartment_id must be a clean 400, not a 500."""
+        url = self.url_template.format(pk=lease.pk)
+        response = authenticated_api_client.post(
+            url,
+            {
+                "apartment_id": 999999,
+                "responsible_tenant_id": tenant.pk,
+                "validity_months": 12,
+            },
+            format="json",
+        )
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    def test_transfer_soft_deleted_apartment_returns_400_not_500(
+        self, authenticated_api_client, lease, tenant, building, admin_user
+    ):
+        """B19(a): a soft-deleted target apartment must be rejected as if nonexistent."""
+        target = make_apartment(
+            building=building,
+            number=203,
+            user=admin_user,
+            rental_value=Decimal("1600.00"),
+            max_tenants=2,
+        )
+        target.delete(deleted_by=admin_user)
+
+        url = self.url_template.format(pk=lease.pk)
+        response = authenticated_api_client.post(
+            url,
+            {
+                "apartment_id": target.pk,
+                "responsible_tenant_id": tenant.pk,
+                "validity_months": 12,
+            },
+            format="json",
+        )
+        assert response.status_code == status.HTTP_400_BAD_REQUEST

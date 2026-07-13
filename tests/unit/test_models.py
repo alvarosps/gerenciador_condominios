@@ -245,6 +245,53 @@ class TestLeaseModel:
             lease.clean()
         assert "start_date" in exc_info.value.message_dict
 
+    def test_historical_lease_stays_editable_when_start_date_unchanged(
+        self, apartment: Apartment, tenant: Tenant
+    ) -> None:
+        """B19(b) regression: a lease legitimately created years ago (start_date now
+        >10 years in the past) must remain editable via unrelated field updates —
+        full_clean() runs on every save(), so without the "only when start_date is
+        actually changing" guard this would become permanently uneditable.
+
+        The row is aged past the 10-year boundary with a QuerySet-level UPDATE (bypasses
+        save()/full_clean(), simulating a lease that WAS valid when originally created).
+        """
+        lease = make_lease(
+            apartment=apartment,
+            tenant=tenant,
+            start_date=date(2026, 1, 1),
+            validity_months=12,
+        )
+        Lease.objects.filter(pk=lease.pk).update(start_date=date(2000, 1, 1))
+        lease.refresh_from_db()
+
+        # An unrelated field update must succeed — start_date is untouched.
+        lease.tag_fee = Decimal("75.00")
+        lease.save()
+
+        lease.refresh_from_db()
+        assert lease.tag_fee == Decimal("75.00")
+        assert lease.start_date == date(2000, 1, 1)
+
+    def test_historical_lease_rejects_start_date_change_further_into_past(
+        self, apartment: Apartment, tenant: Tenant
+    ) -> None:
+        """B19(b): the 10-year rule still applies when start_date IS being changed,
+        even on an existing (already historical) lease."""
+        lease = make_lease(
+            apartment=apartment,
+            tenant=tenant,
+            start_date=date(2026, 1, 1),
+            validity_months=12,
+        )
+        Lease.objects.filter(pk=lease.pk).update(start_date=date(2020, 1, 1))
+        lease.refresh_from_db()
+
+        lease.start_date = date(2000, 1, 1)
+        with pytest.raises(ValidationError) as exc_info:
+            lease.save()
+        assert "start_date" in exc_info.value.message_dict
+
 
 # =============================================================================
 # Landlord

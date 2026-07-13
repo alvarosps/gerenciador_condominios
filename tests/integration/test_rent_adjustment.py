@@ -184,9 +184,11 @@ class TestRentAdjustmentService:
 
         assert "zero" in str(exc_info.value).lower()
 
-    def test_apply_adjustment_expired_lease_raises(self) -> None:
+    def test_apply_adjustment_auto_renewed_lease_is_adjustable(self) -> None:
+        # Brazilian leases auto-renew past the original term (Lei 8.245/91 art. 46-47);
+        # a lease whose original validity_months window has elapsed is still active
+        # (SSOT: RentScheduleService.collectible_leases) and must remain adjustable.
         apartment = _make_apartment(_make_building(9906))
-        # Lease started 3 years ago, valid for 12 months → expired
         lease = _make_lease(
             apartment,
             _make_tenant(_CPF_6),
@@ -194,14 +196,17 @@ class TestRentAdjustmentService:
             validity_months=12,
         )
 
-        with pytest.raises(ValidationError) as exc_info:
-            RentAdjustmentService.apply_adjustment(
-                lease=lease,
-                percentage=Decimal("5.00"),
-                update_apartment_prices=False,
-            )
+        adjustment, warning = RentAdjustmentService.apply_adjustment(
+            lease=lease,
+            percentage=Decimal("5.00"),
+            update_apartment_prices=False,
+        )
 
-        assert "encerrada" in str(exc_info.value).lower()
+        # 1400.00 * 1.05 = 1470.00
+        assert adjustment.new_value == Decimal("1470.00")
+        lease.refresh_from_db()
+        assert lease.rental_value == Decimal("1470.00")
+        assert warning is None
 
     def test_apply_adjustment_recent_adjustment_returns_warning(self) -> None:
         apartment = _make_apartment(_make_building(9907))
@@ -345,10 +350,12 @@ class TestGetEligibleLeases:
         lease_ids_returned = [item["lease_id"] for item in result["alerts"]]
         assert lease.pk not in lease_ids_returned
 
-    def test_get_eligible_leases_excludes_expired(self) -> None:
+    def test_get_eligible_leases_includes_auto_renewed(self) -> None:
+        # A lease whose original validity_months window elapsed 2 years ago is still
+        # active by auto-renewal (SSOT: RentScheduleService.collectible_leases has NO
+        # upper date bound) and must remain eligible for adjustment alerts.
         apartment = _make_apartment(_make_building(9702))
-        # Lease expired 2 years ago (started 3yr ago, valid 12 months)
-        expired_lease = _make_lease(
+        auto_renewed_lease = _make_lease(
             apartment,
             _make_tenant(_CPF_14),
             start_date=date.today() - relativedelta(months=36),
@@ -358,7 +365,7 @@ class TestGetEligibleLeases:
         result = RentAdjustmentService.get_eligible_leases()
 
         lease_ids_returned = [item["lease_id"] for item in result["alerts"]]
-        assert expired_lease.pk not in lease_ids_returned
+        assert auto_renewed_lease.pk in lease_ids_returned
 
     def test_get_eligible_leases_uses_last_adjustment_date(self) -> None:
         apartment = _make_apartment(_make_building(9703))

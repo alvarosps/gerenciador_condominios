@@ -13,9 +13,10 @@ from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
 
 from django.conf import settings
-from django.utils import timezone
+from django.core.exceptions import ValidationError
 
 from core.services.date_calculator import DateCalculatorService
+from core.services.timezone import today_sp
 
 
 class FeeCalculatorService:
@@ -138,9 +139,16 @@ class FeeCalculatorService:
             daily_rate = 1250/30 = 41.67
             fee = round(41.67 × 15) = 625
             total_due = 1250 + 625 = 1875
+
+        Raises:
+            ValidationError: If new_due_day equals current_due_day.
         """
+        if new_due_day == current_due_day:
+            msg = "O novo dia de vencimento é igual ao atual."
+            raise ValidationError(msg)
+
         if reference_date is None:
-            reference_date = timezone.now().date()
+            reference_date = today_sp()
 
         # The old due date is current_due_day within the reference month; the new due
         # date stays in that month when later, or rolls to the next month when earlier.

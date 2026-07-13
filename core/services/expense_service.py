@@ -2,7 +2,7 @@
 
 import calendar
 from datetime import date
-from decimal import ROUND_HALF_UP, Decimal
+from decimal import ROUND_DOWN, Decimal
 from typing import Any
 
 from dateutil.relativedelta import relativedelta
@@ -84,13 +84,18 @@ class ExpenseService:
 
         Splitting ``total_amount`` by ``n`` and rounding each parcel can drift from the
         total (e.g. 100.00 / 3); the last parcel absorbs the residual so the parcels
-        always sum to ``total_amount``. Credit-card installments fall on the card's
-        ``due_day``, clamped to the month's last day to avoid a ValueError on short months.
+        always sum to ``total_amount``. The base is rounded DOWN so
+        Σ(base * (n-1)) <= total and the leftover cents land on the LAST installment,
+        which is therefore always >= base >= 0 (ROUND_HALF_UP could round the base UP
+        and make the last installment negative for tiny totals, e.g. 0.05 / 9 — mirrors
+        ``finances/services/installment_plan_service.py::_split_amount``). Credit-card
+        installments fall on the card's ``due_day``, clamped to the month's last day to
+        avoid a ValueError on short months.
         """
         n = expense.total_installments
         if not n:
             raise serializers.ValidationError(_NOT_INSTALLMENT_ERROR)
-        base = (expense.total_amount / n).quantize(_CENTS, rounding=ROUND_HALF_UP)
+        base = (expense.total_amount / n).quantize(_CENTS, rounding=ROUND_DOWN)
         last = expense.total_amount - base * (n - 1)
 
         credit_card = expense.credit_card

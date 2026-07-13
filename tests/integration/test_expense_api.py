@@ -492,8 +492,9 @@ class TestExpenseInstallmentAPI:
 
     # --- Actions ---
 
-    @freeze_time("2026-04-25")
+    @freeze_time("2026-04-25 12:00:00")
     def test_mark_paid(self, authenticated_api_client, expense_with_installments):
+        # Frozen at noon UTC so today_sp() stays on 2026-04-25 (not the previous day).
         inst = expense_with_installments.installments.first()
         url = f"{self.url}{inst.pk}/mark_paid/"
         response = authenticated_api_client.post(url)

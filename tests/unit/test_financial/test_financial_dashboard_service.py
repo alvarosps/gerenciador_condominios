@@ -473,10 +473,11 @@ class TestFinancialDashboardOverdue:
         assert len(result) == 1
         assert result[0]["installment_number"] == 2
 
-    @freeze_time("2026-03-15")
+    @freeze_time("2026-03-15 12:00:00")
     def test_days_overdue_calculation(
         self, person_rodrigo: Person, credit_card: CreditCard
     ) -> None:
+        # Frozen at noon UTC so today_sp() stays on 2026-03-15 (not the previous day).
         _create_expense_with_installments(
             description="Compra cartão",
             expense_type=ExpenseType.CARD_PURCHASE,
@@ -1909,8 +1910,9 @@ class TestUpcomingInstallmentsEdgeCases:
     """Edge cases for get_upcoming_installments."""
 
     @pytest.mark.unit
-    @freeze_time("2026-03-15")
+    @freeze_time("2026-03-15 12:00:00")
     def test_upcoming_no_person_no_card_returns_none_fields(self) -> None:
+        # Frozen at noon UTC so today_sp() stays on 2026-03-15 (not the previous day).
         expense = Expense.objects.create(
             description="Gasto sem pessoa",
             expense_type=ExpenseType.BANK_LOAN,
@@ -1967,8 +1969,9 @@ class TestOverdueInstallmentsEdgeCases:
     """Edge cases for get_overdue_installments."""
 
     @pytest.mark.unit
-    @freeze_time("2026-03-15")
+    @freeze_time("2026-03-15 12:00:00")
     def test_overdue_no_person_no_card(self) -> None:
+        # Frozen at noon UTC so today_sp() stays on 2026-03-15 (not the previous day).
         expense = Expense.objects.create(
             description="Dívida sem pessoa",
             expense_type=ExpenseType.BANK_LOAN,

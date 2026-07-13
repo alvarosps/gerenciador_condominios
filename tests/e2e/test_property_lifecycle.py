@@ -153,8 +153,9 @@ class TestPropertyLifecycleE2E:
         assert lease_detail.data["contract_generated"] is True
 
         # Step 6: Calculate late fee with frozen time past due date
-        # due_day=10, freeze to day 15 of the same month — 5 days late
-        with freeze_time("2025-02-15"):
+        # due_day=10, freeze to day 15 of the same month — 5 days late.
+        # Frozen at noon UTC so today_sp() stays on 2025-02-15 (not the previous day).
+        with freeze_time("2025-02-15 12:00:00"):
             late_fee_resp = client.get(f"/api/leases/{lease_id}/calculate_late_fee/")
             assert late_fee_resp.status_code == status.HTTP_200_OK
             # Should be late because day 15 > due_day 10

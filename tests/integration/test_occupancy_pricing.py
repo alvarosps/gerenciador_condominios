@@ -379,7 +379,7 @@ class TestLeaseOccupancyPricing:
         lease_single.refresh_from_db()
         assert lease_single.rental_value == Decimal("1200.00")
 
-    @freeze_time("2026-03-15")
+    @freeze_time("2026-03-15 12:00:00")
     def test_late_fee_uses_lease_rental_value(
         self, api_client, apartment_double, tenant, admin_user
     ):
@@ -387,7 +387,8 @@ class TestLeaseOccupancyPricing:
 
         apartment_double.rental_value = 1000.00
         lease.rental_value = 1500.00 (custom, higher than apartment)
-        tenant.due_day = 10, today = 2026-03-15 → 5 days late
+        tenant.due_day = 10, today = 2026-03-15 (SP) → 5 days late.
+        Frozen at noon UTC so today_sp() stays on the same calendar day.
 
         Fee with lease.rental_value=1500: 5 * 0.05 * (1500/30) = 5 * 0.05 * 50 = 12.50
         Fee with apartment.rental_value=1000: 5 * 0.05 * (1000/30) = 5 * 0.05 * 33.33 = 8.33

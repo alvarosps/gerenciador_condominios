@@ -265,6 +265,10 @@ max-complexity = 12
 # tasks.py and views.py use local imports to avoid circular deps and lazy-load Celery
 "core/tasks.py" = ["PLC0415"]
 "core/views.py" = ["PLC0415"]
+# model_validators.py is imported by core.models at load time; core.services.timezone is
+# reached through the core.services package __init__ (which imports ContractService ->
+# core.models) — a top-level import here would create a circular import during core.models init.
+"core/validators/model_validators.py" = ["PLC0415"]
 
 [tool.ruff.lint.pylint]
 max-args = 8

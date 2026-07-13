@@ -12,10 +12,10 @@ from typing import Any
 from dateutil.relativedelta import relativedelta
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.utils import timezone
 
 from core.models import Landlord, Lease, RentAdjustment
 from core.services.ipca_service import IPCAService
+from core.services.timezone import today_sp
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +47,7 @@ class RentAdjustmentService:
             Tuple of (RentAdjustment, warning_dict | None).
 
         Raises:
-            ValidationError: If percentage is zero or the lease has already ended.
+            ValidationError: If percentage is zero.
         """
         if percentage == 0:
             msg = "O percentual de reajuste não pode ser zero."
@@ -56,11 +56,7 @@ class RentAdjustmentService:
         # Re-fetch with a row lock to prevent concurrent double-adjustments
         lease = Lease.objects.select_for_update().get(pk=lease.pk)
 
-        today = timezone.now().date()
-        if today > lease.start_date + relativedelta(months=lease.validity_months):
-            msg = "A locação está encerrada e não pode ser reajustada."
-            raise ValidationError(msg)
-
+        today = today_sp()
         adjustment_date = renewal_date or today
 
         multiplier = Decimal(1) + percentage / Decimal(100)
@@ -131,7 +127,7 @@ class RentAdjustmentService:
         Returns:
             Number of adjustments activated.
         """
-        today = timezone.now().date()
+        today = today_sp()
         current_month_start = today.replace(day=1)
 
         pending_leases = (
@@ -209,7 +205,7 @@ class RentAdjustmentService:
             Dict with alerts list, IPCA metadata, and fallback percentage.
         """
 
-        today = timezone.now().date()
+        today = today_sp()
         alert_cutoff = today + relativedelta(months=alert_months)
 
         # Read only from the DB — the external IPCA fetch runs in the daily cron
@@ -227,7 +223,7 @@ class RentAdjustmentService:
         # and the alerts quietly drift onto the Landlord fallback. A stale (but present) index is
         # the discriminating signal — log it loudly so the broken cron is visible (an absent index
         # may be an intentional fallback-only setup, so it is not flagged here).
-        expected_latest_month = timezone.now().date().replace(day=1) - relativedelta(months=1)
+        expected_latest_month = today_sp().replace(day=1) - relativedelta(months=1)
         if latest_ipca_month is not None and latest_ipca_month < expected_latest_month:
             logger.warning(
                 "IPCA index is stale (latest=%s, expected >= %s) — the daily send_finance_alerts "
@@ -256,9 +252,6 @@ class RentAdjustmentService:
         alerts: list[dict[str, Any]] = []
 
         for lease in leases:
-            # Skip leases whose contract has already ended — they are not adjustable.
-            if today > lease.start_date + relativedelta(months=lease.validity_months):
-                continue
             reference_date: date = lease.last_rent_increase_date or lease.start_date
             eligible_date = reference_date + relativedelta(months=_ADJUSTMENT_INTERVAL_MONTHS)
 
