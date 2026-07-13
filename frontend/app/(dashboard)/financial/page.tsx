@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
+import { PageHeader } from '@/components/layouts/page-header';
 import { useDashboardSummary } from '@/lib/api/hooks/use-financial-dashboard';
 import { formatMonthYear } from '@/lib/utils/formatters';
 import { ROUTES } from '@/lib/utils/constants';
@@ -22,10 +23,10 @@ export default function FinancialDashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div className="mb-2">
-        <h1 className="text-3xl font-bold">Dashboard Financeiro</h1>
-        <p className="text-muted-foreground mt-1">Visão geral das finanças — {monthLabel}</p>
-      </div>
+      <PageHeader
+        title="Dashboard Financeiro"
+        description={`Visão geral das finanças — ${monthLabel}`}
+      />
 
       {isLoading && <BalanceCardsSkeleton />}
 

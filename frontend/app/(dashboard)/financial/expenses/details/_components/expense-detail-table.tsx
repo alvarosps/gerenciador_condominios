@@ -5,6 +5,8 @@ import { CheckCircle, Pencil, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { ExpenseDetailItem } from '@/lib/api/hooks/use-financial-dashboard';
 import { formatCurrency } from '@/lib/utils/formatters';
+import { DEFAULT_CATEGORY_COLOR } from '@/lib/utils/constants';
+import { colorMixWithTransparent } from '@/lib/utils/chart-colors';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -73,8 +75,11 @@ export function ExpenseDetailTable({
                     <span
                       className="inline-block px-2 py-0.5 rounded-full text-xs font-medium"
                       style={{
-                        backgroundColor: `${item.category_color ?? '#6b7280'}20`,
-                        color: item.category_color ?? '#6b7280',
+                        backgroundColor: colorMixWithTransparent(
+                          item.category_color ?? DEFAULT_CATEGORY_COLOR,
+                          12
+                        ),
+                        color: item.category_color ?? DEFAULT_CATEGORY_COLOR,
                       }}
                     >
                       {item.category_name}

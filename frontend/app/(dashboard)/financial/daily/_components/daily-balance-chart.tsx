@@ -16,6 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { DailyBreakdownDay } from '@/lib/api/hooks/use-daily-control';
 import { formatCurrency, isDateStringAfterToday } from '@/lib/utils/formatters';
+import { chartColor } from '@/lib/utils/chart-colors';
 
 interface Props {
   data: DailyBreakdownDay[];
@@ -153,7 +154,7 @@ export function DailyBalanceChart({ data, isLoading }: Props) {
             <ReferenceLine
               yAxisId="left"
               x={todayDay}
-              stroke="#6366f1"
+              stroke={chartColor(2)}
               strokeDasharray="4 4"
               label={{ value: 'Hoje', position: 'top', fontSize: 11 }}
             />

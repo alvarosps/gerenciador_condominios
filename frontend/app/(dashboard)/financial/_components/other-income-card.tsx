@@ -32,7 +32,7 @@ export function OtherIncomeCard({
             <div
               key={inc.description}
               className="rounded-lg border bg-muted/20 p-3"
-              style={{ borderLeftWidth: 3, borderLeftColor: '#22c55e' }}
+              style={{ borderLeftWidth: 3, borderLeftColor: 'var(--success)' }}
             >
               <div className="flex items-center justify-between">
                 <div>
@@ -43,7 +43,10 @@ export function OtherIncomeCard({
                   <p className="text-lg font-bold">{formatCurrency(inc.amount)}</p>
                 </div>
                 {inc.is_recurring && (
-                  <Badge variant="outline" className="text-[10px] text-success border-success/30 bg-success/10">
+                  <Badge
+                    variant="outline"
+                    className="text-[10px] text-success border-success/30 bg-success/10"
+                  >
                     mensal
                   </Badge>
                 )}

@@ -62,7 +62,12 @@ function PixSection() {
             </div>
             <div className="flex items-center gap-2">
               <code className="flex-1 rounded-md bg-muted p-3 text-xs break-all">{pixPayload}</code>
-              <Button variant="outline" size="icon" onClick={() => void handleCopy()}>
+              <Button
+                variant="outline"
+                size="touch"
+                onClick={() => void handleCopy()}
+                aria-label="Copiar código PIX"
+              >
                 {copied ? (
                   <Check className="h-4 w-4 text-green-500" />
                 ) : (

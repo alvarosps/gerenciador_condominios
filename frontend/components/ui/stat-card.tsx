@@ -1,5 +1,6 @@
 import type * as React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 
 export type StatTone = 'success' | 'destructive' | 'warning' | 'info' | 'foreground' | 'muted';
@@ -9,8 +10,9 @@ export interface StatCardProps {
   value: React.ReactNode;
   icon?: React.ReactNode;
   tone?: StatTone;
-  subLabel?: string;
+  subLabel?: React.ReactNode;
   className?: string;
+  loading?: boolean;
 }
 
 const valueToneClasses: Record<StatTone, string> = {
@@ -31,21 +33,41 @@ const iconToneClasses: Record<StatTone, string> = {
   muted: 'bg-muted text-muted-foreground',
 };
 
-export function StatCard({ label, value, icon, tone = 'foreground', subLabel, className }: StatCardProps) {
+export function StatCard({
+  label,
+  value,
+  icon,
+  tone = 'foreground',
+  subLabel,
+  className,
+  loading = false,
+}: StatCardProps) {
+  if (loading) {
+    return (
+      <Card className={className} aria-live="polite" aria-busy={true}>
+        <CardContent className="flex flex-col gap-2 pt-6">
+          <div className="flex items-center justify-between">
+            <Skeleton className="h-3 w-24" />
+            {icon && <Skeleton className="size-8 rounded-lg" />}
+          </div>
+          <Skeleton className="h-8 w-32" />
+          {subLabel !== undefined && <Skeleton className="h-3 w-20" />}
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
-    <Card
-      className={cn(
-        'transition-shadow duration-200 hover:shadow-md',
-        className,
-      )}
-    >
+    <Card className={cn('transition-shadow duration-200 hover:shadow-md', className)}>
       <CardContent className="flex flex-col gap-2 pt-6">
         <div className="flex items-center justify-between">
           <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
             {label}
           </span>
           {icon && (
-            <span className={cn('grid size-8 place-items-center rounded-lg', iconToneClasses[tone])}>
+            <span
+              className={cn('grid size-8 place-items-center rounded-lg', iconToneClasses[tone])}
+            >
               {icon}
             </span>
           )}
@@ -53,9 +75,7 @@ export function StatCard({ label, value, icon, tone = 'foreground', subLabel, cl
         <span className={cn('text-2xl font-bold tabular-nums', valueToneClasses[tone])}>
           {value}
         </span>
-        {subLabel && (
-          <span className="text-xs text-muted-foreground">{subLabel}</span>
-        )}
+        {subLabel && <span className="text-xs text-muted-foreground">{subLabel}</span>}
       </CardContent>
     </Card>
   );

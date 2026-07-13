@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { DataTable, type Column } from '@/components/tables/data-table';
 import { AmountDisplay } from '@/components/ui/amount-display';
+import { PageHeader } from '@/components/layouts/page-header';
 import { cn } from '@/lib/utils';
 import {
   useCondoMonthCloses,
@@ -211,53 +212,58 @@ export default function MonthClosePage() {
 
   return (
     <div>
-      <div className="mb-4 flex justify-between items-center flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">Fechamento Mensal</h1>
-          <p className="text-muted-foreground mt-1">
-            Histórico de fechamentos e saldos do condomínio
-          </p>
-        </div>
-
-        {isStaff && (
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1">
+      <PageHeader
+        title="Fechamento Mensal"
+        description="Histórico de fechamentos e saldos do condomínio"
+        actions={
+          isStaff && (
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => shiftSelectedMonth(-1)}
+                  aria-label="Mês anterior"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="min-w-[10rem] text-center text-sm font-medium">
+                  {formatReferenceMonth(selectedReferenceMonth)}
+                </span>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => shiftSelectedMonth(1)}
+                  aria-label="Próximo mês"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
               <Button
-                variant="outline"
-                size="icon"
-                onClick={() => shiftSelectedMonth(-1)}
-                aria-label="Mês anterior"
+                disabled={selectedClose?.status === 'closed'}
+                onClick={openCloseDialogForSelectedMonth}
               >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <span className="min-w-[10rem] text-center text-sm font-medium">
-                {formatReferenceMonth(selectedReferenceMonth)}
-              </span>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => shiftSelectedMonth(1)}
-                aria-label="Próximo mês"
-              >
-                <ChevronRight className="h-4 w-4" />
+                Fechar mês
               </Button>
             </div>
-            <Button
-              disabled={selectedClose?.status === 'closed'}
-              onClick={openCloseDialogForSelectedMonth}
-            >
-              Fechar mês
-            </Button>
-          </div>
-        )}
-      </div>
-
-      <DataTable<CondoMonthClose>
-        columns={columns}
-        dataSource={closes}
-        loading={isLoading}
-        rowKey="id"
+          )
+        }
       />
+
+      {!isLoading && (closes?.length ?? 0) === 0 ? (
+        <p className="rounded-md border-2 border-dashed py-12 text-center text-sm text-muted-foreground">
+          {isStaff
+            ? 'Nenhum fechamento ainda. Use o botão "Fechar mês" para fechar o primeiro mês.'
+            : 'Nenhum fechamento ainda.'}
+        </p>
+      ) : (
+        <DataTable<CondoMonthClose>
+          columns={columns}
+          dataSource={closes}
+          loading={isLoading}
+          rowKey="id"
+        />
+      )}
 
       <MonthCloseActionDialog
         open={dialogRecord !== null}

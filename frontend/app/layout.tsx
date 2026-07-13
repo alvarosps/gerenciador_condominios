@@ -12,9 +12,10 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
+  // --primary token, oklch(0.55 0.15 175) → #008c6c (app/globals.css:60)
   themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#0d847a' },
-    { media: '(prefers-color-scheme: dark)', color: '#0d847a' },
+    { media: '(prefers-color-scheme: light)', color: '#008c6c' },
+    { media: '(prefers-color-scheme: dark)', color: '#008c6c' },
   ],
 };
 

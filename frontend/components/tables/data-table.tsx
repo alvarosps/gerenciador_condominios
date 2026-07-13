@@ -16,11 +16,14 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Skeleton } from '@/components/ui/skeleton';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PAGINATION } from '@/lib/utils/constants';
 import { renderCellContent } from './cell-value';
 import { DataTableCards } from './data-table-cards';
+
+const SKELETON_ROW_COUNT = 8;
 
 type ColumnAlign = 'left' | 'center' | 'right';
 
@@ -205,17 +208,46 @@ export function DataTable<T extends object>({
     rowSelection.onChange(newSelectedKeys, newSelectedRows);
   };
 
+  // skeleton é o padrão de loading do app
   if (loading) {
     return (
-      <div
-        className="flex items-center justify-center p-8 border rounded-md"
-        aria-live="polite"
-        aria-busy={true}
-      >
-        <div className="flex flex-col items-center gap-2">
-          <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-          <p className="text-sm text-muted-foreground">Carregando...</p>
-        </div>
+      <div className="rounded-md border overflow-x-auto" aria-live="polite" aria-busy={true}>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              {rowSelection && <TableHead style={{ width: 50 }} />}
+              {columns.map((column) => (
+                <TableHead
+                  key={column.key}
+                  style={{ width: column.width }}
+                  className={column.align ? ALIGN_CLASSES[column.align] : undefined}
+                >
+                  {column.title}
+                </TableHead>
+              ))}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {Array.from({ length: SKELETON_ROW_COUNT }, (_, rowIndex) => (
+              <TableRow key={`skeleton-row-${rowIndex}`}>
+                {rowSelection && (
+                  <TableCell style={{ width: 50 }}>
+                    <Skeleton className="h-4 w-4" />
+                  </TableCell>
+                )}
+                {columns.map((column) => (
+                  <TableCell
+                    key={column.key}
+                    style={{ width: column.width }}
+                    className={column.align ? ALIGN_CLASSES[column.align] : undefined}
+                  >
+                    <Skeleton className="h-4 w-full max-w-[80%]" />
+                  </TableCell>
+                ))}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       </div>
     );
   }

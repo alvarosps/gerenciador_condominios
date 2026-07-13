@@ -35,6 +35,7 @@ import { useFurniture, useDeleteFurniture } from '@/lib/api/hooks/use-furniture'
 import { type Furniture } from '@/lib/schemas/furniture.schema';
 import { furnitureExportColumns } from '@/lib/hooks/use-export';
 import { useCrudPage } from '@/lib/hooks/use-crud-page';
+import { PageHeader } from '@/components/layouts/page-header';
 
 export default function FurniturePage() {
   const { data: furniture, isLoading, error } = useFurniture();
@@ -101,39 +102,39 @@ export default function FurniturePage() {
 
   return (
     <div>
-      <div className="mb-4 flex justify-between items-center flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">Móveis</h1>
-          <p className="text-muted-foreground mt-1">Gerencie o catálogo de móveis disponíveis</p>
-        </div>
-        <div className="flex gap-2">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                disabled={crud.isExporting || !furniture || furniture.length === 0}
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Exportar
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              <DropdownMenuItem onClick={() => crud.handleExport('excel', furniture ?? [])}>
-                <FileSpreadsheet className="h-4 w-4 mr-2" />
-                Exportar para Excel
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => crud.handleExport('csv', furniture ?? [])}>
-                <FileText className="h-4 w-4 mr-2" />
-                Exportar para CSV
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <Button onClick={crud.openCreateModal}>
-            <Plus className="h-4 w-4 mr-2" />
-            Novo Móvel
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        title="Móveis"
+        description="Gerencie o catálogo de móveis disponíveis"
+        actions={
+          <>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  disabled={crud.isExporting || !furniture || furniture.length === 0}
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Exportar
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem onClick={() => crud.handleExport('excel', furniture ?? [])}>
+                  <FileSpreadsheet className="h-4 w-4 mr-2" />
+                  Exportar para Excel
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => crud.handleExport('csv', furniture ?? [])}>
+                  <FileText className="h-4 w-4 mr-2" />
+                  Exportar para CSV
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button onClick={crud.openCreateModal}>
+              <Plus className="h-4 w-4 mr-2" />
+              Novo Móvel
+            </Button>
+          </>
+        }
+      />
 
       {error && !furniture && (
         <Alert variant="destructive" className="mb-4">

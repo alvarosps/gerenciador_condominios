@@ -21,6 +21,7 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import { DataTable } from '@/components/tables/data-table';
+import { PageHeader } from '@/components/layouts/page-header';
 import {
   useDeleteInstallmentPlan,
   useInstallmentPlans,
@@ -68,20 +69,18 @@ export default function InstallmentPlansPage() {
 
   return (
     <div>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">Planos de Parcelas</h1>
-          <p className="mt-1 text-muted-foreground">
-            Gerencie os planos de parcelas do condomínio (IPTU, parcelamentos)
-          </p>
-        </div>
-        {isAdmin && (
-          <Button onClick={crud.openCreateModal}>
-            <Plus className="mr-2 h-4 w-4" />
-            Novo Plano
-          </Button>
-        )}
-      </div>
+      <PageHeader
+        title="Planos de Parcelas"
+        description="Gerencie os planos de parcelas do condomínio (IPTU, parcelamentos)"
+        actions={
+          isAdmin && (
+            <Button onClick={crud.openCreateModal}>
+              <Plus className="mr-2 h-4 w-4" />
+              Novo Plano
+            </Button>
+          )
+        }
+      />
 
       {isError ? (
         <p className="rounded-md border-2 border-dashed border-destructive/40 py-12 text-center text-sm text-destructive">
@@ -141,9 +140,7 @@ export default function InstallmentPlansPage() {
             <AlertDialogTitle>Excluir plano de parcelas</AlertDialogTitle>
             <AlertDialogDescription>
               Tem certeza que deseja excluir{' '}
-              {crud.itemToDelete?.description
-                ? `"${crud.itemToDelete.description}"`
-                : 'este plano'}
+              {crud.itemToDelete?.description ? `"${crud.itemToDelete.description}"` : 'este plano'}
               ? Esta ação não pode ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>

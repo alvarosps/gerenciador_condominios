@@ -29,6 +29,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { DataTable } from '@/components/tables/data-table';
+import { PageHeader } from '@/components/layouts/page-header';
 import {
   useBills,
   useDeleteBill,
@@ -166,43 +167,43 @@ export default function BillsPage() {
 
   return (
     <div>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">Contas do Condomínio</h1>
-          <p className="mt-1 text-muted-foreground">Gerencie as contas a pagar do condomínio</p>
-        </div>
-        {isAdmin && (
-          <div className="flex flex-wrap gap-2">
-            <Button
-              variant="outline"
-              onClick={handleGenerateMonth}
-              disabled={generateMonth.isPending}
-            >
-              <CalendarPlus className="mr-2 h-4 w-4" />
-              Gerar contas do mês
-            </Button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="application/pdf"
-              hidden
-              onChange={handleInvoiceSelected}
-            />
-            <Button
-              variant="outline"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={parseInvoice.isPending}
-            >
-              <FileUp className="mr-2 h-4 w-4" />
-              {parseInvoice.isPending ? 'Lendo fatura...' : 'Importar fatura (PDF)'}
-            </Button>
-            <Button onClick={crud.openCreateModal}>
-              <Plus className="mr-2 h-4 w-4" />
-              Nova Conta
-            </Button>
-          </div>
-        )}
-      </div>
+      <PageHeader
+        title="Contas do Condomínio"
+        description="Gerencie as contas a pagar do condomínio"
+        actions={
+          isAdmin && (
+            <>
+              <Button
+                variant="outline"
+                onClick={handleGenerateMonth}
+                disabled={generateMonth.isPending}
+              >
+                <CalendarPlus className="mr-2 h-4 w-4" />
+                Gerar contas do mês
+              </Button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="application/pdf"
+                hidden
+                onChange={handleInvoiceSelected}
+              />
+              <Button
+                variant="outline"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={parseInvoice.isPending}
+              >
+                <FileUp className="mr-2 h-4 w-4" />
+                {parseInvoice.isPending ? 'Lendo fatura...' : 'Importar fatura (PDF)'}
+              </Button>
+              <Button onClick={crud.openCreateModal}>
+                <Plus className="mr-2 h-4 w-4" />
+                Nova Conta
+              </Button>
+            </>
+          )
+        }
+      />
 
       {isAdmin && (
         <div className="mb-4">

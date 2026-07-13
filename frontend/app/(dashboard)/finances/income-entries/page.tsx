@@ -17,6 +17,7 @@ import { Plus, Pencil, Trash2, Loader2, CheckCircle2, Clock } from 'lucide-react
 import { toast } from 'sonner';
 import { DataTable, type Column } from '@/components/tables/data-table';
 import { DeleteConfirmDialog } from '@/components/shared/delete-confirm-dialog';
+import { PageHeader } from '@/components/layouts/page-header';
 import { cn } from '@/lib/utils';
 import { useIncomeEntries, useDeleteIncomeEntry } from '@/lib/api/hooks/use-income-entries';
 import type { IncomeEntryFilters } from '@/lib/schemas/finances/income-entry.schema';
@@ -188,18 +189,18 @@ export default function IncomeEntriesPage() {
 
   return (
     <div>
-      <div className="mb-4 flex justify-between items-center flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">Receitas do Condomínio</h1>
-          <p className="text-muted-foreground mt-1">Receitas e entradas financeiras</p>
-        </div>
-        {isStaff && (
-          <Button onClick={crud.openCreateModal}>
-            <Plus className="h-4 w-4 mr-2" />
-            Nova Receita
-          </Button>
-        )}
-      </div>
+      <PageHeader
+        title="Receitas do Condomínio"
+        description="Receitas e entradas financeiras"
+        actions={
+          isStaff && (
+            <Button onClick={crud.openCreateModal}>
+              <Plus className="h-4 w-4 mr-2" />
+              Nova Receita
+            </Button>
+          )
+        }
+      />
 
       {/* Filters */}
       <Card className="mb-4">

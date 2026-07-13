@@ -68,6 +68,33 @@ describe('MonthClosePage', () => {
     await waitForQueriesToSettle(queryClient);
   });
 
+  it('shows an empty state pointing staff to the "Fechar mês" header button', async () => {
+    setStaff(true);
+    setCloses([]);
+
+    const { queryClient } = renderWithProviders(<MonthClosePage />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/nenhum fechamento ainda/i)).toBeInTheDocument();
+      expect(screen.getByText(/"fechar mês"/i)).toBeInTheDocument();
+    });
+
+    await waitForQueriesToSettle(queryClient);
+  });
+
+  it('shows a plain empty state for non-staff (no header control to point to)', async () => {
+    setStaff(false);
+    setCloses([]);
+
+    const { queryClient } = renderWithProviders(<MonthClosePage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Nenhum fechamento ainda.')).toBeInTheDocument();
+    });
+
+    await waitForQueriesToSettle(queryClient);
+  });
+
   it('renders month closes in the table', async () => {
     setCloses([
       createMockCondoMonthClose({ id: 1, reference_month: '2026-05-01', status: 'closed' }),

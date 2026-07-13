@@ -1,5 +1,6 @@
 'use client';
 
+import { PageHeader } from '@/components/layouts/page-header';
 import { FinancialSummaryWidget } from './_components/financial-summary-widget';
 import { LeaseMetricsWidget } from './_components/lease-metrics-widget';
 import { BuildingStatisticsChart } from './_components/building-statistics-chart';
@@ -18,12 +19,7 @@ export default function DashboardPage() {
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold">Dashboard</h1>
-        <p className="text-muted-foreground mt-1">
-          Visão geral do sistema de gestão de condomínios
-        </p>
-      </div>
+      <PageHeader title="Dashboard" description="Visão geral do sistema de gestão de condomínios" />
 
       <div className="space-y-6">
         {/* Condominium finance KPIs — above the condominium calendar (Phase 4) */}

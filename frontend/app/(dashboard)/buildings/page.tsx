@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { DataTable, type Column } from '@/components/tables/data-table';
+import { PageHeader } from '@/components/layouts/page-header';
 import { BuildingFormModal } from './_components/building-form-modal';
 import { useBuildings, useDeleteBuilding } from '@/lib/api/hooks/use-buildings';
 import { type Building } from '@/lib/schemas/building.schema';
@@ -105,39 +106,39 @@ export default function BuildingsPage() {
 
   return (
     <div>
-      <div className="mb-4 flex justify-between items-center flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">Prédios</h1>
-          <p className="text-muted-foreground mt-1">Gerencie os prédios do condomínio</p>
-        </div>
-        <div className="flex gap-2">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                disabled={crud.isExporting || !buildings || buildings.length === 0}
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Exportar
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              <DropdownMenuItem onClick={() => crud.handleExport('excel', buildings ?? [])}>
-                <FileSpreadsheet className="h-4 w-4 mr-2" />
-                Exportar para Excel
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => crud.handleExport('csv', buildings ?? [])}>
-                <FileText className="h-4 w-4 mr-2" />
-                Exportar para CSV
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <Button onClick={crud.openCreateModal}>
-            <Plus className="h-4 w-4 mr-2" />
-            Novo Prédio
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        title="Prédios"
+        description="Gerencie os prédios do condomínio"
+        actions={
+          <>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  disabled={crud.isExporting || !buildings || buildings.length === 0}
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Exportar
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem onClick={() => crud.handleExport('excel', buildings ?? [])}>
+                  <FileSpreadsheet className="h-4 w-4 mr-2" />
+                  Exportar para Excel
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => crud.handleExport('csv', buildings ?? [])}>
+                  <FileText className="h-4 w-4 mr-2" />
+                  Exportar para CSV
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button onClick={crud.openCreateModal}>
+              <Plus className="h-4 w-4 mr-2" />
+              Novo Prédio
+            </Button>
+          </>
+        }
+      />
 
       {error && !buildings && (
         <Alert variant="destructive" className="mb-4">

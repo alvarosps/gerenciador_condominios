@@ -1,8 +1,7 @@
 'use client';
 
 import { CreditCard, Droplets, Landmark, ShoppingBag, Repeat } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
+import { StatCard } from '@/components/ui/stat-card';
 import { formatCurrency } from '@/lib/utils/formatters';
 import type { MonthlyPurchasesResponse } from '@/lib/api/hooks/use-monthly-purchases';
 
@@ -49,15 +48,7 @@ export function PurchaseSummaryCards({ data, isLoading }: PurchaseSummaryCardsPr
     return (
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
         {TYPE_CONFIG.map((config) => (
-          <Card key={config.key}>
-            <CardHeader className="pb-2">
-              <Skeleton className="h-4 w-24" />
-            </CardHeader>
-            <CardContent>
-              <Skeleton className="h-6 w-20 mb-1" />
-              <Skeleton className="h-3 w-12" />
-            </CardContent>
-          </Card>
+          <StatCard key={config.key} label="" value="" subLabel="" loading />
         ))}
       </div>
     );
@@ -69,20 +60,13 @@ export function PurchaseSummaryCards({ data, isLoading }: PurchaseSummaryCardsPr
         const group = data?.[config.key];
         const Icon = config.icon;
         return (
-          <Card key={config.key} className="hover:shadow-md transition-shadow">
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                <Icon className={`h-4 w-4 ${config.colorClass}`} />
-                {config.label}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-xl font-bold">{formatCurrency(group?.total ?? 0)}</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                {group?.count ?? 0} {(group?.count ?? 0) === 1 ? 'item' : 'itens'}
-              </p>
-            </CardContent>
-          </Card>
+          <StatCard
+            key={config.key}
+            label={config.label}
+            value={formatCurrency(group?.total ?? 0)}
+            icon={<Icon className={`h-4 w-4 ${config.colorClass}`} />}
+            subLabel={`${group?.count ?? 0} ${(group?.count ?? 0) === 1 ? 'item' : 'itens'}`}
+          />
         );
       })}
     </div>

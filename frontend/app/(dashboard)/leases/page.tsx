@@ -46,6 +46,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { DataTable } from '@/components/tables/data-table';
+import { PageHeader } from '@/components/layouts/page-header';
 import { SearchableSelect, type SearchableSelectOption } from '@/components/ui/searchable-select';
 import { createLeaseColumns, getLeaseStatus } from './_components/lease-table-columns';
 import { LeaseDeleteDialog, LeaseBulkDeleteDialog } from './_components/lease-dialogs';
@@ -286,42 +287,39 @@ export default function LeasesPage() {
 
   return (
     <div>
-      {/* Header */}
-      <div className="mb-4 flex justify-between items-center flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">Locações</h1>
-          <p className="text-muted-foreground mt-1">
-            Gerencie os contratos de locação dos apartamentos
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                disabled={crud.isExporting || !leases || leases.length === 0}
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Exportar
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              <DropdownMenuItem onClick={() => crud.handleExport('excel', leases ?? [])}>
-                <FileSpreadsheet className="h-4 w-4 mr-2" />
-                Exportar para Excel
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => crud.handleExport('csv', leases ?? [])}>
-                <FileText className="h-4 w-4 mr-2" />
-                Exportar para CSV
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <Button onClick={crud.openCreateModal}>
-            <Plus className="h-4 w-4 mr-2" />
-            Nova Locação
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        title="Locações"
+        description="Gerencie os contratos de locação dos apartamentos"
+        actions={
+          <>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  disabled={crud.isExporting || !leases || leases.length === 0}
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Exportar
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem onClick={() => crud.handleExport('excel', leases ?? [])}>
+                  <FileSpreadsheet className="h-4 w-4 mr-2" />
+                  Exportar para Excel
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => crud.handleExport('csv', leases ?? [])}>
+                  <FileText className="h-4 w-4 mr-2" />
+                  Exportar para CSV
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button onClick={crud.openCreateModal}>
+              <Plus className="h-4 w-4 mr-2" />
+              Nova Locação
+            </Button>
+          </>
+        }
+      />
 
       {error && !leases && (
         <Alert variant="destructive" className="mb-4">

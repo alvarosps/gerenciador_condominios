@@ -26,6 +26,7 @@ import {
   type MonthSnapshotSummary,
 } from '@/lib/api/hooks/use-month-advance';
 import { formatCurrency, formatMonthYear } from '@/lib/utils/formatters';
+import { PageHeader } from '@/components/layouts/page-header';
 import { MonthStatusCard } from './_components/month-status-card';
 import { AdvanceDialog } from './_components/advance-dialog';
 import { RollbackDialog } from './_components/rollback-dialog';
@@ -33,8 +34,18 @@ import { SnapshotSummary } from './_components/snapshot-summary';
 import { SnapshotHistory } from './_components/snapshot-history';
 
 const MONTH_NAMES = [
-  'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-  'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
+  'Janeiro',
+  'Fevereiro',
+  'Março',
+  'Abril',
+  'Maio',
+  'Junho',
+  'Julho',
+  'Agosto',
+  'Setembro',
+  'Outubro',
+  'Novembro',
+  'Dezembro',
 ];
 
 function NextMonthPreviewCard({ year, month }: { year: number; month: number }) {
@@ -142,7 +153,7 @@ export default function MonthAdvancePage() {
 
   const { data: snapshotDetail, isLoading: isDetailLoading } = useMonthSnapshotDetail(
     selectedSnapshotYear,
-    selectedSnapshotMonth,
+    selectedSnapshotMonth
   );
 
   const advanceMutation = useAdvanceMonth();
@@ -173,7 +184,7 @@ export default function MonthAdvancePage() {
       await advanceMutation.mutateAsync({ year, month, force, notes });
       setAdvanceDialogOpen(false);
     },
-    [advanceMutation, year, month],
+    [advanceMutation, year, month]
   );
 
   const handleRollbackConfirm = useCallback(async () => {
@@ -193,44 +204,33 @@ export default function MonthAdvancePage() {
     .sort((a, b) => b.reference_month.localeCompare(a.reference_month))[0];
 
   const isLastFinalizedMonth =
-    lastFinalized?.reference_month ===
-    `${String(year)}-${String(month).padStart(2, '0')}-01`;
+    lastFinalized?.reference_month === `${String(year)}-${String(month).padStart(2, '0')}-01`;
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">Avanço de Mês</h1>
-          <p className="text-muted-foreground mt-1">
-            Finalize meses e gerencie o histórico financeiro
-          </p>
-        </div>
-
-        {/* Month Selector */}
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" onClick={goToPrevMonth} aria-label="Mês anterior">
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <span className="text-lg font-semibold min-w-[160px] text-center">
-            {monthLabel} {year}
-          </span>
-          <Button variant="outline" size="icon" onClick={goToNextMonth} aria-label="Próximo mês">
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        title="Avanço de Mês"
+        description="Finalize meses e gerencie o histórico financeiro"
+        actions={
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="icon" onClick={goToPrevMonth} aria-label="Mês anterior">
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-lg font-semibold min-w-[160px] text-center">
+              {monthLabel} {year}
+            </span>
+            <Button variant="outline" size="icon" onClick={goToNextMonth} aria-label="Próximo mês">
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        }
+      />
 
       {/* Main content grid */}
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Left column: Status + Actions */}
         <div className="space-y-4">
-          <MonthStatusCard
-            status={status}
-            isLoading={isStatusLoading}
-            year={year}
-            month={month}
-          />
+          <MonthStatusCard status={status} isLoading={isStatusLoading} year={year} month={month} />
 
           {/* Action Buttons */}
           <div className="flex gap-3">
@@ -285,9 +285,7 @@ export default function MonthAdvancePage() {
             </Card>
           )}
 
-          {snapshotDetail && !isDetailLoading && (
-            <SnapshotSummary snapshot={snapshotDetail} />
-          )}
+          {snapshotDetail && !isDetailLoading && <SnapshotSummary snapshot={snapshotDetail} />}
 
           {!selectedSnapshot && isCurrentMonthFinalized && status?.snapshot_id && (
             <Card>

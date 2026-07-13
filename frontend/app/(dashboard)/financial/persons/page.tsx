@@ -8,6 +8,7 @@ import { Plus, Pencil, Trash2, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { DataTable, type Column } from '@/components/tables/data-table';
 import { DeleteConfirmDialog } from '@/components/shared/delete-confirm-dialog';
+import { PageHeader } from '@/components/layouts/page-header';
 import { PersonFormModal } from './_components/person-form-modal';
 import { usePersons, useDeletePerson } from '@/lib/api/hooks/use-persons';
 import { type Person } from '@/lib/schemas/person.schema';
@@ -111,18 +112,16 @@ export default function PersonsPage() {
 
   return (
     <div>
-      <div className="mb-4 flex justify-between items-center flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">Pessoas</h1>
-          <p className="text-muted-foreground mt-1">
-            Gerencie pessoas, proprietários e seus cartões de crédito
-          </p>
-        </div>
-        <Button onClick={crud.openCreateModal}>
-          <Plus className="h-4 w-4 mr-2" />
-          Nova Pessoa
-        </Button>
-      </div>
+      <PageHeader
+        title="Pessoas"
+        description="Gerencie pessoas, proprietários e seus cartões de crédito"
+        actions={
+          <Button onClick={crud.openCreateModal}>
+            <Plus className="h-4 w-4 mr-2" />
+            Nova Pessoa
+          </Button>
+        }
+      />
 
       {error && !persons && (
         <Alert variant="destructive" className="mb-4">

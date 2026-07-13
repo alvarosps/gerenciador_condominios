@@ -49,6 +49,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { DataTable, type Column } from '@/components/tables/data-table';
+import { PageHeader } from '@/components/layouts/page-header';
 import { TenantFormWizard } from './_components/wizard';
 import { TenantLeaseModal } from './_components/tenant-lease-modal';
 import { ContractViewModal } from './_components/contract-view-modal';
@@ -342,39 +343,39 @@ export default function TenantsPage() {
 
   return (
     <div>
-      <div className="mb-4 flex justify-between items-center flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">Inquilinos</h1>
-          <p className="text-muted-foreground mt-1">Gerencie os inquilinos dos apartamentos</p>
-        </div>
-        <div className="flex gap-2">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                disabled={crud.isExporting || !tenants || tenants.length === 0}
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Exportar
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              <DropdownMenuItem onClick={() => crud.handleExport('excel', tenants ?? [])}>
-                <FileSpreadsheet className="h-4 w-4 mr-2" />
-                Exportar para Excel
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => crud.handleExport('csv', tenants ?? [])}>
-                <FileText className="h-4 w-4 mr-2" />
-                Exportar para CSV
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <Button onClick={crud.openCreateModal}>
-            <Plus className="h-4 w-4 mr-2" />
-            Novo Inquilino
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        title="Inquilinos"
+        description="Gerencie os inquilinos dos apartamentos"
+        actions={
+          <>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  disabled={crud.isExporting || !tenants || tenants.length === 0}
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Exportar
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem onClick={() => crud.handleExport('excel', tenants ?? [])}>
+                  <FileSpreadsheet className="h-4 w-4 mr-2" />
+                  Exportar para Excel
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => crud.handleExport('csv', tenants ?? [])}>
+                  <FileText className="h-4 w-4 mr-2" />
+                  Exportar para CSV
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button onClick={crud.openCreateModal}>
+              <Plus className="h-4 w-4 mr-2" />
+              Novo Inquilino
+            </Button>
+          </>
+        }
+      />
 
       {error && !tenants && (
         <Alert variant="destructive" className="mb-4">

@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { PageHeader } from '@/components/layouts/page-header';
 import { toast } from 'sonner';
 import {
   useFinancialSettings,
@@ -72,20 +73,15 @@ export default function FinancialSettingsPage() {
   };
 
   if (isLoading) {
-    return (
-      <div>
-        <h1 className="text-2xl font-bold">Configurações Financeiras</h1>
-        <p className="text-muted-foreground mt-1">Carregando...</p>
-      </div>
-    );
+    return <PageHeader title="Configurações Financeiras" description="Carregando..." />;
   }
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold">Configurações Financeiras</h1>
-        <p className="text-muted-foreground mt-1">Configure o saldo inicial e parâmetros do módulo financeiro</p>
-      </div>
+      <PageHeader
+        title="Configurações Financeiras"
+        description="Configure o saldo inicial e parâmetros do módulo financeiro"
+      />
 
       <div className="max-w-lg">
         <Form {...formMethods}>
@@ -118,11 +114,7 @@ export default function FinancialSettingsPage() {
                 <FormItem>
                   <FormLabel>Data do Saldo Inicial *</FormLabel>
                   <FormControl>
-                    <Input
-                      type="date"
-                      {...field}
-                      disabled={updateMutation.isPending || !isAdmin}
-                    />
+                    <Input type="date" {...field} disabled={updateMutation.isPending || !isAdmin} />
                   </FormControl>
                   <FormDescription>Data de referência do saldo inicial</FormDescription>
                   <FormMessage />

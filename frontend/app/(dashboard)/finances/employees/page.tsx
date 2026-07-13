@@ -13,6 +13,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { DataTable } from '@/components/tables/data-table';
+import { PageHeader } from '@/components/layouts/page-header';
 import { useDeleteEmployee, useEmployees } from '@/lib/api/hooks/use-employees';
 import { useAuthStore } from '@/store/auth-store';
 import { useCrudPage } from '@/lib/hooks/use-crud-page';
@@ -45,20 +46,18 @@ export default function EmployeesPage() {
 
   return (
     <div>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">Folha de Pagamento</h1>
-          <p className="mt-1 text-muted-foreground">
-            Gerencie os funcionários do condomínio e seus pagamentos
-          </p>
-        </div>
-        {isAdmin && (
-          <Button onClick={crud.openCreateModal}>
-            <Plus className="mr-2 h-4 w-4" />
-            Novo Funcionário
-          </Button>
-        )}
-      </div>
+      <PageHeader
+        title="Folha de Pagamento"
+        description="Gerencie os funcionários do condomínio e seus pagamentos"
+        actions={
+          isAdmin && (
+            <Button onClick={crud.openCreateModal}>
+              <Plus className="mr-2 h-4 w-4" />
+              Novo Funcionário
+            </Button>
+          )
+        }
+      />
 
       {!isLoading && (employees?.length ?? 0) === 0 ? (
         <p className="rounded-md border-2 border-dashed py-12 text-center text-sm text-muted-foreground">

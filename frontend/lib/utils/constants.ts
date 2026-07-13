@@ -45,6 +45,9 @@ export const TAG_FEES = {
 export const LATE_FEE_RATE = 0.05; // 5% per day
 export const DAYS_PER_MONTH = 30;
 
+/** Fallback color for expense categories without a user-defined color (gray-500). */
+export const DEFAULT_CATEGORY_COLOR = '#6B7280';
+
 export const ROUTES = {
   HOME: '/',
   DASHBOARD: '/',

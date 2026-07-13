@@ -37,6 +37,7 @@ import {
 } from '@/lib/api/hooks/use-expense-categories';
 import { type ExpenseCategory } from '@/lib/schemas/expense-category.schema';
 import { handleError } from '@/lib/utils/error-handler';
+import { DEFAULT_CATEGORY_COLOR } from '@/lib/utils/constants';
 
 interface CategoryFormModalProps {
   open: boolean;
@@ -62,7 +63,7 @@ export function CategoryFormModal({ open, category, onClose }: CategoryFormModal
   const isLoading = createMutation.isPending || updateMutation.isPending;
 
   const topLevelCategories = (allCategories ?? []).filter(
-    (cat) => !cat.parent && cat.id !== category?.id,
+    (cat) => !cat.parent && cat.id !== category?.id
   );
 
   const formMethods = useForm<CategoryFormValues>({
@@ -70,7 +71,7 @@ export function CategoryFormModal({ open, category, onClose }: CategoryFormModal
     defaultValues: {
       name: '',
       description: '',
-      color: '#6B7280',
+      color: DEFAULT_CATEGORY_COLOR,
       parent_id: null,
     },
   });
@@ -80,14 +81,14 @@ export function CategoryFormModal({ open, category, onClose }: CategoryFormModal
       formMethods.reset({
         name: category.name,
         description: category.description ?? '',
-        color: category.color ?? '#6B7280',
+        color: category.color ?? DEFAULT_CATEGORY_COLOR,
         parent_id: category.parent_id ?? null,
       });
     } else {
       formMethods.reset({
         name: '',
         description: '',
-        color: '#6B7280',
+        color: DEFAULT_CATEGORY_COLOR,
         parent_id: null,
       });
     }
@@ -145,7 +146,12 @@ export function CategoryFormModal({ open, category, onClose }: CategoryFormModal
                 <FormItem>
                   <FormLabel>Nome *</FormLabel>
                   <FormControl>
-                    <Input placeholder="Ex: Manutenção" maxLength={100} {...field} disabled={isLoading} />
+                    <Input
+                      placeholder="Ex: Manutenção"
+                      maxLength={100}
+                      {...field}
+                      disabled={isLoading}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -179,9 +185,14 @@ export function CategoryFormModal({ open, category, onClose }: CategoryFormModal
                   <FormLabel>Cor</FormLabel>
                   <FormControl>
                     <div className="flex items-center gap-3">
-                      <Input type="color" className="w-16 h-10 p-1 cursor-pointer" {...field} disabled={isLoading} />
                       <Input
-                        placeholder="#6B7280"
+                        type="color"
+                        className="w-16 h-10 p-1 cursor-pointer"
+                        {...field}
+                        disabled={isLoading}
+                      />
+                      <Input
+                        placeholder={DEFAULT_CATEGORY_COLOR}
                         maxLength={7}
                         {...field}
                         disabled={isLoading}

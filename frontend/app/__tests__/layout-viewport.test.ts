@@ -18,10 +18,10 @@ describe('layout viewport', () => {
     expect(viewport.viewportFit).toBe('cover');
   });
 
-  it('declares the teal themeColor (added in Session 28)', () => {
+  it('declares the teal themeColor derived from the --primary OKLCH token', () => {
     expect(viewport.themeColor).toEqual([
-      { media: '(prefers-color-scheme: light)', color: '#0d847a' },
-      { media: '(prefers-color-scheme: dark)', color: '#0d847a' },
+      { media: '(prefers-color-scheme: light)', color: '#008c6c' },
+      { media: '(prefers-color-scheme: dark)', color: '#008c6c' },
     ]);
   });
 });

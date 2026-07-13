@@ -4,6 +4,7 @@ import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Card, CardContent } from '@/components/ui/card';
 import { Loading } from '@/components/shared/loading';
+import { PageHeader } from '@/components/layouts/page-header';
 import { useAuthStore } from '@/store/auth-store';
 import {
   useCondoProjection,
@@ -43,14 +44,14 @@ export default function ProjectionPage() {
           setSimulationResult(null);
           toast.error('Erro ao executar a simulação. Tente novamente.');
         },
-      },
+      }
     );
   }
 
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <h1 className="text-3xl font-bold">Projeção do condomínio</h1>
+        <PageHeader title="Projeção do condomínio" />
         <Loading />
       </div>
     );
@@ -59,7 +60,7 @@ export default function ProjectionPage() {
   if (isError || !projection) {
     return (
       <div className="space-y-6">
-        <h1 className="text-3xl font-bold">Projeção do condomínio</h1>
+        <PageHeader title="Projeção do condomínio" />
         <p className="py-8 text-center text-muted-foreground">
           Erro ao carregar a projeção. Verifique se há dados financeiros cadastrados.
         </p>
@@ -69,7 +70,7 @@ export default function ProjectionPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold">Projeção do condomínio</h1>
+      <PageHeader title="Projeção do condomínio" />
 
       <ProjectionTable months={projection} />
       <ProjectionChart months={projection} />

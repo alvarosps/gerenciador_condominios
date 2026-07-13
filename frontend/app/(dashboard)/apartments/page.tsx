@@ -46,6 +46,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { DataTable, type Column } from '@/components/tables/data-table';
+import { PageHeader } from '@/components/layouts/page-header';
 import { ApartmentFormModal } from './_components/apartment-form-modal';
 import { useApartments, useDeleteApartment } from '@/lib/api/hooks/use-apartments';
 import { useBuildings } from '@/lib/api/hooks/use-buildings';
@@ -226,41 +227,39 @@ export default function ApartmentsPage() {
 
   return (
     <div>
-      <div className="mb-4 flex justify-between items-center flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">Apartamentos</h1>
-          <p className="text-muted-foreground mt-1">
-            Gerencie os apartamentos disponíveis para locação
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                disabled={crud.isExporting || !apartments || apartments.length === 0}
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Exportar
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              <DropdownMenuItem onClick={() => crud.handleExport('excel', apartments ?? [])}>
-                <FileSpreadsheet className="h-4 w-4 mr-2" />
-                Exportar para Excel
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => crud.handleExport('csv', apartments ?? [])}>
-                <FileText className="h-4 w-4 mr-2" />
-                Exportar para CSV
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <Button onClick={crud.openCreateModal}>
-            <Plus className="h-4 w-4 mr-2" />
-            Novo Apartamento
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        title="Apartamentos"
+        description="Gerencie os apartamentos disponíveis para locação"
+        actions={
+          <>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  disabled={crud.isExporting || !apartments || apartments.length === 0}
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Exportar
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem onClick={() => crud.handleExport('excel', apartments ?? [])}>
+                  <FileSpreadsheet className="h-4 w-4 mr-2" />
+                  Exportar para Excel
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => crud.handleExport('csv', apartments ?? [])}>
+                  <FileText className="h-4 w-4 mr-2" />
+                  Exportar para CSV
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button onClick={crud.openCreateModal}>
+              <Plus className="h-4 w-4 mr-2" />
+              Novo Apartamento
+            </Button>
+          </>
+        }
+      />
 
       {error && !apartments && (
         <Alert variant="destructive" className="mb-4">
