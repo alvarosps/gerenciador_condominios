@@ -80,6 +80,45 @@ class ExpenseService:
 
     @staticmethod
     @transaction.atomic
+    def create_with_installments(
+        *,
+        expense_data: dict[str, Any],
+        installments_data: list[dict[str, Any]],
+        user: User,
+    ) -> Expense:
+        """Create an Expense and its installments in a single atomic transaction.
+
+        Replaces the previous non-atomic "1 POST /expenses/ + N POSTs
+        /expense-installments/" client-side loop, which left an orphaned expense behind
+        on a mid-loop failure and duplicated installments on retry. Mirrors
+        ``rebuild_installments``'s bulk-write shape and ``generate_installments``'s
+        explicit cache invalidation (bulk_create bypasses post_save, so the
+        ExpenseInstallment save signal never fires).
+        """
+        expense = Expense.objects.create(**expense_data)
+
+        to_create = [
+            ExpenseInstallment(
+                expense=expense,
+                installment_number=inst["installment_number"],
+                total_installments=inst["total_installments"],
+                amount=inst["amount"],
+                due_date=inst["due_date"],
+                is_paid=inst.get("is_paid", False),
+                paid_date=inst.get("paid_date"),
+                created_by=user,
+                updated_by=user,
+            )
+            for inst in installments_data
+        ]
+        if to_create:
+            ExpenseInstallment.objects.bulk_create(to_create)
+            invalidate_legacy_financial_caches()
+
+        return expense
+
+    @staticmethod
+    @transaction.atomic
     def generate_installments(*, expense: Expense, start_date: date, user: User) -> Expense:
         """Generate the expense's installments, with the residual on the last parcel.
 

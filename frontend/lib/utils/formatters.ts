@@ -179,3 +179,29 @@ export function isDateStringBeforeToday(dateStr: string): boolean {
 export function isDateStringAfterToday(dateStr: string): boolean {
   return dateStr > getTodayLocalISO();
 }
+
+/**
+ * Add `n` months to a YYYY-MM-DD date string, using pure calendar arithmetic on the
+ * year/month/day components — never `Date`/`setMonth`/`toISOString`.
+ *
+ * The day is clamped to the last day of the target month (e.g. 31/01 + 1 month -> 28/02 or
+ * 29/02 in a leap year; 30/03 + 1 month -> 30/04), mirroring the backend's day-clamping
+ * (`RentScheduleService.clamp_due_day` / `finances/services/installment_plan_service.py::_schedule_due_dates`).
+ *
+ * `n` may be negative to go backward. Timezone-independent: `Date`/`setMonth` shift a UTC
+ * instant, which drifts a day in negative-offset timezones (e.g. Brazil UTC-3); this function
+ * only ever does integer arithmetic on the string's own year/month/day.
+ */
+export function addMonthsClamped(dateStr: string, n: number): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr);
+  if (!match) {
+    throw new Error(`addMonthsClamped: invalid date string "${dateStr}"`);
+  }
+  const [, yearStr, monthStr, dayStr] = match;
+  const totalMonths = Number(yearStr) * 12 + (Number(monthStr) - 1) + n;
+  const targetYear = Math.floor(totalMonths / 12);
+  const targetMonth = totalMonths - targetYear * 12; // 0-indexed
+  const lastDayOfTargetMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
+  const targetDay = Math.min(Number(dayStr), lastDayOfTargetMonth);
+  return `${String(targetYear)}-${String(targetMonth + 1).padStart(2, '0')}-${String(targetDay).padStart(2, '0')}`;
+}

@@ -201,6 +201,75 @@ class TestExpenseAPI:
         assert response.status_code == status.HTTP_201_CREATED
         assert response.data["bank_name"] == "Banco do Brasil"
 
+    def test_create_with_installments_data_is_atomic(
+        self, authenticated_api_client, person, credit_card, category
+    ):
+        """F2: POST /expenses/ accepts installments embedded via installments_data and
+        creates the expense + all installments in a single request/transaction — replacing
+        the old client-side "1 POST + N POSTs" loop that could leave an orphaned expense."""
+        data = {
+            "description": "TV Samsung",
+            "expense_type": "card_purchase",
+            "total_amount": "3600.00",
+            "expense_date": "2026-03-10",
+            "person_id": person.pk,
+            "credit_card_id": credit_card.pk,
+            "category_id": category.pk,
+            "is_installment": True,
+            "total_installments": 2,
+            "installments_data": [
+                {
+                    "installment_number": 1,
+                    "total_installments": 2,
+                    "amount": "1800.00",
+                    "due_date": "2026-04-10",
+                    "is_paid": False,
+                },
+                {
+                    "installment_number": 2,
+                    "total_installments": 2,
+                    "amount": "1800.00",
+                    "due_date": "2026-05-10",
+                    "is_paid": False,
+                },
+            ],
+        }
+        response = authenticated_api_client.post(self.url, data, format="json")
+        assert response.status_code == status.HTTP_201_CREATED
+        assert len(response.data["installments"]) == 2
+        assert "installments_data" not in response.data
+
+        created_expense = Expense.objects.get(pk=response.data["id"])
+        assert created_expense.installments.count() == 2
+
+    def test_create_with_invalid_installment_data_creates_nothing(
+        self, authenticated_api_client, person, credit_card, category
+    ):
+        """A malformed installment (missing required due_date) fails validation before any
+        write happens — no orphaned expense is left behind."""
+        data = {
+            "description": "TV Samsung",
+            "expense_type": "card_purchase",
+            "total_amount": "3600.00",
+            "expense_date": "2026-03-10",
+            "person_id": person.pk,
+            "credit_card_id": credit_card.pk,
+            "category_id": category.pk,
+            "is_installment": True,
+            "total_installments": 1,
+            "installments_data": [
+                {
+                    "installment_number": 1,
+                    "total_installments": 1,
+                    "amount": "3600.00",
+                    # due_date intentionally omitted
+                },
+            ],
+        }
+        response = authenticated_api_client.post(self.url, data, format="json")
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert not Expense.objects.filter(description="TV Samsung").exists()
+
     def test_retrieve_expense_with_installments(
         self, authenticated_api_client, expense_with_installments
     ):

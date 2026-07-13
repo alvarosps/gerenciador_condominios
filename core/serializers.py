@@ -1,11 +1,12 @@
 from datetime import date
 from decimal import Decimal
-from typing import Any
+from typing import Any, cast
 
-from django.contrib.auth import get_user_model
+from django.contrib.auth.models import User
 from django.utils import timezone
 from rest_framework import serializers
 
+from core.services.expense_service import ExpenseService
 from core.validators import BrazilianPhoneValidator, CNPJValidator, CPFValidator, validate_due_day
 from core.validators.upload import validate_proof_file
 
@@ -37,8 +38,6 @@ from .models import (
     RentPayment,
     Tenant,
 )
-
-User = get_user_model()
 
 # Mirrors the DB UniqueConstraint (unique_active_lease_per_apartment, condition is_deleted=False):
 # an apartment may have at most one active (non-soft-deleted) lease. Surfaced as a clean 400
@@ -853,6 +852,22 @@ class ExpenseInstallmentSerializer(FinalizedMonthProtectionMixin, serializers.Mo
         return None
 
 
+class ExpenseInstallmentInputSerializer(serializers.Serializer):
+    """Write-only shape for installments embedded in ``ExpenseSerializer.installments_data``.
+
+    Mirrors ``ExpenseInstallmentSerializer``'s writable fields, minus ``expense``/``id``
+    (the expense does not exist yet at validation time — ``ExpenseService.create_with_installments``
+    assigns it after creating the parent row).
+    """
+
+    installment_number = serializers.IntegerField(min_value=1)
+    total_installments = serializers.IntegerField(min_value=1)
+    amount = serializers.DecimalField(max_digits=12, decimal_places=2)
+    due_date = serializers.DateField()
+    is_paid = serializers.BooleanField(default=False)
+    paid_date = serializers.DateField(required=False, allow_null=True, default=None)
+
+
 class ExpenseSerializer(serializers.ModelSerializer):
     person = PersonSimpleSerializer(read_only=True)
     person_id = serializers.PrimaryKeyRelatedField(
@@ -887,6 +902,15 @@ class ExpenseSerializer(serializers.ModelSerializer):
         allow_null=True,
     )
     installments = ExpenseInstallmentSerializer(many=True, read_only=True)
+    # Write-only counterpart of the read-only "installments" list above — named distinctly
+    # (installments_data, not installments/installment_ids) because DRF/Python cannot declare
+    # two class attributes with the same name, and the read field already carries id/expense/
+    # is_overdue, which do not exist yet at input time. Consumed by create() to build the
+    # expense + all installments in a single atomic transaction (P: F2 non-atomic parceled
+    # creation fix) instead of the previous "POST expense, then N POSTs per installment" flow.
+    installments_data = ExpenseInstallmentInputSerializer(
+        many=True, write_only=True, required=False
+    )
     remaining_installments = serializers.SerializerMethodField()
     total_paid = serializers.SerializerMethodField()
     total_remaining = serializers.SerializerMethodField()
@@ -921,6 +945,7 @@ class ExpenseSerializer(serializers.ModelSerializer):
             "interest_rate",
             "notes",
             "installments",
+            "installments_data",
             "remaining_installments",
             "total_paid",
             "total_remaining",
@@ -928,6 +953,16 @@ class ExpenseSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
+
+    def create(self, validated_data: dict[str, Any]) -> Expense:
+        installments_data = validated_data.pop("installments_data", [])
+        if not installments_data:
+            return Expense.objects.create(**validated_data)
+        return ExpenseService.create_with_installments(
+            expense_data=validated_data,
+            installments_data=installments_data,
+            user=cast(User, validated_data["created_by"]),
+        )
 
     def get_remaining_installments(self, obj: Expense) -> int:
         # Iterate the prefetched installments (ExpenseViewSet prefetches them) instead of a

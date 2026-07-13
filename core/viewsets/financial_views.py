@@ -9,7 +9,7 @@ from django.db import transaction
 from django.db.models import QuerySet
 from django.http import QueryDict
 from django.utils import timezone
-from rest_framework import status, viewsets
+from rest_framework import serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -142,6 +142,11 @@ class FinancialSettingsViewSet(viewsets.ViewSet):
 class ExpenseViewSet(viewsets.ModelViewSet):
     serializer_class = ExpenseSerializer
     permission_classes = [IsAdminUser]
+
+    def perform_create(self, serializer: serializers.BaseSerializer[Expense]) -> None:
+        """Pass the requesting user through so ExpenseSerializer.create() can attribute
+        installments created via the atomic installments_data path (created_by/updated_by)."""
+        serializer.save(created_by=cast(User, self.request.user))
 
     def get_queryset(self) -> QuerySet[Expense]:
         queryset = Expense.objects.select_related(

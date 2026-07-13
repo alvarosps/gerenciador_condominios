@@ -2,11 +2,12 @@ from datetime import date
 from decimal import Decimal
 
 import pytest
+from django.db import IntegrityError
 from model_bakery import baker
 
-from core.models import ExpenseInstallment
+from core.models import Expense, ExpenseInstallment
 from core.services.expense_service import ExpenseService
-from tests.factories import make_credit_card, make_expense
+from tests.factories import make_credit_card, make_expense, make_person
 
 pytestmark = [pytest.mark.django_db, pytest.mark.unit]
 
@@ -223,3 +224,111 @@ class TestExpenseServiceGenerateInstallments:
         patterns = [call.args[0] for call in spy.call_args_list]
         assert "cash-flow*" in patterns
         assert "financial-dashboard*" in patterns
+
+
+class TestExpenseServiceCreateWithInstallments:
+    """F2: single-transaction creation of an Expense + its installments, replacing the
+    previous frontend "1 POST /expenses/ + N POSTs /expense-installments/" loop, which left
+    an orphaned expense behind on a mid-loop failure."""
+
+    def test_creates_expense_and_all_installments(self, admin_user, person):
+        installments_data = [
+            {
+                "installment_number": 1,
+                "total_installments": 2,
+                "amount": Decimal("150.00"),
+                "due_date": date(2026, 4, 10),
+                "is_paid": False,
+            },
+            {
+                "installment_number": 2,
+                "total_installments": 2,
+                "amount": Decimal("150.00"),
+                "due_date": date(2026, 5, 10),
+                "is_paid": False,
+            },
+        ]
+
+        expense = ExpenseService.create_with_installments(
+            expense_data={
+                "description": "Compra parcelada",
+                "expense_type": "personal_loan",
+                "total_amount": Decimal("300.00"),
+                "expense_date": date(2026, 4, 10),
+                "person": person,
+                "is_installment": True,
+                "total_installments": 2,
+            },
+            installments_data=installments_data,
+            user=admin_user,
+        )
+
+        assert Expense.objects.filter(pk=expense.pk).exists()
+        created = ExpenseInstallment.objects.filter(expense=expense).order_by("installment_number")
+        assert created.count() == 2
+        assert list(created.values_list("amount", flat=True)) == [
+            Decimal("150.00"),
+            Decimal("150.00"),
+        ]
+        assert all(i.created_by_id == admin_user.pk for i in created)
+
+    def test_no_installments_creates_bare_expense(self, admin_user, person):
+        expense = ExpenseService.create_with_installments(
+            expense_data={
+                "description": "Sem parcelas",
+                "expense_type": "one_time_expense",
+                "total_amount": Decimal("50.00"),
+                "expense_date": date(2026, 4, 10),
+                "person": person,
+            },
+            installments_data=[],
+            user=admin_user,
+        )
+
+        assert Expense.objects.filter(pk=expense.pk).exists()
+        assert ExpenseInstallment.objects.filter(expense=expense).count() == 0
+
+    def test_invalid_installment_rolls_back_the_whole_expense(self, admin_user, person):
+        """Regression for the non-atomic create: a failure while writing installments (here,
+        a duplicate installment_number violating unique_active_expense_installment) must roll
+        back the just-created Expense too — never leave an orphaned parent row behind."""
+        installments_data = [
+            {
+                "installment_number": 1,
+                "total_installments": 2,
+                "amount": Decimal("150.00"),
+                "due_date": date(2026, 4, 10),
+                "is_paid": False,
+            },
+            {
+                "installment_number": 1,  # duplicate -> violates the unique constraint
+                "total_installments": 2,
+                "amount": Decimal("150.00"),
+                "due_date": date(2026, 5, 10),
+                "is_paid": False,
+            },
+        ]
+        expenses_before = Expense.objects.count()
+
+        with pytest.raises(IntegrityError):
+            ExpenseService.create_with_installments(
+                expense_data={
+                    "description": "Compra que vai falhar",
+                    "expense_type": "personal_loan",
+                    "total_amount": Decimal("300.00"),
+                    "expense_date": date(2026, 4, 10),
+                    "person": person,
+                    "is_installment": True,
+                    "total_installments": 2,
+                },
+                installments_data=installments_data,
+                user=admin_user,
+            )
+
+        assert Expense.objects.count() == expenses_before
+        assert not Expense.objects.filter(description="Compra que vai falhar").exists()
+
+
+@pytest.fixture
+def person(admin_user):
+    return make_person(user=admin_user, name="Fulano de Tal")
