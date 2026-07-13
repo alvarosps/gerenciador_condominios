@@ -11,7 +11,7 @@ from django.db.models import Count, DateField, Q, QuerySet
 from django.db.models.expressions import RawSQL
 from django.http import FileResponse, HttpResponseBase
 from django.utils import timezone
-from rest_framework import serializers, status, viewsets
+from rest_framework import filters, serializers, status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.request import Request
@@ -92,6 +92,10 @@ class BuildingViewSet(viewsets.ModelViewSet):
     queryset = Building.objects.all().order_by("id")
     serializer_class = BuildingSerializer
     permission_classes = [IsAdminUser]
+    filter_backends = [filters.SearchFilter]
+    # Building has no street_name field — name/address/street_number are the real fields
+    # that identify a building for search purposes.
+    search_fields = ["name", "address", "street_number"]
 
     def get_queryset(self) -> QuerySet[Building]:
         """
@@ -122,6 +126,8 @@ class FurnitureViewSet(viewsets.ModelViewSet):
     queryset = Furniture.objects.all().order_by("id")
     serializer_class = FurnitureSerializer
     permission_classes = [IsAdminUser]
+    filter_backends = [filters.SearchFilter]
+    search_fields = ["name"]
 
 
 class ApartmentViewSet(viewsets.ModelViewSet):
@@ -145,6 +151,8 @@ class ApartmentViewSet(viewsets.ModelViewSet):
     queryset = Apartment.objects.all().order_by("id")
     serializer_class = ApartmentSerializer
     permission_classes = [IsAdminUser]
+    filter_backends = [filters.SearchFilter]
+    search_fields = ["number", "building__name"]
 
     def get_queryset(self) -> QuerySet[Apartment]:
         """
@@ -306,6 +314,8 @@ class LeaseViewSet(viewsets.ModelViewSet):
     queryset = Lease.objects.all().order_by("id")
     serializer_class = LeaseSerializer
     permission_classes = [CanModifyLease]
+    filter_backends = [filters.SearchFilter]
+    search_fields = ["responsible_tenant__name", "apartment__number"]
 
     def perform_create(self, serializer: serializers.BaseSerializer[Lease]) -> None:
         """Delegate lease creation to LeaseCreationService (business logic out of the serializer)."""

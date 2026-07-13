@@ -9,6 +9,7 @@ from rest_framework import status
 
 from finances.models import BillingAccount
 from tests.factories import make_billing_account, make_lease
+from tests.utils import flush_on_commit_callbacks
 
 pytestmark = [pytest.mark.integration, pytest.mark.django_db]
 
@@ -126,9 +127,13 @@ def test_projection_cached_and_invalidated(authenticated_api_client):
     BillingAccount.objects.filter(pk=account.pk).update(expected_amount=Decimal("500.00"))
     cached = authenticated_api_client.get(url)
     assert cached.data[1]["expenses_total"] == "100.00"
-    # a normal save fires the finance-* signal → cache invalidated → fresh value
+    # a normal save fires the finance-* signal → cache invalidated → fresh value.
+    # CacheManager.invalidate_pattern defers its real deletion to transaction.on_commit (P4.2
+    # item (d)), which pytest-django's per-test wrapping transaction never fires on its own —
+    # flush it explicitly, mirroring what a real commit (between two separate requests) does.
     account.refresh_from_db()
     account.save()
+    flush_on_commit_callbacks()
     fresh = authenticated_api_client.get(url)
     assert fresh.data[1]["expenses_total"] == "500.00"
 

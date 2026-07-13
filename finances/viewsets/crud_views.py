@@ -25,7 +25,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.serializers import BaseSerializer
 
-from core.pagination import CustomPageNumberPagination, LargePageNumberPagination
+from core.pagination import CustomPageNumberPagination
 from core.permissions import IsAdminUser
 from core.services.timezone import today_sp
 from finances.models import (
@@ -309,11 +309,10 @@ def _parse_lines(
 class BillViewSet(viewsets.ModelViewSet):
     serializer_class = BillSerializer
     permission_classes = [IsAdminUser]
-    # The Contas UI groups ALL bills per building (no page slicing). Keep the paginated
-    # {results, count} envelope (consumers/tests rely on it) but lift the cap so page_size=10000
-    # returns every bill in one page (CustomPageNumberPagination's max_page_size=500 would silently
-    # drop bills beyond 500).
-    pagination_class = LargePageNumberPagination
+    # The Contas UI groups ALL bills per building (no page slicing) and relies on
+    # page_size=10000 returning every bill in one page — CustomPageNumberPagination's
+    # max_page_size is 10000 (A3), so no dedicated "large" pagination class is needed here.
+    pagination_class = CustomPageNumberPagination
 
     def get_queryset(self) -> QuerySet[Bill]:
         queryset = Bill.objects.with_amounts(today_sp()).with_list_relations()

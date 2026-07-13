@@ -200,3 +200,26 @@ class TestExpenseServiceGenerateInstallments:
             .values_list("due_date", flat=True)
         )
         assert due_days == [date(2026, 1, 20), date(2026, 2, 20), date(2026, 3, 20)]
+
+    def test_bulk_create_invalidates_financial_caches(self, admin_user, mocker):
+        """B17(a) regression: bulk_create() bypasses post_save, so
+        signals.invalidate_expense_installment_cache_on_save never fires — the service must
+        invalidate the same real prefixes explicitly (invalidate_legacy_financial_caches),
+        not leave the caches stale until the TTL."""
+        from core.cache import CacheManager
+
+        expense = make_expense(
+            user=admin_user,
+            total_amount=Decimal("90.00"),
+            is_installment=True,
+            total_installments=3,
+        )
+        spy = mocker.spy(CacheManager, "invalidate_pattern")
+
+        ExpenseService.generate_installments(
+            expense=expense, start_date=date(2026, 1, 20), user=admin_user
+        )
+
+        patterns = [call.args[0] for call in spy.call_args_list]
+        assert "cash-flow*" in patterns
+        assert "financial-dashboard*" in patterns

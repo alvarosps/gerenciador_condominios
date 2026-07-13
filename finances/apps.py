@@ -11,9 +11,11 @@ class FinancesConfig(AppConfig):
     name = "finances"
 
     def ready(self) -> None:
-        """Import signal handlers when the app is ready."""
-        try:
-            importlib.import_module(".signals", package="finances")
-            logger.info("Finances app signals registered successfully")
-        except Exception:
-            logger.exception("Error registering finances signals")
+        """Import signal handlers when the app is ready.
+
+        A failure here means cache invalidation is silently broken app-wide (every finance
+        write would leave stale finance-* caches with no error surfaced) — this must fail
+        loud at startup, not be swallowed into a log line.
+        """
+        importlib.import_module(".signals", package="finances")
+        logger.info("Finances app signals registered successfully")

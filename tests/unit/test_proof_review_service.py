@@ -105,9 +105,8 @@ class TestProofReviewServiceRentPayment:
 
         ProofReviewService.review(proof=proof, action="approve", reason="", user=admin_user)
 
-        payments = RentPayment.objects.filter(lease=lease, reference_month=date(2026, 3, 1))
-        assert payments.count() == 1
-        assert payments.first().payment_date == date(2026, 3, 5)
+        payment = RentPayment.objects.get(lease=lease, reference_month=date(2026, 3, 1))
+        assert payment.payment_date == date(2026, 3, 5)
 
     def test_reject_does_not_create_rent_payment(self, admin_user) -> None:
         proof = _make_proof()

@@ -383,14 +383,20 @@ def test_anonymous_is_unauthorized(api_client) -> None:
 
 def test_plan_write_invalidates_finance_cache(authenticated_api_client) -> None:
     # LocMem cache: invalidation is asserted by a probe key disappearing after the write
-    # (same pattern as test_finance_cache_signals; no internal mocking).
+    # (same pattern as test_finance_cache_signals; no internal mocking). The probe is
+    # registered via set_tracked_cache_probe (not a bare cache.set) because P4.2 item (e)'s
+    # LocMem fallback only deletes keys it knows @cache_result created; and
+    # CacheManager.invalidate_pattern defers the real deletion to transaction.on_commit
+    # (P4.2 item (d)), which pytest-django's wrapping transaction never fires on its own —
+    # flush_on_commit_callbacks runs it explicitly.
     from django.core.cache import cache
 
     from finances.cache import FINANCE_CACHE_PREFIXES
+    from tests.utils import flush_on_commit_callbacks, set_tracked_cache_probe
 
     condo = make_condominium()
     for prefix in FINANCE_CACHE_PREFIXES:
-        cache.set(f"{prefix}:probe", "x")
+        set_tracked_cache_probe(f"{prefix}:probe")
     authenticated_api_client.post(
         PLANS_URL,
         {
@@ -403,4 +409,5 @@ def test_plan_write_invalidates_finance_cache(authenticated_api_client) -> None:
         },
         format="json",
     )
+    flush_on_commit_callbacks()
     assert all(cache.get(f"{prefix}:probe") is None for prefix in FINANCE_CACHE_PREFIXES)

@@ -200,6 +200,82 @@ class TestCacheManager:
 
 
 @pytest.mark.unit
+class TestInvalidatePatternLocmemSelective:
+    """B17(e): the non-Redis (LocMemCache) fallback must delete only the keys it registered
+    via @cache_result and matching the given prefix — it must NEVER cache.clear() the whole
+    store, which would also wipe unrelated keys such as the DRF throttle counters on every
+    unrelated cache write. A simulated throttle key (set directly via cache.set, mirroring how
+    rest_framework.throttling writes its counters — never through cache_result) proves the
+    fallback leaves non-tracked keys untouched."""
+
+    @override_settings(CACHES=LOCMEM_CACHE)
+    def test_fallback_deletes_only_matching_tracked_prefix(self):
+        from django.core.cache import cache
+
+        @cache_result(timeout=60, key_prefix="dashboard-financial-summary")
+        def summary():
+            return "stale"
+
+        @cache_result(timeout=60, key_prefix="dashboard-lease-metrics")
+        def metrics():
+            return "unrelated-but-matches-nothing"
+
+        summary()
+        metrics()
+        # Simulates a DRF throttle counter key — written directly, never via cache_result.
+        cache.set("throttle_anon_1.2.3.4", "5")
+
+        count = CacheManager._invalidate_pattern_now("dashboard-financial-summary*")
+
+        assert count == 1
+        assert cache.get("dashboard-financial-summary") is None
+        # The simulated throttle counter must survive — proves this is NOT cache.clear().
+        assert cache.get("throttle_anon_1.2.3.4") == "5"
+        assert cache.get("dashboard-lease-metrics") == "unrelated-but-matches-nothing"
+
+    @override_settings(CACHES=LOCMEM_CACHE)
+    def test_fallback_never_clears_whole_cache(self):
+        from django.core.cache import cache
+
+        cache.set("throttle_anon_9.9.9.9", "1")
+        cache.set("some-unrelated-app-key", "value")
+
+        CacheManager._invalidate_pattern_now("dashboard-financial-summary*")
+
+        # No tracked keys match the pattern — the throttle/unrelated keys must be untouched,
+        # proving the old cache.clear() fallback (P4.2 regression) has not come back.
+        assert cache.get("throttle_anon_9.9.9.9") == "1"
+        assert cache.get("some-unrelated-app-key") == "value"
+
+    @pytest.mark.django_db
+    @override_settings(CACHES=LOCMEM_CACHE)
+    def test_invalidate_pattern_defers_deletion_to_on_commit(
+        self, django_capture_on_commit_callbacks
+    ):
+        """B17(d): invalidate_pattern() defers the real deletion to transaction.on_commit
+        (so a concurrent read inside the same transaction cannot re-populate the cache with
+        pre-commit data). Inside an atomic block the key must still be present immediately
+        after the call, and only disappear once the on_commit callback actually runs."""
+        from django.core.cache import cache
+
+        @cache_result(timeout=60, key_prefix="dashboard-financial-summary")
+        def summary():
+            return "stale"
+
+        summary()
+
+        with django_capture_on_commit_callbacks(execute=False):
+            CacheManager.invalidate_pattern("dashboard-financial-summary*")
+            # Deferred — the on_commit callback has not run yet, so the key must still exist.
+            assert cache.get("dashboard-financial-summary") == "stale"
+
+        with django_capture_on_commit_callbacks(execute=True):
+            CacheManager.invalidate_pattern("dashboard-financial-summary*")
+
+        assert cache.get("dashboard-financial-summary") is None
+
+
+@pytest.mark.unit
 class TestGetCacheKeyWithModelInstance:
     """Covers lines 72, 79: Model instance handling in get_cache_key."""
 
@@ -254,12 +330,17 @@ class TestCacheManagerInvalidateWithRedis:
 
     @override_settings(CACHES=REDIS_CACHE)
     def test_invalidate_pattern_with_redis_deletes_matching_keys(self, mocker):
-        """Covers lines 239-242: keys found and deleted."""
+        """Covers lines 239-242: keys found and deleted.
+
+        invalidate_pattern() itself always returns 0 immediately (the real deletion is
+        deferred to transaction.on_commit — P4.2 item (d)); the count is only observable
+        from the deferred worker, _invalidate_pattern_now.
+        """
         mock_redis = mocker.MagicMock()
         mock_redis.scan.return_value = (0, [b"condominios:1:SomeModel:1"])
         mock_redis.delete.return_value = 1
         mocker.patch("core.cache.get_redis_connection", return_value=mock_redis)
-        count = CacheManager.invalidate_pattern("*SomeModel*")
+        count = CacheManager._invalidate_pattern_now("*SomeModel*")
         assert count == 1
 
     @override_settings(CACHES=LOCMEM_CACHE)

@@ -10,6 +10,7 @@ from django.contrib.auth.models import User
 from django.db import transaction
 from rest_framework import serializers
 
+from core.cache import invalidate_legacy_financial_caches
 from core.models import Expense, ExpenseInstallment
 
 _CENTS = Decimal("0.01")
@@ -120,4 +121,10 @@ class ExpenseService:
                 )
             )
         ExpenseInstallment.objects.bulk_create(installments)
+        # bulk_create bypasses post_save, so it never fires
+        # signals.invalidate_expense_installment_cache_on_save — invalidate explicitly with the
+        # same mapping the signal uses (ExpenseInstallment -> _invalidate_financial_caches ->
+        # invalidate_legacy_financial_caches), so newly generated installments are reflected
+        # immediately in cash-flow / financial-dashboard / finance-* instead of waiting out the TTL.
+        invalidate_legacy_financial_caches()
         return expense
