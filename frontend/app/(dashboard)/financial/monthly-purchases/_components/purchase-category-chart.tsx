@@ -3,13 +3,14 @@
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatCurrency } from '@/lib/utils/formatters';
+import { chartColor } from '@/lib/utils/chart-colors';
 import type { MonthlyPurchaseCategoryBreakdown } from '@/lib/api/hooks/use-monthly-purchases';
 
 interface PurchaseCategoryChartProps {
   data: MonthlyPurchaseCategoryBreakdown[];
 }
 
-const NO_CATEGORY_COLOR = '#9CA3AF';
+const NO_CATEGORY_COLOR = chartColor(0);
 
 function toPieData(data: MonthlyPurchaseCategoryBreakdown[]) {
   return data.map((item) => ({
@@ -38,7 +39,9 @@ function CustomTooltip({
 
   return (
     <div className="bg-card border rounded-lg shadow-lg p-3">
-      <p className="font-medium" style={{ color: item.color }}>{item.name}</p>
+      <p className="font-medium" style={{ color: item.color }}>
+        {item.name}
+      </p>
       <p className="text-sm">
         <span className="text-muted-foreground">Valor: </span>
         <span className="font-bold">{formatCurrency(item.value)}</span>
@@ -63,7 +66,9 @@ export function PurchaseCategoryChart({ data }: PurchaseCategoryChartProps) {
           <CardTitle>Por Categoria</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-center text-muted-foreground py-8">Nenhuma compra registrada neste mês</p>
+          <p className="text-center text-muted-foreground py-8">
+            Nenhuma compra registrada neste mês
+          </p>
         </CardContent>
       </Card>
     );

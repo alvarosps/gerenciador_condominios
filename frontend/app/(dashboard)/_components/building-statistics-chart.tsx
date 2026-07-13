@@ -15,6 +15,7 @@ import {
 } from 'recharts';
 import { useDashboardBuildingStatistics } from '@/lib/api/hooks/use-dashboard';
 import { formatCurrency } from '@/lib/utils/formatters';
+import { chartColor } from '@/lib/utils/chart-colors';
 
 interface ChartDataItem {
   name: string;
@@ -47,9 +48,7 @@ export function BuildingStatisticsChart() {
           <CardTitle>Estatísticas por Prédio</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-center text-muted-foreground py-8">
-            Erro ao carregar estatísticas
-          </p>
+          <p className="text-center text-muted-foreground py-8">Erro ao carregar estatísticas</p>
         </CardContent>
       </Card>
     );
@@ -62,18 +61,15 @@ export function BuildingStatisticsChart() {
           <CardTitle>Estatísticas por Prédio</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-center text-muted-foreground py-8">
-            Nenhum prédio cadastrado
-          </p>
+          <p className="text-center text-muted-foreground py-8">Nenhum prédio cadastrado</p>
         </CardContent>
       </Card>
     );
   }
 
   const chartData: ChartDataItem[] = data.map((stat) => {
-    const revenue = typeof stat.total_revenue === 'string'
-      ? parseFloat(stat.total_revenue)
-      : stat.total_revenue;
+    const revenue =
+      typeof stat.total_revenue === 'string' ? parseFloat(stat.total_revenue) : stat.total_revenue;
     return {
       name: `Prédio ${stat.building_number}`,
       'Ocupação (%)': Number(stat.occupancy_rate.toFixed(1)),
@@ -82,8 +78,6 @@ export function BuildingStatisticsChart() {
       alugados: stat.rented_apartments,
     };
   });
-
-  const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
   const CustomTooltip = ({
     active,
@@ -109,9 +103,7 @@ export function BuildingStatisticsChart() {
           </p>
           <p className="text-sm">
             <span className="text-muted-foreground">Ocupação: </span>
-            <span className="font-medium text-info">
-              {dataItem['Ocupação (%)']}%
-            </span>
+            <span className="font-medium text-info">{dataItem['Ocupação (%)']}%</span>
           </p>
           <p className="text-sm">
             <span className="text-muted-foreground">Receita: </span>
@@ -156,15 +148,15 @@ export function BuildingStatisticsChart() {
             />
             <Tooltip content={<CustomTooltip />} />
             <Legend />
-            <Bar yAxisId="left" dataKey="Ocupação (%)" fill="#3b82f6" radius={[8, 8, 0, 0]}>
+            <Bar yAxisId="left" dataKey="Ocupação (%)" fill={chartColor(0)} radius={[8, 8, 0, 0]}>
               {chartData.map((_entry, index) => (
-                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                <Cell key={`cell-${index}`} fill={chartColor(index)} />
               ))}
             </Bar>
             <Bar
               yAxisId="right"
               dataKey="Receita (R$ mil)"
-              fill="#10b981"
+              fill={chartColor(1)}
               radius={[8, 8, 0, 0]}
             />
           </BarChart>
@@ -192,9 +184,10 @@ export function BuildingStatisticsChart() {
               <div className="text-2xl font-bold text-primary">
                 {formatCurrency(
                   data.reduce((sum, b) => {
-                    const revenue = typeof b.total_revenue === 'string'
-                      ? parseFloat(b.total_revenue)
-                      : b.total_revenue;
+                    const revenue =
+                      typeof b.total_revenue === 'string'
+                        ? parseFloat(b.total_revenue)
+                        : b.total_revenue;
                     return sum + revenue;
                   }, 0)
                 )}

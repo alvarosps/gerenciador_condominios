@@ -14,6 +14,7 @@ import {
 import { type ExpenseCategory } from '@/lib/schemas/expense-category.schema';
 import { useCrudPage } from '@/lib/hooks/use-crud-page';
 import { useAuthStore } from '@/store/auth-store';
+import { DEFAULT_CATEGORY_COLOR } from '@/lib/utils/constants';
 
 interface FlatCategory {
   [key: string]: unknown;
@@ -111,7 +112,7 @@ export default function CategoriesPage() {
         <div className="flex items-center gap-2">
           <div
             className="w-6 h-6 rounded border"
-            style={{ backgroundColor: record.color ?? '#6B7280' }}
+            style={{ backgroundColor: record.color ?? DEFAULT_CATEGORY_COLOR }}
           />
         </div>
       ),

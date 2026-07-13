@@ -37,6 +37,7 @@ import {
 } from '@/lib/api/hooks/use-finance-categories';
 import { type FinanceCategory } from '@/lib/schemas/finances/category.schema';
 import { handleError } from '@/lib/utils/error-handler';
+import { DEFAULT_CATEGORY_COLOR } from '@/lib/utils/constants';
 
 interface FinanceCategoryFormModalProps {
   open: boolean;
@@ -55,7 +56,7 @@ type FinanceCategoryFormValues = z.infer<typeof financeCategoryFormSchema>;
 
 const DEFAULTS: FinanceCategoryFormValues = {
   name: '',
-  color: '#6B7280',
+  color: DEFAULT_CATEGORY_COLOR,
   sort_order: 0,
   parent_id: null,
 };
@@ -74,7 +75,7 @@ export function FinanceCategoryFormModal({
 
   // Only root categories can be a parent (one level), and never the category being edited itself.
   const parentOptions = (allCategories ?? []).filter(
-    (cat) => !cat.parent && cat.id !== category?.id,
+    (cat) => !cat.parent && cat.id !== category?.id
   );
 
   const formMethods = useForm<FinanceCategoryFormValues>({
@@ -87,11 +88,11 @@ export function FinanceCategoryFormModal({
       category
         ? {
             name: category.name,
-            color: category.color ?? '#6B7280',
+            color: category.color ?? DEFAULT_CATEGORY_COLOR,
             sort_order: category.sort_order ?? 0,
             parent_id: category.parent_id ?? category.parent?.id ?? null,
           }
-        : DEFAULTS,
+        : DEFAULTS
     );
   }, [category, formMethods]);
 
@@ -165,7 +166,7 @@ export function FinanceCategoryFormModal({
                         disabled={isLoading}
                       />
                       <Input
-                        placeholder="#6B7280"
+                        placeholder={DEFAULT_CATEGORY_COLOR}
                         maxLength={7}
                         {...field}
                         disabled={isLoading}
@@ -224,7 +225,7 @@ export function FinanceCategoryFormModal({
                           <SelectItem key={cat.id} value={String(cat.id)}>
                             {cat.name}
                           </SelectItem>
-                        ),
+                        )
                       )}
                     </SelectContent>
                   </Select>

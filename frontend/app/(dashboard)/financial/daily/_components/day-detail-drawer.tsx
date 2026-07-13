@@ -324,7 +324,7 @@ export function DayDetailDrawer({ day, open, onClose }: Props) {
 
           <div className="mt-6 space-y-6">
             {/* Summary row */}
-            <div className="grid grid-cols-3 gap-3 text-center">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-center">
               <div className="bg-success/10 rounded-lg p-3">
                 <p className="text-xs text-muted-foreground">Entradas</p>
                 <p className="text-sm font-bold text-success">{formatCurrency(totalEntries)}</p>

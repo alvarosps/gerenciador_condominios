@@ -13,7 +13,7 @@ describe('PWA web manifest', () => {
   });
 
   it('uses the documented theme HEX colors derived from the OKLCH tokens', () => {
-    expect(result.theme_color).toBe('#0d847a');
+    expect(result.theme_color).toBe('#008c6c');
     expect(result.background_color).toBe('#fbfbfc');
   });
 
@@ -27,7 +27,7 @@ describe('PWA web manifest', () => {
     }
 
     const hasMaskable512 = icons.some(
-      (icon) => icon.sizes === '512x512' && icon.purpose === 'maskable',
+      (icon) => icon.sizes === '512x512' && icon.purpose === 'maskable'
     );
     expect(hasMaskable512).toBe(true);
 

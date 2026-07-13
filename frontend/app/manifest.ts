@@ -1,7 +1,7 @@
 import type { MetadataRoute } from 'next';
 
 export default function manifest(): MetadataRoute.Manifest {
-  // theme_color = oklch(0.55 0.15 175) ≈ #0d847a (primary) ; background = oklch(0.985 0.002 240) ≈ #fbfbfc
+  // theme_color = --primary token, oklch(0.55 0.15 175) → #008c6c (app/globals.css:60)
   return {
     name: 'Condomínios Manager',
     short_name: 'Condomínios',
@@ -10,11 +10,16 @@ export default function manifest(): MetadataRoute.Manifest {
     display: 'standalone',
     lang: 'pt-BR',
     background_color: '#fbfbfc',
-    theme_color: '#0d847a',
+    theme_color: '#008c6c',
     icons: [
       { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
       { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
-      { src: '/icons/icon-512-maskable.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+      {
+        src: '/icons/icon-512-maskable.png',
+        sizes: '512x512',
+        type: 'image/png',
+        purpose: 'maskable',
+      },
     ],
   };
 }

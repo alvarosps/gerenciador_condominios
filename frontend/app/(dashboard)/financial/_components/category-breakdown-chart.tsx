@@ -6,13 +6,24 @@ import { Loading } from '@/components/shared/loading';
 import { useCategoryBreakdown } from '@/lib/api/hooks/use-financial-dashboard';
 import type { CategoryBreakdown } from '@/lib/api/hooks/use-financial-dashboard';
 import { formatCurrency } from '@/lib/utils/formatters';
+import { chartColor } from '@/lib/utils/chart-colors';
 
 const MONTH_NAMES = [
-  'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-  'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
+  'Janeiro',
+  'Fevereiro',
+  'Março',
+  'Abril',
+  'Maio',
+  'Junho',
+  'Julho',
+  'Agosto',
+  'Setembro',
+  'Outubro',
+  'Novembro',
+  'Dezembro',
 ];
 
-const NO_CATEGORY_COLOR = '#9CA3AF';
+const NO_CATEGORY_COLOR = chartColor(0);
 
 function toPieData(data: CategoryBreakdown[]) {
   return data.map((item) => ({
@@ -41,7 +52,9 @@ function CustomTooltip({
 
   return (
     <div className="bg-card border rounded-lg shadow-lg p-3">
-      <p className="font-medium" style={{ color: item.color }}>{item.name}</p>
+      <p className="font-medium" style={{ color: item.color }}>
+        {item.name}
+      </p>
       <p className="text-sm">
         <span className="text-muted-foreground">Valor: </span>
         <span className="font-bold">{formatCurrency(item.value)}</span>
@@ -101,7 +114,9 @@ export function CategoryBreakdownChart() {
           <CardTitle>{title}</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-center text-muted-foreground py-8">Nenhuma despesa registrada neste mês</p>
+          <p className="text-center text-muted-foreground py-8">
+            Nenhuma despesa registrada neste mês
+          </p>
         </CardContent>
       </Card>
     );

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { DEFAULT_CATEGORY_COLOR } from '@/lib/utils/constants';
 
 interface RawExpenseCategory {
   id?: number;
@@ -17,13 +18,13 @@ export const expenseCategorySchema: z.ZodType<RawExpenseCategory> = z.lazy(() =>
     id: z.number().optional(),
     name: z.string().min(1, 'Nome é obrigatório'),
     description: z.string().optional().default(''),
-    color: z.string().optional().default('#6B7280'),
+    color: z.string().optional().default(DEFAULT_CATEGORY_COLOR),
     parent: z.union([expenseCategorySchema, z.number(), z.null()]).optional(),
     parent_id: z.number().nullable().optional(),
     subcategories: z.array(expenseCategorySchema).default([]),
     created_at: z.string().optional(),
     updated_at: z.string().optional(),
-  }),
+  })
 );
 
 export type ExpenseCategory = z.infer<typeof expenseCategorySchema>;

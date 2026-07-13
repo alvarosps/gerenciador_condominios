@@ -86,7 +86,7 @@ function PhoneField({ phone }: { phone: string }) {
         </div>
         <Button
           variant="ghost"
-          size="icon"
+          size="touch"
           onClick={() => setIsEditing(true)}
           aria-label="Editar telefone"
         >

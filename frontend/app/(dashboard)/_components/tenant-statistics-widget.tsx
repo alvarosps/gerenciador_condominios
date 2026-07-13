@@ -5,6 +5,7 @@ import { Loading } from '@/components/shared/loading';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useDashboardTenantStatistics } from '@/lib/api/hooks/use-dashboard';
 import { Users, User, Home, Building } from 'lucide-react';
+import { chartColor } from '@/lib/utils/chart-colors';
 
 export function TenantStatisticsWidget() {
   const { data, isLoading, error } = useDashboardTenantStatistics();
@@ -29,20 +30,16 @@ export function TenantStatisticsWidget() {
           <CardTitle>Estatísticas de Inquilinos</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-center text-muted-foreground py-8">
-            Erro ao carregar estatísticas
-          </p>
+          <p className="text-center text-muted-foreground py-8">Erro ao carregar estatísticas</p>
         </CardContent>
       </Card>
     );
   }
 
   const pieData = [
-    { name: 'Pessoas Físicas', value: data.individual_tenants, color: '#3b82f6' },
-    { name: 'Empresas', value: data.company_tenants, color: '#10b981' },
+    { name: 'Pessoas Físicas', value: data.individual_tenants, color: chartColor(0) },
+    { name: 'Empresas', value: data.company_tenants, color: chartColor(1) },
   ];
-
-  const COLORS = ['#3b82f6', '#10b981'];
 
   const CustomTooltip = ({
     active,
@@ -76,9 +73,7 @@ export function TenantStatisticsWidget() {
     data.total_tenants > 0 ? (data.tenants_with_dependents / data.total_tenants) * 100 : 0;
 
   const avgDependents =
-    data.tenants_with_dependents > 0
-      ? data.total_dependents / data.tenants_with_dependents
-      : 0;
+    data.tenants_with_dependents > 0 ? data.total_dependents / data.tenants_with_dependents : 0;
 
   return (
     <Card className="hover:shadow-md transition-shadow">
@@ -107,7 +102,7 @@ export function TenantStatisticsWidget() {
                   labelLine={false}
                 >
                   {pieData.map((_entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    <Cell key={`cell-${index}`} fill={chartColor(index)} />
                   ))}
                 </Pie>
                 <Tooltip content={<CustomTooltip />} />
@@ -148,9 +143,7 @@ export function TenantStatisticsWidget() {
                 <span className="text-sm text-muted-foreground flex items-center gap-2">
                   <Home className="h-4 w-4" /> Total de Dependentes
                 </span>
-                <span className="font-bold">
-                  {data.total_dependents}
-                </span>
+                <span className="font-bold">{data.total_dependents}</span>
               </div>
             </div>
           </div>

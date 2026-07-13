@@ -5,14 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import type { ApartmentInfo, DashboardSummary } from '@/lib/api/hooks/use-financial-dashboard';
 import { formatCurrency } from '@/lib/utils/formatters';
+import { chartColor, colorMixWithTransparent } from '@/lib/utils/chart-colors';
 
-const OWNER_COLORS = ['#f59e0b', '#a855f7', '#06b6d4', '#ec4899', '#14b8a6'];
-const CONDOMINIUM_COLOR = '#3b82f6';
-const VACANT_COLOR = '#f59e0b';
+const CONDOMINIUM_COLOR = 'var(--info)';
+const VACANT_COLOR = 'var(--warning)';
 
 function getOwnerColor(index: number): string {
-  const color = OWNER_COLORS[index % OWNER_COLORS.length];
-  return color ?? '#f59e0b';
+  return chartColor(index);
 }
 
 function computeVacantByOwner(vacantKitnets: ApartmentInfo[]) {
@@ -37,7 +36,13 @@ function computeVacantByOwner(vacantKitnets: ApartmentInfo[]) {
   return { byOwner, condoVacant: { count: condoCount, lostRent: condoLostRent } };
 }
 
-export function IncomeSummaryCard({ data, monthLabel }: { data: DashboardSummary; monthLabel: string }) {
+export function IncomeSummaryCard({
+  data,
+  monthLabel,
+}: {
+  data: DashboardSummary;
+  monthLabel: string;
+}) {
   const { income_summary } = data;
   const totalIncome = income_summary.total_monthly_income;
   const hasVacant = income_summary.vacant_count > 0;
@@ -88,8 +93,8 @@ export function IncomeSummaryCard({ data, monthLabel }: { data: DashboardSummary
                   className="rounded-r border border-dashed"
                   style={{
                     width: `${100 - rentedPercent}%`,
-                    borderColor: `${VACANT_COLOR}44`,
-                    background: `repeating-linear-gradient(45deg, transparent, transparent 4px, ${VACANT_COLOR}33 4px, ${VACANT_COLOR}33 8px)`,
+                    borderColor: colorMixWithTransparent(VACANT_COLOR, 27),
+                    background: `repeating-linear-gradient(45deg, transparent, transparent 4px, ${colorMixWithTransparent(VACANT_COLOR, 20)} 4px, ${colorMixWithTransparent(VACANT_COLOR, 20)} 8px)`,
                   }}
                 />
               </div>
@@ -113,9 +118,11 @@ export function IncomeSummaryCard({ data, monthLabel }: { data: DashboardSummary
             subtitle={`${income_summary.condominium_kitnet_count} kitnets`}
             footnote="vai pro caixa"
             color={CONDOMINIUM_COLOR}
-            percentage={totalIncome > 0
-              ? Math.round((income_summary.condominium_income / totalIncome) * 100)
-              : 0}
+            percentage={
+              totalIncome > 0
+                ? Math.round((income_summary.condominium_income / totalIncome) * 100)
+                : 0
+            }
             vacantCount={condoVacant.count}
             vacantLostRent={condoVacant.lostRent}
           />
@@ -131,9 +138,7 @@ export function IncomeSummaryCard({ data, monthLabel }: { data: DashboardSummary
                 subtitle={`Aptos ${owner.apartments.join(', ')}`}
                 footnote="repasse direto"
                 color={getOwnerColor(index)}
-                percentage={totalIncome > 0
-                  ? Math.round((owner.total / totalIncome) * 100)
-                  : 0}
+                percentage={totalIncome > 0 ? Math.round((owner.total / totalIncome) * 100) : 0}
                 vacantCount={ownerVacant?.count ?? 0}
                 vacantLostRent={ownerVacant?.lostRent ?? 0}
               />
@@ -175,13 +180,19 @@ function DistributionCard({
       <Badge
         variant="outline"
         className="absolute top-2 right-2 text-[10px] font-semibold px-1.5 py-0"
-        style={{ color, borderColor: `${color}33`, backgroundColor: `${color}20` }}
+        style={{
+          color,
+          borderColor: colorMixWithTransparent(color, 20),
+          backgroundColor: colorMixWithTransparent(color, 12),
+        }}
       >
         {percentage}%
       </Badge>
       <div>
         <p className="text-xs text-muted-foreground">{label}</p>
-        <p className="text-xl font-bold" style={{ color }}>{formatCurrency(value)}</p>
+        <p className="text-xl font-bold" style={{ color }}>
+          {formatCurrency(value)}
+        </p>
         <p className="text-xs text-muted-foreground">{subtitle}</p>
         <p className="text-[10px] text-muted-foreground mt-1 flex items-center gap-1">
           <ArrowRight className="h-2.5 w-2.5" />
@@ -212,8 +223,8 @@ function DistributionCard({
               className="rounded-r border border-dashed"
               style={{
                 width: `${100 - filledPercent}%`,
-                borderColor: `${VACANT_COLOR}44`,
-                background: `repeating-linear-gradient(45deg, transparent, transparent 3px, ${VACANT_COLOR}33 3px, ${VACANT_COLOR}33 6px)`,
+                borderColor: colorMixWithTransparent(VACANT_COLOR, 27),
+                background: `repeating-linear-gradient(45deg, transparent, transparent 3px, ${colorMixWithTransparent(VACANT_COLOR, 20)} 3px, ${colorMixWithTransparent(VACANT_COLOR, 20)} 6px)`,
               }}
             />
           )}

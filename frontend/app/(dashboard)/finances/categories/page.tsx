@@ -13,6 +13,7 @@ import {
 import { type FinanceCategory } from '@/lib/schemas/finances/category.schema';
 import { useCrudPage } from '@/lib/hooks/use-crud-page';
 import { useAuthStore } from '@/store/auth-store';
+import { DEFAULT_CATEGORY_COLOR } from '@/lib/utils/constants';
 import { FinanceCategoryFormModal } from './_components/finance-category-form-modal';
 
 export default function FinanceCategoriesPage() {
@@ -47,7 +48,7 @@ export default function FinanceCategoriesPage() {
       render: (_, record) => (
         <div
           className="h-6 w-6 rounded border"
-          style={{ backgroundColor: record.color || '#6B7280' }}
+          style={{ backgroundColor: record.color || DEFAULT_CATEGORY_COLOR }}
         />
       ),
     },
