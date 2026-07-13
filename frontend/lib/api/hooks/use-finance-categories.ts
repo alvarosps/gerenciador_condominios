@@ -1,11 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
 import { queryKeys } from '../query-keys';
+import { parseList } from '../parse-list';
 import {
   type FinanceCategory,
   financeCategorySchema,
 } from '@/lib/schemas/finances/category.schema';
-import { type PaginatedResponse, extractResults } from '@/lib/types/api';
 
 const ENDPOINT = '/finances/finance-categories/';
 
@@ -18,11 +18,10 @@ export function useFinanceCategories() {
   return useQuery({
     queryKey: queryKeys.finances.financeCategories.list(),
     queryFn: async () => {
-      const { data } = await apiClient.get<PaginatedResponse<FinanceCategory> | FinanceCategory[]>(
-        ENDPOINT,
-        { params: { page_size: 10000 } },
-      );
-      return extractResults(data).map((category) => financeCategorySchema.parse(category));
+      const { data } = await apiClient.get<unknown>(ENDPOINT, {
+        params: { page_size: 10000 },
+      });
+      return parseList(data, financeCategorySchema).items;
     },
   });
 }

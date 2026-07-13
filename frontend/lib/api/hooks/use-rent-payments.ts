@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
+import { parseList } from '../parse-list';
 import { type RentPayment, rentPaymentSchema } from '@/lib/schemas/rent-payment.schema';
-import { type PaginatedResponse, extractResults } from '@/lib/types/api';
 import { queryKeys } from '@/lib/api/query-keys';
 
 export interface RentPaymentFilters {
@@ -17,11 +17,10 @@ export function useRentPayments(filters?: RentPaymentFilters) {
   return useQuery({
     queryKey: queryKeys.rentPayments.list(cleanFilters),
     queryFn: async () => {
-      const { data } = await apiClient.get<PaginatedResponse<RentPayment> | RentPayment[]>('/rent-payments/', {
+      const { data } = await apiClient.get<unknown>('/rent-payments/', {
         params: { page_size: 10000, ...cleanFilters },
       });
-      const payments = extractResults(data);
-      return payments.map((payment) => rentPaymentSchema.parse(payment));
+      return parseList(data, rentPaymentSchema).items;
     },
   });
 }

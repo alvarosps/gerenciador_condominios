@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
 import { queryKeys } from '../query-keys';
+import { parseList } from '../parse-list';
 import {
   reserveSchema,
   type Reserve,
@@ -8,18 +9,15 @@ import {
   type DepositPayload,
   type WithdrawPayload,
 } from '@/lib/schemas/finances/reserve.schema';
-import { type PaginatedResponse, extractResults } from '@/lib/types/api';
 
 export function useReserves() {
   return useQuery({
     queryKey: queryKeys.finances.reserves.list(),
     queryFn: async () => {
-      const { data } = await apiClient.get<PaginatedResponse<Reserve> | Reserve[]>(
-        '/finances/reserves/',
-        { params: { page_size: 10000 } },
-      );
-      const items = extractResults(data);
-      return items.map((item) => reserveSchema.parse(item));
+      const { data } = await apiClient.get<unknown>('/finances/reserves/', {
+        params: { page_size: 10000 },
+      });
+      return parseList(data, reserveSchema).items;
     },
   });
 }
@@ -89,7 +87,7 @@ export function useDepositReserve() {
     mutationFn: async (params: { reserveId: number; payload: DepositPayload }) => {
       const { data } = await apiClient.post<Reserve>(
         `/finances/reserves/${params.reserveId}/deposit/`,
-        params.payload,
+        params.payload
       );
       return reserveSchema.parse(data);
     },
@@ -107,7 +105,7 @@ export function useWithdrawReserve() {
     mutationFn: async (params: { reserveId: number; payload: WithdrawPayload }) => {
       const { data } = await apiClient.post<Reserve>(
         `/finances/reserves/${params.reserveId}/withdraw/`,
-        params.payload,
+        params.payload
       );
       return reserveSchema.parse(data);
     },

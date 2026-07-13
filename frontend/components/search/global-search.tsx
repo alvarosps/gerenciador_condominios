@@ -5,13 +5,14 @@ import { Search, Building2, DoorOpen, Users, FileText, Package, Loader2 } from '
 import { useRouter } from 'next/navigation';
 import { useDebounce } from '@/lib/hooks/use-debounce';
 import { apiClient } from '@/lib/api/client';
+import { parseList } from '@/lib/api/parse-list';
 import { ROUTES } from '@/lib/utils/constants';
 import { formatCurrency, formatCpfCnpj, formatPhone } from '@/lib/utils/formatters';
-import { type Building } from '@/lib/schemas/building.schema';
-import { type Apartment } from '@/lib/schemas/apartment.schema';
-import { type Tenant } from '@/lib/schemas/tenant.schema';
-import { type Lease } from '@/lib/schemas/lease.schema';
-import { type Furniture } from '@/lib/schemas/furniture.schema';
+import { buildingSchema } from '@/lib/schemas/building.schema';
+import { apartmentSchema } from '@/lib/schemas/apartment.schema';
+import { tenantSchema } from '@/lib/schemas/tenant.schema';
+import { leaseSchema } from '@/lib/schemas/lease.schema';
+import { furnitureSchema } from '@/lib/schemas/furniture.schema';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
@@ -45,17 +46,17 @@ export function GlobalSearch() {
 
     try {
       const [buildings, apartments, tenants, leases, furniture] = await Promise.all([
-        apiClient.get('/buildings/', { params: { search: term } }),
-        apiClient.get('/apartments/', { params: { search: term } }),
-        apiClient.get('/tenants/', { params: { search: term } }),
-        apiClient.get('/leases/', { params: { search: term } }),
-        apiClient.get('/furnitures/', { params: { search: term } }),
+        apiClient.get<unknown>('/buildings/', { params: { search: term } }),
+        apiClient.get<unknown>('/apartments/', { params: { search: term } }),
+        apiClient.get<unknown>('/tenants/', { params: { search: term } }),
+        apiClient.get<unknown>('/leases/', { params: { search: term } }),
+        apiClient.get<unknown>('/furnitures/', { params: { search: term } }),
       ]);
 
       const searchResults: SearchResult[] = [];
 
       // Buildings
-      (buildings.data as Building[]).forEach((item: Building) => {
+      parseList(buildings.data, buildingSchema).items.forEach((item) => {
         if (item.id !== undefined) {
           searchResults.push({
             type: 'building',
@@ -69,7 +70,7 @@ export function GlobalSearch() {
       });
 
       // Apartments
-      (apartments.data as Apartment[]).forEach((item: Apartment) => {
+      parseList(apartments.data, apartmentSchema).items.forEach((item) => {
         if (item.id !== undefined) {
           searchResults.push({
             type: 'apartment',
@@ -83,7 +84,7 @@ export function GlobalSearch() {
       });
 
       // Tenants
-      (tenants.data as Tenant[]).forEach((item: Tenant) => {
+      parseList(tenants.data, tenantSchema).items.forEach((item) => {
         if (item.id !== undefined) {
           searchResults.push({
             type: 'tenant',
@@ -97,7 +98,7 @@ export function GlobalSearch() {
       });
 
       // Leases
-      (leases.data as Lease[]).forEach((item: Lease) => {
+      parseList(leases.data, leaseSchema).items.forEach((item) => {
         if (item.id !== undefined) {
           searchResults.push({
             type: 'lease',
@@ -111,7 +112,7 @@ export function GlobalSearch() {
       });
 
       // Furniture
-      (furniture.data as Furniture[]).forEach((item: Furniture) => {
+      parseList(furniture.data, furnitureSchema).items.forEach((item) => {
         if (item.id !== undefined) {
           searchResults.push({
             type: 'furniture',

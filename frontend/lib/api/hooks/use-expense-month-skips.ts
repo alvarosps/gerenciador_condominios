@@ -1,10 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
+import { parseList } from '../parse-list';
 import {
   type ExpenseMonthSkip,
   expenseMonthSkipSchema,
 } from '@/lib/schemas/expense-month-skip.schema';
-import { type PaginatedResponse, extractResults } from '@/lib/types/api';
 import { queryKeys } from '@/lib/api/query-keys';
 
 export interface ExpenseMonthSkipFilters {
@@ -20,13 +20,10 @@ export function useExpenseMonthSkips(filters?: ExpenseMonthSkipFilters) {
   return useQuery({
     queryKey: queryKeys.expenseMonthSkips.list(cleanFilters),
     queryFn: async () => {
-      const { data } = await apiClient.get<
-        PaginatedResponse<ExpenseMonthSkip> | ExpenseMonthSkip[]
-      >('/expense-month-skips/', {
+      const { data } = await apiClient.get<unknown>('/expense-month-skips/', {
         params: { page_size: 10000, ...cleanFilters },
       });
-      const skips = extractResults(data);
-      return skips.map((skip) => expenseMonthSkipSchema.parse(skip));
+      return parseList(data, expenseMonthSkipSchema).items;
     },
   });
 }
@@ -35,7 +32,9 @@ export function useCreateExpenseMonthSkip() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: Omit<ExpenseMonthSkip, 'id' | 'expense_description' | 'created_at' | 'updated_at'>) => {
+    mutationFn: async (
+      data: Omit<ExpenseMonthSkip, 'id' | 'expense_description' | 'created_at' | 'updated_at'>
+    ) => {
       const response = await apiClient.post<ExpenseMonthSkip>('/expense-month-skips/', data);
       return response.data;
     },

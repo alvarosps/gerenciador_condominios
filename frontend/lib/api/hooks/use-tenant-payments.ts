@@ -78,12 +78,8 @@ export function useTenantProofs() {
   return useQuery({
     queryKey: tenantPaymentKeys.proofs,
     queryFn: async () => {
-      // The axios response interceptor already unwraps DRF's paginated envelope
-      // ({results, count, ...}) into a plain array — handle both shapes defensively.
-      const { data } = await apiClient.get<{ results: PaymentProof[] } | PaymentProof[]>(
-        '/tenant/payments/proof/'
-      );
-      return Array.isArray(data) ? data : data.results;
+      const { data } = await apiClient.get<{ results: PaymentProof[] }>('/tenant/payments/proof/');
+      return data.results;
     },
   });
 }

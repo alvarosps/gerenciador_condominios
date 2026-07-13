@@ -1,8 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
 import { queryKeys } from '../query-keys';
+import { parseList } from '../parse-list';
 import { type Building, buildingSchema } from '@/lib/schemas/building.schema';
-import { type PaginatedResponse } from '@/lib/types/api';
 
 /**
  * Hook to fetch all buildings
@@ -11,13 +11,10 @@ export function useBuildings() {
   return useQuery({
     queryKey: queryKeys.buildings.all,
     queryFn: async () => {
-      const { data } = await apiClient.get<PaginatedResponse<Building> | Building[]>('/buildings/', {
+      const { data } = await apiClient.get<unknown>('/buildings/', {
         params: { page_size: 10000 },
       });
-      // Handle both paginated and non-paginated responses
-      const buildings = Array.isArray(data) ? data : data.results;
-      // Validate each building with Zod schema
-      return buildings.map((building) => buildingSchema.parse(building));
+      return parseList(data, buildingSchema).items;
     },
   });
 }
@@ -67,10 +64,7 @@ export function useUpdateBuilding() {
       if (!data.id) throw new Error('Building ID is required for update');
       // Validate complete building data
       const validated = buildingSchema.parse(data);
-      const response = await apiClient.put<Building>(
-        `/buildings/${data.id}/`,
-        validated
-      );
+      const response = await apiClient.put<Building>(`/buildings/${data.id}/`, validated);
       return response.data;
     },
     onSuccess: (data) => {

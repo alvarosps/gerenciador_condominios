@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
+import { parseList } from '../parse-list';
 import { type PersonIncome, personIncomeSchema } from '@/lib/schemas/person-income.schema';
-import { type PaginatedResponse, extractResults } from '@/lib/types/api';
 import { queryKeys } from '@/lib/api/query-keys';
 
 export interface PersonIncomeFilters {
@@ -19,11 +19,10 @@ export function usePersonIncomes(filters?: PersonIncomeFilters) {
   return useQuery({
     queryKey: queryKeys.personIncomes.list(cleanFilters),
     queryFn: async () => {
-      const { data } = await apiClient.get<PaginatedResponse<PersonIncome> | PersonIncome[]>('/person-incomes/', {
+      const { data } = await apiClient.get<unknown>('/person-incomes/', {
         params: { page_size: 10000, ...cleanFilters },
       });
-      const incomes = extractResults(data);
-      return incomes.map((income) => personIncomeSchema.parse(income));
+      return parseList(data, personIncomeSchema).items;
     },
   });
 }
@@ -32,7 +31,9 @@ export function useCreatePersonIncome() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: Omit<PersonIncome, 'id' | 'person' | 'apartment' | 'current_value'>) => {
+    mutationFn: async (
+      data: Omit<PersonIncome, 'id' | 'person' | 'apartment' | 'current_value'>
+    ) => {
       const response = await apiClient.post<PersonIncome>('/person-incomes/', data);
       return response.data;
     },

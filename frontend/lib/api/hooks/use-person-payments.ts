@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
+import { parseList } from '../parse-list';
 import { type PersonPayment, personPaymentSchema } from '@/lib/schemas/person-payment.schema';
-import { type PaginatedResponse, extractResults } from '@/lib/types/api';
 import { queryKeys } from '@/lib/api/query-keys';
 
 export interface PersonPaymentFilters {
@@ -19,11 +19,10 @@ export function usePersonPayments(filters?: PersonPaymentFilters) {
   return useQuery({
     queryKey: queryKeys.personPayments.list(cleanFilters),
     queryFn: async () => {
-      const { data } = await apiClient.get<PaginatedResponse<PersonPayment> | PersonPayment[]>('/person-payments/', {
+      const { data } = await apiClient.get<unknown>('/person-payments/', {
         params: { page_size: 10000, ...cleanFilters },
       });
-      const payments = extractResults(data);
-      return payments.map((payment) => personPaymentSchema.parse(payment));
+      return parseList(data, personPaymentSchema).items;
     },
   });
 }
@@ -49,7 +48,10 @@ export function useUpdatePersonPayment() {
   return useMutation({
     mutationFn: async (data: Partial<PersonPayment> & { id: number }) => {
       const { person: _person, ...updateData } = data;
-      const response = await apiClient.put<PersonPayment>(`/person-payments/${data.id}/`, updateData);
+      const response = await apiClient.put<PersonPayment>(
+        `/person-payments/${data.id}/`,
+        updateData
+      );
       return response.data;
     },
     onSuccess: () => {

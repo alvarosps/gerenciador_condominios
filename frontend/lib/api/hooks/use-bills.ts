@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
 import { queryKeys } from '../query-keys';
+import { parseList } from '../parse-list';
 import type { CombinedCalendar } from './use-combined-calendar';
 import { type Bill, type BillLineItem, billSchema } from '@/lib/schemas/finances/bill.schema';
 import {
@@ -8,7 +9,6 @@ import {
   parsedInvoiceSchema,
 } from '@/lib/schemas/finances/invoice-parse.schema';
 import type { FundedFrom, PaymentStatus } from '@/lib/schemas/finances/category.schema';
-import { type PaginatedResponse, extractResults } from '@/lib/types/api';
 
 const ENDPOINT = '/finances/bills/';
 
@@ -95,10 +95,10 @@ export function useBills(filters?: BillFilters) {
   return useQuery({
     queryKey: queryKeys.finances.bills.list(cleanFilters),
     queryFn: async () => {
-      const { data } = await apiClient.get<PaginatedResponse<Bill> | Bill[]>(ENDPOINT, {
+      const { data } = await apiClient.get<unknown>(ENDPOINT, {
         params: { page_size: 10000, ...cleanFilters },
       });
-      return extractResults(data).map((bill) => billSchema.parse(bill));
+      return parseList(data, billSchema).items;
     },
   });
 }

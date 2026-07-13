@@ -1,21 +1,52 @@
 /**
- * Tests for tenant payment hooks (rent adjustments, proof upload/list).
- *
- * useTenantPayments is intentionally NOT covered here — it is pre-existing, out of this
- * batch's scope, and currently broken (reads `data.results` after the axios interceptor
- * already unwraps the paginated envelope into a plain array; see use-buildings.ts /
- * use-contract-rules.ts for the correct `Array.isArray(data) ? data : data.results` pattern).
- * Flagged separately — not fixed here to stay within the batch's scope.
+ * Tests for tenant payment hooks (rent payments, rent adjustments, proof upload/list).
  */
 
 import { describe, it, expect } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
-import { useTenantRentAdjustments, useUploadProof, useTenantProofs } from '../use-tenant-payments';
+import {
+  useTenantPayments,
+  useTenantRentAdjustments,
+  useUploadProof,
+  useTenantProofs,
+} from '../use-tenant-payments';
 import { createWrapper } from '@/tests/test-utils';
 import { server } from '@/tests/mocks/server';
 
 const API_BASE = 'http://localhost:8008/api';
+
+describe('useTenantPayments', () => {
+  it('should fetch the rent payment list from the paginated envelope', async () => {
+    server.use(
+      http.get(`${API_BASE}/tenant/payments/`, () =>
+        HttpResponse.json({
+          count: 1,
+          next: null,
+          previous: null,
+          results: [
+            {
+              id: 1,
+              reference_month: '2026-03-01',
+              amount_paid: '1500.00',
+              payment_date: '2026-03-05',
+              notes: '',
+            },
+          ],
+        })
+      )
+    );
+
+    const { result } = renderHook(() => useTenantPayments(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(result.current.data).toHaveLength(1);
+    expect(result.current.data?.[0]?.amount_paid).toBe('1500.00');
+  });
+});
 
 describe('useTenantRentAdjustments', () => {
   it('should fetch the rent adjustments list', async () => {

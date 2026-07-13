@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
+import { parseList } from '../parse-list';
 import { type Furniture, furnitureSchema } from '@/lib/schemas/furniture.schema';
-import { type PaginatedResponse, extractResults } from '@/lib/types/api';
 import { queryKeys } from '@/lib/api/query-keys';
 
 /**
@@ -11,13 +11,10 @@ export function useFurniture() {
   return useQuery({
     queryKey: queryKeys.furniture.list(),
     queryFn: async () => {
-      const { data } = await apiClient.get<PaginatedResponse<Furniture> | Furniture[]>('/furnitures/', {
+      const { data } = await apiClient.get<unknown>('/furnitures/', {
         params: { page_size: 10000 },
       });
-      // Handle both paginated and non-paginated responses
-      const furnitures = extractResults(data);
-      // Validate each furniture item with Zod schema
-      return furnitures.map((furniture) => furnitureSchema.parse(furniture));
+      return parseList(data, furnitureSchema).items;
     },
   });
 }
@@ -70,10 +67,7 @@ export function useUpdateFurniture() {
       if (!data.id) throw new Error('Furniture ID is required for update');
       // Validate complete furniture data
       const validated = furnitureSchema.parse(data);
-      const response = await apiClient.put<Furniture>(
-        `/furnitures/${data.id}/`,
-        validated
-      );
+      const response = await apiClient.put<Furniture>(`/furnitures/${data.id}/`, validated);
       return response.data;
     },
     onSuccess: (data) => {

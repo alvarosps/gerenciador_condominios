@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
+import { parseList } from '../parse-list';
 import { type Income, incomeSchema } from '@/lib/schemas/income.schema';
-import { type PaginatedResponse, extractResults } from '@/lib/types/api';
 import { queryKeys } from '@/lib/api/query-keys';
 
 export interface IncomeFilters {
@@ -19,11 +19,10 @@ export function useIncomes(filters?: IncomeFilters) {
   return useQuery({
     queryKey: queryKeys.incomes.list(cleanFilters),
     queryFn: async () => {
-      const { data } = await apiClient.get<PaginatedResponse<Income> | Income[]>('/incomes/', {
+      const { data } = await apiClient.get<unknown>('/incomes/', {
         params: { page_size: 10000, ...cleanFilters },
       });
-      const incomes = extractResults(data);
-      return incomes.map((income) => incomeSchema.parse(income));
+      return parseList(data, incomeSchema).items;
     },
   });
 }

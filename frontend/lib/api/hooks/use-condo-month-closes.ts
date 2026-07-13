@@ -1,12 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
 import { queryKeys } from '../query-keys';
+import { parseList } from '../parse-list';
 import {
   condoMonthCloseSchema,
   type CondoMonthClose,
   type CondoMonthCloseFilters,
 } from '@/lib/schemas/finances/condo-month-close.schema';
-import { type PaginatedResponse, extractResults } from '@/lib/types/api';
 
 export function useCondoMonthCloses(filters?: CondoMonthCloseFilters) {
   const cleanFilters = filters
@@ -16,11 +16,10 @@ export function useCondoMonthCloses(filters?: CondoMonthCloseFilters) {
   return useQuery({
     queryKey: queryKeys.finances.condoMonthCloses.list(cleanFilters),
     queryFn: async () => {
-      const { data } = await apiClient.get<
-        PaginatedResponse<CondoMonthClose> | CondoMonthClose[]
-      >('/finances/condo-month-closes/', { params: { page_size: 10000, ...cleanFilters } });
-      const items = extractResults(data);
-      return items.map((item) => condoMonthCloseSchema.parse(item));
+      const { data } = await apiClient.get<unknown>('/finances/condo-month-closes/', {
+        params: { page_size: 10000, ...cleanFilters },
+      });
+      return parseList(data, condoMonthCloseSchema).items;
     },
   });
 }
@@ -43,7 +42,7 @@ export function useCloseMonth() {
     mutationFn: async (params: { year: number; month: number }) => {
       const { data } = await apiClient.post<CondoMonthClose>(
         '/finances/condo-month-closes/close/',
-        params,
+        params
       );
       return condoMonthCloseSchema.parse(data);
     },
@@ -61,7 +60,7 @@ export function useReopenMonth() {
     mutationFn: async (params: { year: number; month: number }) => {
       const { data } = await apiClient.post<CondoMonthClose>(
         '/finances/condo-month-closes/reopen/',
-        params,
+        params
       );
       return condoMonthCloseSchema.parse(data);
     },

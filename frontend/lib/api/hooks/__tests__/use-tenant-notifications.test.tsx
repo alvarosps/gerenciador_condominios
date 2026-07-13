@@ -1,21 +1,52 @@
 /**
  * Tests for tenant notification hooks and the contract-download blob error parsing (P11).
- *
- * useTenantNotifications (list) is intentionally NOT covered here — it is pre-existing, out
- * of this batch's scope, and currently broken (reads `data.results` after the axios
- * interceptor already unwraps the paginated envelope into a plain array; see
- * use-buildings.ts / use-contract-rules.ts for the correct
- * `Array.isArray(data) ? data : data.results` pattern). Flagged separately — not fixed here.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
-import { useMarkNotificationRead, useDownloadContract } from '../use-tenant-notifications';
+import {
+  useTenantNotifications,
+  useMarkNotificationRead,
+  useDownloadContract,
+} from '../use-tenant-notifications';
 import { createWrapper } from '@/tests/test-utils';
 import { server } from '@/tests/mocks/server';
 
 const API_BASE = 'http://localhost:8008/api';
+
+describe('useTenantNotifications', () => {
+  it('should fetch the notification list from the paginated envelope', async () => {
+    server.use(
+      http.get(`${API_BASE}/tenant/notifications/`, () =>
+        HttpResponse.json({
+          count: 1,
+          next: null,
+          previous: null,
+          results: [
+            {
+              id: 1,
+              type: 'rent_due',
+              title: 'Aluguel vence em breve',
+              body: 'Seu aluguel vence em 3 dias.',
+              is_read: false,
+              sent_at: '2026-03-01T10:00:00Z',
+            },
+          ],
+        })
+      )
+    );
+
+    const { result } = renderHook(() => useTenantNotifications(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(result.current.data).toHaveLength(1);
+    expect(result.current.data?.[0]?.title).toBe('Aluguel vence em breve');
+  });
+});
 
 describe('useMarkNotificationRead', () => {
   it('should mark a notification as read', async () => {

@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
+import { parseList } from '../parse-list';
 import {
   type PersonPaymentSchedule,
   type BulkConfigureRequest,
@@ -7,7 +8,6 @@ import {
   personPaymentScheduleSchema,
   personMonthTotalSchema,
 } from '@/lib/schemas/person-payment-schedule.schema';
-import { type PaginatedResponse, extractResults } from '@/lib/types/api';
 import { queryKeys } from '@/lib/api/query-keys';
 
 export interface PersonPaymentScheduleFilters {
@@ -23,24 +23,24 @@ export function usePersonPaymentSchedules(filters?: PersonPaymentScheduleFilters
   return useQuery({
     queryKey: queryKeys.personPaymentSchedules.list(cleanFilters),
     queryFn: async () => {
-      const { data } = await apiClient.get<
-        PaginatedResponse<PersonPaymentSchedule> | PersonPaymentSchedule[]
-      >('/person-payment-schedules/', {
+      const { data } = await apiClient.get<unknown>('/person-payment-schedules/', {
         params: { page_size: 10000, ...cleanFilters },
       });
-      const schedules = extractResults(data);
-      return schedules.map((schedule) => personPaymentScheduleSchema.parse(schedule));
+      return parseList(data, personPaymentScheduleSchema).items;
     },
   });
 }
 
-export function usePersonMonthTotal(personId: number | undefined, referenceMonth: string | undefined) {
+export function usePersonMonthTotal(
+  personId: number | undefined,
+  referenceMonth: string | undefined
+) {
   return useQuery({
     queryKey: queryKeys.personPaymentSchedules.personMonthTotal(personId, referenceMonth),
     queryFn: async () => {
       const { data } = await apiClient.get<PersonMonthTotal>(
         '/person-payment-schedules/person_month_total/',
-        { params: { person_id: personId, reference_month: referenceMonth } },
+        { params: { person_id: personId, reference_month: referenceMonth } }
       );
       return personMonthTotalSchema.parse(data);
     },
@@ -55,7 +55,7 @@ export function useBulkConfigureSchedule() {
     mutationFn: async (data: BulkConfigureRequest) => {
       const response = await apiClient.post<PersonPaymentSchedule[]>(
         '/person-payment-schedules/bulk_configure/',
-        data,
+        data
       );
       return response.data;
     },

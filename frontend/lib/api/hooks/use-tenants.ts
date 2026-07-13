@@ -1,8 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
 import { queryKeys } from '../query-keys';
+import { parseList } from '../parse-list';
 import { type Tenant, tenantSchema } from '@/lib/schemas/tenant.schema';
-import { type PaginatedResponse, extractResults } from '@/lib/types/api';
 
 /**
  * Hook to fetch all tenants with optional filters
@@ -21,13 +21,10 @@ export function useTenants(filters?: {
   return useQuery({
     queryKey: queryKeys.tenants.list(cleanFilters),
     queryFn: async () => {
-      const { data } = await apiClient.get<PaginatedResponse<Tenant> | Tenant[]>('/tenants/', {
+      const { data } = await apiClient.get<unknown>('/tenants/', {
         params: { ...cleanFilters, page_size: 10000 },
       });
-      // Handle both paginated and non-paginated responses
-      const tenants = extractResults(data);
-      // Validate each tenant with Zod schema
-      return tenants.map((tenant) => tenantSchema.parse(tenant));
+      return parseList(data, tenantSchema).items;
     },
   });
 }
@@ -79,10 +76,7 @@ export function useUpdateTenant() {
       // Remove nested objects for API call
       const { furnitures: _furnitures, dependents: _dependents, ...updateData } = data;
 
-      const response = await apiClient.put<Tenant>(
-        `/tenants/${data.id}/`,
-        updateData
-      );
+      const response = await apiClient.put<Tenant>(`/tenants/${data.id}/`, updateData);
       return response.data;
     },
     onSuccess: (data) => {

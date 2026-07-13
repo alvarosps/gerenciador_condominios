@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
+import { parseList } from '../parse-list';
 import {
   type RentAdjustment,
   rentAdjustmentSchema,
@@ -40,10 +41,8 @@ export function useRentAdjustments(leaseId: number | null) {
     queryKey: queryKeys.rentAdjustments.byLease(leaseId),
     queryFn: async () => {
       if (!leaseId) throw new Error('Lease ID is required');
-      const { data } = await apiClient.get<RentAdjustment[]>(
-        `/leases/${String(leaseId)}/rent_adjustments/`,
-      );
-      return data.map((item) => rentAdjustmentSchema.parse(item));
+      const { data } = await apiClient.get<unknown>(`/leases/${String(leaseId)}/rent_adjustments/`);
+      return parseList(data, rentAdjustmentSchema).items;
     },
     enabled: Boolean(leaseId),
   });
@@ -60,7 +59,7 @@ export function useRentAdjustmentAlerts() {
     queryKey: queryKeys.rentAdjustmentAlerts.all,
     queryFn: async () => {
       const { data } = await apiClient.get<RentAdjustmentAlertsResponse>(
-        '/dashboard/rent_adjustment_alerts/',
+        '/dashboard/rent_adjustment_alerts/'
       );
       return {
         alerts: data.alerts.map((alert) => rentAdjustmentAlertSchema.parse(alert)),
