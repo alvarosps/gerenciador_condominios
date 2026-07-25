@@ -1,5 +1,9 @@
 """Integration tests for HttpOnly cookie-based JWT authentication."""
 
+import os
+import subprocess
+import sys
+
 import pytest
 from rest_framework import status
 from rest_framework.test import APIClient
@@ -32,6 +36,32 @@ class TestCookieLogin:
         assert "csrftoken" in response.cookies
         # Must be JS-readable (axios reads it to echo back as X-CSRFToken) — not HttpOnly.
         assert not response.cookies["csrftoken"]["httponly"]
+
+    def test_production_settings_keep_csrftoken_readable(self):
+        env = os.environ.copy()
+        env.update(
+            {
+                "DJANGO_SETTINGS_MODULE": "condominios_manager.settings_production",
+                "REDIS_URL": "redis://localhost:6379/0",
+            }
+        )
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                (
+                    "import django; django.setup(); "
+                    "from django.conf import settings; "
+                    "print(settings.CSRF_COOKIE_HTTPONLY)"
+                ),
+            ],
+            check=True,
+            capture_output=True,
+            env=env,
+            text=True,
+        )
+
+        assert result.stdout.strip() == "False"
 
     def test_login_returns_user_in_body_not_tokens(self, api_client, admin_user):
         response = api_client.post(

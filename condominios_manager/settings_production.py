@@ -62,7 +62,8 @@ SESSION_COOKIE_SECURE = True
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = "Lax"
 CSRF_COOKIE_SECURE = True
-CSRF_COOKIE_HTTPONLY = True
+# Axios must read the double-submit token and echo it as X-CSRFToken.
+CSRF_COOKIE_HTTPONLY = False
 CSRF_COOKIE_SAMESITE = "Lax"
 
 # Content Security Policy
