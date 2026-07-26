@@ -292,8 +292,10 @@ class BillService:
         (CondoMonthCloseService.assert_open). When ``header`` is given (a re-imported corrected
         invoice), its editable fields (due_date/external_identifier/issue_date/building/category/…)
         are persisted in the SAME atomic transaction; competence_month stays immutable. Old lines
-        are soft-deleted (audit history kept); with_amounts ignores soft-deleted lines. Raises (PT)
-        when paid or month closed.
+        are soft-deleted (audit history kept); with_amounts ignores soft-deleted lines. The lines
+        replaced here are a confirmed real value, so a still-estimated bill has its
+        amount_is_estimated flag cleared in the SAME transaction (S65 — a bill already confirmed
+        stays False, no-op). Raises (PT) when paid or month closed.
         """
         assert_not_paid(bill)
         CondoMonthCloseService.assert_open(bill.competence_month)
@@ -304,6 +306,11 @@ class BillService:
                 line.delete(deleted_by=user)
             BillService._write_lines(bill, lines, user)
             BillService._upsert_statement(bill, bill.billing_account, statement, user)
+            if bill.amount_is_estimated:
+                bill.amount_is_estimated = False
+                bill.updated_by = user
+                # AuditMixin.save appends updated_at to update_fields automatically.
+                bill.save(update_fields=["amount_is_estimated", "updated_by"])
         return bill
 
     @staticmethod

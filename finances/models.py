@@ -334,6 +334,12 @@ class Bill(AuditMixin, SoftDeleteMixin, models.Model):
     lifecycle_state = models.CharField(
         max_length=20, choices=BillLifecycleState.choices, default=BillLifecycleState.ACTIVE
     )
+    # True only for a bill freshly generated with an unconfirmed value (design §3.3 — cockpit
+    # badge "valor estimado"/"aguardando fatura"). Set exclusively by
+    # BillGenerationService._ensure_account_bill (via get_or_create defaults, on creation) and
+    # cleared exclusively by BillService.update_with_lines / BillPaymentService.pay, once the
+    # real value is known — never in a viewset/serializer (S65).
+    amount_is_estimated = models.BooleanField(default=False)
     attachment = models.FileField(null=True, blank=True, upload_to="finances/bills/")
     notes = models.TextField(blank=True)
 

@@ -70,6 +70,9 @@ class BillPaymentService:
         ReserveMovement(withdrawal, bill=..., payment=...) with a balance guard (design §4.3).
         Only an ACTIVE bill is payable — a CANCELED/SUSPENDED/DEFERRED one would be a double
         charge (its expense is already excluded from the result), so it is rejected (PT 400).
+        A payment (total OR partial) means the real value is now known, so a still-estimated
+        bill has its amount_is_estimated flag cleared in the SAME transaction (S65) — bulk_pay
+        covers this by delegating to pay() per bill.
         """
         CondoMonthCloseService.assert_open(bill.competence_month)
         CondoMonthCloseService.assert_open(payment_date.replace(day=1))
@@ -106,6 +109,11 @@ class BillPaymentService:
                 BillPaymentService._withdraw_reserve_for_bill(
                     locked, payment, amount, payment_date, user
                 )
+            if locked.amount_is_estimated:
+                locked.amount_is_estimated = False
+                locked.updated_by = user
+                # AuditMixin.save appends updated_at to update_fields automatically.
+                locked.save(update_fields=["amount_is_estimated", "updated_by"])
             logger.info("Bill %s paid %s (funded_from=%s)", locked.pk, amount, funded_from)
         return payment
 
