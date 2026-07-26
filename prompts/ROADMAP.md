@@ -556,3 +556,61 @@ Cadeia crítica: `56 → 57 → 58 → 60 → 63 → 64`. `59` antes de `60`; `6
 - **S64 fornece**: `scripts/data/condo_utilities_seed.json` + `seed_condo_utilities` (idempotente, `--dry-run`); parcelas de abertura `competence_month=2026-06`; dívidas diferidas com `BillLineItem` + `billing_account` IPTU; sem backfill pré-tracking; prod após deploy (backup + advisor).
 - **Sem anexo do PDF** (parse em memória); **Atrasados inclui IPTU** (banner = drill-down); storage durável de anexos = futuro.
 - **Gate por sessão**: ≥90% em `finances`; BE `ruff && ruff format --check && mypy core/ finances/ && pyright && pytest` (escopo editado + regressão dirigida); FE `lint && type-check && test:unit`; zero erros/warnings; sem suppressions.
+
+---
+
+# Cockpit operacional de contas + extrato por conta + consolidação — Sessões 65–76
+
+**Design doc**: `docs/plans/2026-07-26-condo-bills-operational-redesign-design.md` (rev. 2)
+**Contratos autoritativos**: `prompts/SESSION_STATE.md` (seção "Cockpit operacional de contas")
+**Branch**: `feat/condo-bills-cockpit`
+
+## Grafo de dependências
+
+```
+65 BE Bill.amount_is_estimated (migração + transições em serviço) + auditoria P2.3 (guards JÁ existem)
+   |
+   +--------------------+--------------------+
+   v                    v                    v
+66 BE month_board    68 BE pay c/ ajuste  69 BE apply_invoice     [67 DEPENDE de 65 (months[] expõe
+   (CondoMonthBoard-    (new_total:          (draft + building,    amount_is_estimated); 70 só precisa de
+    Service, uncached)   semente/juros)       preserva parcelas)   master, mas roda após 65 p/ evitar
+                                                                   conflitos em crud_views.py]
+   |                    |                    |
+   |   67 BE open_balance + statement    70 BE consolidate_open_bills + consolidate_debt
+   |                    |                    |
+   +----------+---------+---------+----------+
+              v
+        71 FE data layer (schemas + query-keys + hooks + MSW)   [precisa 66-70: contratos]
+              |
+   +----------+----------+
+   v                     v
+72 FE /finances/accounts  73 FE /finances/accounts/[id] (primeiro [id]) + consolidate-dialog
+   (CRUD + navegação)        |
+   |                         |
+   +----------+--------------+
+              v
+        74 FE cockpit estrutura (month_board, seções, banner, badges)   [precisa SÓ de 71 — as arestas 72/73→74 do desenho são ordem de execução recomendada, não dependência; 73 é pré-requisito da 75]
+              |
+              v
+        75 FE cockpit interações (popovers pagar/editar, conta avulsa, importar na linha, CTA parcelar)  [precisa 74 + 68/69/70 + 73]
+              |
+              v
+        76 FE preflight fechamento + erros acionáveis + varredura final + /audit
+```
+
+Cadeia crítica: `65 → 66 → 71 → 74 → 75 → 76`.
+
+## Waves
+| Wave | Sessões | Paralelo | Observação |
+|------|---------|----------|------------|
+| 1 | **65** (BE) | 1 | flag + transições; head da feature (commitar o design doc aqui) |
+| 2 | **66** ‖ **67** ‖ **70** (BE) | até 3 | serviços novos em arquivos disjuntos; actions tocam `crud_views.py`/`dashboard_views.py` — se paralelo, integrar com cuidado |
+| 3 | **68** ‖ **69** (BE) | até 2 | ambos dependem de 65; 69 também mexe em `invoice_draft_service.py` |
+| 4 | **71** (FE) | 1 | data layer — precisa dos contratos de 66–70 estáveis |
+| 5 | **72** ‖ **73** (FE) | até 2 | páginas novas independentes entre si |
+| 6 | **74** (FE) | 1 | reescrita estrutural do cockpit |
+| 7 | **75** (FE) | 1 | interações (depende de 73 p/ o dialog de consolidação) |
+| 8 | **76** (FE) | 1 | preflight + varredura + `/audit` |
+
+> **Execução recomendada**: sequencial 65→76 (gate ≥90% em `finances` + ruff/mypy/pyright/pytest ou lint/type-check/test:unit por sessão antes de avançar). Paralelismo opcional nas waves 2/3/5.
