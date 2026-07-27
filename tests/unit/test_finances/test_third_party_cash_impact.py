@@ -269,3 +269,37 @@ def test_month_without_third_party_activity_is_unchanged() -> None:
     assert CondoBalanceService.cash_change_of_month(2026, 6) == Decimal("-400.00")
     assert CondoBalanceService._wedge_residual(2026, 6) == Decimal("0.00")
     assert CondoBalanceService.overview(2026, 6)["wedge_ok"] is True
+
+
+# --- 12: regression-lock — the month comes from settlement_date, never created_at ---------
+
+
+@freeze_time("2026-06-15")
+def test_settlement_counts_by_settlement_date_not_created_at() -> None:
+    """Pins the FIELD, not just the behavior: every other test in this file dates its
+    settlements inside the frozen month, so created_at and settlement_date coincide there and
+    a refactor to created_at would stay green. Here they deliberately differ."""
+    person = make_person()
+    bill = _bill("400.00")
+    _settle("90.00", person, JULY, bill.condominium)  # created in June, dated July
+
+    assert CondoBalanceService.cash_change_of_month(2026, 6) == Decimal("0.00")
+    assert CondoBalanceService.cash_change_of_month(2026, 7) == Decimal("-90.00")
+
+
+@freeze_time("2026-06-15")
+def test_settlements_do_not_leak_across_month_edges() -> None:
+    """Both month boundaries are exact — 05-31 and 07-01 stay out of June."""
+    person = make_person()
+    bill = _bill("400.00")
+    for when, amount in (
+        (date(2026, 5, 31), "50.00"),
+        (date(2026, 6, 1), "7.00"),
+        (date(2026, 6, 30), "17.00"),
+        (date(2026, 7, 1), "70.00"),
+    ):
+        _settle(amount, person, when, bill.condominium)
+
+    assert CondoBalanceService._components(2026, 5, None).settlements_out == Decimal("50.00")
+    assert CondoBalanceService._components(2026, 6, None).settlements_out == Decimal("24.00")
+    assert CondoBalanceService._components(2026, 7, None).settlements_out == Decimal("70.00")
