@@ -25,7 +25,9 @@ from finances.services.invoice_draft_service import InvoiceDraftService
 from finances.services.invoice_parsing.base import ParsedInvoice, ParsedLine
 from tests.factories import (
     make_bill,
+    make_bill_line_item,
     make_billing_account,
+    make_building,
     make_installment,
     make_installment_plan,
 )
@@ -321,3 +323,116 @@ def test_build_draft_match_requires_active_account_state(admin_user):
     )
     draft = InvoiceDraftService.build_draft(_water_invoice())
     assert draft["matched_account"]["id"] == account.id
+
+
+# --- S69: matched_account.building_id (flat) + target_bill divergence warnings -------------------
+
+
+def test_matched_account_exposes_flat_building_id(admin_user):
+    building = make_building(user=admin_user)
+    make_billing_account(
+        account_type=BillingAccountType.WATER,
+        external_identifier=WATER_UC,
+        building=building,
+        user=admin_user,
+    )
+    draft = InvoiceDraftService.build_draft(_water_invoice())
+    assert draft["matched_account"]["building_id"] == building.pk
+
+
+def test_matched_account_building_id_is_none_when_account_has_no_building(admin_user):
+    make_billing_account(
+        account_type=BillingAccountType.WATER,
+        external_identifier=WATER_UC,
+        building=None,
+        user=admin_user,
+    )
+    draft = InvoiceDraftService.build_draft(_water_invoice())
+    assert draft["matched_account"]["building_id"] is None
+
+
+def test_target_bill_building_mismatch_appends_warning(admin_user):
+    account_building = make_building(street_number=100, user=admin_user)
+    bill_building = make_building(street_number=200, user=admin_user)
+    account = make_billing_account(
+        account_type=BillingAccountType.WATER,
+        external_identifier=WATER_UC,
+        building=account_building,
+        user=admin_user,
+    )
+    target_bill = make_bill(
+        billing_account=account,
+        building=bill_building,
+        competence_month=date(2026, 5, 1),
+        lifecycle_state=BillLifecycleState.ACTIVE,
+        user=admin_user,
+    )
+    draft = InvoiceDraftService.build_draft(_water_invoice(), target_bill=target_bill)
+    assert any("outro prédio" in warning for warning in draft["warnings"])
+
+
+def test_target_bill_same_building_no_warning(admin_user):
+    building = make_building(user=admin_user)
+    account = make_billing_account(
+        account_type=BillingAccountType.WATER,
+        external_identifier=WATER_UC,
+        building=building,
+        user=admin_user,
+    )
+    target_bill = make_bill(
+        billing_account=account,
+        building=building,
+        competence_month=date(2026, 5, 1),
+        lifecycle_state=BillLifecycleState.ACTIVE,
+        user=admin_user,
+    )
+    draft = InvoiceDraftService.build_draft(_water_invoice(), target_bill=target_bill)
+    assert not any("outro prédio" in warning for warning in draft["warnings"])
+
+
+def test_no_target_bill_keeps_standalone_draft_unchanged(admin_user):
+    """Without a target_bill, the standalone parse_invoice draft is unaffected (S60 contract)."""
+    account_building = make_building(street_number=100, user=admin_user)
+    make_billing_account(
+        account_type=BillingAccountType.WATER,
+        external_identifier=WATER_UC,
+        building=account_building,
+        user=admin_user,
+    )
+    draft = InvoiceDraftService.build_draft(_water_invoice())
+    assert not any("outro prédio" in warning for warning in draft["warnings"])
+    assert not any("parcela" in warning.lower() for warning in draft["warnings"])
+
+
+def test_reconciled_installment_amount_mismatch_appends_warning(admin_user):
+    """A PARCELA line reconciled to a live installment whose amount differs from the bill's own
+    live embedded line only WARNS (informative) — the live line is never silently overwritten
+    (design §8; the dedup in update_with_lines is what actually preserves it)."""
+    account = make_billing_account(
+        account_type=BillingAccountType.WATER, external_identifier=WATER_UC, user=admin_user
+    )
+    plan = make_installment_plan(
+        embedded=True,
+        billing_account=account,
+        lifecycle_state=InstallmentPlanState.ACTIVE,
+        user=admin_user,
+    )
+    installment = make_installment(plan=plan, number=3, amount=Decimal("530.24"), user=admin_user)
+    target_bill = make_bill(
+        billing_account=account,
+        competence_month=date(2026, 5, 1),
+        lifecycle_state=BillLifecycleState.ACTIVE,
+        user=admin_user,
+    )
+    live_line = make_bill_line_item(
+        bill=target_bill, installment=installment, amount=Decimal("400.00"), user=admin_user
+    )
+    invoice = _water_invoice(
+        line_items=[
+            ParsedLine(description="Parcela 3/59", amount=Decimal("530.24"), installment_number=3)
+        ]
+    )
+    draft = InvoiceDraftService.build_draft(invoice, target_bill=target_bill)
+    assert any("diverge" in warning.lower() for warning in draft["warnings"])
+    live_line.refresh_from_db()
+    assert live_line.amount == Decimal("400.00")  # untouched — the draft never writes

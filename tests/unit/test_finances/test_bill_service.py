@@ -7,7 +7,7 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 
-from finances.models import Bill, BillBehavior, InstallmentPlanState
+from finances.models import Bill, BillBehavior, BillLineItem, InstallmentPlanState
 from finances.services.bill_generation_service import BillGenerationService
 from finances.services.bill_payment_service import BillPaymentService
 from finances.services.bill_service import BillDraft, BillService
@@ -15,7 +15,9 @@ from finances.services.installment_plan_service import InstallmentPlanService
 from tests.factories import (
     make_bill,
     make_bill_line_item,
+    make_billing_account,
     make_condominium,
+    make_installment,
     make_installment_plan,
 )
 
@@ -178,3 +180,105 @@ def test_delete_standalone_installment_bill_reverts_plan_to_active() -> None:
     # generation can now recreate the parcela Bill for the same month
     regenerated = BillGenerationService.ensure_month_bills(2026, 6)
     assert any(b.installment_id == plan.installments.get().id for b in regenerated)
+
+
+# --- S69: update_with_lines preserves embedded-installment lines (only replaces installment__isnull=True) ---
+
+
+def _embedded_installment_bill():
+    """A recurring water bill carrying one embedded-parcela line + one seed (non-parcela) line."""
+    account = make_billing_account(account_type="water", external_identifier="UC-EMBED")
+    plan = make_installment_plan(
+        embedded=True,
+        billing_account=account,
+        lifecycle_state=InstallmentPlanState.ACTIVE,
+    )
+    installment = make_installment(plan=plan, number=3, amount=Decimal("530.24"))
+    bill = make_bill(
+        billing_account=account,
+        competence_month=date(2026, 6, 1),
+        behavior=BillBehavior.RECURRING,
+    )
+    installment_line = make_bill_line_item(
+        bill=bill, installment=installment, amount=Decimal("530.24"), description="Parcela 3/59"
+    )
+    seed_line = make_bill_line_item(
+        bill=bill, amount=Decimal("100.00"), description="Consumo (estimado)"
+    )
+    return bill, installment, installment_line, seed_line
+
+
+def test_update_with_lines_preserves_installment_lines() -> None:
+    bill, _installment, installment_line, seed_line = _embedded_installment_bill()
+
+    BillService.update_with_lines(
+        bill,
+        [
+            {"description": "Consumo A", "amount": Decimal("70.00")},
+            {"description": "Consumo B", "amount": Decimal("80.00")},
+        ],
+    )
+
+    installment_line.refresh_from_db()
+    assert installment_line.is_deleted is False
+    assert installment_line.pk is not None
+    assert BillLineItem.objects.with_deleted().get(pk=seed_line.pk).is_deleted is True
+    non_installment_lines = BillLineItem.objects.filter(bill=bill, installment__isnull=True)
+    assert non_installment_lines.count() == 2
+    assert BillLineItem.objects.filter(bill=bill, installment__isnull=False).count() == 1
+    annotated = Bill.objects.with_amounts(date(2026, 7, 1)).get(pk=bill.pk)
+    assert annotated.amount_total == Decimal("680.24")  # 70 + 80 + 530.24 (parcela preserved)
+
+
+def test_update_with_lines_dedups_incoming_installment_line() -> None:
+    bill, installment, installment_line, _seed_line = _embedded_installment_bill()
+
+    BillService.update_with_lines(
+        bill,
+        [
+            {
+                "description": "Parcela 3/59",
+                "amount": Decimal("530.24"),
+                "installment": installment,
+            },
+            {"description": "Consumo", "amount": Decimal("90.00")},
+        ],
+    )
+
+    assert BillLineItem.objects.filter(bill=bill, installment=installment).count() == 1
+    assert BillLineItem.objects.filter(bill=bill, installment=installment).get().pk == (
+        installment_line.pk
+    )
+    annotated = Bill.objects.with_amounts(date(2026, 7, 1)).get(pk=bill.pk)
+    assert annotated.amount_total == Decimal("620.24")  # 90 + 530.24 — parcela never doubled
+
+
+def test_update_with_lines_creates_new_installment_line_when_absent() -> None:
+    account = make_billing_account(account_type="water", external_identifier="UC-NEWLINE")
+    plan = make_installment_plan(
+        embedded=True,
+        billing_account=account,
+        lifecycle_state=InstallmentPlanState.ACTIVE,
+    )
+    installment = make_installment(plan=plan, number=1, amount=Decimal("200.00"))
+    bill = make_bill(
+        billing_account=account,
+        competence_month=date(2026, 6, 1),
+        behavior=BillBehavior.RECURRING,
+    )
+    make_bill_line_item(bill=bill, amount=Decimal("50.00"), description="Consumo")
+
+    BillService.update_with_lines(
+        bill,
+        [
+            {
+                "description": "Parcela 1/12",
+                "amount": Decimal("200.00"),
+                "installment": installment,
+            }
+        ],
+    )
+
+    assert BillLineItem.objects.filter(bill=bill, installment=installment).count() == 1
+    annotated = Bill.objects.with_amounts(date(2026, 7, 1)).get(pk=bill.pk)
+    assert annotated.amount_total == Decimal("200.00")

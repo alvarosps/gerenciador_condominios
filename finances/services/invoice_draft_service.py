@@ -6,8 +6,9 @@ touches the database: it reads the matching ``BillingAccount`` (by ``account_typ
 reads the embedded-installment plan to resolve ``installment_id`` per line, and reads whether an
 active ``Bill`` already exists for (account, competence) to flag a replacement. It never creates,
 updates or deletes a record — the draft is persisted later by ``create_with_lines`` /
-``update_with_lines`` (S58), from the modal (S63). Direction: ``finances.models`` +
-``finances.services.invoice_parsing.base`` only — never views/serializers reach back here.
+``update_with_lines`` (S58), from the modal (S63) or by ``InvoiceApplyService`` (S69, ``target_bill``
+given). Direction: ``finances.models`` + ``finances.services.invoice_parsing.base`` only — never
+views/serializers reach back here.
 """
 
 from typing import TypedDict
@@ -16,6 +17,7 @@ from finances.models import (
     Bill,
     BillingAccount,
     BillingAccountType,
+    BillLineItem,
     Installment,
     InstallmentPlanState,
 )
@@ -58,13 +60,30 @@ _WARN_INSTALLMENT_NO_PLAN = (
     "Parcela {number} sem plano de parcelamento cadastrado — crie o plano em "
     "Planos de Parcelamento."
 )
+_WARN_BUILDING_MISMATCH = (
+    "A conta casada pertence a outro prédio (conta: {account_building}; "
+    "cobrança: {bill_building}). Confira antes de aplicar."
+)
+_WARN_INSTALLMENT_AMOUNT_MISMATCH = (
+    "A parcela {number} da fatura importada (R$ {parsed_amount}) diverge do valor da linha de "
+    "parcela já lançada nesta conta (R$ {live_amount}) — a linha existente foi preservada; "
+    "confira o plano de parcelamento."
+)
+_NO_BUILDING_LABEL = "Condomínio (sem prédio)"
 
 
 class InvoiceDraftService:
     @staticmethod
-    def build_draft(parsed: ParsedInvoice) -> InvoiceDraft:
+    def build_draft(parsed: ParsedInvoice, target_bill: Bill | None = None) -> InvoiceDraft:
         """Enriquece um ParsedInvoice (S59) com casamento de conta + reconciliação de parcela +
-        idempotência, e devolve o RASCUNHO serializado (grava NADA)."""
+        idempotência, e devolve o RASCUNHO serializado (grava NADA).
+
+        ``target_bill`` (S69, opcional): quando informado (o ``InvoiceApplyService`` está
+        aplicando a fatura a UMA bill alvo), o draft ganha dois warnings informativos — nunca
+        bloqueantes aqui, os bloqueios são responsabilidade do apply — quando a conta casada
+        pertence a outro prédio e quando uma linha de PARCELA reconciliada diverge do valor da
+        linha de parcela viva já lançada na bill alvo. Sem ``target_bill`` (fluxo avulso
+        ``parse_invoice``), o draft é idêntico ao contrato S60 (aditivo: `building_id` plano)."""
         warnings = list(parsed.warnings)
         account = InvoiceDraftService._match_account(parsed)
         if account is None:
@@ -74,9 +93,20 @@ class InvoiceDraftService:
                     identifier=parsed.external_identifier,
                 )
             )
+        elif target_bill is not None and target_bill.building_id != account.building_id:
+            warnings.append(
+                _WARN_BUILDING_MISMATCH.format(
+                    account_building=(
+                        account.building.name if account.building else _NO_BUILDING_LABEL
+                    ),
+                    bill_building=(
+                        target_bill.building.name if target_bill.building else _NO_BUILDING_LABEL
+                    ),
+                )
+            )
 
         line_items = [
-            InvoiceDraftService._reconcile_line(line, account, warnings)
+            InvoiceDraftService._reconcile_line(line, account, target_bill, warnings)
             for line in parsed.line_items
         ]
 
@@ -89,11 +119,18 @@ class InvoiceDraftService:
                 )
             )
 
+        matched_account = None
+        if account is not None:
+            matched_account = {
+                **BillingAccountSerializer(account).data,
+                "building_id": account.building_id,
+            }
+
         return {
             "bill": InvoiceDraftService._bill_dict(parsed, account),
             "line_items": line_items,
             "statement": parsed.statement,
-            "matched_account": (BillingAccountSerializer(account).data if account else None),
+            "matched_account": matched_account,
             "existing_bill_id": existing_bill_id,
             "warnings": warnings,
         }
@@ -135,13 +172,21 @@ class InvoiceDraftService:
 
     @staticmethod
     def _reconcile_line(
-        line: ParsedLine, account: BillingAccount | None, warnings: list[str]
+        line: ParsedLine,
+        account: BillingAccount | None,
+        target_bill: Bill | None,
+        warnings: list[str],
     ) -> dict[str, object]:
         """Serialize one parsed line; resolve installment_id from the account's embedded plan.
 
         installment_number is INTERNAL to ParsedLine (S59) and never leaks into the draft — the
         draft exposes only installment_id. A parcela line whose plan is missing stays generic
         (installment_id=None) and appends a PT warning; no plan/installment is ever created.
+
+        When ``target_bill`` is given (S69) and this parcela already has a LIVE line on the
+        target bill with a DIFFERENT amount, a warning is appended — informative only, the live
+        line is never overwritten here (the draft writes nothing; update_with_lines' dedup, S69,
+        is what actually preserves it, design §8).
         """
         installment_id: int | None = None
         if line.installment_number is not None and account is not None:
@@ -155,6 +200,10 @@ class InvoiceDraftService:
             installment_id = installment.pk if installment is not None else None
         if line.installment_number is not None and installment_id is None:
             warnings.append(_WARN_INSTALLMENT_NO_PLAN.format(number=line.installment_number))
+        if installment_id is not None and target_bill is not None:
+            InvoiceDraftService._warn_installment_amount_mismatch(
+                target_bill, installment_id, line, warnings
+            )
         return {
             "description": line.description,
             "amount": money_str(line.amount),
@@ -162,6 +211,23 @@ class InvoiceDraftService:
             "category_id": None,
             "installment_id": installment_id,
         }
+
+    @staticmethod
+    def _warn_installment_amount_mismatch(
+        target_bill: Bill, installment_id: int, line: ParsedLine, warnings: list[str]
+    ) -> None:
+        live_line = BillLineItem.objects.filter(
+            bill=target_bill, installment_id=installment_id
+        ).first()
+        if live_line is None or live_line.amount == line.amount:
+            return
+        warnings.append(
+            _WARN_INSTALLMENT_AMOUNT_MISMATCH.format(
+                number=line.installment_number,
+                parsed_amount=money_str(line.amount),
+                live_amount=money_str(live_line.amount),
+            )
+        )
 
     @staticmethod
     def _existing_bill_id(parsed: ParsedInvoice, account: BillingAccount | None) -> int | None:

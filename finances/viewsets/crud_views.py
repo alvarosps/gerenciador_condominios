@@ -65,7 +65,9 @@ from finances.services.bill_service import (
     StatementInput,
 )
 from finances.services.condo_month_close_service import CondoMonthCloseService
+from finances.services.invoice_apply_service import InvoiceApplyService
 from finances.services.invoice_draft_service import InvoiceDraftService
+from finances.services.invoice_parsing.base import ParsedInvoice
 from finances.services.invoice_parsing.registry import detect_and_parse
 from finances.services.reserve_service import ReserveService
 from finances.viewsets.query_params import int_param
@@ -589,15 +591,14 @@ class BillViewSet(viewsets.ModelViewSet):
             return Response({"error": message}, status=status.HTTP_400_BAD_REQUEST)
         return Response(self._serialized_bill(bill), status=status.HTTP_200_OK)
 
-    @action(detail=False, methods=["post"], parser_classes=[MultiPartParser])
-    def parse_invoice(self, request: Request) -> Response:
-        """Receive a utility invoice PDF (multipart), parse it in MEMORY and return a DRAFT.
+    def _read_parsed_invoice(self, request: Request) -> ParsedInvoice | Response:
+        """Read+validate the uploaded invoice PDF and parse it in MEMORY (shared by
+        parse_invoice/apply_invoice — DRY, identical 400/422 PT on both).
 
-        Writes NOTHING (past-immutable, design §6): the draft is persisted later via
-        create_with_lines/update_with_lines (S58), from the modal (S63). is_staff is enforced by
-        IsAdminUser (admin-only viewset). The PDF is validated and discarded — never stored
-        (decisão #4). The only external I/O boundary is pdfplumber.open; the positional parsing
-        lives in the S59 registry.
+        Returns the parsed invoice on success or the PT error Response on failure (the caller
+        checks ``isinstance(result, ParsedInvoice)`` and returns the Response verbatim otherwise).
+        The PDF is validated and discarded — never stored (decisão #4). The only external I/O
+        boundary is pdfplumber.open; the positional parsing lives in the S59 registry.
         """
         uploaded = request.FILES.get("file")
         if uploaded is None:
@@ -611,11 +612,46 @@ class BillViewSet(viewsets.ModelViewSet):
         if not has_pages:
             return Response({"error": _ERR_NOT_PDF}, status=status.HTTP_400_BAD_REQUEST)
         try:
-            parsed = detect_and_parse(pdf_bytes)
+            return detect_and_parse(pdf_bytes)
         except ValueError as exc:
             return Response({"error": str(exc)}, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+    @action(detail=False, methods=["post"], parser_classes=[MultiPartParser])
+    def parse_invoice(self, request: Request) -> Response:
+        """Receive a utility invoice PDF (multipart), parse it in MEMORY and return a DRAFT.
+
+        Writes NOTHING (past-immutable, design §6): the draft is persisted later via
+        create_with_lines/update_with_lines (S58), from the modal (S63). is_staff is enforced by
+        IsAdminUser (admin-only viewset). The PDF is validated and discarded — never stored
+        (decisão #4). The only external I/O boundary is pdfplumber.open; the positional parsing
+        lives in the S59 registry.
+        """
+        parsed = self._read_parsed_invoice(request)
+        if not isinstance(parsed, ParsedInvoice):
+            return parsed
         draft = InvoiceDraftService.build_draft(parsed)
         return Response(draft, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"], parser_classes=[MultiPartParser])
+    def apply_invoice(self, request: Request, pk: str | None = None) -> Response:
+        """Receive a utility invoice PDF (multipart), parse it in MEMORY and APPLY it to THIS bill.
+
+        Unlike parse_invoice (a read-only draft for the modal), this writes: lines + statement +
+        editable header (due_date/external_identifier) are replaced on the SAME transaction via
+        InvoiceApplyService.apply -> BillService.update_with_lines (S69, design §3.3). 400 PT on
+        account/competence mismatch, a non-ACTIVE bill, a paid bill or a closed month (the last
+        two rejected by update_with_lines' own guards, delegated). 422 PT on an unknown issuer
+        (same status as parse_invoice). The PDF is validated and discarded — never stored.
+        """
+        bill = self.get_object()
+        parsed = self._read_parsed_invoice(request)
+        if not isinstance(parsed, ParsedInvoice):
+            return parsed
+        try:
+            InvoiceApplyService.apply(bill, parsed, user=cast(User, request.user))
+        except ValidationError as exc:
+            return Response({"error": str(exc.messages[0])}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(self._serialized_bill(bill), status=status.HTTP_200_OK)
 
     def create(self, request: Request, *args: object, **kwargs: object) -> Response:
         # The default create cannot write line items (amount_total derives from them), so a bill
