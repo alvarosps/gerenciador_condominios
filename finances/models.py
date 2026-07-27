@@ -14,7 +14,7 @@ exist yet); only Bill.billing_account is created here.
 from datetime import date
 from decimal import Decimal
 
-from django.core.exceptions import ValidationError
+from django.core.exceptions import NON_FIELD_ERRORS, ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.db.models import (
@@ -85,6 +85,7 @@ class SupplyStatus(models.TextChoices):
 class FundedFrom(models.TextChoices):
     CAIXA = "caixa", "Caixa"
     RESERVE = "reserve", "Reserva"
+    THIRD_PARTY = "third_party", "Terceiro"
 
 
 class Category(AuditMixin, SoftDeleteMixin, models.Model):
@@ -369,6 +370,16 @@ class BillQuerySet(models.QuerySet["Bill"]):
 # that and exposes with_amounts()/with_deleted() on Bill.objects (django-stubs friendly).
 BillManager = SoftDeleteManager.from_queryset(BillQuerySet)
 
+# Third-party invariants (S77). PUBLIC on purpose: BillPaymentService validates the same
+# rule before Payment.objects.create(), which skips full_clean() (S80).
+ERR_THIRD_PARTY_NEEDS_PERSON = "Pagamento de terceiro exige a pessoa que pagou."
+ERR_PERSON_ONLY_THIRD_PARTY = "Apenas pagamento de terceiro pode ter pessoa pagadora."
+# Mutual exclusivity of the THREE source FKs only — paid_by_person is an orthogonal
+# attribution dimension ("who funded it") and coexists with any of them (design §4.3).
+ERR_BILL_MULTIPLE_SOURCES = (
+    "A conta pode ter no máximo uma origem (conta de cobrança, parcela ou funcionário)."
+)
+
 
 class Bill(AuditMixin, SoftDeleteMixin, models.Model):
     """A payable (real). amount_* via Bill.objects.with_amounts(today) — never a Python property.
@@ -376,6 +387,8 @@ class Bill(AuditMixin, SoftDeleteMixin, models.Model):
     Source FKs: billing_account (S36, recurring), installment (S41, non-embedded plan),
     employee (S41, payroll). on_delete=SET_NULL so deleting a plan/employee never erases
     the real Bill history (past = real lines, design §3.2). behavior includes INSTALLMENT.
+    At most one source FK may be set (clean()). paid_by_person (S77) is NOT a source — it is
+    an orthogonal attribution FK and may coexist with any of the three.
     """
 
     condominium = models.ForeignKey(Condominium, on_delete=models.PROTECT, related_name="bills")
@@ -399,6 +412,15 @@ class Bill(AuditMixin, SoftDeleteMixin, models.Model):
     )
     employee = models.ForeignKey(
         "Employee", null=True, blank=True, on_delete=models.SET_NULL, related_name="bills"
+    )
+    # NOT a fourth source FK: orthogonal attribution ("who funded it"), coexists with any
+    # source FK (design §4.3). PROTECT — deleting the person would erase the debt owed to her.
+    paid_by_person = models.ForeignKey(
+        Person,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="finance_bills_purchased",
     )
     lifecycle_state = models.CharField(
         max_length=20, choices=BillLifecycleState.choices, default=BillLifecycleState.ACTIVE
@@ -451,6 +473,9 @@ class Bill(AuditMixin, SoftDeleteMixin, models.Model):
         super().clean()
         if self.competence_month is not None:
             self.competence_month = self.competence_month.replace(day=1)
+        sources = (self.billing_account_id, self.installment_id, self.employee_id)
+        if sum(1 for source_id in sources if source_id is not None) > 1:
+            raise ValidationError({NON_FIELD_ERRORS: ERR_BILL_MULTIPLE_SOURCES})
 
 
 class BillLineItem(AuditMixin, SoftDeleteMixin, models.Model):
@@ -498,7 +523,16 @@ class Payment(AuditMixin, SoftDeleteMixin, models.Model):
     amount = models.DecimalField(max_digits=12, decimal_places=2)  # > 0
     method = models.CharField(max_length=50, blank=True)
     funded_from = models.CharField(
-        max_length=10, choices=FundedFrom.choices, default=FundedFrom.CAIXA
+        max_length=20, choices=FundedFrom.choices, default=FundedFrom.CAIXA
+    )
+    # PROTECT — deliberately diverges from Employee.person (SET_NULL): deleting the person
+    # would erase the debt owed to her.
+    paid_by = models.ForeignKey(
+        Person,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="finance_payments_funded",
     )
     reference = models.CharField(max_length=200, blank=True)
     notes = models.TextField(blank=True)
@@ -523,6 +557,11 @@ class Payment(AuditMixin, SoftDeleteMixin, models.Model):
         super().clean()
         if self.amount is not None and self.amount <= 0:
             raise ValidationError({"amount": "O valor do pagamento deve ser positivo."})
+        is_third_party = self.funded_from == FundedFrom.THIRD_PARTY
+        if is_third_party and self.paid_by_id is None:
+            raise ValidationError({"paid_by": ERR_THIRD_PARTY_NEEDS_PERSON})
+        if not is_third_party and self.paid_by_id is not None:
+            raise ValidationError({"paid_by": ERR_PERSON_ONLY_THIRD_PARTY})
 
 
 class PaymentAllocation(AuditMixin, SoftDeleteMixin, models.Model):
@@ -1023,3 +1062,42 @@ class ElectricityBillStatement(AuditMixin, SoftDeleteMixin, models.Model):
 
     def __str__(self) -> str:
         return f"Luz {self.consumo_kwh} kWh — {self.bill}"
+
+
+class ThirdPartySettlement(AuditMixin, SoftDeleteMixin, models.Model):
+    """Acerto com um terceiro: saída de caixa que abate a dívida acumulada com a pessoa.
+
+    Nunca vinculado a mês ou cobrança específica — a alocação é FIFO computada
+    (ThirdPartyStatementService), jamais persistida. Sem FK de prédio deliberadamente:
+    a dívida é com a pessoa, não de um prédio (design §4.4).
+    """
+
+    condominium = models.ForeignKey(
+        Condominium, on_delete=models.PROTECT, related_name="third_party_settlements"
+    )
+    person = models.ForeignKey(Person, on_delete=models.PROTECT, related_name="finance_settlements")
+    settlement_date = models.DateField()
+    amount = models.DecimalField(max_digits=12, decimal_places=2)  # > 0
+    method = models.CharField(max_length=50, blank=True)
+    notes = models.TextField(blank=True)
+
+    all_objects = models.Manager()
+    objects = SoftDeleteManager()
+
+    class Meta:
+        default_manager_name = "objects"
+        ordering = ["-settlement_date"]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(amount__gt=0),
+                name="third_party_settlement_amount_positive",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"Acerto R${self.amount} com {self.person} ({self.settlement_date:%d/%m/%Y})"
+
+    def clean(self) -> None:
+        super().clean()
+        if self.amount is not None and self.amount <= 0:
+            raise ValidationError({"amount": "O valor do acerto deve ser positivo."})
