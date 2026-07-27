@@ -134,8 +134,11 @@ Red primeiro. Cenários obrigatórios (calcular à mão, nunca contra a própria
 ## Aceite
 
 - Rodada escopada verde: `python -m pytest tests/unit/test_finances/test_third_party_statement_service.py --cov-fail-under=0`
-- **Cobertura ≥95% do serviço novo**, medida com comando explícito:
-  `python -m pytest tests/unit/test_finances/test_third_party_statement_service.py --cov=finances.services.third_party_statement_service --cov-fail-under=95`
+- **Cobertura ≥95% do serviço novo**, medida em DOIS passos (o comando de uma linha **não funciona** — `pytest.ini` já injeta `--cov=core --cov=finances`, então acrescentar `--cov=<módulo>` **amplia** o conjunto medido em vez de restringir, e o total cai para ~10%):
+  ```
+  python -m pytest tests/unit/test_finances/test_third_party_statement_service.py --cov-fail-under=0
+  python -m coverage report --include="finances/services/third_party_statement_service.py" --fail-under=95
+  ```
   Para isso ser atingível, o serviço **não pode ter branches defensivas inalcançáveis** (ex.: `except Person.DoesNotExist` — a validação de pessoa é da S80, no viewset, não aqui).
 - Suíte `finances` completa sem regressão (é aqui que o gate de 90% do `pytest.ini` se aplica)
 

@@ -245,6 +245,8 @@ O agrupamento usa `payment_date` para pagamentos e `competence_month` para compr
 
 Regra: **no mês M só entram no pool os acertos com `settlement_date <= último dia de M`.** FIFO cronológico é preservado; sobra vira crédito para os meses seguintes, como antes.
 
+**Armadilha do pseudocódigo (achada na implementação da S79):** implementar isso como um dicionário "acertos agrupados por mês da cobrança" **perde silenciosamente** todo acerto cujo mês não tem cobrança — ele some do `saldo_credor`. Usar ponteiro cronológico sobre a lista ordenada e, no fim, **drenar os acertos restantes** (posteriores à última cobrança) para o `saldo_credor`: são dinheiro já entregue.
+
 ```
 para cada mês M em ordem cronológica:
     pool += Σ acertos com settlement_date dentro de M   # entram no mês em que ocorreram
