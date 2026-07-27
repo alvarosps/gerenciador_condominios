@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { CalendarPlus, ChevronLeft, ChevronRight, FileUp, Plus } from 'lucide-react';
+import { CalendarPlus, ChevronLeft, ChevronRight, FileUp, Plus, ShoppingBag } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import {
@@ -48,6 +48,7 @@ import { BillPaymentDialog } from './_components/bill-payment-dialog';
 import { GenerateMissingBanner } from './_components/generate-missing-banner';
 import { OverdueSection, toConsolidableBills } from './_components/overdue-section';
 import { QuickBillDialog } from './_components/quick-bill-dialog';
+import { ThirdPartyPurchaseDialog } from './_components/third-party-purchase-dialog';
 
 const ALL = 'all';
 
@@ -84,6 +85,7 @@ export default function BillsPage() {
   const [payingBill, setPayingBill] = useState<Bill | null>(null);
   const [importDraft, setImportDraft] = useState<ParsedInvoice | null>(null);
   const [quickBillOpen, setQuickBillOpen] = useState(false);
+  const [purchaseOpen, setPurchaseOpen] = useState(false);
   const [rowImportBill, setRowImportBill] = useState<Bill | null>(null);
   const [rowImport, setRowImport] = useState<{
     bill: Bill;
@@ -246,6 +248,10 @@ export default function BillsPage() {
                 <Plus className="mr-2 h-4 w-4" />
                 Conta avulsa
               </Button>
+              <Button variant="outline" onClick={() => setPurchaseOpen(true)}>
+                <ShoppingBag className="mr-2 h-4 w-4" />
+                Nova compra de terceiro
+              </Button>
               <Button onClick={crud.openCreateModal}>
                 <Plus className="mr-2 h-4 w-4" />
                 Nova Conta
@@ -394,6 +400,15 @@ export default function BillsPage() {
         year={period.year}
         month={period.month}
       />
+
+      {isAdmin && (
+        <ThirdPartyPurchaseDialog
+          open={purchaseOpen}
+          onClose={() => setPurchaseOpen(false)}
+          year={period.year}
+          month={period.month}
+        />
+      )}
 
       <input
         ref={rowFileInputRef}

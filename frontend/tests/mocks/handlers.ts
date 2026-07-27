@@ -50,6 +50,7 @@ import {
   createMockOverdueResponse,
   createMockOwnerDistribution,
   createMockPayment,
+  createMockPersonSimple,
   createMockReserve,
   createMockReserveMovement,
   createMockThirdPartyPeople,
@@ -2314,6 +2315,29 @@ const financeHandlers = [
   http.post(`${API_BASE}/finances/bills/parse_invoice/`, async () => {
     await delay(50);
     return HttpResponse.json(createMockParsedInvoice());
+  }),
+  // Third-party purchase (S80): returns an ARRAY — one bill per parcela, each born paid.
+  http.post(`${API_BASE}/finances/bills/create_purchase/`, async ({ request }) => {
+    await delay(50);
+    const body = (await request.json()) as Record<string, unknown>;
+    const text = (value: unknown, fallback: string) =>
+      typeof value === 'string' ? value : fallback;
+    const count = typeof body.installment_count === 'number' ? body.installment_count : 1;
+    const created = Array.from({ length: count }, (_, index) =>
+      createMockBill({
+        id: financeBills.length + index + 1,
+        description: text(body.description, 'Compra'),
+        competence_month: text(body.competence_month, '2026-07-01'),
+        due_date: text(body.due_date, '2026-07-10'),
+        payment_status: 'paid',
+        amount_remaining: '0.00',
+        paid_by_person: createMockPersonSimple({
+          id: typeof body.person_id === 'number' ? body.person_id : 1,
+        }),
+      })
+    );
+    financeBills.push(...created);
+    return HttpResponse.json(created, { status: 201 });
   }),
   http.post(`${API_BASE}/finances/bills/generate_month/`, async ({ request }) => {
     await delay(100);

@@ -20,6 +20,7 @@ interface PayBody {
   amount?: number;
   funded_from: string;
   new_total?: string;
+  paid_by_person_id?: number;
 }
 
 function spyPay() {
@@ -202,6 +203,102 @@ describe('BillPayPopover', () => {
     expect(bodies[0]).not.toHaveProperty('new_total');
 
     await waitForQueriesToSettle(queryClient);
+  });
+
+  describe('origem "Terceiro" (S82)', () => {
+    async function chooseThirdParty(user: ReturnType<typeof userEvent.setup>) {
+      await user.click(screen.getByRole('combobox', { name: /origem/i }));
+      await user.click(await screen.findByRole('option', { name: 'Terceiro' }));
+    }
+
+    it('reveals the person selector only after "Terceiro" is chosen', async () => {
+      renderWithProviders(<BillPayPopover bill={confirmedBill()} />);
+      const user = await openPopover();
+
+      expect(screen.queryByText(/quem pagou/i)).not.toBeInTheDocument();
+
+      await chooseThirdParty(user);
+
+      expect(await screen.findByText(/quem pagou/i)).toBeInTheDocument();
+      expect(
+        screen.getByText(/não sai do caixa: a conta é quitada e vira dívida com essa pessoa\./i)
+      ).toBeInTheDocument();
+    });
+
+    it('keeps the confirm button disabled until a person is picked', async () => {
+      const bodies = spyPay();
+      renderWithProviders(<BillPayPopover bill={confirmedBill()} />);
+      const user = await openPopover();
+      await chooseThirdParty(user);
+
+      const confirm = screen.getByRole('button', { name: /confirmar pagamento/i });
+      await waitFor(() => expect(confirm).toBeDisabled());
+      expect(bodies).toHaveLength(0);
+
+      await user.click(screen.getByRole('combobox', { name: /quem pagou/i }));
+      await user.click(await screen.findByRole('option', { name: 'Rodrigo Souza' }));
+
+      await waitFor(() => expect(confirm).toBeEnabled());
+    });
+
+    it('sends funded_from=third_party with the chosen paid_by_person_id', async () => {
+      const bodies = spyPay();
+      const { queryClient } = renderWithProviders(<BillPayPopover bill={confirmedBill()} />);
+      const user = await openPopover();
+      await chooseThirdParty(user);
+
+      await user.click(screen.getByRole('combobox', { name: /quem pagou/i }));
+      await user.click(await screen.findByRole('option', { name: 'Rodrigo Souza' }));
+      await user.click(screen.getByRole('button', { name: /confirmar pagamento/i }));
+
+      await waitFor(() => expect(bodies).toHaveLength(1));
+      expect(bodies[0]).toMatchObject({
+        bill_id: 7,
+        funded_from: 'third_party',
+        paid_by_person_id: 1,
+      });
+
+      await waitForQueriesToSettle(queryClient);
+    });
+
+    it('never sends paid_by_person_id when the source is caixa', async () => {
+      const bodies = spyPay();
+      const { queryClient } = renderWithProviders(<BillPayPopover bill={confirmedBill()} />);
+      await openPopover();
+
+      await userEvent.click(screen.getByRole('button', { name: /confirmar pagamento/i }));
+
+      await waitFor(() => expect(bodies).toHaveLength(1));
+      expect(bodies[0]).toMatchObject({ funded_from: 'caixa' });
+      expect(bodies[0]).not.toHaveProperty('paid_by_person_id');
+
+      await waitForQueriesToSettle(queryClient);
+    });
+
+    it('surfaces a backend 400 on a third-party payment as a PT toast', async () => {
+      server.use(
+        http.post(`${API_BASE}/finances/bills/7/pay/`, () =>
+          HttpResponse.json(
+            { error: 'Pagamento de terceiro exige informar quem pagou.' },
+            { status: 400 }
+          )
+        )
+      );
+      const { queryClient } = renderWithProviders(<BillPayPopover bill={confirmedBill()} />);
+      const user = await openPopover();
+      await chooseThirdParty(user);
+      await user.click(screen.getByRole('combobox', { name: /quem pagou/i }));
+      await user.click(await screen.findByRole('option', { name: 'Rodrigo Souza' }));
+      await user.click(screen.getByRole('button', { name: /confirmar pagamento/i }));
+
+      await waitFor(() => {
+        expect(toast.error).toHaveBeenCalledWith(
+          'Pagamento de terceiro exige informar quem pagou.'
+        );
+      });
+
+      await waitForQueriesToSettle(queryClient);
+    });
   });
 
   it('surfaces the backend 400 message via toast on error', async () => {

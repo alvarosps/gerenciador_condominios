@@ -7,6 +7,34 @@
 
 ---
 
+## Feature: Pagamentos e compras de terceiros (filhos, genro) — Sessões 77–82
+
+**Design Doc**: `docs/plans/2026-07-27-condo-third-party-payments-design.md` (rev. 2 — 2 revisões adversariais incorporadas)
+**Total de Sessões**: 6 (77–82) — BE 77–80, FE 81–82
+**Branch**: `feat/condo-third-party-payments`
+**Status**: **FEATURE COMPLETA** — S77–S82 concluídas. É a **Fase 2** esboçada em §7 do design do cockpit (S65–76).
+**Decisões de produto** (design §2): reusar `core.Person` (sem `finances.ThirdParty`); escopo = pagamento de conta do condomínio **e** compras avulsas/parceladas; acerto **FIFO automático computado, nunca persistido**; cartão emprestado (direção inversa) **fora de escopo**.
+
+| # | Sessão | Camada | Status |
+|---|--------|--------|--------|
+| 77 | Model + invariantes (`FundedFrom.THIRD_PARTY`, `Payment.paid_by`, `Bill.paid_by_person`, `ThirdPartySettlement`) | BE | concluída |
+| 78 | Impacto no caixa e no wedge (`settlements_out`, zeragem por prédio) | BE | concluída |
+| 79 | `ThirdPartyStatementService` (FIFO computado, 6 status) | BE | concluída |
+| 80 | API (acertos, compras, extrato, `pay` estendido) | BE | concluída |
+| 81 | FE: índice de terceiros, extrato mês a mês, modal de acerto | FE | concluída |
+| 82 | FE: cockpit (origem Terceiro, badge, compra avulsa) + documentação viva + fluxo integrado | FE | concluída |
+
+**Contratos cross-session AUTORITATIVOS:**
+
+- **S77 fornece**: `FundedFrom.THIRD_PARTY = "third_party"` (o `AlterField` alargou `Payment.funded_from` para `max_length=20` — `"third_party"` tem 11 chars e estouraria o `max_length=10` original, sem ser pego em teste porque `create()` pula `full_clean()`); `Payment.paid_by` (FK `Person`, `PROTECT`, `related_name="finance_payments_funded"`); `Bill.paid_by_person` (FK `Person`) — **ORTOGONAL** às 3 FKs de origem, não é uma quarta: `billing_account + paid_by_person` e `installment + paid_by_person` são válidos; duas FKs de **origem** continuam 400. Invariantes: `THIRD_PARTY` sem `paid_by` → 400; `caixa` **com** `paid_by` → 400. `ThirdPartySettlement` (`AuditMixin` + `SoftDeleteMixin`, `amount > 0` por CheckConstraint, sem FK de prédio) com RLS habilitado na mesma migration.
+- **S78 fornece**: `settlements_out` (Σ `ThirdPartySettlement.amount` por `settlement_date` no mês) em `CondoBalanceService`; `cash_out = caixa_outflow + deposit_out + settlements_out`; `Δpayables = expense_competence − caixa_outflow − settlements_out`. Pagamento/compra de terceiro **não** movem `cash_balance` (allowlist de origens já cuidava disso). `settlements_out` é **zerado na visão por prédio** (a dívida é com a pessoa, não de um prédio). **O `wedge_ok` é vacuous para bugs de acerto** (o termo cancela dos dois lados) — só os testes de caixa dedicados fixam os KPIs concretos.
+- **S79 fornece**: `ThirdPartyStatementService` — FIFO cronológico do pool de acertos sobre o devido mês a mês, **computado a cada leitura, jamais persistido** (correção retroativa é absorvida pela próxima leitura, sem migração nem alocação órfã); **sem cache** (depende de `today_sp()`, e virada de meia-noite não é escrita — mesmo raciocínio de `month_board`). `devido(M)` = Σ pagamentos de terceiro com `payment_date` em M + Σ `amount_total` das compras com `competence_month` == M (`CANCELED` fora; `SUSPENDED`/`DEFERRED` dentro). **SEIS** status, não cinco: `paid`, `overdue`, `partially_paid`, `open`, `credit` e **`empty`** (mês na janela sem movimento) — `empty` **nunca** pode herdar o estilo de `paid`.
+- **S80 fornece**: `GET third-party/people/` (**array puro**, quem não deve nada é omitido) e `GET third-party/statement/?person_id=` (**objeto puro**, não `{results,count}`); CRUD `third-party-settlements/` com guard de mês fechado; `POST bills/create_purchase/` (`person_id`, `description`, `amount`, `competence_month`, `due_date`, `installment_count` ≤ **60**, `category_id`/`building_id` opcionais) → **array** de bills, cada uma nascida quitada — o **serviço** cria as N `Bill`s + N `Payment`s numa transação (parcelamento **não** reusa `InstallmentPlan`, que materializa num job mensal, sem `paid_by_person` e não pagas); `DELETE bills/{id}/delete_purchase/` e `POST bills/{id}/reassign_payer/` (a compra nasce paga, então `assert_not_paid` bloqueia o caminho normal); `unpay` de pagamento de compra é **rejeitado** (deixaria a bill ativa e não paga → dinheiro contado duas vezes); `pay`/`bulk_pay` aceitam `funded_from="third_party"` + `paid_by_person_id`, validados no MESMO ponto (`_validated_funding`). **`paid_by_person` foi adicionado a `BillSerializer.Meta.fields` (allowlist) + `select_related`** — sem isso o badge da S82 não teria como existir.
+- **S81 fornece**: `lib/schemas/finances/third-party.schema.ts` (6 status; `superRefine` da pessoa aceita o objeto aninhado **OU** `person_id` — exigir só o id write-only estoura em toda leitura e esvazia a lista inteira, a armadilha registrada em `installment-plan.schema.ts`), `lib/api/hooks/use-third-party.ts` (`useThirdPartyPeople`/`useThirdPartyStatement` com `staleTime: 0`; mutações de acerto invalidam `people` **e** `statement` **e** `settlements`), `queryKeys.finances.thirdParty.*`, rotas `/finances/third-party` (índice) e `/finances/third-party/[id]` (extrato com detalhe expansível por mês), `SettlementFormModal`, e as factories/handlers MSW.
+- **S82 fornece**: origem **Terceiro** no popover do cockpit com seletor de pessoa **obrigatório** (botão desabilitado sem pessoa — o backend também rejeita, mas o usuário não pode descobrir a regra por toast); `paymentFormSchema` ganhou `paid_by_person_id` (**sem `.default(0)`**: um default do Zod torna o campo opcional no tipo de INPUT e obrigatório no de output, e o RHF recusa o resolver como incompatível); `DIALOG_FUNDED_FROM_VALUES` restringe o dialog detalhado a caixa/reserva (ele não tem seletor de pessoa, e oferecer a origem lá produziria payload sempre rejeitado); badge com o nome da pessoa nas bills com `paid_by_person`; `ThirdPartyPurchaseDialog` (admin-gated, no header) com o texto obrigatório "A compra já foi paga pela pessoa e entra como dívida com ela"; `useCreateThirdPartyPurchase` + `invalidateThirdPartyCaches` (compra e pagamento de terceiro invalidam `finances.thirdParty.*` além das caches de bill); **`usePayBill` continua sem optimistic update**. Documentação viva: `docs/FINANCES.md` (seção de terceiros), `CLAUDE.md` (modelo + rotas), este bloco. **Teste de fluxo integrado** `tests/flows/__tests__/third-party-flow.test.tsx`: compra → extrato → acerto → saldo baixa, com MSW **stateful** (recomputa o extrato a partir do que recebeu, como o FIFO real) para que a queda do saldo prove o refetch, não a fixture.
+
+---
+
 ## Feature: Cockpit operacional de contas + extrato por conta + consolidação de dívida — Sessões 65–76
 
 **Design Doc**: `docs/plans/2026-07-26-condo-bills-operational-redesign-design.md` (rev. 2)

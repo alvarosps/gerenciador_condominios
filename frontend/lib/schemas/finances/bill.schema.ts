@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { buildingSchema } from '../building.schema';
+import { personSimpleSchema } from '../credit-card.schema';
 import { billingAccountSchema, billingAccountTypeEnum } from './billing-account.schema';
 import {
   billBehaviorEnum,
@@ -57,6 +58,11 @@ export const billSchema = z.object({
   behavior: billBehaviorEnum,
   billing_account: billingAccountSchema.nullable().optional(),
   billing_account_id: z.number().nullable().optional(),
+  // Third-party purchase (S80): the person who bought this with her own money. It is ORTHOGONAL
+  // to the three origin FKs — a bill can be both `billing_account` and `paid_by_person` (a third
+  // party paid the water bill). Present, it means the condominium owes HER, not a supplier.
+  paid_by_person: personSimpleSchema.nullable().optional(),
+  paid_by_person_id: z.number().nullable().optional(), // write-only on the serializer
   lifecycle_state: billLifecycleStateEnum,
   notes: z.string().optional().default(''),
   line_items: z.array(billLineItemSchema).default([]),

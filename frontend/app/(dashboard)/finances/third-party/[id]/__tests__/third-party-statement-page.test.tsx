@@ -13,6 +13,8 @@ import ThirdPartyStatementPage from '../page';
 // treatment the sidebar test gives it. Every data hook goes through MSW.
 vi.mock('next/navigation', () => ({
   useParams: vi.fn(() => ({ id: '1' })),
+  // The page renders SettlementFormModal, whose closed-month error path routes to the fechamento.
+  useRouter: vi.fn(() => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn(), back: vi.fn() })),
 }));
 
 const API_BASE = 'http://localhost:8008/api';

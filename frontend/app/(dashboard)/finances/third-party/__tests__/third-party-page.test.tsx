@@ -145,6 +145,45 @@ describe('ThirdPartyPage (índice de terceiros)', () => {
     await waitForQueriesToSettle(queryClient);
   });
 
+  it('após o acerto a lista REFETCHA e mostra o novo saldo (invalidação de cache)', async () => {
+    // Prova o refetch, não só que a mutação disparou: sem este teste, apagar TODAS as
+    // invalidações do useInvalidateThirdParty deixava a suíte verde (revisão adversarial, I-1),
+    // e a tela continuaria mostrando o saldo pré-acerto até um reload manual.
+    setAdmin(true);
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    let peopleCalls = 0;
+    server.use(
+      http.get(`${API_BASE}/finances/third-party/people/`, () => {
+        peopleCalls += 1;
+        return HttpResponse.json([
+          createMockThirdPartyPerson({
+            person_id: 1,
+            person_name: 'Alvaro',
+            // 1ª chamada: devendo 300. Depois do acerto de 120: 180.
+            total_em_aberto: peopleCalls === 1 ? '300.00' : '180.00',
+          }),
+        ]);
+      })
+    );
+    spyCreateSettlement();
+
+    const { queryClient } = renderWithProviders(<ThirdPartyPage />);
+    await waitForQueriesToSettle(queryClient);
+    // getAllByText: DataTable renders a desktop table AND a CSS-hidden mobile card view from the
+    // same `render`, so each cell string legitimately appears twice (precedent above, line 91).
+    await waitFor(() => expect(screen.getAllByText('R$ 300,00').length).toBeGreaterThan(0));
+
+    await user.click(screen.getByRole('button', { name: /registrar acerto/i }));
+    await user.click(await screen.findByLabelText('Pessoa *'));
+    await user.click(await screen.findByRole('option', { name: 'Alvaro' }));
+    await user.clear(screen.getByLabelText('Valor *'));
+    await user.type(screen.getByLabelText('Valor *'), '120');
+    await user.click(screen.getByRole('button', { name: 'Registrar' }));
+
+    await waitFor(() => expect(screen.getAllByText('R$ 180,00').length).toBeGreaterThan(0));
+    expect(screen.queryAllByText('R$ 300,00')).toHaveLength(0);
+  });
+
   it('admin registra acerto pelo modal enviando person_id, data, valor e método', async () => {
     setAdmin(true);
     setPeopleResponse([createMockThirdPartyPerson({ person_id: 1, person_name: 'Alvaro' })]);
@@ -195,8 +234,15 @@ describe('ThirdPartyPage (índice de terceiros)', () => {
     await user.type(screen.getByLabelText('Valor *'), '120');
     await user.click(screen.getByRole('button', { name: 'Registrar' }));
 
+    // Mês fechado é acionável, não beco sem saída: showFinanceMutationError anexa a ação
+    // "Abrir fechamento" (obrigatório em todo onError de mutação do cockpit — frontend/CLAUDE.md).
     await waitFor(() =>
-      expect(toast.error).toHaveBeenCalledWith('Este mês está fechado e não aceita lançamentos.')
+      expect(toast.error).toHaveBeenCalledWith(
+        'Este mês está fechado e não aceita lançamentos.',
+        expect.objectContaining({
+          action: expect.objectContaining({ label: 'Abrir fechamento' }),
+        })
+      )
     );
   });
 

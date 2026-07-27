@@ -15,6 +15,7 @@ import {
 } from '@/lib/schemas/finances/third-party.schema';
 import type { IptuAlertRow } from '@/lib/api/hooks/use-iptu-alerts';
 import type { BillSkip } from '@/lib/schemas/finances/bill-skip.schema';
+import { type personSimpleSchema } from '@/lib/schemas/credit-card.schema';
 import { type financeCategorySchema } from '@/lib/schemas/finances/category.schema';
 import { type employeeSchema } from '@/lib/schemas/finances/employee.schema';
 import {
@@ -60,6 +61,23 @@ type AccountStatementRaw = z.input<typeof accountStatementSchema>;
 type ThirdPartyPersonRaw = z.input<typeof thirdPartyPersonSchema>;
 type ThirdPartyStatementRaw = z.input<typeof thirdPartyStatementSchema>;
 type ThirdPartySettlementRaw = z.input<typeof thirdPartySettlementSchema>;
+
+type PersonSimpleRaw = z.input<typeof personSimpleSchema>;
+
+/** Nested person as `PersonSimpleSerializer` returns it — shared by settlements and paid_by_person. */
+export function createMockPersonSimple(overrides: Partial<PersonSimpleRaw> = {}): PersonSimpleRaw {
+  return {
+    id: 1,
+    name: 'Alvaro',
+    relationship: 'Filho',
+    phone: '',
+    email: '',
+    is_owner: false,
+    is_employee: false,
+    notes: '',
+    ...overrides,
+  };
+}
 
 export function createMockFinanceCategory(
   overrides: Partial<FinanceCategoryRaw> = {}
@@ -700,16 +718,7 @@ export function createMockThirdPartySettlement(
   return {
     id: 1,
     condominium: { id: 1, name: 'Condomínio' },
-    person: {
-      id: 1,
-      name: 'Alvaro',
-      relationship: 'Filho',
-      phone: '',
-      email: '',
-      is_owner: false,
-      is_employee: false,
-      notes: '',
-    },
+    person: createMockPersonSimple(),
     settlement_date: '2026-07-05',
     amount: '120.00',
     method: 'PIX',

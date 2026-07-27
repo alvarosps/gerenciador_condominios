@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -33,8 +34,9 @@ import {
 } from '@/components/ui/select';
 import { usePersons } from '@/lib/api/hooks/use-persons';
 import { useCreateThirdPartySettlement } from '@/lib/api/hooks/use-third-party';
-import { getErrorMessage, handleError } from '@/lib/utils/error-handler';
+import { handleError, showFinanceMutationError } from '@/lib/utils/error-handler';
 import { getTodayLocalISO } from '@/lib/utils/formatters';
+import { ROUTES } from '@/lib/utils/constants';
 
 interface SettlementFormModalProps {
   open: boolean;
@@ -69,6 +71,7 @@ export function SettlementFormModal({
   onClose,
   defaultPersonId = null,
 }: SettlementFormModalProps) {
+  const router = useRouter();
   const createMutation = useCreateThirdPartySettlement();
   const { data: persons } = usePersons();
 
@@ -107,7 +110,12 @@ export function SettlementFormModal({
       toast.success('Acerto registrado com sucesso');
       onClose();
     } catch (error) {
-      toast.error(getErrorMessage(error, 'Erro ao registrar acerto'));
+      // showFinanceMutationError, not a bare toast: a settlement IS closed-month guarded
+      // (ThirdPartySettlementService asserts the month on create/update/delete), so that 400 is
+      // reachable here and the user needs the "Abrir fechamento" action instead of a dead end.
+      showFinanceMutationError(error, 'Erro ao registrar acerto', () =>
+        router.push(ROUTES.FINANCES_MONTH_CLOSE)
+      );
       handleError(error, 'SettlementFormModal.onSubmit');
     }
   };

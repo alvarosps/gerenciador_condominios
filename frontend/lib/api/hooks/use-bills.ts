@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '../client';
 import { queryKeys } from '../query-keys';
+import { parseList } from '../parse-list';
 import { type Bill, type BillLineItem, billSchema } from '@/lib/schemas/finances/bill.schema';
 import {
   type ParsedInvoice,
@@ -68,6 +69,24 @@ export interface PayBillRequest {
   amount?: number;
   funded_from?: FundedFrom;
   new_total?: string; // decimal string (contract S68) — adjusts the bill's total before allocating
+  /** Required when `funded_from` is `third_party` — the person who footed the bill (S80). */
+  paid_by_person_id?: number;
+}
+
+/**
+ * `POST bills/create_purchase` — a purchase somebody else already paid for. `installment_count`
+ * makes the BACKEND create N bills + N payments in one transaction (max 60); the frontend never
+ * splits money itself. Amount is a decimal STRING all the way through.
+ */
+export interface CreatePurchaseRequest {
+  person_id: number;
+  description: string;
+  amount: string;
+  competence_month: string; // YYYY-MM-01
+  due_date: string; // YYYY-MM-DD
+  installment_count?: number;
+  category_id?: number;
+  building_id?: number;
 }
 
 interface PayBillResponse {
@@ -89,6 +108,16 @@ export function invalidateFinanceMoneyCaches(queryClient: ReturnType<typeof useQ
   void queryClient.invalidateQueries({ queryKey: queryKeys.finances.byCategory.all });
   void queryClient.invalidateQueries({ queryKey: queryKeys.finances.projection.all });
   void queryClient.invalidateQueries({ queryKey: queryKeys.finances.ownerDistribution.all });
+}
+
+/**
+ * Invalidate everything that describes what the condominium owes a PERSON: the índice, the
+ * month-by-month extrato and the settlement list. Third-party debt is derived (FIFO, recomputed
+ * at every read, never persisted), so any third-party payment or purchase changes all three at
+ * once. Invalidating the shared `thirdParty.all` prefix reaches them together.
+ */
+export function invalidateThirdPartyCaches(queryClient: ReturnType<typeof useQueryClient>) {
+  void queryClient.invalidateQueries({ queryKey: queryKeys.finances.thirdParty.all });
 }
 
 function invalidateBillCaches(queryClient: ReturnType<typeof useQueryClient>) {
@@ -256,6 +285,9 @@ export function usePayBill() {
         ...(request.amount !== undefined ? { amount: request.amount } : {}),
         funded_from: request.funded_from ?? 'caixa',
         ...(request.new_total !== undefined ? { new_total: request.new_total } : {}),
+        ...(request.paid_by_person_id !== undefined
+          ? { paid_by_person_id: request.paid_by_person_id }
+          : {}),
       });
       return data;
     },
@@ -265,6 +297,28 @@ export function usePayBill() {
         void queryClient.invalidateQueries({ queryKey: queryKeys.finances.reserves.all });
         void queryClient.invalidateQueries({ queryKey: queryKeys.finances.reserveMovements.all });
       }
+      if (request.funded_from === 'third_party') {
+        invalidateThirdPartyCaches(queryClient);
+      }
+    },
+  });
+}
+
+/**
+ * Third-party purchase. Invalidates the bill caches (the purchase IS a bill, born paid, so it
+ * shows on the board) AND the third-party caches (it is new debt with that person, and the FIFO
+ * statement is recomputed at every read — never persisted).
+ */
+export function useCreateThirdPartyPurchase() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (request: CreatePurchaseRequest) => {
+      const { data } = await apiClient.post<unknown>(`${ENDPOINT}create_purchase/`, request);
+      return parseList(data, billSchema).items;
+    },
+    onSuccess: () => {
+      invalidateBillCaches(queryClient);
+      invalidateThirdPartyCaches(queryClient);
     },
   });
 }

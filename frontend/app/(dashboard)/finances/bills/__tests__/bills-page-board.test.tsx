@@ -6,7 +6,11 @@ import userEvent from '@testing-library/user-event';
 import { renderWithProviders, waitForQueriesToSettle } from '@/tests/test-utils';
 import { server } from '@/tests/mocks/server';
 import { useAuthStore } from '@/store/auth-store';
-import { createMockBill, createMockMonthBoard } from '@/tests/mocks/data/finances';
+import {
+  createMockBill,
+  createMockMonthBoard,
+  createMockPersonSimple,
+} from '@/tests/mocks/data/finances';
 import BillsPage from '../page';
 
 // Real hooks (useMonthBoard / useGenerateMonthBills / …) hit MSW — no hook is mocked. The board is
@@ -513,6 +517,57 @@ describe('BillsPage — estimate badges via month board (Descrição column)', (
     expect(cell).toBeDefined();
     if (!cell) throw new Error('table cell not found');
     expect(within(cell).getByText('aguardando fatura')).toBeInTheDocument();
+
+    await waitForQueriesToSettle(queryClient);
+  });
+});
+
+describe('BillsPage — badge de compra de terceiro (S82)', () => {
+  beforeEach(() => {
+    setAdmin(true);
+    setIptuAlerts();
+    setBillingAccounts([]);
+  });
+
+  /** Locates the Descrição table cell for a bill, ignoring the CSS-hidden mobile card view. */
+  async function descriptionCell(description: string): Promise<HTMLTableCellElement> {
+    const matches = await screen.findAllByText(description);
+    const cell = matches
+      .map((el) => el.closest('td'))
+      .find((el): el is HTMLTableCellElement => el !== null);
+    if (!cell) throw new Error('table cell not found');
+    return cell;
+  }
+
+  it('names the person on a bill carrying paid_by_person, and omits the badge otherwise', async () => {
+    setMonthBoard(
+      createMockMonthBoard({
+        groups: [
+          {
+            building_id: 1,
+            building_label: 'Prédio 836',
+            bills: [
+              createMockBill({
+                id: 1,
+                description: 'Bomba d’água',
+                paid_by_person: createMockPersonSimple({ id: 4, name: 'Rodrigo Souza' }),
+                payment_status: 'paid',
+                amount_remaining: '0.00',
+              }),
+              createMockBill({ id: 2, description: 'Conta de Luz' }),
+            ],
+          },
+        ],
+      })
+    );
+
+    const { queryClient } = renderWithProviders(<BillsPage />);
+
+    const purchaseCell = await descriptionCell('Bomba d’água');
+    expect(within(purchaseCell).getByText('Rodrigo Souza')).toBeInTheDocument();
+
+    const utilityCell = await descriptionCell('Conta de Luz');
+    expect(within(utilityCell).queryByText('Rodrigo Souza')).not.toBeInTheDocument();
 
     await waitForQueriesToSettle(queryClient);
   });

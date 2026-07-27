@@ -36,9 +36,9 @@ import {
 import { usePayBill } from '@/lib/api/hooks/use-bills';
 import { showFinanceMutationError } from '@/lib/utils/error-handler';
 import { formatCurrency } from '@/lib/utils/formatters';
-import { fundedFromValues } from '@/lib/schemas/finances/category.schema';
 import { ROUTES } from '@/lib/utils/constants';
 import {
+  DIALOG_FUNDED_FROM_VALUES,
   FUNDED_FROM_LABELS,
   type PaymentFormValues,
   paymentFormSchema,
@@ -66,12 +66,22 @@ export function BillPaymentDialog({
 
   const form = useForm<PaymentFormValues>({
     resolver: zodResolver(paymentFormSchema),
-    defaultValues: { amount: '', funded_from: 'caixa', payment_date: todayISO() },
+    defaultValues: {
+      amount: '',
+      funded_from: 'caixa',
+      paid_by_person_id: 0,
+      payment_date: todayISO(),
+    },
   });
 
   useEffect(() => {
     if (open) {
-      form.reset({ amount: '', funded_from: 'caixa', payment_date: todayISO() });
+      form.reset({
+        amount: '',
+        funded_from: 'caixa',
+        paid_by_person_id: 0,
+        payment_date: todayISO(),
+      });
     }
   }, [open, billId, form]);
 
@@ -157,7 +167,7 @@ export function BillPaymentDialog({
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {fundedFromValues.map((value) => (
+                      {DIALOG_FUNDED_FROM_VALUES.map((value) => (
                         <SelectItem key={value} value={value}>
                           {FUNDED_FROM_LABELS[value]}
                         </SelectItem>
