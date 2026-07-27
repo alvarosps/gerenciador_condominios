@@ -220,7 +220,12 @@ def test_pay_action_accepts_new_total_string(authenticated_api_client):
 
 @freeze_time(FROZEN)
 def test_pay_action_invalid_new_total_returns_400(authenticated_api_client):
-    """new_total inválido -> 400 PT."""
+    """new_total inválido (não-numérico) -> 400 PT.
+
+    _parse_new_total intercepts InvalidOperation before the generic amount/date/funded_from
+    catch-all (Round 2 fix, I-1), so a non-numeric new_total now gets the specific PT format
+    message instead of the generic one — still 400, still PT, just more precise.
+    """
     bill = _bill_total("300.00")
     resp = authenticated_api_client.post(
         f"/api/finances/bills/{bill.id}/pay/",
@@ -228,7 +233,48 @@ def test_pay_action_invalid_new_total_returns_400(authenticated_api_client):
         format="json",
     )
     assert resp.status_code == status.HTTP_400_BAD_REQUEST
-    assert resp.data["error"] == "Valor, data ou forma de pagamento inválido."
+    assert resp.data["error"] == "Valor inválido: use no máximo 2 casas decimais."
+
+
+@freeze_time(FROZEN)
+def test_pay_action_new_total_too_many_decimal_places_returns_pt_400(authenticated_api_client):
+    """new_total com 3+ casas decimais -> 400 PT (nunca a mensagem em inglês do Django)."""
+    bill = _bill_total("300.00")
+    resp = authenticated_api_client.post(
+        f"/api/finances/bills/{bill.id}/pay/",
+        {"payment_date": "2026-06-05", "new_total": "230.005"},
+        format="json",
+    )
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    assert resp.data["error"] == "Valor inválido: use no máximo 2 casas decimais."
+
+
+@freeze_time(FROZEN)
+@pytest.mark.parametrize("bad_value", ["Infinity", "-Infinity", "NaN"])
+def test_pay_action_new_total_non_finite_returns_pt_400(authenticated_api_client, bad_value):
+    """new_total não-finito (Infinity/NaN) -> 400 PT (nunca a mensagem em inglês do Django)."""
+    bill = _bill_total("300.00")
+    resp = authenticated_api_client.post(
+        f"/api/finances/bills/{bill.id}/pay/",
+        {"payment_date": "2026-06-05", "new_total": bad_value},
+        format="json",
+    )
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    assert resp.data["error"] == "Valor inválido: use no máximo 2 casas decimais."
+
+
+@freeze_time(FROZEN)
+def test_pay_action_new_total_two_decimal_places_still_works(authenticated_api_client):
+    """Casos válidos (<=2 casas decimais) continuam funcionando após o guard de formato."""
+    bill = make_bill(amount_is_estimated=True)
+    make_bill_line_item(bill=bill, amount=Decimal("200.00"), description=bill.description)
+    resp = authenticated_api_client.post(
+        f"/api/finances/bills/{bill.id}/pay/",
+        {"payment_date": "2026-06-05", "amount": "230.00", "new_total": "230.00"},
+        format="json",
+    )
+    assert resp.status_code == status.HTTP_200_OK
+    assert resp.data["amount_total"] == "230.00"
 
 
 @freeze_time(FROZEN)

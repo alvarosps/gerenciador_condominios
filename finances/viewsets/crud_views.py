@@ -102,6 +102,36 @@ def _validated_funded_from(raw: object) -> str:
     return value
 
 
+_NEW_TOTAL_INVALID = "Valor inválido: use no máximo 2 casas decimais."
+_NEW_TOTAL_MAX_DECIMAL_PLACES = -2  # Decimal.as_tuple().exponent, money is always cents-scale.
+
+
+def _parse_new_total(raw: object) -> Decimal | None:
+    """new_total as a finite Decimal with at most 2 decimal places, or None (-> PT 400 otherwise).
+
+    ``Decimal(str(raw))`` alone accepts "Infinity"/"NaN" (not caught by ValueError/
+    InvalidOperation) and any decimal scale (e.g. "230.005"), both of which would otherwise
+    reach BillLineItem.full_clean() and surface Django's default (English) validator message
+    verbatim through the action's error shape. Rejected here instead, as a ValidationError (PT,
+    caught by the same handler as every other business-rule rejection in this action) — no
+    scientific/silent rounding: an out-of-range value is a 400, not a truncation.
+    """
+    if raw is None:
+        return None
+    try:
+        value = Decimal(str(raw))
+    except InvalidOperation as exc:
+        raise ValidationError(_NEW_TOTAL_INVALID) from exc
+    if not value.is_finite():
+        raise ValidationError(_NEW_TOTAL_INVALID)
+    # is_finite() guarantees a numeric (int) exponent here — Infinity/NaN ('F'/'n'/'N') are
+    # already rejected above, so this comparison is type-safe (never the sign/payload literals).
+    exponent = value.as_tuple().exponent
+    if isinstance(exponent, str) or exponent < _NEW_TOTAL_MAX_DECIMAL_PLACES:
+        raise ValidationError(_NEW_TOTAL_INVALID)
+    return value
+
+
 class CategoryViewSet(viewsets.ModelViewSet):
     serializer_class = CategorySerializer
     permission_classes = [IsAdminUser]
@@ -379,8 +409,7 @@ class BillViewSet(viewsets.ModelViewSet):
             payment_date = date.fromisoformat(str(payment_date_raw))
             amount_raw = request.data.get("amount")
             amount = Decimal(str(amount_raw)) if amount_raw is not None else None
-            new_total_raw = request.data.get("new_total")
-            new_total = Decimal(str(new_total_raw)) if new_total_raw is not None else None
+            new_total = _parse_new_total(request.data.get("new_total"))
             funded_from = _validated_funded_from(request.data.get("funded_from", "caixa"))
             BillPaymentService.pay(
                 bill,
