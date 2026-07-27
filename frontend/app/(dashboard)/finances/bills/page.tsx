@@ -30,7 +30,12 @@ import {
 } from '@/components/ui/select';
 import { DataTable } from '@/components/tables/data-table';
 import { PageHeader } from '@/components/layouts/page-header';
-import { useDeleteBill, useGenerateMonthBills, useParseInvoice } from '@/lib/api/hooks/use-bills';
+import {
+  useDeleteBill,
+  useDeleteThirdPartyPurchase,
+  useGenerateMonthBills,
+  useParseInvoice,
+} from '@/lib/api/hooks/use-bills';
 import { useMonthBoard } from '@/lib/api/hooks/use-month-board';
 import { useAuthStore } from '@/store/auth-store';
 import { handleError } from '@/lib/utils/error-handler';
@@ -132,14 +137,35 @@ export default function BillsPage() {
     bills: filterByLifecycle(group.bills, lifecycleFilter),
   }));
 
-  const deleteMutation = useDeleteBill();
+  const deleteBillMutation = useDeleteBill();
+  const deletePurchaseMutation = useDeleteThirdPartyPurchase();
 
   const crud = useCrudPage<Bill>({
     entityName: 'conta',
     entityNamePlural: 'contas',
-    deleteMutation,
+    deleteMutation: deleteBillMutation,
     deleteErrorMessage: 'Erro ao excluir conta.',
   });
+
+  const purchaseCrud = useCrudPage<Bill>({
+    entityName: 'compra',
+    entityNamePlural: 'compras',
+    deleteMutation: deletePurchaseMutation,
+    deleteErrorMessage: 'Erro ao excluir compra de terceiro.',
+  });
+
+  /**
+   * A third-party purchase is born paid, so the ordinary delete route rejects it ("Desfaça o
+   * pagamento primeiro") while unpay rejects purchase payments ("exclua a compra") — following
+   * either message sends the user straight back to the other. Sending these rows to
+   * `delete_purchase` (the only path that removes Bill + Payment atomically) is what breaks that
+   * dead-end loop and makes a mistyped purchase correctable from the UI at all.
+   */
+  const crudFor = (bill: Bill) => (bill.paid_by_person ? purchaseCrud : crud);
+
+  // Only one delete dialog is ever open; it renders from whichever instance owns the pending row.
+  const isDeletingPurchase = purchaseCrud.deleteDialogOpen;
+  const activeDeleteCrud = isDeletingPurchase ? purchaseCrud : crud;
 
   const columns = buildBillColumns({
     isAdmin,
@@ -148,8 +174,9 @@ export default function BillsPage() {
       setPayingBill(bill);
     },
     onDelete: (bill) => {
-      crud.setItemToDelete(bill);
-      if (bill.id !== undefined) crud.handleDeleteClick(bill.id);
+      const target = crudFor(bill);
+      target.setItemToDelete(bill);
+      if (bill.id !== undefined) target.handleDeleteClick(bill.id);
     },
     onImportInvoice: (bill) => {
       setRowImportBill(bill);
@@ -438,24 +465,36 @@ export default function BillsPage() {
         />
       )}
 
-      <AlertDialog open={crud.deleteDialogOpen} onOpenChange={crud.setDeleteDialogOpen}>
+      <AlertDialog
+        open={activeDeleteCrud.deleteDialogOpen}
+        onOpenChange={activeDeleteCrud.setDeleteDialogOpen}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Excluir conta</AlertDialogTitle>
+            <AlertDialogTitle>
+              {isDeletingPurchase ? 'Excluir compra de terceiro' : 'Excluir conta'}
+            </AlertDialogTitle>
             <AlertDialogDescription>
               Tem certeza que deseja excluir{' '}
-              {crud.itemToDelete?.description ? `"${crud.itemToDelete.description}"` : 'esta conta'}
-              ? Esta ação não pode ser desfeita.
+              {activeDeleteCrud.itemToDelete?.description
+                ? `"${activeDeleteCrud.itemToDelete.description}"`
+                : isDeletingPurchase
+                  ? 'esta compra'
+                  : 'esta conta'}
+              ?{' '}
+              {isDeletingPurchase
+                ? 'A compra e o pagamento da pessoa serão removidos juntos, e a dívida com ela deixa de existir.'
+                : 'Esta ação não pode ser desfeita.'}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              onClick={crud.handleDelete}
-              disabled={crud.isDeleting}
+              onClick={activeDeleteCrud.handleDelete}
+              disabled={activeDeleteCrud.isDeleting}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {crud.isDeleting ? 'Excluindo...' : 'Excluir'}
+              {activeDeleteCrud.isDeleting ? 'Excluindo...' : 'Excluir'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

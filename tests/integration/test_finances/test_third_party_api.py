@@ -762,6 +762,46 @@ def test_people_omits_a_fully_settled_person(authenticated_api_client, condomini
     assert response.data == []
 
 
+@freeze_time(FROZEN)
+def test_people_keeps_a_person_who_only_holds_credit(authenticated_api_client, condominium, person):
+    """Overpaid person stays listed: the index is the ONLY path to her extrato.
+
+    Filtering on open debt alone made her vanish while the owners still had R$400 parked with
+    her, with no navigable way back (whole-branch review, finding 4).
+    """
+    authenticated_api_client.post(
+        SETTLEMENTS_URL,
+        {"person_id": person.pk, "settlement_date": "2026-07-05", "amount": "400.00"},
+        format="json",
+    )
+
+    rows = authenticated_api_client.get(PEOPLE_URL).data
+
+    assert [row["person_name"] for row in rows] == [person.name]
+    assert rows[0]["total_em_aberto"] == "0.00"
+    assert rows[0]["saldo_credor"] == "400.00"
+
+
+@freeze_time(FROZEN)
+def test_people_does_not_walk_the_whole_person_roster(
+    authenticated_api_client, condominium, person, django_assert_max_num_queries
+):
+    """Cost is proportional to people IN the third-party flow, not to the Person table.
+
+    The index used to build a full statement (7 queries) for EVERY Person and discard the ones
+    with no debt — 146 queries for 20 unrelated people (whole-branch review, finding 3). The
+    Person table is the legacy personal-financial roster and only grows.
+    """
+    for index in range(20):
+        make_person(name=f"Sem relação {index}")
+    _create_purchase(authenticated_api_client, person)
+
+    with django_assert_max_num_queries(15):
+        rows = authenticated_api_client.get(PEOPLE_URL).data
+
+    assert [row["person_name"] for row in rows] == [person.name]
+
+
 # --------------------------------------------------------------------------------------
 # 7. BillSerializer.paid_by_person (§3b)
 # --------------------------------------------------------------------------------------

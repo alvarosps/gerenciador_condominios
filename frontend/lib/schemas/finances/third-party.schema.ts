@@ -28,16 +28,22 @@ export const THIRD_PARTY_MONTH_STATUS_LABELS: Record<ThirdPartyMonthStatus, stri
   empty: 'Sem movimento',
 };
 
-export const thirdPartyItemKindValues = ['payment', 'purchase'] as const;
+export const thirdPartyItemKindValues = ['payment', 'purchase', 'settlement'] as const;
 export const thirdPartyItemKindEnum = z.enum(thirdPartyItemKindValues);
 export type ThirdPartyItemKind = z.infer<typeof thirdPartyItemKindEnum>;
 
 export const THIRD_PARTY_ITEM_KIND_LABELS: Record<ThirdPartyItemKind, string> = {
   payment: 'Pagamento',
   purchase: 'Compra',
+  // The repayment side: what the owners already handed over. Listed in the month it was paid —
+  // it is the counterpart of `devido`, never part of it.
+  settlement: 'Acerto',
 };
 
-/** One row composing a month's `devido` — a bill the person paid, or a purchase she made. */
+/**
+ * One row composing a month: a bill the person paid, a purchase she made (both make up `devido`),
+ * or an acerto the owners paid her (the counterpart, so `aplicado` is auditable).
+ */
 export const thirdPartyStatementItemSchema = z.object({
   kind: thirdPartyItemKindEnum,
   id: z.number(),

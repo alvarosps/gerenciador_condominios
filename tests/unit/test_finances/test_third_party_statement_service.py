@@ -117,13 +117,19 @@ def third_party_payment(
 
 
 def settle(
-    condominium: Condominium, person: Person, amount: str, settlement_date: date
+    condominium: Condominium,
+    person: Person,
+    amount: str,
+    settlement_date: date,
+    *,
+    method: str = "",
 ) -> ThirdPartySettlement:
     return ThirdPartySettlement.objects.create(
         condominium=condominium,
         person=person,
         settlement_date=settlement_date,
         amount=Decimal(amount),
+        method=method,
     )
 
 
@@ -636,6 +642,33 @@ class TestWindowAndShape:
         assert by_kind["payment"]["amount"] == "200.00"
         assert by_kind["payment"]["date"] == date(2026, 6, 12)
         assert by_kind["payment"]["description"] == "Luz junho"
+
+    def test_items_show_the_settlement_that_repaid_the_person(
+        self, condominium: Condominium, person: Person
+    ) -> None:
+        """The extrato must show what was HANDED OVER, not only what is owed.
+
+        Without a `settlement` item kind, `aplicado` had nothing behind it and the owners could
+        not audit their own acertos (whole-branch review, finding 2). The settlement is listed in
+        the month it was paid — it is the counterpart of `devido`, never part of it.
+        """
+        purchase(condominium, person, "300.00", JUNE)
+        settle(condominium, person, "120.00", date(2026, 7, 5), method="PIX")
+
+        result = ThirdPartyStatementService.build(person.pk, TODAY)
+
+        # June: the debt, already partly covered by the July settlement (already-made money).
+        june_items = month_row(result, JUNE)["items"]
+        assert [item["kind"] for item in june_items] == ["purchase"]
+        assert month_row(result, JUNE)["aplicado"] == "120.00"
+
+        # July: the repayment itself, visible and auditable.
+        july_items = month_row(result, JULY)["items"]
+        assert len(july_items) == 1
+        assert july_items[0]["kind"] == "settlement"
+        assert july_items[0]["amount"] == "120.00"
+        assert july_items[0]["description"] == "PIX"
+        assert july_items[0]["date"] == date(2026, 7, 5)
 
     def test_month_row_shape(self, condominium: Condominium, person: Person) -> None:
         purchase(condominium, person, "100.00", JUNE)

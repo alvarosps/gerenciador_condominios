@@ -323,6 +323,50 @@ export function useCreateThirdPartyPurchase() {
   });
 }
 
+/**
+ * Delete a third-party purchase — Bill + Payment + allocation, atomically.
+ *
+ * The ONLY way to undo one: a purchase is born paid, so the ordinary delete hits
+ * `assert_not_paid` ("Desfaça o pagamento primeiro") while `unpay` rejects purchase payments
+ * ("exclua a compra") — following either message lands the user back at the other. Without this
+ * hook wired into the cockpit, a mistyped purchase is uncorrectable from the UI.
+ */
+export function useDeleteThirdPartyPurchase() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (billId: number) => {
+      await apiClient.delete(`${ENDPOINT}${billId}/delete_purchase/`);
+    },
+    onSuccess: () => {
+      invalidateBillCaches(queryClient);
+      invalidateThirdPartyCaches(queryClient);
+    },
+  });
+}
+
+/**
+ * Fix a wrong payer on BOTH sides (Bill.paid_by_person and Payment.paid_by) in one transaction.
+ *
+ * `paid_by_person` is not an editable header field and `update_with_lines` would hit
+ * `assert_not_paid`, so this dedicated action is the only correction path for "I charged the
+ * wrong child".
+ */
+export function useReassignPurchasePayer() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ billId, personId }: { billId: number; personId: number }) => {
+      const { data } = await apiClient.post<Bill>(`${ENDPOINT}${billId}/reassign_payer/`, {
+        paid_by_person_id: personId,
+      });
+      return data;
+    },
+    onSuccess: () => {
+      invalidateBillCaches(queryClient);
+      invalidateThirdPartyCaches(queryClient);
+    },
+  });
+}
+
 function useBillLifecycleAction(action: 'suspend' | 'defer' | 'cancel' | 'reactivate') {
   const queryClient = useQueryClient();
   return useMutation({

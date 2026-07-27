@@ -49,6 +49,11 @@ STATUS_EMPTY = "empty"
 
 ITEM_PAYMENT = "payment"
 ITEM_PURCHASE = "purchase"
+# The repayment side. Without it the extrato shows only what is OWED and never what was already
+# handed over, so `aplicado` appears with nothing behind it and the owners cannot audit their own
+# acertos (whole-branch review, finding 2). A settlement is not part of `devido` — it is listed in
+# the month it was paid, as the counterpart.
+ITEM_SETTLEMENT = "settlement"
 
 
 class MonthCharge(NamedTuple):
@@ -365,7 +370,7 @@ class ThirdPartyStatementService:
         ]
         allocated, totals = allocate_fifo(charges, settlement_rows, current_month=current_month)
 
-        items_by_month = _items_by_month(payments, purchases)
+        items_by_month = _items_by_month(payments, purchases, settlements)
         return {
             "person_id": person_id,
             "person_name": _person_name(person_id),
@@ -396,14 +401,31 @@ def _person_name(person_id: int) -> str:
 
 
 def _items_by_month(
-    payments: QuerySet[Payment], purchases: QuerySet[Bill]
+    payments: QuerySet[Payment],
+    purchases: QuerySet[Bill],
+    settlements: QuerySet[ThirdPartySettlement],
 ) -> dict[date, list[StatementItem]]:
-    """Per-month detail rows (what composes the ``devido``) — ONE query per kind, never per month.
+    """Per-month detail rows — ONE query per kind, never per month.
+
+    Payments and purchases compose the ``devido``; settlements are the counterpart (what the
+    owners already handed over), listed in the month they were paid so ``aplicado`` is auditable.
 
     Purchases carry ``amount_total`` from the ``with_amounts`` annotation, so the item amount and
     the month aggregate come from the same source and can never disagree.
     """
     grouped: dict[date, list[StatementItem]] = {}
+    for settlement_id, settlement_date, amount, method in settlements.values_list(
+        "id", "settlement_date", "amount", "method"
+    ):
+        grouped.setdefault(settlement_date.replace(day=1), []).append(
+            {
+                "kind": ITEM_SETTLEMENT,
+                "id": settlement_id,
+                "description": method or "Acerto",
+                "amount": money_str(amount),
+                "date": settlement_date,
+            }
+        )
     for payment_id, payment_date, amount, reference in payments.values_list(
         "id", "payment_date", "amount", "reference"
     ):

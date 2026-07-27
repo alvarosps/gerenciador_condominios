@@ -1221,7 +1221,7 @@ class ThirdPartyViewSet(viewsets.ViewSet):
         today = today_sp()
         rows = [
             row
-            for person_id, person_name in Person.objects.order_by("id").values_list("id", "name")
+            for person_id, person_name in _people_with_third_party_activity()
             if (row := _third_party_row(person_id, person_name, today)) is not None
         ]
         rows.sort(key=lambda row: Decimal(cast(str, row["total_em_aberto"])), reverse=True)
@@ -1239,6 +1239,35 @@ class ThirdPartyViewSet(viewsets.ViewSet):
         )
 
 
+def _people_with_third_party_activity() -> list[tuple[int, str]]:
+    """(id, name) of people who actually appear somewhere in the third-party flow.
+
+    The index used to walk EVERY ``Person`` and build a full statement (7 queries) for each,
+    discarding the ones with no debt — 146 queries for 20 people, of whom most were the legacy
+    personal-financial roster with no third-party activity at all. That roster only grows.
+    Restricting to the three tables where a third party can appear keeps the cost proportional to
+    the people who are genuinely involved.
+    """
+    person_ids = set(
+        Bill.objects.filter(paid_by_person__isnull=False)
+        .values_list("paid_by_person_id", flat=True)
+        .distinct()
+    )
+    person_ids |= set(
+        Payment.objects.filter(paid_by__isnull=False)
+        .values_list("paid_by_id", flat=True)
+        .distinct()
+    )
+    person_ids |= set(ThirdPartySettlement.objects.values_list("person_id", flat=True).distinct())
+    if not person_ids:
+        return []
+    # all_objects: a soft-deleted person still owes (or is owed) — she keeps her row and her
+    # extrato stays reachable, mirroring owner_distribution_service's name resolution.
+    return list(
+        Person.all_objects.filter(pk__in=person_ids).order_by("id").values_list("id", "name")
+    )
+
+
 def _third_party_row(person_id: int, person_name: str, today: date) -> dict[str, object] | None:
     """One index row, or None when the person owes nothing live (design §7).
 
@@ -1247,7 +1276,12 @@ def _third_party_row(person_id: int, person_name: str, today: date) -> dict[str,
     """
     statement = ThirdPartyStatementService.build(person_id, today)
     totals = statement["totals"]
-    if Decimal(totals["total_em_aberto"]) <= 0:
+    # Credit counts as a live relationship, not just debt: someone the owners OVERPAID is owed
+    # nothing yet still has money parked with them, and the index is the only navigable path to
+    # a person's extrato — filtering on open debt alone made them disappear with no way back.
+    has_open_debt = Decimal(totals["total_em_aberto"]) > 0
+    has_credit = Decimal(totals["saldo_credor"]) > 0
+    if not has_open_debt and not has_credit:
         return None
     last_settlement = (
         ThirdPartySettlement.objects.filter(person_id=person_id)
@@ -1260,5 +1294,7 @@ def _third_party_row(person_id: int, person_name: str, today: date) -> dict[str,
         "person_name": person_name,
         "total_em_aberto": totals["total_em_aberto"],
         "total_atrasado": totals["total_atrasado"],
+        # Exposed so a credit-only row can say WHY it is listed (nothing owed, money parked).
+        "saldo_credor": totals["saldo_credor"],
         "last_settlement_date": last_settlement,
     }
