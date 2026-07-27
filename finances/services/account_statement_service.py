@@ -19,6 +19,7 @@ from finances.models import (
     BillingAccount,
     BillLifecycleState,
     BillLineItem,
+    Installment,
     InstallmentPlan,
     PaymentAllocation,
 )
@@ -100,7 +101,11 @@ def _month_row(bill: Bill) -> StatementMonthRow:
         "amount_total": money_str(getattr(bill, "amount_total", Decimal(0))),
         "amount_paid": money_str(getattr(bill, "amount_paid", Decimal(0))),
         "amount_remaining": money_str(getattr(bill, "amount_remaining", Decimal(0))),
-        "payment_status": str(getattr(bill, "payment_status", "open")),
+        # getattr (not direct attribute access) only to satisfy mypy/django-stubs, which cannot
+        # see the with_amounts() dynamic annotation — the default never actually fires, since
+        # _account_bills always annotates payment_status (mirrors BillSerializer.get_payment_status,
+        # serializers.py:408-409).
+        "payment_status": str(getattr(bill, "payment_status", "")),
         "lifecycle_state": bill.lifecycle_state,
         "amount_is_estimated": bill.amount_is_estimated,
         "paid_date": getattr(bill, "paid_date", None),
@@ -129,27 +134,46 @@ def _avg_delay_days(bills: list[Bill]) -> int | None:
     return round(sum(delays) / len(delays))
 
 
-def _plan_row(plan: InstallmentPlan) -> StatementPlanRow:
-    """materialized_count mirrors BillGenerationService._mark_completed_plans_materialized
-    (bill_generation_service.py:325-349): embedded counts materialized BillLineItem rows,
-    standalone counts materialized Bill rows — same live managers, no writes here."""
-    installments = list(plan.installments.all())
-    if plan.embedded:
-        materialized_count = sum(
-            1 for inst in installments if BillLineItem.objects.filter(installment=inst).exists()
-        )
-    else:
-        materialized_count = sum(
-            1 for inst in installments if Bill.objects.filter(installment=inst).exists()
-        )
-    return {
-        "id": plan.pk,
-        "description": plan.description,
-        "installment_count": plan.installment_count,
-        "materialized_count": materialized_count,
-        "lifecycle_state": plan.lifecycle_state,
-        "embedded": plan.embedded,
-    }
+def _materialized_installment_ids(plan_ids: list[int]) -> set[int]:
+    """Installment ids of ``plan_ids`` that already have a materialized BillLineItem OR Bill —
+    TWO queries total (one per source), never one per plan/installment. Mirrors
+    BillGenerationService._mark_completed_plans_materialized (bill_generation_service.py:325-349):
+    embedded plans materialize via BillLineItem, standalone plans materialize via Bill — a given
+    plan is only ever one or the other, so taking the union of both sources is safe and avoids a
+    per-plan branch query."""
+    from_line_items = BillLineItem.objects.filter(installment__plan_id__in=plan_ids).values_list(
+        "installment_id", flat=True
+    )
+    from_bills = Bill.objects.filter(installment__plan_id__in=plan_ids).values_list(
+        "installment_id", flat=True
+    )
+    return {*from_line_items, *from_bills}
+
+
+def _plan_rows(plans: list[InstallmentPlan]) -> list[StatementPlanRow]:
+    """materialized_count per plan, built from a single preloaded index (no N+1): one query for
+    ALL plans' installments, two queries for the materialized ids (_materialized_installment_ids)
+    — independent of how many plans or installments the account has (design §10 / review S67)."""
+    plan_ids = [plan.pk for plan in plans]
+    installments_by_plan: dict[int, list[int]] = {plan_id: [] for plan_id in plan_ids}
+    for installment_id, plan_id in Installment.objects.filter(plan_id__in=plan_ids).values_list(
+        "id", "plan_id"
+    ):
+        installments_by_plan[plan_id].append(installment_id)
+    materialized_ids = _materialized_installment_ids(plan_ids)
+    return [
+        {
+            "id": plan.pk,
+            "description": plan.description,
+            "installment_count": plan.installment_count,
+            "materialized_count": sum(
+                1 for inst_id in installments_by_plan[plan.pk] if inst_id in materialized_ids
+            ),
+            "lifecycle_state": plan.lifecycle_state,
+            "embedded": plan.embedded,
+        }
+        for plan in plans
+    ]
 
 
 class AccountStatementService:
@@ -165,8 +189,10 @@ class AccountStatementService:
         open_bills_count = sum(
             1 for bill in bills if getattr(bill, "amount_remaining", Decimal(0)) > 0
         )
-        plans = InstallmentPlan.objects.filter(billing_account=account).select_related(
-            "billing_account"
+        plans = list(
+            InstallmentPlan.objects.filter(billing_account=account).select_related(
+                "billing_account"
+            )
         )
         return {
             "account": dict(BillingAccountSerializer(account).data),
@@ -176,5 +202,5 @@ class AccountStatementService:
                 "avg_delay_days": _avg_delay_days(bills),
             },
             "months": [_month_row(bill) for bill in bills],
-            "plans": [_plan_row(plan) for plan in plans],
+            "plans": _plan_rows(plans),
         }

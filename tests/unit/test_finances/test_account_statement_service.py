@@ -189,8 +189,8 @@ class TestStatementStats:
 
     def test_avg_delay_days_mean_of_last_12(self) -> None:
         """13 settled bills (due dates 30 days apart, most recent first): only the 12 most
-        recent (due_date desc) enter the average. The oldest (excluded) is paid 100 days late —
-        if wrongly included the average would spike far beyond the other 12 delays."""
+        recent (due_date desc) enter the average. The oldest (excluded) is paid ~100 days EARLY —
+        if wrongly included the average would swing sharply negative instead of 0."""
         account = make_billing_account()
         for i in range(13):
             due_date = date(2026, 1, 10) + timedelta(days=30 * i)
@@ -293,6 +293,41 @@ class TestStatementQueryCount:
         eight_bill_queries = len(ctx_eight_bills.captured_queries)
 
         assert eight_bill_queries == two_bill_queries
+
+    def test_plans_section_query_count_stable_across_plan_and_installment_count(self) -> None:
+        """The plans section must NOT issue a per-installment query for materialized_count
+        (_plan_row looping .exists() per installment is an N+1) — query count of build() must
+        stay stable as the number of plans/installments on the account grows: 1 plan x 3
+        installments vs 4 plans x 3 installments must cost the SAME number of queries."""
+        account = make_billing_account(account_type="water", external_identifier="UC-N1")
+        one_plan = make_installment_plan(
+            condominium=account.condominium,
+            billing_account=account,
+            embedded=False,
+            installment_count=3,
+        )
+        for number in range(1, 4):
+            make_installment(plan=one_plan, number=number)
+        with CaptureQueriesContext(connection) as ctx_one_plan:
+            AccountStatementService.build(account.pk, TODAY)
+        one_plan_queries = len(ctx_one_plan.captured_queries)
+
+        for plan_index in range(3):
+            extra_plan = make_installment_plan(
+                condominium=account.condominium,
+                billing_account=account,
+                embedded=False,
+                installment_count=3,
+                description=f"Plano extra {plan_index}",
+                start_due_date=date(2026, 9 + plan_index, 10),
+            )
+            for number in range(1, 4):
+                make_installment(plan=extra_plan, number=number)
+        with CaptureQueriesContext(connection) as ctx_four_plans:
+            AccountStatementService.build(account.pk, TODAY)
+        four_plan_queries = len(ctx_four_plans.captured_queries)
+
+        assert four_plan_queries == one_plan_queries
 
 
 class TestStatementPlans:
