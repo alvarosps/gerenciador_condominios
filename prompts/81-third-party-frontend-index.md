@@ -58,7 +58,8 @@ Precedente de rota `[id]` já existe (`finances/accounts/[id]`, criada na S73) �
 
 - `StatCard`s: em aberto / atrasado / crédito
 - Tabela mês a mês: mês, devido, aplicado, resto, badge de status
-- Badge por status com cor e rótulo PT: `paid` "Quitado" / `overdue` "Atrasado" / `partially_paid` "Parcial" / `open` "Em aberto" / `credit` "Crédito"
+- Badge por status com cor e rótulo PT — são **6**, não 5: `paid` "Quitado" / `overdue` "Atrasado" / `partially_paid` "Parcial" / `open` "Em aberto" / `credit` "Crédito" / **`empty` "Sem movimento"**
+  > `empty` foi acrescentado na revisão da S79: a janela materializa meses vazios para o extrato não ter buracos, e antes eles vinham como "Quitado" — na tela isso lia como "esse mês foi acertado". Renderizar `empty` com **tom neutro/discreto** (nunca verde de sucesso), senão o bug volta pela UI.
 - Detalhe expansível por mês: os `items` (pagamentos e compras) que compõem o devido
 - **Nunca recalcular** no frontend — todos os números vêm do backend (mesma disciplina da S50: "lidos do backend, nunca recalculados")
 
@@ -72,7 +73,7 @@ Precedente de rota `[id]` já existe (`finances/accounts/[id]`, criada na S73) �
 
 - **MSW é a única fronteira mockada.** Proibido `vi.mock` de hook interno (norma da casa, P6.1)
 - Handlers + `createMockThirdPartyStatement` / `createMockThirdPartyPeople` em `tests/mocks/`
-- Testes: renderiza cards; empty state; extrato renderiza os 5 status; expansível mostra itens; modal de acerto envia payload correto; erro da API vira toast PT; não-admin não vê ações de escrita; sidebar ativo em `/finances/third-party` e na subrota `[id]`
+- Testes: renderiza cards; empty state; extrato renderiza os 6 status (incl. `empty` em tom neutro); expansível mostra itens; modal de acerto envia payload correto; erro da API vira toast PT; não-admin não vê ações de escrita; sidebar ativo em `/finances/third-party` e na subrota `[id]`
 
 ## NÃO fazer
 
