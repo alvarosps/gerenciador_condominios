@@ -42,6 +42,10 @@ STATUS_PAID = "paid"
 STATUS_OVERDUE = "overdue"
 STATUS_PARTIALLY_PAID = "partially_paid"
 STATUS_OPEN = "open"
+# A month inside the window with no movement at all. Distinct from "paid" (design §6.3 requires
+# devido > 0 for paid): rendering an empty month as "Quitado" between two overdue months reads as
+# "you settled that month" when nothing happened — exactly the lie this statement must not tell.
+STATUS_EMPTY = "empty"
 
 ITEM_PAYMENT = "payment"
 ITEM_PURCHASE = "purchase"
@@ -121,9 +125,16 @@ def _next_month(value: date) -> date:
 def _month_status(
     *, devido: Decimal, aplicado: Decimal, resto: Decimal, month: date, current_month: date
 ) -> str:
-    """Evaluation order matters (design §6.3): credit first, then paid, then overdue."""
+    """Evaluation order matters (design §6.3): credit first, then empty, then paid, then overdue.
+
+    ``empty`` comes before ``paid`` because design §6.3 requires ``devido > 0`` for paid: a gap
+    month inside the window (materialized with devido=0 so the statement has no holes) would
+    otherwise render "Quitado" between two overdue months, reading as "that month was settled".
+    """
     if devido < ZERO:
         return STATUS_CREDIT
+    if devido == ZERO:
+        return STATUS_EMPTY
     if resto == ZERO:
         return STATUS_PAID
     if month < current_month:
@@ -281,8 +292,10 @@ class ThirdPartyStatementService:
         still shows her name: PROTECT stops a hard delete, not a soft one, and a debt owed to
         her must not become anonymous (precedent: owner_distribution_service).
 
-        Constant query count — two aggregations for the monthly figures, one settlement fetch,
-        two row fetches (name + item detail) — regardless of how many months the window spans.
+        Constant query count regardless of how many months the window spans: 6 queries — two
+        aggregations for the monthly figures, one settlement fetch, two item-detail fetches
+        (payments + purchases) and one person-name fetch — plus 1 more when ``condominium_id``
+        is omitted and has to be resolved by default (7 total). Measured, not estimated.
         """
         if condominium_id is None:
             condominium_id = _default_condominium_id()

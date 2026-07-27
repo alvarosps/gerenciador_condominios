@@ -550,7 +550,12 @@ class TestWindowAndShape:
             JULY,
         ]
         assert month_row(result, date(2026, 4, 1))["devido"] == "0.00"
-        assert month_row(result, date(2026, 4, 1))["status"] == "paid"
+        # NOT "paid": design §6.3 requires devido > 0 for paid. A gap month rendered "Quitado"
+        # between two overdue months would read as "that month was settled" — it had no movement.
+        assert month_row(result, date(2026, 4, 1))["status"] == "empty"
+        assert month_row(result, MAY)["status"] == "empty"
+        # A month that really WAS charged and settled still reads "paid".
+        assert month_row(result, date(2026, 3, 1))["status"] == "overdue"
 
     def test_window_extends_to_the_last_movement_beyond_current_month(
         self, condominium: Condominium, person: Person
