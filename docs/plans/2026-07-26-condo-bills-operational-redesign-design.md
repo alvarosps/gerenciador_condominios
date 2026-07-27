@@ -129,7 +129,7 @@ Por que a Fase 1 não cria obstáculo: `paid_by` é coluna aditiva; `FundedFrom`
 ## 9. Testes
 
 - **Backend (integração view→service→model)**:
-  - `month_board`: atrasadas cross-competência (só ACTIVE), sub-seção deferred/suspended fora dos totais, CANCELED invisível, `generation.missing_count` com BillSkip/tracking/conta nova no meio do mês, mês fechado → 400.
+  - `month_board`: atrasadas cross-competência (só ACTIVE), sub-seção deferred/suspended fora dos totais, CANCELED invisível, `generation.missing_count` com BillSkip/tracking/conta nova no meio do mês, 400 só em `year`/`month` inválidos. **Correção rev. 3 (achado da varredura final):** `month_board` é GET read-only e NÃO retorna 400 em mês fechado — o cockpit precisa exibir competência fechada. O guard de mês fechado pertence ao `generate_month` (POST) que o banner dispara, e é lá que o 400 é testado.
   - `statement`/`open_balance`: braço `installment__plan__billing_account` (conta IPTU não zera), conta cortada acumulando, atraso médio (exclui `amount_total=0`, exige quitada, alocações/payments vivos).
   - Flag `amount_is_estimated`: gerar→True (incl. via caminho embutido), editar/importar/pagar→False, `unpay` não re-marca, `bulk_pay` coberto via serviço.
   - Pagar-com-ajuste: estimada com valor real maior/menor (linha-semente ajustada, sem resto fantasma), juros/multa em confirmada, atomicidade.
