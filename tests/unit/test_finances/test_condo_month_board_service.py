@@ -4,6 +4,8 @@ from datetime import date
 from decimal import Decimal
 
 import pytest
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 
 from finances.services.bill_generation_service import BillGenerationService
 from finances.services.condo_month_board_service import CondoMonthBoardService
@@ -280,3 +282,22 @@ class TestMonthBoardGeneration:
         board = CondoMonthBoardService.build(2026, 7, TODAY)
 
         assert board["generation"]["missing_count"] == 0
+
+    def test_missing_count_no_n_plus_one(self) -> None:
+        """Query count for build() must NOT grow with the number of eligible billing accounts —
+        _missing_count preloads the BillSkip index and the occupied-slot set once (mirroring
+        CondoProjectionService.project's skip_index preload), instead of two queries per account
+        (a BillSkip.exists() inside is_account_eligible + a Bill.exists() for the slot)."""
+        for i in range(2):
+            make_billing_account(name=f"Conta {i}", default_due_day=10)
+        with CaptureQueriesContext(connection) as ctx_two:
+            CondoMonthBoardService.build(2026, 7, TODAY)
+        two_account_queries = len(ctx_two.captured_queries)
+
+        for i in range(6):
+            make_billing_account(name=f"Conta extra {i}", default_due_day=10)
+        with CaptureQueriesContext(connection) as ctx_eight:
+            CondoMonthBoardService.build(2026, 7, TODAY)
+        eight_account_queries = len(ctx_eight.captured_queries)
+
+        assert eight_account_queries == two_account_queries

@@ -13,7 +13,7 @@ from typing import TypedDict
 
 from django.db.models import QuerySet
 
-from finances.models import Bill, BillingAccount, BillLifecycleState
+from finances.models import Bill, BillingAccount, BillLifecycleState, BillSkip
 from finances.money import money_str
 from finances.serializers import BillSerializer
 from finances.services.bill_generation_service import BillGenerationService
@@ -188,14 +188,29 @@ class CondoMonthBoardService:
         is_deleted=False) does not filter by lifecycle_state, so a SUSPENDED/CANCELED bill in the
         month already occupies that slot — generate_month would not create another one, so it must
         NOT count as missing (otherwise the banner would never zero out after generation).
+
+        Batched to avoid an N+1: the BillSkip check inside is_account_eligible and the occupied-slot
+        check are each preloaded ONCE (a skip_index set + an occupied billing_account_id set) instead
+        of one query per account — same pattern as CondoProjectionService.project's skip_index
+        preload (condo_projection_service.py:74-79).
         """
+        skip_index: set[tuple[int, date]] = {
+            (ba_id, ref_month)
+            for ba_id, ref_month in BillSkip.objects.filter(
+                reference_month=month_start
+            ).values_list("billing_account_id", "reference_month")
+        }
+        occupied_account_ids: set[int] = set(
+            Bill.all_objects.filter(
+                billing_account__isnull=False, competence_month=month_start, is_deleted=False
+            ).values_list("billing_account_id", flat=True)
+        )
         missing = 0
         for account in BillingAccount.objects.recurring_for_generation():
-            if not BillGenerationService.is_account_eligible(account, month_start):
+            if not BillGenerationService.is_account_eligible(
+                account, month_start, skip_index=skip_index
+            ):
                 continue
-            occupied = Bill.all_objects.filter(
-                billing_account=account, competence_month=month_start, is_deleted=False
-            ).exists()
-            if not occupied:
+            if account.pk not in occupied_account_ids:
                 missing += 1
         return missing
