@@ -84,7 +84,7 @@ Ler antes de escrever qualquer código:
 | Relógio/Imóvel | `secondary_identifier` ou `—` |
 | Dia venc. | `default_due_day` |
 | Valor esperado | `formatCurrency(expected_amount)` |
-| Estado | `Badge`: `active` → "Ativa" (secondary), `closed` → "Encerrada" (outline) |
+| Estado | `Badge` sobre o enum REAL `BillingAccountState` (4 valores): `active` → "Ativa" (secondary), `suspended` → "Suspensa", `deferred` → "Adiada", `ended` → "Encerrada" (outline). NAO existe `closed` no backend. |
 | Fornecimento | `supply_status === 'cut'` → `Badge` destructive **"Cortada"**; senão `—` (o estado normal não ganha badge — sinal só onde há problema) |
 | Saldo devedor | `open_balance === undefined ? '—' : formatCurrency(open_balance)`; quando `> 0`, `className="text-destructive font-medium"` |
 | Ações (só `isAdmin`) | Dropdown Editar/Excluir (padrão `bill-columns.tsx:97-133`; sem ações de ciclo de vida aqui) |
@@ -92,7 +92,7 @@ Ler antes de escrever qualquer código:
 ### `account-form-modal.tsx` — `AccountFormModal({ open, account, onClose })`
 
 - Form schema Zod **local** (padrão `finance-category-form-modal.tsx:48-62`), write no **dual pattern** (`_id`):
-  - `name` (min 1, "Nome é obrigatório"), `building_id: number|null`, `category_id: number|null`, `account_type` (enum, default `generic`), `external_identifier`, `secondary_identifier`, `holder_name`, `registered_address` (strings, default `''`), `default_due_day` (int 1–31), `expected_amount` (number ≥ 0), `lifecycle_state` (`active|closed`), `supply_status` (`active|cut`), `tracking_start_month: string|null`, `end_date: string|null`, `description` (`Textarea` — o model `finances/models.py:174` e o schema expõem o campo; sem este input nenhuma UI o preencheria), `notes`.
+  - `name` (min 1, "Nome é obrigatório"), `building_id: number|null`, `category_id: number|null`, `account_type` (enum, default `generic`), `external_identifier`, `secondary_identifier`, `holder_name`, `registered_address` (strings, default `''`), `default_due_day` (int 1–31), `expected_amount` (number ≥ 0), `lifecycle_state` (`active|suspended|deferred|ended` — enum real `billingAccountStateEnum`), `supply_status` (`active|cut`), `tracking_start_month: string|null`, `end_date: string|null`, `description` (`Textarea` — o model `finances/models.py:174` e o schema expõem o campo; sem este input nenhuma UI o preencheria), `notes`.
 - Selects: prédio (`useBuildings`, opção "Condomínio (sem prédio)" = null), categoria (`useFinanceCategories`, opção "Nenhuma" = null), tipo (`ACCOUNT_TYPE_LABELS`), estado, fornecimento. `Input type="date"` para `tracking_start_month` (enviar `YYYY-MM-01`) e `end_date`.
 - **Validação espelho do backend (S56)**: `superRefine` — `external_identifier` em branco com `account_type` ∈ {water, electricity, iptu} ⇒ erro PT "Inscrição/UC é obrigatória para contas de água, luz e IPTU" (o backend rejeita; falhar cedo no form).
 - Edit: `useEffect` reset a partir de `account` (nested → `_id`: `building_id: account.building_id ?? account.building?.id ?? null`, padrão `bill-form-modal.tsx:129-135`). Create: DEFAULTS.
