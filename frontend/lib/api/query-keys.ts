@@ -56,8 +56,7 @@ export const queryKeys = {
   },
   rentPayments: {
     all: ['rent-payments'] as const,
-    list: (filters?: Record<string, unknown>) =>
-      [...queryKeys.rentPayments.all, filters] as const,
+    list: (filters?: Record<string, unknown>) => [...queryKeys.rentPayments.all, filters] as const,
     detail: (id: number) => [...queryKeys.rentPayments.all, id] as const,
   },
   employeePayments: {
@@ -68,8 +67,7 @@ export const queryKeys = {
   },
   personIncomes: {
     all: ['person-incomes'] as const,
-    list: (filters?: Record<string, unknown>) =>
-      [...queryKeys.personIncomes.all, filters] as const,
+    list: (filters?: Record<string, unknown>) => [...queryKeys.personIncomes.all, filters] as const,
   },
   personPayments: {
     all: ['person-payments'] as const,
@@ -140,6 +138,13 @@ export const queryKeys = {
       list: (filters?: Record<string, unknown>) =>
         [...queryKeys.finances.billingAccounts.all, filters ?? null] as const,
       detail: (id: number) => [...queryKeys.finances.billingAccounts.all, id] as const,
+      statement: (id: number) =>
+        [...queryKeys.finances.billingAccounts.all, id, 'statement'] as const,
+    },
+    monthBoard: {
+      all: ['finances', 'month-board'] as const,
+      month: (year: number, month: number) =>
+        [...queryKeys.finances.monthBoard.all, 'month', year, month] as const,
     },
     bills: {
       all: ['finances', 'bills'] as const,

@@ -1,10 +1,7 @@
 import { z } from 'zod';
 import { buildingSchema } from '../building.schema';
-import {
-  billingAccountStateEnum,
-  financeCategorySchema,
-} from './category.schema';
-import { condominiumRefSchema, moneyFieldRounded } from './money';
+import { billingAccountStateEnum, financeCategorySchema } from './category.schema';
+import { condominiumRefSchema, moneyField, moneyFieldRounded } from './money';
 
 export const billingAccountTypeValues = [
   'water',
@@ -39,6 +36,9 @@ export const billingAccountSchema = z.object({
   tracking_start_month: z.string().nullable().optional(),
   end_date: z.string().nullable().optional(),
   notes: z.string().optional().default(''),
+  // Sum of open balance across the account's bills (S67) — OPTIONAL so payloads that predate
+  // it (old MSW fixtures, cached responses) still parse via parseList.
+  open_balance: moneyField.optional(),
   created_at: z.string().optional(),
   updated_at: z.string().optional(),
 });
@@ -64,7 +64,5 @@ export const ACCOUNT_TYPE_LABELS: Record<BillingAccountType, string> = {
 export function accountLabel(account: BillingAccount): string {
   const typeLabel = ACCOUNT_TYPE_LABELS[account.account_type];
   const id = account.external_identifier || account.secondary_identifier || '';
-  return [account.name, typeLabel && `— ${typeLabel}`, id && `· ${id}`]
-    .filter(Boolean)
-    .join(' ');
+  return [account.name, typeLabel && `— ${typeLabel}`, id && `· ${id}`].filter(Boolean).join(' ');
 }

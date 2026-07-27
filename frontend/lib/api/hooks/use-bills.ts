@@ -2,7 +2,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
 import { queryKeys } from '../query-keys';
 import { parseList } from '../parse-list';
-import type { CombinedCalendar } from './use-combined-calendar';
 import { type Bill, type BillLineItem, billSchema } from '@/lib/schemas/finances/bill.schema';
 import {
   type ParsedInvoice,
@@ -75,6 +74,7 @@ export interface PayBillRequest {
   payment_date: string;
   amount?: number;
   funded_from?: FundedFrom;
+  new_total?: string; // decimal string (contract S68) — adjusts the bill's total before allocating
 }
 
 interface PayBillResponse {
@@ -83,9 +83,9 @@ interface PayBillResponse {
   amount_remaining?: number;
 }
 
-interface PayBillContext {
-  previousBills: [readonly unknown[], Bill[] | Bill | undefined][];
-  previousCalendar: [readonly unknown[], CombinedCalendar | undefined][];
+export interface ApplyInvoiceRequest {
+  bill_id: number;
+  file: File;
 }
 
 export function useBills(filters?: BillFilters) {
@@ -129,6 +129,9 @@ function invalidateBillCaches(queryClient: ReturnType<typeof useQueryClient>) {
   void queryClient.invalidateQueries({ queryKey: queryKeys.finances.bills.all });
   void queryClient.invalidateQueries({ queryKey: queryKeys.finances.combinedCalendar.all });
   void queryClient.invalidateQueries({ queryKey: queryKeys.finances.overdueBills.all });
+  // Paying/editing a bill moves the cockpit board and the owning account's open_balance (S71).
+  void queryClient.invalidateQueries({ queryKey: queryKeys.finances.monthBoard.all });
+  void queryClient.invalidateQueries({ queryKey: queryKeys.finances.billingAccounts.all });
   invalidateFinanceMoneyCaches(queryClient);
 }
 
@@ -143,6 +146,13 @@ export function useCreateBillWithLines() {
   });
 }
 
+/** Pure: wraps a PDF File in the single-field FormData both invoice endpoints expect. */
+function pdfFormData(file: File): FormData {
+  const formData = new FormData();
+  formData.append('file', file);
+  return formData;
+}
+
 /**
  * Parse a utility invoice PDF into a serialized DRAFT (S60). Multipart: send FormData with
  * `Content-Type: undefined` so the browser sets the boundary. Writes NOTHING — no cache
@@ -151,13 +161,35 @@ export function useCreateBillWithLines() {
 export function useParseInvoice() {
   return useMutation({
     mutationFn: async (file: File): Promise<ParsedInvoice> => {
-      const formData = new FormData();
-      formData.append('file', file);
-      const { data } = await apiClient.post<unknown>(`${ENDPOINT}parse_invoice/`, formData, {
-        headers: { 'Content-Type': undefined },
-      });
+      const { data } = await apiClient.post<unknown>(
+        `${ENDPOINT}parse_invoice/`,
+        pdfFormData(file),
+        {
+          headers: { 'Content-Type': undefined },
+        }
+      );
       return parsedInvoiceSchema.parse(data); // single draft object — returned raw
     },
+  });
+}
+
+/**
+ * Apply a parsed invoice PDF directly to a TARGET bill (S69) — atomic write, replaces only the
+ * lines without an `installment` FK and clears `amount_is_estimated`. Unlike `useParseInvoice`,
+ * this endpoint WRITES: it invalidates the bill caches on success.
+ */
+export function useApplyInvoice() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ bill_id, file }: ApplyInvoiceRequest) => {
+      const { data } = await apiClient.post<unknown>(
+        `${ENDPOINT}${bill_id}/apply_invoice/`,
+        pdfFormData(file),
+        { headers: { 'Content-Type': undefined } } // browser sets the multipart boundary
+      );
+      return billSchema.parse(data); // response = the bill serialized with amounts (S69)
+    },
+    onSuccess: () => invalidateBillCaches(queryClient),
   });
 }
 
@@ -223,77 +255,24 @@ export function useGenerateMonthBills() {
   });
 }
 
-/** Pure, immutable: flip a single Bill to fully paid (conservative optimistic update). */
-function flipBillPaid(bill: Bill, billId: number): Bill {
-  return bill.id === billId ? { ...bill, payment_status: 'paid', amount_remaining: 0 } : bill;
-}
-
-function markBillPaid(data: Bill[] | Bill | undefined, billId: number): Bill[] | Bill | undefined {
-  if (!data) return data;
-  if (Array.isArray(data)) return data.map((bill) => flipBillPaid(bill, billId));
-  return flipBillPaid(data, billId);
-}
-
-function markBillPaidInCalendar(calendar: CombinedCalendar, billId: number): CombinedCalendar {
-  return {
-    ...calendar,
-    days: calendar.days.map((day) => ({
-      ...day,
-      bill_exits: day.bill_exits.map((exit) =>
-        exit.bill_id === billId
-          ? { ...exit, payment_status: 'paid', amount_remaining: '0.00', is_overdue: false }
-          : exit
-      ),
-    })),
-  };
-}
-
 /**
- * Pay a bill (partial/total) with a conservative optimistic update: only a full payment
- * (amount omitted) is reflected optimistically as 'paid'; partial payments wait for the
- * server (onSettled) to reconcile, since simulating partial arithmetic client-side is fragile.
+ * Pay a bill (partial/total, optionally adjusting its total via `new_total`). NO optimistic
+ * update on any path (design §8 — never simulate a money mutation client-side): the payment
+ * status only changes once the server responds and the bill caches are invalidated/refetched.
  */
 export function usePayBill() {
   const queryClient = useQueryClient();
-  return useMutation<PayBillResponse, Error, PayBillRequest, PayBillContext>({
+  return useMutation<PayBillResponse, Error, PayBillRequest>({
     mutationFn: async (request) => {
       const { data } = await apiClient.post<PayBillResponse>(`${ENDPOINT}${request.bill_id}/pay/`, {
         payment_date: request.payment_date,
         ...(request.amount !== undefined ? { amount: request.amount } : {}),
         funded_from: request.funded_from ?? 'caixa',
+        ...(request.new_total !== undefined ? { new_total: request.new_total } : {}),
       });
       return data;
     },
-    onMutate: async (request) => {
-      if (request.amount !== undefined) {
-        return { previousBills: [], previousCalendar: [] };
-      }
-      await queryClient.cancelQueries({ queryKey: queryKeys.finances.bills.all });
-      await queryClient.cancelQueries({ queryKey: queryKeys.finances.combinedCalendar.all });
-
-      const previousBills = queryClient.getQueriesData<Bill[] | Bill>({
-        queryKey: queryKeys.finances.bills.all,
-      });
-      for (const [key, data] of previousBills) {
-        if (data) {
-          queryClient.setQueryData(key, markBillPaid(data, request.bill_id));
-        }
-      }
-      const previousCalendar = queryClient.getQueriesData<CombinedCalendar>({
-        queryKey: queryKeys.finances.combinedCalendar.all,
-      });
-      for (const [key, data] of previousCalendar) {
-        if (data) {
-          queryClient.setQueryData(key, markBillPaidInCalendar(data, request.bill_id));
-        }
-      }
-      return { previousBills, previousCalendar };
-    },
-    onError: (_error, _request, context) => {
-      context?.previousBills.forEach(([key, data]) => queryClient.setQueryData(key, data));
-      context?.previousCalendar.forEach(([key, data]) => queryClient.setQueryData(key, data));
-    },
-    onSettled: (_data, _error, request) => {
+    onSuccess: (_data, request) => {
       invalidateBillCaches(queryClient);
       if (request.funded_from === 'reserve') {
         void queryClient.invalidateQueries({ queryKey: queryKeys.finances.reserves.all });

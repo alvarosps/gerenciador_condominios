@@ -6,6 +6,8 @@ import type {
 import { type billingAccountSchema } from '@/lib/schemas/finances/billing-account.schema';
 import { type billLineItemSchema, type billSchema } from '@/lib/schemas/finances/bill.schema';
 import { type parsedInvoiceSchema } from '@/lib/schemas/finances/invoice-parse.schema';
+import { type monthBoardSchema } from '@/lib/schemas/finances/month-board.schema';
+import { type accountStatementSchema } from '@/lib/schemas/finances/account-statement.schema';
 import type { IptuAlertRow } from '@/lib/api/hooks/use-iptu-alerts';
 import type { BillSkip } from '@/lib/schemas/finances/bill-skip.schema';
 import { type financeCategorySchema } from '@/lib/schemas/finances/category.schema';
@@ -48,6 +50,8 @@ type CondoMonthCloseRaw = z.input<typeof condoMonthCloseSchema>;
 // The parse_invoice DRAFT (write prefill, not a read) — bill.building_id/category_id are inherited
 // from the matched account (S60) and belong here; the line amount is money_str -> a string.
 type ParsedInvoiceRaw = z.input<typeof parsedInvoiceSchema>;
+type MonthBoardRaw = z.input<typeof monthBoardSchema>;
+type AccountStatementRaw = z.input<typeof accountStatementSchema>;
 
 export function createMockFinanceCategory(
   overrides: Partial<FinanceCategoryRaw> = {}
@@ -87,6 +91,7 @@ export function createMockBillingAccount(
     tracking_start_month: '2026-06-01',
     end_date: null,
     notes: '',
+    open_balance: '0.00',
     created_at: '2026-06-01T00:00:00Z',
     updated_at: '2026-06-01T00:00:00Z',
     ...overrides,
@@ -125,6 +130,7 @@ export function createMockBill(overrides: Partial<BillRaw> = {}): BillRaw {
     amount_remaining: '350.00',
     payment_status: 'open',
     is_overdue: false,
+    amount_is_estimated: false,
     created_at: '2026-06-01T00:00:00Z',
     updated_at: '2026-06-01T00:00:00Z',
     ...overrides,
@@ -242,6 +248,58 @@ export function createMockCombinedCalendar(
         bill_exits: [createMockBillExit()],
       },
     ],
+    ...overrides,
+  };
+}
+
+export function createMockMonthBoard(overrides: Partial<MonthBoardRaw> = {}): MonthBoardRaw {
+  return {
+    overdue: [],
+    deferred_suspended: [],
+    groups: [
+      {
+        building_id: 1,
+        building_label: 'Prédio 836',
+        bills: [createMockBill()],
+      },
+    ],
+    totals: {
+      due: '350.00',
+      paid: '0.00',
+      remaining: '350.00',
+      overdue: '0.00',
+    },
+    generation: { missing_count: 0 },
+    ...overrides,
+  };
+}
+
+export function createMockAccountStatement(
+  overrides: Partial<AccountStatementRaw> = {}
+): AccountStatementRaw {
+  return {
+    account: createMockBillingAccount(),
+    stats: {
+      open_balance: '350.00',
+      open_bills_count: 1,
+      avg_delay_days: null,
+    },
+    months: [
+      {
+        bill_id: 1,
+        competence_month: '2026-06-01',
+        due_date: '2026-06-10',
+        description: 'Conta de Luz',
+        amount_total: '350.00',
+        amount_paid: '0.00',
+        amount_remaining: '350.00',
+        payment_status: 'open',
+        lifecycle_state: 'active',
+        amount_is_estimated: false,
+        paid_date: null,
+      },
+    ],
+    plans: [],
     ...overrides,
   };
 }

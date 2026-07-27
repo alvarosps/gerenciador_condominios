@@ -29,6 +29,7 @@ import {
 } from './data';
 import { createMockRentCalendar } from './data/rent-calendar';
 import {
+  createMockAccountStatement,
   createMockBill,
   createMockBillingAccount,
   createMockBillSkip,
@@ -44,6 +45,7 @@ import {
   createMockInstallment,
   createMockParsedInvoice,
   createMockInstallmentPlan,
+  createMockMonthBoard,
   createMockMonthlyBalance,
   createMockOverdueResponse,
   createMockOwnerDistribution,
@@ -2247,10 +2249,25 @@ const webPushHandlers = [
  * are registered before the `:id` routes so MSW does not capture them as a detail pk.
  */
 const financeHandlers = [
-  // --- billing-accounts ---
+  // --- billing-accounts (collection/statement actions before the generic :id route) ---
   http.get(`${API_BASE}/finances/billing-accounts/`, async () => {
     await delay(50);
     return HttpResponse.json(billingAccounts);
+  }),
+  http.get(`${API_BASE}/finances/billing-accounts/:id/statement/`, async ({ params }) => {
+    await delay(50);
+    const id = Number(params.id);
+    const account = billingAccounts.find((a) => a.id === id);
+    if (!account) return new HttpResponse(null, { status: 404 });
+    return HttpResponse.json(createMockAccountStatement({ account }));
+  }),
+  http.post(`${API_BASE}/finances/billing-accounts/:id/consolidate_debt/`, async ({ params }) => {
+    await delay(100);
+    const account = billingAccounts.find((a) => a.id === Number(params.id));
+    if (!account) return new HttpResponse(null, { status: 404 });
+    const plan = createMockInstallmentPlan({ id: installmentPlans.length + 1 });
+    installmentPlans.push(plan);
+    return HttpResponse.json(plan, { status: 201 });
   }),
   http.get(`${API_BASE}/finances/billing-accounts/:id/`, async ({ params }) => {
     await delay(50);
@@ -2317,6 +2334,14 @@ const financeHandlers = [
     };
     if (index !== -1) financeBills[index] = paid;
     return HttpResponse.json(paid);
+  }),
+  http.post(`${API_BASE}/finances/bills/:id/apply_invoice/`, async ({ params }) => {
+    await delay(100);
+    const id = Number(params.id);
+    const index = financeBills.findIndex((b) => b.id === id);
+    const applied = createMockBill({ id, amount_is_estimated: false });
+    if (index !== -1) financeBills[index] = applied;
+    return HttpResponse.json(applied);
   }),
   http.post(`${API_BASE}/finances/bills/:id/update_with_lines/`, async ({ params }) => {
     await delay(50);
@@ -2471,6 +2496,14 @@ const financeHandlers = [
     const year = Number(params.get('year') ?? '2026');
     const month = Number(params.get('month') ?? '6');
     return HttpResponse.json(createMockCombinedCalendar({ year, month }));
+  }),
+  http.get(`${API_BASE}/finances/finance-dashboard/month_board/`, ({ request }) => {
+    const params = new URL(request.url).searchParams;
+    const month = Number(params.get('month') ?? '6');
+    if (!Number.isInteger(month) || month < 1 || month > 12) {
+      return HttpResponse.json({ detail: 'Mês inválido.' }, { status: 400 });
+    }
+    return HttpResponse.json(createMockMonthBoard());
   }),
   http.get(`${API_BASE}/finances/finance-dashboard/overdue/`, () => {
     return HttpResponse.json(createMockOverdueResponse());
