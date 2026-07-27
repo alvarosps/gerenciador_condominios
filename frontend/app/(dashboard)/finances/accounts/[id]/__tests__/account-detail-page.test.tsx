@@ -225,7 +225,35 @@ describe('AccountDetailPage', () => {
     await waitForQueriesToSettle(queryClient);
   });
 
-  it('esconde "Parcelar saldo devedor" para non-admin', async () => {
+  it('non-admin recebe 403 do backend (IsAdminUser — S67) e vê o empty state, sem quebrar', async () => {
+    // The `statement` endpoint is IsAdminUser (S67) — a non-staff user never gets a 200 in
+    // production. The real behavior is a 403, which the page maps to the same "not found" empty
+    // state as any other error (no data leak; the backend is the actual barrier — this is UX, not
+    // a security boundary).
+    setNonAdmin();
+    server.use(
+      http.get(
+        `${API_BASE}/finances/billing-accounts/1/statement/`,
+        () => new HttpResponse(null, { status: 403 })
+      )
+    );
+
+    const { queryClient } = renderWithProviders(<AccountDetailPage />);
+
+    expect(await screen.findByText(/conta não encontrada/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: /voltar para contas cadastradas/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /parcelar saldo devedor/i })
+    ).not.toBeInTheDocument();
+
+    await waitForQueriesToSettle(queryClient);
+  });
+
+  it('esconde "Parcelar saldo devedor" para non-admin quando a página consegue renderizar (defesa em profundidade)', async () => {
+    // Defensive UI gating in case the 200 path is ever reached for a non-staff session (e.g. a
+    // future relaxation of the backend permission) — the button stays admin-only regardless.
     setNonAdmin();
     server.use(
       http.get(`${API_BASE}/finances/billing-accounts/1/statement/`, () =>
