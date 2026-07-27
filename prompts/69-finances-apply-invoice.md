@@ -195,7 +195,10 @@ Constrói `ParsedInvoice` na mão (dataclass S59) + ORM real; bill alvo estimada
 ```bash
 python -m pytest tests/unit/test_finances/test_invoice_apply_service.py tests/unit/test_finances/test_invoice_draft_service.py \
   tests/unit/test_finances/test_bill_service.py tests/integration/test_apply_invoice_api.py \
-  --cov=finances --cov-report=term-missing --cov-fail-under=90 -q
+  --cov=finances --cov-report=term-missing --cov-fail-under=0 -q
+# ^ run ESCOPADO: --cov-fail-under=0 desliga o gate global (o addopts do projeto usa 90).
+# O numero de 90% de `finances` e medido SEPARADAMENTE, na suite completa:
+#   python -m pytest tests/unit/test_finances/ tests/integration/test_finances/ --cov=finances -q
 python -m pytest tests/integration/test_parse_invoice_api.py tests/unit/test_finances/test_bill_statement_service.py \
   tests/integration/test_finances_bill_statement_api.py -q  # regressão dirigida (update_with_lines com linhas de installment)
 ruff check finances/ tests/unit/test_finances/ tests/integration/test_apply_invoice_api.py
@@ -223,7 +226,7 @@ pyright finances/services/invoice_apply_service.py finances/services/invoice_dra
 - [ ] `InvoiceApplyService.apply(bill, parsed, user)`: 400 PT p/ conta divergente/null e competência divergente; linhas+statement+header (`due_date`/`external_identifier`) aplicados via `update_with_lines` em transação única; parcela embutida preservada; `amount_is_estimated` termina `False` (delegação S65); atômico.
 - [ ] `POST /api/finances/bills/{id}/apply_invoice/` (MultiPartParser, `IsAdminUser`): 200 com a bill serializada (com amounts); 400 sem arquivo/não-PDF/regras de negócio; 422 emissor desconhecido; 401/403 auth; rota auto-exposta (`finances/urls.py` intacto).
 - [ ] `parse_invoice` comportamento idêntico (`test_parse_invoice_api.py` 100% verde sem edição); helper `_read_parsed_invoice` compartilhado (zero duplicação dos erros de upload).
-- [ ] Gate verde: pytest escopado 100% + coverage `finances` ≥90% nos módulos tocados; `ruff check`/`format --check`, `mypy core/ finances/`, `pyright` — zero erros e zero warnings, sem suppressions.
+- [ ] Gate verde: pytest escopado 100% (com `--cov-fail-under=0`) + coverage `finances` ≥90% medido na SUITE COMPLETA de finances; `ruff check`/`format --check`, `mypy core/ finances/`, `pyright` — zero erros e zero warnings, sem suppressions.
 
 ## Handoff
 

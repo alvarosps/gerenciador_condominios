@@ -104,7 +104,7 @@ Antes do `/audit`, montar uma tabela `cenário → arquivo de teste → status` 
 
 - **Backend**: `month_board` (atrasadas cross-competência só ACTIVE; deferred/suspended fora dos totais; CANCELED invisível; `missing_count` com BillSkip/tracking/conta nova; mês fechado → 400) · `statement`/`open_balance`: braço `installment__plan__billing_account` (conta IPTU não zera), conta cortada acumulando, atraso médio (exclui `amount_total=0`, exige quitada, alocações/payments vivos) · flag `amount_is_estimated` (gerar→True incl. embutido; editar/importar/pagar→False; `unpay` não re-marca; `bulk_pay` via serviço) · pagar-com-ajuste (estimada maior/menor sem resto fantasma; juros/multa em confirmada; atomicidade) · `apply_invoice` (match ok; mismatch building/inscrição; preservação de linha de parcela) · `consolidate_debt` (N bills incl. parciais → 1 plano = Σ restos + origens canceladas; atomicidade; sem dupla contagem).
 - **Frontend**: cockpit (popover pagar/editar, banner gerar faltantes, seções Atrasadas/adiada-suspensa) · contas cadastradas (CRUD, célula-link) · extrato (primeira página `[id]`) · MSW (actions de collection antes de `:id`; factories `createMockMonthBoard`/`createMockAccountStatement`; blocos `monthBoard`/`billingAccounts.statement` em `query-keys.ts`).
-- **Gate**: ≥90% cobertura em `finances/` (BE), zero warnings, regressão com escopo, mock só de fronteiras externas.
+- **Gate**: ≥90% cobertura em `finances/` (BE) medida na SUITE COMPLETA de finances (nunca em run escopado), zero warnings, regressão com escopo, mock só de fronteiras externas.
 
 ### Fecho: skill `/audit`
 

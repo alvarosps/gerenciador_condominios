@@ -279,7 +279,10 @@ def test_billing_accounts_list_includes_open_balance(authenticated_api_client) -
 python -m pytest tests/unit/test_finances/test_billing_account_open_balance.py \
   tests/unit/test_finances/test_account_statement_service.py \
   tests/integration/test_finances/test_finance_account_statement_api.py \
-  --cov=finances --cov-report=term-missing --cov-fail-under=90 -p no:cacheprovider -q
+  --cov=finances --cov-report=term-missing --cov-fail-under=0 -p no:cacheprovider -q
+# ^ run ESCOPADO: --cov-fail-under=0 desliga o gate global (o addopts do projeto usa 90).
+# O numero de 90% de `finances` e medido SEPARADAMENTE, na suite completa:
+#   python -m pytest tests/unit/test_finances/ tests/integration/test_finances/ --cov=finances -q
 ruff check && ruff format --check
 mypy core/ finances/
 pyright
@@ -311,7 +314,7 @@ python manage.py makemigrations --check --dry-run   # annotation não gera migra
 - [ ] `BillingAccountSerializer` expõe `open_balance` (string decimal) e a listagem `GET billing-accounts/` o carrega (queryset anotado); conta IPTU não zera (braço installment).
 - [ ] `AccountStatementService.build(account_id, today)` devolve `{account, stats{open_balance, open_bills_count, avg_delay_days}, months[], plans[]}` EXATO ao contrato; `avg_delay_days` = média das últimas 12 quitadas (`amount_remaining=0` e `amount_total>0`), `paid_date` = MAX(payment_date) vivo, `None` sem quitadas; `plans` com `materialized_count` (espelho da materialização).
 - [ ] `GET billing-accounts/{id}/statement` UNCACHED, `IsAdminUser` (403/401), 404 p/ conta inexistente/deletada; rota auto-exposta (`finances/urls.py` intacto).
-- [ ] Testes desta sessão 100% verdes; **coverage `finances` ≥90%** no run escopado; regressão verde; `makemigrations --check` limpo.
+- [ ] Testes desta sessão 100% verdes; **coverage `finances` ≥90%** medido na SUITE COMPLETA de finances (nunca no run escopado, onde e matematicamente inatingivel); regressão verde; `makemigrations --check` limpo.
 - [ ] `ruff check && ruff format --check` + `mypy core/ finances/` + `pyright` — **zero erros e zero warnings**, sem suppressions.
 - [ ] Nenhum arquivo de S68–S76 criado; `pay`/`month_board`/`convert_deferred` intocados.
 

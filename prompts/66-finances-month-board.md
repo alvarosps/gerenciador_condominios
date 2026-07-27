@@ -242,7 +242,10 @@ def test_month_board_uncached_reflects_payment(authenticated_api_client) -> None
 ```bash
 python -m pytest tests/unit/test_finances/test_condo_month_board_service.py \
   tests/integration/test_finances/test_finance_month_board_api.py \
-  --cov=finances --cov-report=term-missing --cov-fail-under=90 -p no:cacheprovider -q
+  --cov=finances --cov-report=term-missing --cov-fail-under=0 -p no:cacheprovider -q
+# ^ run ESCOPADO: --cov-fail-under=0 desliga o gate global (o addopts do projeto usa 90).
+# O numero de 90% de `finances` e medido SEPARADAMENTE, na suite completa:
+#   python -m pytest tests/unit/test_finances/ tests/integration/test_finances/ --cov=finances -q
 ruff check && ruff format --check
 mypy core/ finances/
 pyright
@@ -275,7 +278,7 @@ pyright
 - [ ] `overdue` cross-competência, só ACTIVE, `due_date < today` estrito, resto>0; `deferred_suspended` fora dos totais; CANCELED invisível; groups = ACTIVE da competência (pagas incluídas), bucket "Condomínio" por último.
 - [ ] `missing_count` via `is_account_eligible` + slot `(conta, mês)` não-deletado (qualquer lifecycle); zera após `generate_month`; IPTU/BillSkip/tracking respeitados.
 - [ ] `GET finance-dashboard/month_board?year&month` UNCACHED, `IsAdminUser` (403/401), 400 PT em params inválidos, default = mês SP corrente; rota auto-exposta (`finances/urls.py` intacto).
-- [ ] Testes desta sessão 100% verdes; **coverage `finances` ≥90%** no run escopado; regressão verde.
+- [ ] Testes desta sessão 100% verdes; **coverage `finances` ≥90%** medido na SUITE COMPLETA de finances (nunca no run escopado, onde e matematicamente inatingivel); regressão verde.
 - [ ] `ruff check && ruff format --check` + `mypy core/ finances/` + `pyright` — **zero erros e zero warnings**, sem suppressions.
 - [ ] Nenhum arquivo de S67–S76 criado; `is_overdue`/`overdue` legado/`combined_calendar`/`generate_month` intactos.
 

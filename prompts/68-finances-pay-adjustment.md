@@ -157,7 +157,10 @@ def pay(
 
 ```bash
 python -m pytest tests/unit/test_finances/test_bill_payment_service.py tests/integration/test_finances/test_finance_bill_actions.py \
-  --cov=finances --cov-report=term-missing --cov-fail-under=90 -q
+  --cov=finances --cov-report=term-missing --cov-fail-under=0 -q
+# ^ run ESCOPADO: --cov-fail-under=0 desliga o gate global (o addopts do projeto usa 90).
+# O numero de 90% de `finances` e medido SEPARADAMENTE, na suite completa:
+#   python -m pytest tests/unit/test_finances/ tests/integration/test_finances/ --cov=finances -q
 ruff check finances/ tests/unit/test_finances/test_bill_payment_service.py tests/integration/test_finances/test_finance_bill_actions.py
 ruff format --check finances/ tests/unit/test_finances/test_bill_payment_service.py tests/integration/test_finances/test_finance_bill_actions.py
 mypy core/ finances/
@@ -189,7 +192,7 @@ pyright finances/services/bill_payment_service.py finances/viewsets/crud_views.p
 - [ ] Ajuste ANTES da alocação, mesma transação; `amount=None` defaulta ao resto pós-ajuste; over-allocation/positivo/ACTIVE/mês fechado valem após o ajuste; rollback desfaz o ajuste.
 - [ ] `amount_is_estimated` termina `False` no caminho `new_total` (via S65, sem duplicação); `unpay` não reverte ajuste nem re-marca.
 - [ ] Action `pay` aceita `new_total` (decimal string, inválido → 400 PT); `bulk_pay` ignora o campo (código intocado).
-- [ ] Gate verde: pytest escopado 100% + coverage `finances` ≥90% nos módulos tocados; `ruff check`/`format --check`, `mypy core/ finances/`, `pyright` — zero erros e zero warnings, sem suppressions.
+- [ ] Gate verde: pytest escopado 100% (com `--cov-fail-under=0`) + coverage `finances` ≥90% medido na SUITE COMPLETA de finances; `ruff check`/`format --check`, `mypy core/ finances/`, `pyright` — zero erros e zero warnings, sem suppressions.
 
 ## Handoff
 

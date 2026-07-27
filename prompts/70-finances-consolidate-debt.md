@@ -176,7 +176,10 @@ def consolidate_debt(self, request: Request, pk: str | None = None) -> Response:
 
 ```bash
 python -m pytest tests/unit/test_finances/test_installment_plan_service.py tests/integration/test_finances/test_finance_consolidate_debt_api.py \
-  --cov=finances --cov-report=term-missing --cov-fail-under=90 -q
+  --cov=finances --cov-report=term-missing --cov-fail-under=0 -q
+# ^ run ESCOPADO: --cov-fail-under=0 desliga o gate global (o addopts do projeto usa 90).
+# O numero de 90% de `finances` e medido SEPARADAMENTE, na suite completa:
+#   python -m pytest tests/unit/test_finances/ tests/integration/test_finances/ --cov=finances -q
 python -m pytest tests/unit/test_finances/test_generation_installments_payroll.py tests/integration/test_finances/test_finance_viewset_guards.py -q  # regressão dirigida
 ruff check finances/ tests/unit/test_finances/test_installment_plan_service.py tests/integration/test_finances/test_finance_consolidate_debt_api.py
 ruff format --check finances/ tests/unit/test_finances/test_installment_plan_service.py tests/integration/test_finances/test_finance_consolidate_debt_api.py
@@ -205,7 +208,7 @@ pyright finances/services/installment_plan_service.py finances/viewsets/crud_vie
 - [ ] Pagamento parcial vivo é admitido no cancelamento (docstring explica; alocação permanece viva); guard manual de cancel (`set_state`/`assert_not_paid`) intocado.
 - [ ] `POST /api/finances/billing-accounts/{id}/consolidate_debt/` (`IsAdminUser`): 201 com `InstallmentPlanSerializer` (parcelas aninhadas); 400 payload/regras PT; 404 conta; 401/403 auth; rota auto-exposta (`finances/urls.py` intacto).
 - [ ] `convert_deferred` intocado (suite existente verde sem edição).
-- [ ] Gate verde: pytest escopado 100% + coverage `finances` ≥90% nos módulos tocados; `ruff check`/`format --check`, `mypy core/ finances/`, `pyright` — zero erros e zero warnings, sem suppressions.
+- [ ] Gate verde: pytest escopado 100% (com `--cov-fail-under=0`) + coverage `finances` ≥90% medido na SUITE COMPLETA de finances; `ruff check`/`format --check`, `mypy core/ finances/`, `pyright` — zero erros e zero warnings, sem suppressions.
 
 ## Handoff
 
