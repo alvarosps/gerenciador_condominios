@@ -50,6 +50,7 @@ from finances.serializers import (
     CategorySerializer,
     CondoMonthCloseSerializer,
     IncomeEntrySerializer,
+    InstallmentPlanSerializer,
     PaymentSerializer,
     ReserveMovementSerializer,
     ReserveSerializer,
@@ -65,6 +66,7 @@ from finances.services.bill_service import (
     StatementInput,
 )
 from finances.services.condo_month_close_service import CondoMonthCloseService
+from finances.services.installment_plan_service import InstallmentPlanService
 from finances.services.invoice_apply_service import InvoiceApplyService
 from finances.services.invoice_draft_service import InvoiceDraftService
 from finances.services.invoice_parsing.base import ParsedInvoice
@@ -134,6 +136,53 @@ def _parse_new_total(raw: object) -> Decimal | None:
     return value
 
 
+_CONSOLIDATE_DEBT_PAYLOAD_INVALID = (
+    "Parâmetros inválidos: bill_ids (lista), embedded, installment_count, "
+    "start_due_date, default_due_day."
+)
+
+
+class _ConsolidateDebtPayload:
+    """Validated request.data for consolidate_debt (Session 70)."""
+
+    __slots__ = ("bill_ids", "default_due_day", "embedded", "installment_count", "start_due_date")
+
+    def __init__(
+        self,
+        bill_ids: list[int],
+        embedded: bool,
+        installment_count: int,
+        start_due_date: date,
+        default_due_day: int,
+    ) -> None:
+        self.bill_ids = bill_ids
+        self.embedded = embedded
+        self.installment_count = installment_count
+        self.start_due_date = start_due_date
+        self.default_due_day = default_due_day
+
+
+def _parse_consolidate_debt_payload(data: dict[str, object]) -> _ConsolidateDebtPayload:
+    """Parse consolidate_debt's body; raise KeyError/ValueError/TypeError (-> 400 PT) otherwise.
+
+    embedded must be a strict JSON bool (isinstance check) — bool("false") is True in Python, so
+    coercing via bool(...) would silently accept the string "false" as True.
+    """
+    bill_ids_raw = data["bill_ids"]
+    if not isinstance(bill_ids_raw, list) or not bill_ids_raw:
+        raise TypeError
+    bill_ids = [int(cast(str, item)) for item in bill_ids_raw]
+    embedded = data["embedded"]
+    if not isinstance(embedded, bool):
+        raise TypeError
+    installment_count = int(cast(str, data["installment_count"]))
+    start_due_date = date.fromisoformat(str(data["start_due_date"]))
+    default_due_day = int(cast(str, data["default_due_day"]))
+    return _ConsolidateDebtPayload(
+        bill_ids, embedded, installment_count, start_due_date, default_due_day
+    )
+
+
 class CategoryViewSet(viewsets.ModelViewSet):
     serializer_class = CategorySerializer
     permission_classes = [IsAdminUser]
@@ -185,6 +234,33 @@ class BillingAccountViewSet(viewsets.ModelViewSet):
         account = self.get_object()  # 404 for unknown/soft-deleted account (live manager)
         return Response(
             AccountStatementService.build(account.pk, today_sp()), status=status.HTTP_200_OK
+        )
+
+    @action(detail=True, methods=["post"])
+    def consolidate_debt(self, request: Request, pk: str | None = None) -> Response:
+        """Consolida N contas em aberto desta conta em 1 plano (cancela as origens)."""
+        account = self.get_object()  # 404 for unknown/soft-deleted account (live manager)
+        try:
+            payload = _parse_consolidate_debt_payload(request.data)
+        except KeyError, ValueError, TypeError:
+            return Response(
+                {"error": _CONSOLIDATE_DEBT_PAYLOAD_INVALID}, status=status.HTTP_400_BAD_REQUEST
+            )
+        try:
+            plan = InstallmentPlanService.consolidate_open_bills(
+                account=account,
+                bill_ids=payload.bill_ids,
+                embedded=payload.embedded,
+                installment_count=payload.installment_count,
+                start_due_date=payload.start_due_date,
+                default_due_day=payload.default_due_day,
+                user=cast(User, request.user),
+            )
+        except ValidationError as exc:
+            return Response({"error": str(exc.messages[0])}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            InstallmentPlanSerializer(plan, context={"request": request}).data,
+            status=status.HTTP_201_CREATED,
         )
 
 
