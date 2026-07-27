@@ -103,8 +103,9 @@ def test_bill_with_employee_and_billing_account_is_invalid() -> None:
         billing_account=make_billing_account(condominium=condominium),
         employee=make_employee(condominium=condominium),
     )
-    with pytest.raises(ValidationError):
+    with pytest.raises(ValidationError) as exc:
         bill.clean()
+    assert exc.value.message_dict["__all__"] == [ERR_BILL_MULTIPLE_SOURCES]
 
 
 def test_bill_with_single_source_or_none_is_valid() -> None:
@@ -153,7 +154,7 @@ def test_settlement_amount_must_be_positive() -> None:
     )
     with pytest.raises(ValidationError) as exc:
         settlement.clean()
-    assert "amount" in exc.value.message_dict
+    assert exc.value.message_dict["amount"] == ["O valor do acerto deve ser positivo."]
 
     settlement.amount = Decimal("150.00")
     settlement.clean()  # valid

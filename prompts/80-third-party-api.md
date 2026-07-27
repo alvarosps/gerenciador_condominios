@@ -125,6 +125,14 @@ O acerto é saída de caixa real; `CondoMonthClose.cash_balance_end` é congelad
 
 **Shape de erro** (o módulo usa dois, não misturar): guards de action → `{"error": "<PT>"}` (`crud_views.py:496,542`); validação de serializer → shape nativo do DRF (`{"campo": ["msg"]}`). `{"detail": …}` é só para 405.
 
+**Nota da revisão da S77:** a regra de exclusividade de origem levanta `ValidationError({NON_FIELD_ERRORS: …})` (cobre 3 campos, não há campo único). Ao espelhar em serializer, levantar de `validate()` — **não** de `validate_<campo>()`. E no teste da resposta HTTP, esperar a chave **`non_field_errors`**: o DRF renomeia; não assumir a string literal `__all__`.
+
+### 3c. Follow-up herdado da S77 (Important, corrigir aqui)
+
+`_EDITABLE_HEADER_FIELDS` (`bill_service.py:128-140`) inclui `billing_account`, e `_apply_header` chama `full_clean()` (`:275`). Depois da S77, editar `billing_account` numa bill que já tem `installment` (parcela avulsa) **bate na regra nova de exclusividade** e devolve o erro genérico de múltiplas origens — mensagem inútil para o usuário.
+
+Nenhum dado atual dispara isso (0 bills multi-origem, verificado local **e** em produção), mas o caminho existe. Corrigir: em `update_with_lines`, rejeitar `billing_account` quando a bill tem `installment`, com mensagem PT dedicada (ex.: `"Não é possível trocar a conta de cobrança de uma parcela."`). Teste obrigatório.
+
 ## TDD
 
 Red primeiro. Obrigatórios:
