@@ -162,22 +162,35 @@ class _ConsolidateDebtPayload:
         self.default_due_day = default_due_day
 
 
+def _strict_int(raw: object) -> int:
+    """raw as an int, rejecting bool and float coercion; raise TypeError (-> 400 PT) otherwise.
+
+    isinstance(True, int) is True in Python (bool is an int subclass) and int(3.7) silently
+    truncates to 3, so a bare int(...) cast would accept a JSON bill id of `true` (-> 1) or `3.7`
+    (-> 3) — the same laxness the strict embedded bool check below exists to avoid.
+    """
+    if isinstance(raw, bool) or not isinstance(raw, int):
+        raise TypeError
+    return raw
+
+
 def _parse_consolidate_debt_payload(data: dict[str, object]) -> _ConsolidateDebtPayload:
     """Parse consolidate_debt's body; raise KeyError/ValueError/TypeError (-> 400 PT) otherwise.
 
     embedded must be a strict JSON bool (isinstance check) — bool("false") is True in Python, so
-    coercing via bool(...) would silently accept the string "false" as True.
+    coercing via bool(...) would silently accept the string "false" as True. bill_ids items and
+    installment_count/default_due_day are strict JSON ints for the same reason (_strict_int).
     """
     bill_ids_raw = data["bill_ids"]
     if not isinstance(bill_ids_raw, list) or not bill_ids_raw:
         raise TypeError
-    bill_ids = [int(cast(str, item)) for item in bill_ids_raw]
+    bill_ids = [_strict_int(item) for item in bill_ids_raw]
     embedded = data["embedded"]
     if not isinstance(embedded, bool):
         raise TypeError
-    installment_count = int(cast(str, data["installment_count"]))
+    installment_count = _strict_int(data["installment_count"])
     start_due_date = date.fromisoformat(str(data["start_due_date"]))
-    default_due_day = int(cast(str, data["default_due_day"]))
+    default_due_day = _strict_int(data["default_due_day"])
     return _ConsolidateDebtPayload(
         bill_ids, embedded, installment_count, start_due_date, default_due_day
     )

@@ -308,31 +308,39 @@ class InstallmentPlanService:
 
     @staticmethod
     def _assert_consolidatable(bills: list[Bill]) -> None:
-        """Reject (PT) a CANCELED bill or a standalone-parcela bill of a live plan (pureza v1) and
-        assert every competence month is open — BEFORE any write (design contract S70).
+        """Reject (PT) a CANCELED bill or a plan-owned bill (pureza v1) and assert every
+        competence month is open — BEFORE any write (design contract S70).
         """
         for bill in bills:
             if bill.lifecycle_state == BillLifecycleState.CANCELED:
                 raise ValidationError(_BILL_CANCELED)
-            if InstallmentPlanService._is_from_active_plan(bill):
+            if InstallmentPlanService._is_from_installment_plan(bill):
                 raise ValidationError(_BILL_FROM_PLAN.format(id=bill.pk))
             CondoMonthCloseService.assert_open(bill.competence_month)
 
     @staticmethod
-    def _is_from_active_plan(bill: Bill) -> bool:
-        """True when the bill IS a standalone parcela (FK installment) of a live plan, or carries
-        an embedded parcela line (BillLineItem.installment) tied to a live plan (pureza v1 — a
-        plan still ACTIVE/MATERIALIZED would keep generating in parallel, doubling the debt, and
-        the S67 statement's N/M progress would lie).
+    def _is_from_installment_plan(bill: Bill) -> bool:
+        """Pureza v1 (design contract S70): reject a bill with FK ``installment`` set
+        UNCONDITIONALLY (the bill IS a standalone parcela — its plan owns it regardless of the
+        plan's own lifecycle_state, e.g. PAID/DEFERRED/CANCELED); reject a bill that carries an
+        embedded parcela line (BillLineItem.installment) ONLY when that line's plan is still
+        ACTIVE/MATERIALIZED (a live plan would keep generating in parallel, doubling the debt, and
+        the S67 statement's N/M progress would lie — a plan already PAID/DEFERRED/CANCELED
+        generates nothing more, so its past embedded line does not block consolidation).
+
+        Consolidating a standalone parcela bill unconditionally — even of a PAID/DEFERRED/CANCELED
+        plan — would cancel the bill while its Installment row survives pointing at a now-CANCELED
+        bill: account_statement_service still counts that Installment as materialized, so the
+        extrato's N/M progress lies. That risk exists independent of the origin plan's state, so
+        this branch has no live_states qualifier (unlike the embedded-line branch below).
 
         Reads bill.installment / bill.line_items.all() (prefetched by the caller) rather than
         re-querying with .filter() — a fresh queryset call on a prefetched relation manager
         bypasses the prefetch cache and reintroduces the N+1 this helper is meant to avoid.
         """
-        live_states = {InstallmentPlanState.ACTIVE.value, InstallmentPlanState.MATERIALIZED.value}
-        installment = bill.installment
-        if installment is not None and installment.plan.lifecycle_state in live_states:
+        if bill.installment_id is not None:
             return True
+        live_states = {InstallmentPlanState.ACTIVE.value, InstallmentPlanState.MATERIALIZED.value}
         for line in bill.line_items.all():
             line_installment = line.installment
             if (

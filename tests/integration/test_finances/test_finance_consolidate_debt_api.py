@@ -131,6 +131,25 @@ def test_consolidate_debt_non_bool_embedded_returns_400(authenticated_api_client
 
 
 @freeze_time(FROZEN)
+def test_consolidate_debt_non_int_bill_ids_returns_400(authenticated_api_client):
+    """bool/float bill_ids items must be rejected, not silently coerced (True -> 1, 3.7 -> 3)."""
+    account = make_billing_account(account_type=BillingAccountType.WATER)
+    bill = _open_bill(account, "100.00")
+
+    resp_bool = authenticated_api_client.post(_url(account.id), _payload([True]), format="json")
+    assert resp_bool.status_code == status.HTTP_400_BAD_REQUEST
+    assert InstallmentPlan.objects.count() == 0
+
+    resp_float_count = authenticated_api_client.post(
+        _url(account.id), _payload([bill.id], installment_count=3.7), format="json"
+    )
+    assert resp_float_count.status_code == status.HTTP_400_BAD_REQUEST
+    assert InstallmentPlan.objects.count() == 0
+    bill.refresh_from_db()
+    assert bill.lifecycle_state == BillLifecycleState.ACTIVE
+
+
+@freeze_time(FROZEN)
 def test_consolidate_debt_cross_account_bill_returns_400(authenticated_api_client):
     account = make_billing_account(account_type=BillingAccountType.WATER)
     other_account = make_billing_account(

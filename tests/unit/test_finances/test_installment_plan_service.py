@@ -377,6 +377,50 @@ class TestConsolidateOpenBills:
         assert InstallmentPlan.objects.count() == 1  # nothing new persisted
 
     @freeze_time("2026-07-15")
+    @pytest.mark.parametrize(
+        "origin_plan_state",
+        [InstallmentPlanState.PAID, InstallmentPlanState.DEFERRED, InstallmentPlanState.CANCELED],
+    )
+    def test_bill_with_installment_fk_rejected_regardless_of_plan_state(
+        self, origin_plan_state: InstallmentPlanState
+    ) -> None:
+        """FK installment is an UNCONDITIONAL reject (contract S70) — the "live plan" qualifier
+        binds only to the embedded-line branch, never to the FK-installment branch. A bill that
+        IS a standalone parcela must never be consolidated even when its origin plan is
+        PAID/DEFERRED/CANCELED, or the Installment row survives orphaned (pointing at a CANCELED
+        bill) while account_statement_service still counts it as materialized — the exact "parcela
+        MATERIALIZED órfã" progress-lying risk the rule exists to prevent."""
+        host_account = make_billing_account(
+            account_type=BillingAccountType.WATER, external_identifier="UC-1"
+        )
+        embedded_plan = make_installment_plan(
+            condominium=host_account.condominium,
+            embedded=True,
+            billing_account=host_account,
+            installment_count=1,
+            total_amount=Decimal("50.00"),
+            lifecycle_state=origin_plan_state,
+        )
+        installment = make_installment(plan=embedded_plan, number=1, amount=Decimal("50.00"))
+        standalone_parcela_bill = make_bill(
+            condominium=host_account.condominium, installment=installment
+        )
+        make_bill_line_item(bill=standalone_parcela_bill, amount=Decimal("50.00"))
+
+        with pytest.raises(ValidationError):
+            InstallmentPlanService.consolidate_open_bills(
+                account=host_account,
+                bill_ids=[standalone_parcela_bill.id],
+                embedded=False,
+                installment_count=1,
+                start_due_date=date(2026, 8, 10),
+                default_due_day=10,
+            )
+        assert InstallmentPlan.objects.count() == 1  # nothing new persisted
+        standalone_parcela_bill.refresh_from_db()
+        assert standalone_parcela_bill.lifecycle_state != BillLifecycleState.CANCELED
+
+    @freeze_time("2026-07-15")
     def test_bill_with_embedded_line_of_active_plan_rejected(self) -> None:
         account = make_billing_account(
             account_type=BillingAccountType.WATER, external_identifier="UC-2"
