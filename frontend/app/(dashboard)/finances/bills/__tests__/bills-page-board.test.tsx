@@ -258,7 +258,7 @@ describe('BillsPage — month board structure', () => {
     await waitForQueriesToSettle(queryClient);
   });
 
-  it('shows the backend PT message on a 400 closed-month error from generate_month', async () => {
+  it('shows an actionable "Abrir fechamento" toast on a 400 closed-month error from generate_month', async () => {
     setMonthBoard(createMockMonthBoard({ generation: { missing_count: 1 } }));
     server.use(
       http.post(`${API_BASE}/finances/bills/generate_month/`, () =>
@@ -271,9 +271,15 @@ describe('BillsPage — month board structure', () => {
     const button = await screen.findByRole('button', { name: 'Gerar contas faltantes (1)' });
     await userEvent.click(button);
 
-    // sonner is globally mocked (tests/setup.ts) — assert the toast call, not rendered DOM text.
+    // sonner is globally mocked (tests/setup.ts) — assert the toast call (S76: actionable now),
+    // not rendered DOM text.
     await waitFor(() =>
-      expect(toast.error).toHaveBeenCalledWith('Competência 06/2026 está fechada.')
+      expect(toast.error).toHaveBeenCalledWith(
+        'Competência 06/2026 está fechada.',
+        expect.objectContaining({
+          action: expect.objectContaining({ label: 'Abrir fechamento' }) as unknown,
+        })
+      )
     );
 
     await waitForQueriesToSettle(queryClient);
@@ -408,7 +414,7 @@ describe('BillsPage — "Gerar contas do mês" header action (always-available p
     await waitForQueriesToSettle(queryClient);
   });
 
-  it('shows the backend PT message on a 400 closed-month error from the header action', async () => {
+  it('shows an actionable "Abrir fechamento" toast on a 400 closed-month error from the header action', async () => {
     setAdmin(true);
     setMonthBoard(createMockMonthBoard({ generation: { missing_count: 0 } }));
     server.use(
@@ -422,7 +428,12 @@ describe('BillsPage — "Gerar contas do mês" header action (always-available p
     await userEvent.click(button);
 
     await waitFor(() =>
-      expect(toast.error).toHaveBeenCalledWith('Competência 06/2026 está fechada.')
+      expect(toast.error).toHaveBeenCalledWith(
+        'Competência 06/2026 está fechada.',
+        expect.objectContaining({
+          action: expect.objectContaining({ label: 'Abrir fechamento' }) as unknown,
+        })
+      )
     );
 
     await waitForQueriesToSettle(queryClient);

@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
+import { useRouter } from 'next/navigation';
 import {
   Dialog,
   DialogContent,
@@ -33,8 +34,9 @@ import {
 import { useCreateBillWithLines } from '@/lib/api/hooks/use-bills';
 import { useBuildings } from '@/lib/api/hooks/use-buildings';
 import { useFinanceCategories } from '@/lib/api/hooks/use-finance-categories';
-import { getErrorMessage, handleError } from '@/lib/utils/error-handler';
+import { showFinanceMutationError } from '@/lib/utils/error-handler';
 import { getTodayLocalISO } from '@/lib/utils/formatters';
+import { ROUTES } from '@/lib/utils/constants';
 
 const NONE = 'none';
 
@@ -73,6 +75,7 @@ export function QuickBillDialog({ open, onClose, year, month }: QuickBillDialogP
   const createWithLines = useCreateBillWithLines();
   const { data: buildings } = useBuildings();
   const { data: categories } = useFinanceCategories();
+  const router = useRouter();
 
   const form = useForm<QuickBillFormValues>({
     resolver: zodResolver(quickBillFormSchema),
@@ -112,8 +115,9 @@ export function QuickBillDialog({ open, onClose, year, month }: QuickBillDialogP
           onClose();
         },
         onError: (error) => {
-          toast.error(getErrorMessage(error, 'Erro ao criar conta'));
-          handleError(error, 'Erro ao criar conta');
+          showFinanceMutationError(error, 'Erro ao criar conta', () =>
+            router.push(ROUTES.FINANCES_MONTH_CLOSE)
+          );
         },
       }
     );

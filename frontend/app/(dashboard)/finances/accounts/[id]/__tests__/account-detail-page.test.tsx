@@ -12,6 +12,7 @@ const API_BASE = 'http://localhost:8008/api';
 
 vi.mock('next/navigation', () => ({
   useParams: vi.fn(() => ({ id: '1' })),
+  useRouter: vi.fn(() => ({ push: vi.fn() })),
 }));
 
 function setAdmin() {

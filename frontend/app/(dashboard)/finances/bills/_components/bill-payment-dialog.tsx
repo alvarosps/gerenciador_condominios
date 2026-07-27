@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Info } from 'lucide-react';
 import { toast } from 'sonner';
+import { useRouter } from 'next/navigation';
 import {
   Dialog,
   DialogContent,
@@ -33,9 +34,10 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { usePayBill } from '@/lib/api/hooks/use-bills';
-import { handleError } from '@/lib/utils/error-handler';
+import { showFinanceMutationError } from '@/lib/utils/error-handler';
 import { formatCurrency } from '@/lib/utils/formatters';
 import { fundedFromValues } from '@/lib/schemas/finances/category.schema';
+import { ROUTES } from '@/lib/utils/constants';
 import {
   FUNDED_FROM_LABELS,
   type PaymentFormValues,
@@ -60,6 +62,7 @@ export function BillPaymentDialog({
   onClose,
 }: BillPaymentDialogProps) {
   const payBill = usePayBill();
+  const router = useRouter();
 
   const form = useForm<PaymentFormValues>({
     resolver: zodResolver(paymentFormSchema),
@@ -90,7 +93,9 @@ export function BillPaymentDialog({
           onClose();
         },
         onError: (error) => {
-          handleError(error, 'Erro ao pagar conta');
+          showFinanceMutationError(error, 'Erro ao pagar conta', () =>
+            router.push(ROUTES.FINANCES_MONTH_CLOSE)
+          );
         },
       }
     );

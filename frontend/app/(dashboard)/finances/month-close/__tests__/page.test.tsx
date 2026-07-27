@@ -5,11 +5,26 @@ import { renderWithProviders, waitForQueriesToSettle } from '@/tests/test-utils'
 import { server } from '@/tests/mocks/server';
 import { useAuthStore } from '@/store/auth-store';
 import MonthClosePage from '../page';
-import { createMockCondoMonthClose } from '@/tests/mocks/data/finances';
+import { createMockCondoMonthClose, createMockMonthBoard } from '@/tests/mocks/data/finances';
 import { formatReferenceMonth } from '@/lib/utils/finances';
 import { toast } from 'sonner';
 
 const API_BASE = 'http://localhost:8008/api';
+
+/** No open bills — the close preflight (S76) self-confirms immediately, so these pre-existing
+ *  single-confirm close flows keep working unchanged. */
+function setMonthBoardNoOpenBills() {
+  server.use(
+    http.get(`${API_BASE}/finances/finance-dashboard/month_board/`, () =>
+      HttpResponse.json(
+        createMockMonthBoard({
+          groups: [],
+          totals: { due: '0.00', paid: '0.00', remaining: '0.00', overdue: '0.00' },
+        })
+      )
+    )
+  );
+}
 
 /** Previous calendar month relative to "now", mirroring the page's own default. */
 function previousMonth(): { year: number; month: number } {
@@ -52,6 +67,7 @@ function spyClose() {
 describe('MonthClosePage', () => {
   beforeEach(() => {
     setStaff(false);
+    setMonthBoardNoOpenBills();
     vi.mocked(toast.success).mockReset();
     vi.mocked(toast.error).mockReset();
   });
@@ -195,7 +211,9 @@ describe('MonthClosePage', () => {
     if (!openBtn) throw new Error('open button not found');
     fireEvent.click(openBtn);
     const dialog = await screen.findByRole('alertdialog');
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Fechar mês' }));
+    const confirmButton = within(dialog).getByRole('button', { name: 'Fechar mês' });
+    await waitFor(() => expect(confirmButton).not.toBeDisabled());
+    fireEvent.click(confirmButton);
 
     // 2026-05-01 → {year:2026, month:5} via split (NOT new Date) — no off-by-one/TZ shift.
     await waitFor(() => expect(bodies).toHaveLength(1));
@@ -223,7 +241,9 @@ describe('MonthClosePage', () => {
     if (!openBtn) throw new Error('open button not found');
     fireEvent.click(openBtn);
     const dialog = await screen.findByRole('alertdialog');
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Fechar mês' }));
+    const confirmButton = within(dialog).getByRole('button', { name: 'Fechar mês' });
+    await waitFor(() => expect(confirmButton).not.toBeDisabled());
+    fireEvent.click(confirmButton);
 
     // The front never validates chronology — it shows the server's PT message verbatim (§18).
     await waitFor(() =>
@@ -281,7 +301,9 @@ describe('MonthClosePage', () => {
     const headerButton = await screen.findByRole('button', { name: 'Fechar mês' });
     fireEvent.click(headerButton);
     const dialog = await screen.findByRole('alertdialog');
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Fechar mês' }));
+    const confirmButton = within(dialog).getByRole('button', { name: 'Fechar mês' });
+    await waitFor(() => expect(confirmButton).not.toBeDisabled());
+    fireEvent.click(confirmButton);
 
     await waitFor(() => expect(bodies).toHaveLength(1));
     expect(bodies[0]).toMatchObject({ year, month });

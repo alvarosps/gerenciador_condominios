@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Info } from 'lucide-react';
 import { toast } from 'sonner';
+import { useRouter } from 'next/navigation';
 import {
   Dialog,
   DialogBody,
@@ -36,13 +37,14 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useConsolidateDebt } from '@/lib/api/hooks/use-billing-accounts';
-import { handleError } from '@/lib/utils/error-handler';
+import { showFinanceMutationError } from '@/lib/utils/error-handler';
 import {
   formatCurrency,
   getTodayLocalISO,
   competenceMonthLabel,
   dueDateLabel,
 } from '@/lib/utils/formatters';
+import { ROUTES } from '@/lib/utils/constants';
 import type { BillingAccountType } from '@/lib/schemas/finances/billing-account.schema';
 
 /** Account types eligible for embedded consolidation — mirrors the backend rule (embedded ⇒ consumption). */
@@ -103,6 +105,7 @@ export function ConsolidateDebtDialog({
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [selectionError, setSelectionError] = useState<string | null>(null);
   const consolidateDebt = useConsolidateDebt();
+  const router = useRouter();
   const consumptionAccount = CONSUMPTION_ACCOUNT_TYPES.has(accountType);
 
   const form = useForm<ConsolidateFormValues>({
@@ -159,7 +162,9 @@ export function ConsolidateDebtDialog({
           onClose();
         },
         onError: (error) => {
-          handleError(error, 'Erro ao parcelar saldo devedor');
+          showFinanceMutationError(error, 'Erro ao parcelar saldo devedor', () =>
+            router.push(ROUTES.FINANCES_MONTH_CLOSE)
+          );
         },
       }
     );

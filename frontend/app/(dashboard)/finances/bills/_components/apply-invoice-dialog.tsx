@@ -2,6 +2,7 @@
 
 import { AlertTriangle, Info } from 'lucide-react';
 import { toast } from 'sonner';
+import { useRouter } from 'next/navigation';
 import {
   Dialog,
   DialogContent,
@@ -13,8 +14,9 @@ import {
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useApplyInvoice } from '@/lib/api/hooks/use-bills';
-import { getErrorMessage, handleError } from '@/lib/utils/error-handler';
+import { showFinanceMutationError } from '@/lib/utils/error-handler';
 import { competenceMonthLabel, dueDateLabel, formatCurrency } from '@/lib/utils/formatters';
+import { ROUTES } from '@/lib/utils/constants';
 import type { Bill } from '@/lib/schemas/finances/bill.schema';
 import type { ParsedInvoice } from '@/lib/schemas/finances/invoice-parse.schema';
 
@@ -40,6 +42,7 @@ function draftTotal(draft: ParsedInvoice): number {
  */
 export function ApplyInvoiceDialog({ open, bill, draft, file, onClose }: ApplyInvoiceDialogProps) {
   const applyInvoice = useApplyInvoice();
+  const router = useRouter();
 
   const billAccountId = bill.billing_account_id ?? bill.billing_account?.id ?? null;
   const accountDiverges = draft.matched_account?.id !== billAccountId;
@@ -54,8 +57,9 @@ export function ApplyInvoiceDialog({ open, bill, draft, file, onClose }: ApplyIn
           onClose();
         },
         onError: (error) => {
-          toast.error(getErrorMessage(error, 'Erro ao aplicar fatura'));
-          handleError(error, 'Erro ao aplicar fatura');
+          showFinanceMutationError(error, 'Erro ao aplicar fatura', () =>
+            router.push(ROUTES.FINANCES_MONTH_CLOSE)
+          );
         },
       }
     );

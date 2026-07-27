@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { useRouter } from 'next/navigation';
 import { apiClient } from '../client';
 import { queryKeys } from '../query-keys';
 import { parseList } from '../parse-list';
@@ -9,7 +10,8 @@ import {
   parsedInvoiceSchema,
 } from '@/lib/schemas/finances/invoice-parse.schema';
 import type { FundedFrom, PaymentStatus } from '@/lib/schemas/finances/category.schema';
-import { getErrorMessage, handleError } from '@/lib/utils/error-handler';
+import { showFinanceMutationError } from '@/lib/utils/error-handler';
+import { ROUTES } from '@/lib/utils/constants';
 
 const ENDPOINT = '/finances/bills/';
 
@@ -257,6 +259,7 @@ export function useDeleteBill() {
  */
 export function useGenerateMonthBills() {
   const queryClient = useQueryClient();
+  const router = useRouter();
   return useMutation({
     mutationFn: async (params: { year: number; month: number }) => {
       const { data } = await apiClient.post<{ created: number; bills: Bill[] }>(
@@ -270,8 +273,9 @@ export function useGenerateMonthBills() {
       toast.success(`${String(result.created)} conta(s) gerada(s)`);
     },
     onError: (error) => {
-      handleError(error, 'Erro ao gerar contas do mês');
-      toast.error(getErrorMessage(error, 'Erro ao gerar contas do mês'));
+      showFinanceMutationError(error, 'Erro ao gerar contas do mês', () =>
+        router.push(ROUTES.FINANCES_MONTH_CLOSE)
+      );
     },
   });
 }

@@ -169,7 +169,7 @@ describe('ApplyInvoiceDialog', () => {
     await waitForQueriesToSettle(queryClient);
   });
 
-  it('surfaces the backend 400 (competência divergente / mês fechado) as a PT toast', async () => {
+  it('surfaces the backend 400 (competência divergente / mês fechado) as an actionable PT toast', async () => {
     server.use(
       http.post(`${API_BASE}/finances/bills/7/apply_invoice/`, () =>
         HttpResponse.json({ detail: 'Competência 06/2026 está fechada.' }, { status: 400 })
@@ -199,8 +199,14 @@ describe('ApplyInvoiceDialog', () => {
 
     await userEvent.click(await screen.findByRole('button', { name: /confirmar/i }));
 
+    // S76: closed-month errors get the actionable "Abrir fechamento" toast, not the plain one.
     await waitFor(() => {
-      expect(toast.error).toHaveBeenCalledWith('Competência 06/2026 está fechada.');
+      expect(toast.error).toHaveBeenCalledWith(
+        'Competência 06/2026 está fechada.',
+        expect.objectContaining({
+          action: expect.objectContaining({ label: 'Abrir fechamento' }) as unknown,
+        })
+      );
     });
 
     await waitForQueriesToSettle(queryClient);

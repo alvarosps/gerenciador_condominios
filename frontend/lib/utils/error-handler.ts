@@ -6,6 +6,7 @@
  */
 
 import { type AxiosError } from 'axios';
+import { toast } from 'sonner';
 
 /**
  * Type guard to check if an error is an AxiosError.
@@ -168,4 +169,34 @@ export function handleError(error: unknown, context: string): void {
 
   // Here you could also send to an error tracking service like Sentry:
   // Sentry.captureException(error, { extra: { context } });
+}
+
+/**
+ * Closed-month detection is a substring match on the extracted message (`/fechad/i` — covers
+ * "fechada"/"fechado", both genders used by the backend's PT messages, e.g.
+ * `condo_month_close_service.py`'s "Este mês está fechado e não aceita lançamentos."). The
+ * backend does not expose a structured error code (design §8 keeps the error shape frozen by
+ * existing tests), so this heuristic is the only signal available on the frontend.
+ */
+const CLOSED_MONTH_MESSAGE_PATTERN = /fechad/i;
+
+/**
+ * Finance cockpit mutation error toast (S76): shows the backend's PT message and, when the
+ * failure is a 400 caused by a closed competence, adds a sonner `action` ("Abrir fechamento")
+ * that navigates to the month-close page — the bridge to the reabrir → pagar → fechar flow
+ * (design §6). Every other error keeps the plain `handleError` toast behavior.
+ */
+export function showFinanceMutationError(
+  error: unknown,
+  fallback: string,
+  goToMonthClose: () => void
+): void {
+  const message = getErrorMessage(error, fallback);
+
+  if (isValidationError(error) && CLOSED_MONTH_MESSAGE_PATTERN.test(message)) {
+    toast.error(message, { action: { label: 'Abrir fechamento', onClick: goToMonthClose } });
+    return;
+  }
+
+  toast.error(message);
 }

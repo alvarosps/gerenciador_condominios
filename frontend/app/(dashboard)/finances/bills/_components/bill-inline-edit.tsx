@@ -3,13 +3,15 @@
 import { useState } from 'react';
 import { Pencil } from 'lucide-react';
 import { toast } from 'sonner';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useUpdateBill, useUpdateBillWithLines } from '@/lib/api/hooks/use-bills';
-import { handleError } from '@/lib/utils/error-handler';
+import { showFinanceMutationError } from '@/lib/utils/error-handler';
 import { dueDateLabel, formatCurrency } from '@/lib/utils/formatters';
+import { ROUTES } from '@/lib/utils/constants';
 import type { Bill } from '@/lib/schemas/finances/bill.schema';
 
 /** Consumption account types (S56) — the only ones an embedded installment plan can attach to
@@ -46,6 +48,7 @@ export function DueDatePopover({ bill }: DueDatePopoverProps) {
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState(bill.due_date);
   const updateBill = useUpdateBill();
+  const router = useRouter();
 
   if (bill.id === undefined) return null;
   const billId = bill.id;
@@ -64,7 +67,9 @@ export function DueDatePopover({ bill }: DueDatePopoverProps) {
           setOpen(false);
         },
         onError: (error) => {
-          handleError(error, 'Erro ao atualizar vencimento');
+          showFinanceMutationError(error, 'Erro ao atualizar vencimento', () =>
+            router.push(ROUTES.FINANCES_MONTH_CLOSE)
+          );
         },
       }
     );
@@ -115,6 +120,7 @@ export function AmountPopover({ bill }: AmountPopoverProps) {
   const [value, setValue] = useState(line ? String(line.amount) : '');
   const [validationError, setValidationError] = useState<string | null>(null);
   const updateWithLines = useUpdateBillWithLines();
+  const router = useRouter();
 
   if (bill.id === undefined || !line) return null;
   const billId = bill.id;
@@ -152,7 +158,9 @@ export function AmountPopover({ bill }: AmountPopoverProps) {
           setOpen(false);
         },
         onError: (error) => {
-          handleError(error, 'Erro ao atualizar valor');
+          showFinanceMutationError(error, 'Erro ao atualizar valor', () =>
+            router.push(ROUTES.FINANCES_MONTH_CLOSE)
+          );
         },
       }
     );

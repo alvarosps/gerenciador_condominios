@@ -115,4 +115,35 @@ describe('QuickBillDialog', () => {
 
     await waitForQueriesToSettle(queryClient);
   });
+
+  it('shows an actionable "Abrir fechamento" toast when create_with_lines hits a closed month', async () => {
+    server.use(
+      http.post(`${API_BASE}/finances/bills/create_with_lines/`, () =>
+        HttpResponse.json({ detail: 'Competência 06/2026 está fechada.' }, { status: 400 })
+      )
+    );
+
+    const { queryClient } = renderWithProviders(
+      <QuickBillDialog open onClose={vi.fn()} year={2026} month={6} />
+    );
+
+    fireEvent.change(await screen.findByLabelText(/descrição/i), {
+      target: { value: 'Reparo emergencial' },
+    });
+    fireEvent.change(screen.getByLabelText(/valor/i), { target: { value: '150' } });
+    fireEvent.change(screen.getByLabelText(/vencimento/i), { target: { value: '2026-06-15' } });
+
+    await userEvent.click(screen.getByRole('button', { name: /^criar$/i }));
+
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith(
+        'Competência 06/2026 está fechada.',
+        expect.objectContaining({
+          action: expect.objectContaining({ label: 'Abrir fechamento' }) as unknown,
+        })
+      );
+    });
+
+    await waitForQueriesToSettle(queryClient);
+  });
 });

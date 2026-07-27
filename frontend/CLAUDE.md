@@ -4,8 +4,12 @@
 
 ```
 app/(dashboard)/              # Rotas protegidas (Dashboard, Buildings, Apartments, Tenants, Leases, Furniture, Contract Template)
-app/(dashboard)/finances/     # CONDOMÍNIO (sidebar "Condomínio"): bills, categories, distribution, employees,
-                              #   income-entries, installment-plans, month-close, projection, reserve — consome /api/finances/
+app/(dashboard)/finances/     # CONDOMÍNIO (sidebar "Condomínio"): bills (cockpit sobre month_board), categories,
+                              #   distribution, employees, income-entries, installment-plans, month-close, projection,
+                              #   reserve — consome /api/finances/
+app/(dashboard)/finances/accounts/          # Contas cadastradas (CRUD BillingAccount + saldo devedor via célula-link)
+app/(dashboard)/finances/accounts/[id]/     # Extrato da conta — PRIMEIRA rota dinâmica [id] do dashboard
+                                            #   (useParams + guard de id inválido + StatCards + consolidação de dívida)
 app/(dashboard)/financial/    # Financeiro PESSOAL — DEPRECATED (sidebar "Finanças"; remoção em P7)
 app/(dashboard)/admin/        # Admin (proofs/notifications/users)
 app/(tenant)/                 # Portal do inquilino (login OTP, payments, contract, notifications)
@@ -52,6 +56,14 @@ store/auth-store.ts           # Zustand auth state
 - Filtros em cascata: person → credit card (opções de cartão filtram pela pessoa selecionada).
 - Installments: visualizar em Sheet/Drawer, `mark_paid` via ação PATCH.
 - Moeda: `formatCurrency()` de `lib/utils/formatters.ts` (R$ 1.500,00); data DD/MM/YYYY via date-fns (locale pt-BR).
+
+### Cockpit operacional de contas (`finances/bills`, `finances/accounts`)
+- Fonte de dados única: `useMonthBoard(year, month)` (`lib/api/hooks/use-month-board.ts`, `staleTime: 0`) — sem cache no backend, sem agrupamento client-side de página inteira.
+- Popover-em-célula para edição inline: reusa `components/ui/popover.tsx` dentro do `render` da coluna do `DataTable` (não criar célula editável genérica) — exemplares em `bills/_components/bill-inline-edit.tsx` (`DueDatePopover`/`AmountPopover`) e `bill-pay-popover.tsx`.
+- Vencimento edita via PATCH (`useUpdateBill` → `update_header`); valor SEMPRE via `useUpdateBillWithLines` (dinheiro vive em `BillLineItem`, nunca no header).
+- Toast acionável de mês fechado: `showFinanceMutationError(error, fallback, goToMonthClose)` em `lib/utils/error-handler.ts` — 400 cuja mensagem casa `/fechad/i` ganha `action: { label: 'Abrir fechamento', onClick }` (sonner) navegando para `ROUTES.FINANCES_MONTH_CLOSE`; todo `onError` de mutação do cockpit usa este helper (nunca reimplementar a detecção por call-site).
+- `/finances/accounts/[id]` é o primeiro precedente de rota dinâmica no dashboard: `'use client'` + `useParams<{id:string}>()` + guard de id inválido (empty state PT, sem redirect) + `PageHeader` + `StatCard`×3 + `DataTable` mês a mês.
+- `CondoMonthBoardService`/`AccountStatementService` (backend) alimentam `useMonthBoard`/`useAccountStatement` — ver `docs/FINANCES.md` para o contrato completo dos payloads.
 
 ## Testes
 

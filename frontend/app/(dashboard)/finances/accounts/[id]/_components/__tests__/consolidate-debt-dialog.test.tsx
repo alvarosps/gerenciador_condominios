@@ -206,13 +206,14 @@ describe('ConsolidateDebtDialog', () => {
     await waitForQueriesToSettle(queryClient);
   });
 
-  it('erro 400 do backend mantém o dialog aberto e exibe a mensagem via handleError', async () => {
+  it('erro 400 do backend mantém o dialog aberto e exibe um toast acionável "Abrir fechamento"', async () => {
+    // S76: closed-month failures route through showFinanceMutationError(error, fallback, …),
+    // which shows the server's PT message via toast.error with the "Abrir fechamento" action.
     server.use(
       http.post(`${API_BASE}/finances/billing-accounts/7/consolidate_debt/`, () =>
         HttpResponse.json({ detail: 'Competência fechada.' }, { status: 400 })
       )
     );
-    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const onClose = vi.fn();
 
     const { queryClient } = renderWithProviders(
@@ -230,14 +231,15 @@ describe('ConsolidateDebtDialog', () => {
     fireEvent.click(screen.getByRole('button', { name: /parcelar/i }));
 
     await waitFor(() => {
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        '[Erro ao parcelar saldo devedor] Competência fechada.',
-        expect.anything()
+      expect(toast.error).toHaveBeenCalledWith(
+        'Competência fechada.',
+        expect.objectContaining({
+          action: expect.objectContaining({ label: 'Abrir fechamento' }) as unknown,
+        })
       );
     });
     expect(onClose).not.toHaveBeenCalled();
 
-    consoleErrorSpy.mockRestore();
     await waitForQueriesToSettle(queryClient);
   });
 

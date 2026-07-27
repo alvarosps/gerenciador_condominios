@@ -73,6 +73,35 @@ describe('DueDatePopover', () => {
 
     await waitForQueriesToSettle(queryClient);
   });
+
+  it('shows an actionable "Abrir fechamento" toast when the PATCH hits a closed month', async () => {
+    server.use(
+      http.patch(`${API_BASE}/finances/bills/:id/`, () =>
+        HttpResponse.json({ detail: 'Competência 06/2026 está fechada.' }, { status: 400 })
+      )
+    );
+    const bill = createMockBill({ id: 7, due_date: '2026-06-10' }) as unknown as Bill;
+
+    const { queryClient } = renderWithProviders(<DueDatePopover bill={bill} />);
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    await user.click(screen.getByRole('button', { name: /editar vencimento/i }));
+
+    fireEvent.change(screen.getByLabelText(/novo vencimento/i), {
+      target: { value: '2026-06-20' },
+    });
+    await user.click(screen.getByRole('button', { name: /^salvar$/i }));
+
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith(
+        'Competência 06/2026 está fechada.',
+        expect.objectContaining({
+          action: expect.objectContaining({ label: 'Abrir fechamento' }) as unknown,
+        })
+      );
+    });
+
+    await waitForQueriesToSettle(queryClient);
+  });
 });
 
 describe('AmountPopover', () => {
@@ -206,5 +235,33 @@ describe('AmountPopover', () => {
 
     expect(await screen.findByText(/o valor deve ser maior que zero/i)).toBeInTheDocument();
     expect(updateBodies).toHaveLength(0);
+  });
+
+  it('shows an actionable "Abrir fechamento" toast when update_with_lines hits a closed month', async () => {
+    server.use(
+      http.post(`${API_BASE}/finances/bills/:id/update_with_lines/`, () =>
+        HttpResponse.json({ detail: 'Competência 06/2026 está fechada.' }, { status: 400 })
+      )
+    );
+    const line = createMockBillLineItem({ id: 1, amount: '350.00' });
+    const bill = createMockBill({ id: 7, line_items: [line] }) as unknown as Bill;
+
+    const { queryClient } = renderWithProviders(<AmountPopover bill={bill} />);
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    await user.click(screen.getByRole('button', { name: /editar valor/i }));
+
+    fireEvent.change(screen.getByLabelText(/novo valor/i), { target: { value: '420' } });
+    await user.click(screen.getByRole('button', { name: /^salvar$/i }));
+
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith(
+        'Competência 06/2026 está fechada.',
+        expect.objectContaining({
+          action: expect.objectContaining({ label: 'Abrir fechamento' }) as unknown,
+        })
+      );
+    });
+
+    await waitForQueriesToSettle(queryClient);
   });
 });

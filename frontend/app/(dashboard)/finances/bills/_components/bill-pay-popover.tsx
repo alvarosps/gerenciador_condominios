@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Wallet } from 'lucide-react';
 import { toast } from 'sonner';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -26,8 +27,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { usePayBill } from '@/lib/api/hooks/use-bills';
-import { getErrorMessage, handleError } from '@/lib/utils/error-handler';
+import { showFinanceMutationError } from '@/lib/utils/error-handler';
 import { fundedFromValues } from '@/lib/schemas/finances/category.schema';
+import { ROUTES } from '@/lib/utils/constants';
 import type { Bill } from '@/lib/schemas/finances/bill.schema';
 import {
   FUNDED_FROM_LABELS,
@@ -71,6 +73,7 @@ export function BillPayPopover({ bill }: BillPayPopoverProps) {
   const [addJurosMulta, setAddJurosMulta] = useState(false);
   const [blockedMessage, setBlockedMessage] = useState<string | null>(null);
   const payBill = usePayBill();
+  const router = useRouter();
 
   const form = useForm<PaymentFormValues>({
     resolver: zodResolver(paymentFormSchema),
@@ -119,8 +122,9 @@ export function BillPayPopover({ bill }: BillPayPopoverProps) {
           setOpen(false);
         },
         onError: (error) => {
-          toast.error(getErrorMessage(error, 'Erro ao pagar conta'));
-          handleError(error, 'Erro ao pagar conta');
+          showFinanceMutationError(error, 'Erro ao pagar conta', () =>
+            router.push(ROUTES.FINANCES_MONTH_CLOSE)
+          );
         },
       }
     );

@@ -76,6 +76,17 @@ Ao final de cada sessão:
 | FeeCalculatorService (static) | fee_calculator.py | 20-197 | Service com @staticmethod |
 | DashboardService (agregações) | dashboard_service.py | 30+ | Agregações Django ORM |
 
+### Backend — Services (`finances/services/`)
+| Padrão | Arquivo | Uso |
+|--------|---------|-----|
+| Month board service (agregação operacional multi-seção, uncached) | `condo_month_board_service.py` — `CondoMonthBoardService.build(year, month, today) -> dict` | Um serviço monta `{overdue, deferred_suspended, groups, totals, generation}` em UMA chamada — fonte única de um cockpit inteiro; consumido por `dashboard_views.py::month_board` (uncached, `IsAdminUser`) |
+| Account statement service (StatCards + linhas + planos) | `account_statement_service.py` — `AccountStatementService.build(account_id, today) -> dict` | Extrato mês a mês de uma entidade agregando por dois braços de FK (`Q(fk_direta) \| Q(fk_indireta__via_relacao)`) — padrão para "saldo devedor" quando o dinheiro pode vir de duas origens |
+
+### Backend — ViewSets (`finances/viewsets/`)
+| Padrão | Arquivo | Uso |
+|--------|---------|-----|
+| Action de collection ANTES da rota `:id` genérica (ordering do router) | `crud_views.py` — `billing-accounts/{id}/statement` e `{id}/consolidate_debt` registrados antes do `retrieve`/`update` genérico | Evita a rota `:id` do DRF router engolir a action — mesma regra vale no MSW (`handlers.ts`) |
+
 ### Backend — URLs (`core/urls.py`)
 | Padrão | Linhas | Uso |
 |--------|--------|-----|
@@ -99,6 +110,8 @@ Ao final de cada sessão:
 |--------|---------|--------|-----|
 | CRUD page canônica | buildings/page.tsx | 1-228 | useCrudPage + DataTable + modals |
 | CRUD page complexa | leases/page.tsx | 1-250+ | Extra modals, filters, dynamic imports |
+| Rota dinâmica `[id]` (primeiro precedente do dashboard) | `finances/accounts/[id]/page.tsx` | 1-177 | `'use client'` + `useParams<{id:string}>()` + guard de id inválido (empty state PT, sem redirect) + `PageHeader` + `StatCard`×N + `DataTable`; ver também `finances/accounts/[id]/__tests__/account-detail-page.test.tsx` para o padrão de mock local de `useParams`/`useRouter` |
+| Cockpit sobre serviço de agregação (fonte única, sem cache) | `finances/bills/page.tsx` (S74/S75/S76) | — | `useMonthBoard(year, month)` substitui `useBills` + agrupamento client-side; seções fixas (Atrasadas) acima de um Accordion por grupo; ver `_components/overdue-section.tsx` |
 
 ### Frontend — Componentes
 | Padrão | Arquivo | Linhas | Uso |
@@ -106,6 +119,8 @@ Ao final de cada sessão:
 | Sidebar/Navegação | components/layouts/sidebar.tsx | 1-123 | ROUTES constant, menu items |
 | useCrudPage hook | lib/hooks/use-crud-page.ts | 1-200+ | State management para CRUD pages |
 | Constantes | lib/utils/constants.ts | 1-42 | ROUTES, PAGINATION, etc. |
+| Popover-em-célula (edição inline sem célula editável genérica) | `finances/bills/_components/bill-inline-edit.tsx` (`DueDatePopover`/`AmountPopover`), `bill-pay-popover.tsx` | — | Reusa `components/ui/popover.tsx` dentro do `render` da coluna do `DataTable` — não criar um tipo de célula editável genérica no `DataTable` |
+| Toast acionável de erro de mutação (mês fechado → link) | `lib/utils/error-handler.ts` — `showFinanceMutationError(error, fallback, goToMonthClose)` | — | Detecção por substring (`/fechad/i`) sobre `getErrorMessage`, 400 apenas; `toast.error(msg, { action: { label, onClick } })` (sonner) — precedente único, todo `onError` de mutação do cockpit delega a este helper |
 
 ---
 
