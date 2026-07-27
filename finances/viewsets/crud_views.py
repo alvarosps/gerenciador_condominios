@@ -379,9 +379,16 @@ class BillViewSet(viewsets.ModelViewSet):
             payment_date = date.fromisoformat(str(payment_date_raw))
             amount_raw = request.data.get("amount")
             amount = Decimal(str(amount_raw)) if amount_raw is not None else None
+            new_total_raw = request.data.get("new_total")
+            new_total = Decimal(str(new_total_raw)) if new_total_raw is not None else None
             funded_from = _validated_funded_from(request.data.get("funded_from", "caixa"))
             BillPaymentService.pay(
-                bill, payment_date, amount, funded_from, user=cast(User, request.user)
+                bill,
+                payment_date,
+                amount,
+                funded_from,
+                new_total=new_total,
+                user=cast(User, request.user),
             )
         except ValueError, InvalidOperation:
             return Response(

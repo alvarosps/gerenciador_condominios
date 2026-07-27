@@ -14,6 +14,7 @@ from django.core.exceptions import ValidationError
 from finances.models import (
     Bill,
     BillLifecycleState,
+    BillLineItem,
     Payment,
     ReserveMovement,
     ReserveMovementKind,
@@ -21,7 +22,13 @@ from finances.models import (
 from finances.services.bill_payment_service import BillPaymentService
 from finances.services.condo_balance_service import CondoBalanceService
 from finances.services.condo_month_close_service import CondoMonthCloseService
-from tests.factories import make_bill, make_bill_line_item, make_reserve, make_reserve_movement
+from tests.factories import (
+    make_bill,
+    make_bill_line_item,
+    make_installment,
+    make_reserve,
+    make_reserve_movement,
+)
 
 pytestmark = pytest.mark.django_db
 
@@ -256,3 +263,242 @@ def test_unpay_reverses_only_its_own_movement_when_two_share_bill_and_amount() -
     assert ReserveMovement.objects.get(pk=move_b.pk).payment_id == pay_b.pk
     # 600 deposited - 300 (pay_b still standing) = 700 after restoring pay_a's 300.
     assert CondoBalanceService.reserve_balance(bill.condominium_id) == Decimal("700.00")
+
+
+# --- Session 68: pay(new_total=...) — adjust the TOTAL before allocating, same transaction ---
+
+
+def _estimated_bill(seed_amount: str | None, condominium=None) -> Bill:
+    """An estimated bill (S65 flag) with 0 or 1 seed line (installment=None)."""
+    bill = make_bill(amount_is_estimated=True, condominium=condominium)
+    if seed_amount is not None:
+        make_bill_line_item(bill=bill, amount=Decimal(seed_amount), description=bill.description)
+    return bill
+
+
+def _confirmed_bill(total_amount: str, condominium=None) -> Bill:
+    bill = make_bill(amount_is_estimated=False, condominium=condominium)
+    make_bill_line_item(bill=bill, amount=Decimal(total_amount))
+    return bill
+
+
+class TestPayWithNewTotal:
+    def test_new_total_none_keeps_current_behavior(self) -> None:
+        """new_total ausente: pagamento total idêntico ao comportamento atual."""
+        bill = _bill_with_total("900.00")
+        payment = BillPaymentService.pay(bill, PAY_DATE)
+        assert payment.amount == Decimal("900.00")
+        assert _amounts(bill).payment_status == "paid"
+
+    def test_estimated_seed_adjusted_up_and_fully_paid(self) -> None:
+        """Fatura real maior que a estimativa: semente ajustada e paga sem over-allocation."""
+        bill = _estimated_bill("200.00")
+        payment = BillPaymentService.pay(
+            bill, PAY_DATE, amount=Decimal("230.00"), new_total=Decimal("230.00")
+        )
+        assert payment.amount == Decimal("230.00")
+        annotated = _amounts(bill)
+        assert annotated.amount_total == Decimal("230.00")
+        assert annotated.amount_remaining == Decimal("0.00")
+        assert annotated.payment_status == "paid"
+
+    def test_estimated_seed_adjusted_down_no_ghost_remainder(self) -> None:
+        """Fatura real menor: sem resto-fantasma de R$20."""
+        bill = _estimated_bill("200.00")
+        BillPaymentService.pay(
+            bill, PAY_DATE, amount=Decimal("180.00"), new_total=Decimal("180.00")
+        )
+        annotated = _amounts(bill)
+        assert annotated.amount_total == Decimal("180.00")
+        assert annotated.amount_remaining == Decimal("0.00")
+
+    def test_estimated_with_embedded_installment_adjusts_only_seed(self) -> None:
+        """Delta aplicado só na semente; linha de parcela intocável."""
+        bill = _estimated_bill("200.00")
+        installment_line = make_bill_line_item(
+            bill=bill,
+            amount=Decimal("530.00"),
+            description="Parcela 3/12",
+            installment=make_installment(),
+        )
+        BillPaymentService.pay(
+            bill, PAY_DATE, amount=Decimal("750.00"), new_total=Decimal("750.00")
+        )
+        seed = BillLineItem.objects.get(bill=bill, installment__isnull=True)
+        assert seed.amount == Decimal("220.00")
+        installment_line.refresh_from_db()
+        assert installment_line.amount == Decimal("530.00")
+        assert _amounts(bill).amount_total == Decimal("750.00")
+
+    def test_estimated_zero_lines_creates_seed(self) -> None:
+        """Bill 'aguardando fatura' paga em 1 clique cria a semente."""
+        bill = _estimated_bill(None)
+        assert BillLineItem.objects.filter(bill=bill).count() == 0
+        BillPaymentService.pay(
+            bill, PAY_DATE, amount=Decimal("150.00"), new_total=Decimal("150.00")
+        )
+        seed = BillLineItem.objects.get(bill=bill, installment__isnull=True)
+        assert seed.description == bill.description
+        assert seed.is_offset is False
+        assert seed.amount == Decimal("150.00")
+        annotated = _amounts(bill)
+        assert annotated.amount_total == Decimal("150.00")
+        assert annotated.payment_status == "paid"
+
+    def test_estimated_multiple_non_installment_lines_rejected(self) -> None:
+        """Semente ambígua: rejeita e não altera nada."""
+        bill = _estimated_bill("100.00")
+        make_bill_line_item(bill=bill, amount=Decimal("100.00"), description="Outra linha")
+        before_amounts = [item.amount for item in BillLineItem.objects.filter(bill=bill)]
+        with pytest.raises(ValidationError):
+            BillPaymentService.pay(bill, PAY_DATE, new_total=Decimal("300.00"))
+        after_amounts = [item.amount for item in BillLineItem.objects.filter(bill=bill)]
+        assert after_amounts == before_amounts
+        assert Payment.objects.count() == 0
+
+    def test_new_total_below_embedded_installments_rejected(self) -> None:
+        """new_total abaixo da soma das parcelas: semente negativa é impossível."""
+        bill = _estimated_bill("200.00")
+        make_bill_line_item(
+            bill=bill,
+            amount=Decimal("530.00"),
+            description="Parcela 3/12",
+            installment=make_installment(),
+        )
+        with pytest.raises(ValidationError):
+            BillPaymentService.pay(bill, PAY_DATE, new_total=Decimal("500.00"))
+        seed = BillLineItem.objects.get(bill=bill, installment__isnull=True)
+        assert seed.amount == Decimal("200.00")
+        assert Payment.objects.count() == 0
+
+    def test_estimated_new_total_equal_to_installments_zeroes_seed(self) -> None:
+        """Fronteira: new_total == soma das parcelas embutidas zera a semente (permitido)."""
+        bill = _estimated_bill("200.00")
+        make_bill_line_item(
+            bill=bill,
+            amount=Decimal("530.00"),
+            description="Parcela 3/12",
+            installment=make_installment(),
+        )
+        BillPaymentService.pay(
+            bill, PAY_DATE, amount=Decimal("530.00"), new_total=Decimal("530.00")
+        )
+        seed = BillLineItem.objects.get(bill=bill, installment__isnull=True)
+        assert seed.amount == Decimal("0.00")
+        assert _amounts(bill).amount_total == Decimal("530.00")
+
+    def test_over_allocation_still_guarded_after_adjustment(self) -> None:
+        """Guard de over-allocation vale APÓS o ajuste, e o rollback desfaz o ajuste."""
+        bill = _estimated_bill("200.00")
+        with pytest.raises(ValidationError):
+            BillPaymentService.pay(
+                bill, PAY_DATE, amount=Decimal("250.00"), new_total=Decimal("230.00")
+            )
+        seed = BillLineItem.objects.get(bill=bill, installment__isnull=True)
+        assert seed.amount == Decimal("200.00")  # rolled back
+        assert Payment.objects.count() == 0
+        bill.refresh_from_db()
+        assert bill.amount_is_estimated is True
+
+    def test_confirmed_new_total_above_adds_juros_multa_line(self) -> None:
+        """Juros/multa CEEE/DMAE em bill confirmada de linha única."""
+        bill = _confirmed_bill("300.00")
+        BillPaymentService.pay(
+            bill, PAY_DATE, amount=Decimal("315.00"), new_total=Decimal("315.00")
+        )
+        juros = BillLineItem.objects.get(bill=bill, description="Juros/multa")
+        assert juros.amount == Decimal("15.00")
+        assert juros.is_offset is False
+        assert juros.category_id is None
+        annotated = _amounts(bill)
+        assert annotated.amount_total == Decimal("315.00")
+        assert annotated.payment_status == "paid"
+
+    def test_confirmed_new_total_below_rejected(self) -> None:
+        """Reduzir total em confirmada é edição, não pagamento."""
+        bill = _confirmed_bill("300.00")
+        with pytest.raises(ValidationError) as exc_info:
+            BillPaymentService.pay(bill, PAY_DATE, new_total=Decimal("280.00"))
+        assert "Edite a conta para reduzir o valor." in str(exc_info.value)
+        assert Payment.objects.count() == 0
+
+    def test_confirmed_multiple_lines_new_total_adds_juros_multa(self) -> None:
+        """Juros/multa em confirmada multi-linha (fatura importada CEEE/DMAE paga com atraso)."""
+        bill = make_bill(amount_is_estimated=False)
+        line_1 = make_bill_line_item(bill=bill, amount=Decimal("200.00"), description="Consumo")
+        line_2 = make_bill_line_item(bill=bill, amount=Decimal("150.00"), description="Taxa")
+        BillPaymentService.pay(
+            bill, PAY_DATE, amount=Decimal("400.00"), new_total=Decimal("400.00")
+        )
+        line_1.refresh_from_db()
+        line_2.refresh_from_db()
+        assert line_1.amount == Decimal("200.00")
+        assert line_2.amount == Decimal("150.00")
+        juros = BillLineItem.objects.get(bill=bill, description="Juros/multa")
+        assert juros.amount == Decimal("50.00")
+        annotated = _amounts(bill)
+        assert annotated.amount_total == Decimal("400.00")
+        assert annotated.payment_status == "paid"
+
+    def test_confirmed_partially_paid_new_total_adds_juros_on_top(self) -> None:
+        """Juros sobre o resto: caso real de atraso em bill parcialmente paga."""
+        bill = _confirmed_bill("300.00")
+        BillPaymentService.pay(bill, PAY_DATE, amount=Decimal("100.00"))
+        BillPaymentService.pay(
+            bill, PAY_DATE, amount=Decimal("215.00"), new_total=Decimal("315.00")
+        )
+        juros = BillLineItem.objects.get(bill=bill, description="Juros/multa")
+        assert juros.amount == Decimal("15.00")
+        annotated = _amounts(bill)
+        assert annotated.amount_total == Decimal("315.00")
+        assert annotated.amount_remaining == Decimal("0.00")
+
+    def test_confirmed_new_total_equal_is_noop(self) -> None:
+        """new_total igual ao total: no-op."""
+        bill = _confirmed_bill("300.00")
+        lines_before = BillLineItem.objects.filter(bill=bill).count()
+        BillPaymentService.pay(bill, PAY_DATE, new_total=Decimal("300.00"))
+        assert BillLineItem.objects.filter(bill=bill).count() == lines_before
+        assert _amounts(bill).payment_status == "paid"
+
+    def test_amount_default_is_adjusted_remaining(self) -> None:
+        """amount=None defaulta para o resto PÓS-ajuste."""
+        bill = _estimated_bill("200.00")
+        payment = BillPaymentService.pay(bill, PAY_DATE, new_total=Decimal("230.00"))
+        assert payment.amount == Decimal("230.00")
+
+    def test_new_total_respects_active_and_closed_month_guards(self) -> None:
+        """Guards ACTIVE/mês fechado inalterados com new_total."""
+        suspended = _estimated_bill("200.00")
+        suspended.lifecycle_state = BillLifecycleState.SUSPENDED
+        suspended.save(update_fields=["lifecycle_state"])
+        with pytest.raises(ValidationError):
+            BillPaymentService.pay(suspended, PAY_DATE, new_total=Decimal("230.00"))
+
+        closed_month_bill = _estimated_bill("200.00")
+        closed_month_bill.competence_month = date(2026, 5, 1)
+        closed_month_bill.save(update_fields=["competence_month"])
+        CondoMonthCloseService.close(2026, 5)
+        with pytest.raises(ValidationError):
+            BillPaymentService.pay(
+                closed_month_bill, date(2026, 5, 20), new_total=Decimal("230.00")
+            )
+
+    def test_estimated_flag_cleared_after_pay_with_new_total(self) -> None:
+        """Pagar com ajuste também confirma a bill (regressão do contrato S65)."""
+        bill = _estimated_bill("200.00")
+        BillPaymentService.pay(bill, PAY_DATE, new_total=Decimal("230.00"))
+        bill.refresh_from_db()
+        assert bill.amount_is_estimated is False
+
+    def test_unpay_keeps_adjustment_and_flag(self) -> None:
+        """unpay reverte só o pagamento, nunca o ajuste de linhas/flag."""
+        bill = _confirmed_bill("300.00")
+        payment = BillPaymentService.pay(
+            bill, PAY_DATE, amount=Decimal("315.00"), new_total=Decimal("315.00")
+        )
+        BillPaymentService.unpay(payment)
+        assert BillLineItem.objects.filter(bill=bill, description="Juros/multa").exists()
+        bill.refresh_from_db()
+        assert bill.amount_is_estimated is False
+        assert _amounts(bill).payment_status == "open"
