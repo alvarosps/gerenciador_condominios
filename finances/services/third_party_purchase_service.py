@@ -37,41 +37,30 @@ from finances.models import (
     BillBehavior,
     BillLineItem,
     Category,
-    CondoMonthClose,
-    CondoMonthCloseStatus,
     FundedFrom,
     Payment,
 )
 from finances.money import quantize_money
 from finances.services.bill_payment_service import BillPaymentService
+from finances.services.condo_month_close_service import CondoMonthCloseService
 
 logger = logging.getLogger(__name__)
 
 ERR_AMOUNT_NON_POSITIVE = "O valor da compra deve ser positivo."
 ERR_INSTALLMENT_COUNT = "O número de parcelas deve ser no mínimo 1."
+ERR_INSTALLMENT_COUNT_MAX = "O número de parcelas deve ser no máximo 60."
 ERR_NOT_A_PURCHASE = "Esta conta não é uma compra de terceiro."
 ERR_NO_PURCHASE_PAYMENT = "Esta compra não tem pagamento de terceiro para corrigir."
 MAX_INSTALLMENT_COUNT = 60
 
 
-def _month_closed_message(month: date) -> str:
-    """Closed-month rejection that names WHICH month — a purchase spans competence AND cash."""
-    return f"O mês {month:%m/%Y} está fechado e não aceita lançamentos."
-
-
 def _assert_month_open(month: date) -> None:
-    """assert_open with the month in the message (design §7).
+    """Closed-month guard that names WHICH month — a purchase spans competence AND cash.
 
-    ``CondoMonthCloseService.assert_open`` says only "Este mês está fechado"; a purchase touches
-    two different months (the card invoice's competence and the cash date), so a bare message
-    leaves the user unable to tell which one to reopen.
+    Delegates to the canonical ``CondoMonthCloseService.assert_open``: a second copy of a
+    safety-critical predicate is exactly the duplication the project rules forbid.
     """
-    reference_month = month.replace(day=1)
-    is_closed = CondoMonthClose.objects.filter(
-        reference_month=reference_month, status=CondoMonthCloseStatus.CLOSED
-    ).exists()
-    if is_closed:
-        raise ValidationError(_month_closed_message(reference_month))
+    CondoMonthCloseService.assert_open(month, name_month=True)
 
 
 def _add_months(month: date, offset: int) -> date:
@@ -128,8 +117,10 @@ class ThirdPartyPurchaseService:
         count = draft.installment_count
         if draft.amount <= 0:
             raise ValidationError(ERR_AMOUNT_NON_POSITIVE)
-        if count < 1 or count > MAX_INSTALLMENT_COUNT:
+        if count < 1:
             raise ValidationError(ERR_INSTALLMENT_COUNT)
+        if count > MAX_INSTALLMENT_COUNT:
+            raise ValidationError(ERR_INSTALLMENT_COUNT_MAX)
 
         months = [_add_months(draft.competence_month, index) for index in range(count)]
         for month in months:
@@ -233,12 +224,20 @@ class ThirdPartyPurchaseService:
         ``Bill.paid_by_person`` alone would leave ``Payment.paid_by`` pointing at the old person,
         so her statement would keep the payment while the purchase moved: the debt would be split
         across two people and neither total would be true.
+
+        Both months (competence and cash) must be OPEN, exactly as in ``delete_purchase``: this
+        rewrites WHO is owed money in those months, so doing it inside a frozen month would leave
+        the ledger disagreeing with that month's snapshot — the B3 bug class this codebase already
+        fixed for payments.
         """
         if bill.paid_by_person_id is None:
             raise ValidationError(ERR_NOT_A_PURCHASE)
+        _assert_month_open(bill.competence_month)
         payments = ThirdPartyPurchaseService._purchase_payments(bill)
         if not payments:
             raise ValidationError(ERR_NO_PURCHASE_PAYMENT)
+        for payment in payments:
+            _assert_month_open(payment.payment_date)
         with transaction.atomic():
             bill.paid_by_person = person
             bill.updated_by = user

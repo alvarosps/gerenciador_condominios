@@ -155,18 +155,19 @@ _NEW_TOTAL_INVALID = "Valor inválido: use no máximo 2 casas decimais."
 _NEW_TOTAL_MAX_DECIMAL_PLACES = -2  # Decimal.as_tuple().exponent, money is always cents-scale.
 
 
-def _parse_new_total(raw: object) -> Decimal | None:
-    """new_total as a finite Decimal with at most 2 decimal places, or None (-> PT 400 otherwise).
+def _parse_money(raw: object) -> Decimal:
+    """A money amount as a finite Decimal with at most 2 decimal places (-> PT 400 otherwise).
 
-    ``Decimal(str(raw))`` alone accepts "Infinity"/"NaN" (not caught by ValueError/
-    InvalidOperation) and any decimal scale (e.g. "230.005"), both of which would otherwise
-    reach BillLineItem.full_clean() and surface Django's default (English) validator message
-    verbatim through the action's error shape. Rejected here instead, as a ValidationError (PT,
-    caught by the same handler as every other business-rule rejection in this action) — no
-    scientific/silent rounding: an out-of-range value is a 400, not a truncation.
+    ``Decimal(str(raw))`` alone accepts "Infinity"/"NaN" (neither raises ValueError nor
+    InvalidOperation) and any decimal scale (e.g. "230.005"). Left unchecked, NaN escapes the
+    caller's try-block and then blows up on the first comparison as an uncaught InvalidOperation
+    (HTTP 500), while an over-scaled value gets silently rounded into the database. Both are
+    rejected here as a PT ValidationError — no scientific notation, no silent truncation: an
+    out-of-range value is a 400, not a rounded write.
+
+    Single money parser for the whole module (DRY): both ``new_total`` on pay and ``amount`` on
+    create_purchase route through it, so the two cannot drift apart.
     """
-    if raw is None:
-        return None
     try:
         value = Decimal(str(raw))
     except InvalidOperation as exc:
@@ -179,6 +180,13 @@ def _parse_new_total(raw: object) -> Decimal | None:
     if isinstance(exponent, str) or exponent < _NEW_TOTAL_MAX_DECIMAL_PLACES:
         raise ValidationError(_NEW_TOTAL_INVALID)
     return value
+
+
+def _parse_new_total(raw: object) -> Decimal | None:
+    """new_total as validated money, or None when the client omitted it."""
+    if raw is None:
+        return None
+    return _parse_money(raw)
 
 
 _CONSOLIDATE_DEBT_PAYLOAD_INVALID = (
@@ -614,7 +622,7 @@ class BillViewSet(viewsets.ModelViewSet):
         """
         try:
             person = _person_or_400(request.data.get("person_id"))
-            amount = Decimal(str(request.data.get("amount")))
+            amount = _parse_money(request.data.get("amount"))
             competence_month = date.fromisoformat(str(request.data.get("competence_month")))
             due_date = date.fromisoformat(str(request.data.get("due_date")))
             installment_count = int(request.data.get("installment_count", 1))

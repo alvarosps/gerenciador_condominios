@@ -207,6 +207,35 @@ def test_settlement_moving_out_of_open_into_closed_month_rejected(
     assert live.settlement_date == date(2026, 7, 5)
 
 
+@freeze_time(FROZEN)
+def test_settlement_moving_out_of_a_closed_month_rejected(
+    authenticated_api_client, condominium, person, admin_user
+):
+    """The OTHER direction, which the sibling test above does not cover.
+
+    Dragging a settlement OUT of a frozen month changes that month's cash just as much as
+    dropping one in: its cash_balance_end was frozen WITH this settlement deducted. Without the
+    guard on the PREVIOUS date the whole suite stayed green (adversarial review, I-2).
+    """
+    live = ThirdPartySettlement.objects.create(
+        condominium=condominium,
+        person=person,
+        settlement_date=date(2026, 5, 10),
+        amount=Decimal("80.00"),
+        created_by=admin_user,
+        updated_by=admin_user,
+    )
+    _close_month(condominium, date(2026, 5, 1))
+
+    response = authenticated_api_client.patch(
+        f"{SETTLEMENTS_URL}{live.pk}/", {"settlement_date": "2026-07-05"}, format="json"
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    live.refresh_from_db()
+    assert live.settlement_date == date(2026, 5, 10)
+
+
 # --------------------------------------------------------------------------------------
 # 2. Permissions
 # --------------------------------------------------------------------------------------
@@ -218,6 +247,10 @@ NEW_WRITE_ENDPOINTS = [
     ("post", "/api/finances/bills/1/reassign_payer/"),
     ("delete", "/api/finances/bills/1/delete_purchase/"),
     ("delete", f"{SETTLEMENTS_URL}1/"),
+    # PUT/PATCH were the one gap in this list (adversarial review, M-4). DRF runs
+    # check_permissions before get_object, so the hardcoded pk never masks a 403 as a 404.
+    ("put", f"{SETTLEMENTS_URL}1/"),
+    ("patch", f"{SETTLEMENTS_URL}1/"),
 ]
 
 NEW_READ_ENDPOINTS = [SETTLEMENTS_URL, PEOPLE_URL, STATEMENT_URL]
@@ -528,6 +561,10 @@ def test_delete_purchase_removes_bill_and_payment_atomically(
     authenticated_api_client, condominium, person
 ):
     bill_id = _create_purchase(authenticated_api_client, person)
+    # Pin the BEFORE value: without it "0.00" afterwards would also pass on an empty statement
+    # for any unrelated reason (adversarial review, M-3).
+    before = authenticated_api_client.get(f"{STATEMENT_URL}?person_id={person.pk}")
+    assert before.data["totals"]["total_em_aberto"] == "300.00"
 
     response = authenticated_api_client.delete(f"/api/finances/bills/{bill_id}/delete_purchase/")
     assert response.status_code == status.HTTP_204_NO_CONTENT
@@ -610,6 +647,47 @@ def test_reassign_payer_rejects_unknown_person(authenticated_api_client, condomi
     assert Bill.objects.get(pk=bill_id).paid_by_person_id == person.pk
 
 
+@freeze_time(FROZEN)
+def test_reassign_payer_rejected_in_a_closed_month(
+    authenticated_api_client, condominium, person, other_person
+):
+    """Reassigning rewrites WHO is owed money in that month — forbidden once it is frozen.
+
+    Every sibling correction path guards this; reassign_payer shipped without it (adversarial
+    review, C-1) and moved R$300 of debt between two people inside a closed month.
+    """
+    bill_id = _create_purchase(authenticated_api_client, person)
+    _close_month(condominium, date(2026, 6, 1))
+
+    response = authenticated_api_client.post(
+        f"/api/finances/bills/{bill_id}/reassign_payer/",
+        {"paid_by_person_id": other_person.pk},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert Bill.objects.get(pk=bill_id).paid_by_person_id == person.pk
+
+
+@freeze_time(FROZEN)
+@pytest.mark.parametrize("bad_amount", ["NaN", "Infinity", "100.005"])
+def test_create_purchase_rejects_non_finite_or_over_scaled_amount(
+    authenticated_api_client, condominium, person, bad_amount
+):
+    """400 PT, never a 500 and never a silent round (adversarial review, I-1).
+
+    Decimal("NaN") constructs without raising, so it escaped the action's try-block and blew up
+    on the first comparison as an uncaught InvalidOperation; "100.005" was quietly rounded to
+    100.01 and written. Both now route through the module's single money parser.
+    """
+    response = authenticated_api_client.post(
+        CREATE_PURCHASE_URL, _purchase_payload(person, amount=bad_amount), format="json"
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert Bill.objects.filter(paid_by_person=person).count() == 0
+
+
 # --------------------------------------------------------------------------------------
 # 6. Read actions: people / statement
 # --------------------------------------------------------------------------------------
@@ -690,9 +768,13 @@ def test_people_omits_a_fully_settled_person(authenticated_api_client, condomini
 
 
 @freeze_time(FROZEN)
-def test_month_board_exposes_paid_by_person_without_n_plus_one(
-    authenticated_api_client, condominium, person, django_assert_num_queries
-):
+def test_month_board_exposes_paid_by_person(authenticated_api_client, condominium, person):
+    """Shape only — the N+1 guarantee is asserted by the query-count test below.
+
+    This test used to take django_assert_num_queries and never call it, so its name promised a
+    guarantee it did not check (adversarial review, I-3): with the N+1 deliberately reintroduced
+    it stayed green while its sibling caught it.
+    """
     _plain_bill(condominium)
     _create_purchase(authenticated_api_client, person, competence_month=JUNE)
 
