@@ -252,6 +252,14 @@ export const queryKeys = {
       month: (year: number, month: number, buildingId?: number) =>
         [...queryKeys.finances.ownerDistribution.all, year, month, buildingId ?? null] as const,
     },
+    thirdParty: {
+      all: ['finances', 'third-party'] as const,
+      people: () => [...queryKeys.finances.thirdParty.all, 'people'] as const,
+      statement: (personId: number) =>
+        [...queryKeys.finances.thirdParty.all, 'statement', personId] as const,
+      settlements: (filters?: Record<string, unknown>) =>
+        [...queryKeys.finances.thirdParty.all, 'settlements', filters ?? null] as const,
+    },
   },
   rentAdjustments: {
     all: ['rent-adjustments'] as const,
