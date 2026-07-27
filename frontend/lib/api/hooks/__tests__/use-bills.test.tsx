@@ -1,9 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
+import { useQuery } from '@tanstack/react-query';
 import { http, HttpResponse } from 'msw';
 import {
-  useBill,
-  useBills,
   useCancelBill,
   useCreateBillWithLines,
   useDeferBill,
@@ -14,121 +13,24 @@ import {
   useSuspendBill,
   useUpdateBill,
 } from '../use-bills';
-import type { Bill } from '@/lib/schemas/finances/bill.schema';
 import { createTestQueryClient, createWrapper } from '@/tests/test-utils';
 import { server } from '@/tests/mocks/server';
 import { queryKeys } from '@/lib/api/query-keys';
 import { createMockBill } from '@/tests/mocks/data/finances';
 
+/** Minimal probe query kept under the bills prefix so `gcTime: 0` (test QueryClient) doesn't
+ *  purge the seeded cache entry between `setQueryData` and the assertion — mirrors having a real
+ *  list subscriber mounted, without depending on the removed `useBills` hook. Never refetches on
+ *  its own (`enabled: false`): the test controls exactly when the cache value changes. */
+function useBillsProbe(queryKey: readonly unknown[]) {
+  return useQuery<{ payment_status: string }[]>({
+    queryKey,
+    queryFn: () => Promise.resolve([]),
+    enabled: false,
+  });
+}
+
 const API_BASE = 'http://localhost:8008/api';
-
-describe('useBills', () => {
-  it('fetches the bill list and parses money annotations to numbers', async () => {
-    const { result } = renderHook(() => useBills(), { wrapper: createWrapper() });
-
-    expect(result.current.isLoading).toBe(true);
-    await waitFor(() => expect(result.current.isSuccess).toBe(true), { timeout: 5000 });
-
-    expect(result.current.data?.length).toBeGreaterThan(0);
-    const bill = result.current.data?.[0];
-    expect(bill?.amount_total).toBe(350);
-    expect(bill?.amount_remaining).toBe(350);
-    expect(bill?.payment_status).toBe('open');
-  });
-
-  it('parses string Decimal annotations to number without recalculating amount_total (§4.1)', async () => {
-    // amount_total is an annotation the front must READ verbatim, never recompute from lines.
-    // The lines deliberately do not sum to amount_total, proving the value comes from the field.
-    server.use(
-      http.get(`${API_BASE}/finances/bills/`, () =>
-        // Raw API shape: money fields are string Decimals the schema transforms to number.
-        HttpResponse.json([
-          {
-            ...createMockBill({ id: 1 }),
-            amount_total: '123.45',
-            amount_paid: '0.00',
-            amount_remaining: '123.45',
-            line_items: [
-              { id: 1, description: 'A', amount: '600.00', is_offset: false },
-              { id: 2, description: 'B', amount: '400.00', is_offset: false },
-              { id: 3, description: 'Desconto', amount: '100.00', is_offset: true },
-            ],
-          },
-        ])
-      )
-    );
-
-    const { result } = renderHook(() => useBills(), { wrapper: createWrapper() });
-    await waitFor(() => expect(result.current.isSuccess).toBe(true), { timeout: 5000 });
-
-    const bill = result.current.data?.[0];
-    expect(typeof bill?.amount_total).toBe('number');
-    expect(typeof bill?.amount_remaining).toBe('number');
-    expect(bill?.amount_total).toBe(123.45); // the annotation, not 600 + 400 - 100
-    expect(typeof bill?.line_items?.[0]?.amount).toBe('number');
-    expect(bill?.line_items?.[2]?.is_offset).toBe(true);
-  });
-
-  it('forwards filters as query params', async () => {
-    let captured: Record<string, string> = {};
-    server.use(
-      http.get(`${API_BASE}/finances/bills/`, ({ request }) => {
-        const params = new URL(request.url).searchParams;
-        captured = {
-          building_id: params.get('building_id') ?? '',
-          competence_month: params.get('competence_month') ?? '',
-          lifecycle_state: params.get('lifecycle_state') ?? '',
-        };
-        return HttpResponse.json([]);
-      })
-    );
-
-    const { result } = renderHook(
-      () => useBills({ building_id: 4, competence_month: '2026-06-01', lifecycle_state: 'active' }),
-      { wrapper: createWrapper() }
-    );
-
-    await waitFor(() => expect(result.current.isSuccess).toBe(true), { timeout: 5000 });
-    expect(captured.building_id).toBe('4');
-    expect(captured.competence_month).toBe('2026-06-01');
-    expect(captured.lifecycle_state).toBe('active');
-  });
-
-  it('surfaces server errors', async () => {
-    server.use(
-      http.get(`${API_BASE}/finances/bills/`, () => new HttpResponse(null, { status: 500 }))
-    );
-
-    const { result } = renderHook(() => useBills(), { wrapper: createWrapper() });
-    await waitFor(() => expect(result.current.isError).toBe(true), { timeout: 5000 });
-  });
-
-  it('defaults amount_is_estimated to false on an old payload without the field (S65/S71)', async () => {
-    server.use(
-      http.get(`${API_BASE}/finances/bills/`, () => {
-        const { amount_is_estimated: _amount_is_estimated, ...rest } = createMockBill();
-        return HttpResponse.json([rest]);
-      })
-    );
-
-    const { result } = renderHook(() => useBills(), { wrapper: createWrapper() });
-    await waitFor(() => expect(result.current.isSuccess).toBe(true), { timeout: 5000 });
-
-    expect(result.current.data?.[0]?.amount_is_estimated).toBe(false);
-  });
-
-  it('fetches a single bill with nested line_items / stays idle when id is null', async () => {
-    const { result } = renderHook(() => useBill(1), { wrapper: createWrapper() });
-    await waitFor(() => expect(result.current.isSuccess).toBe(true), { timeout: 5000 });
-    expect(result.current.data?.id).toBe(1);
-    expect(result.current.data?.line_items?.length).toBeGreaterThan(0);
-    expect(result.current.data?.line_items?.[0]?.is_offset).toBe(false);
-    expect(typeof result.current.data?.line_items?.[0]?.amount).toBe('number');
-
-    const { result: idle } = renderHook(() => useBill(null), { wrapper: createWrapper() });
-    expect(idle.current.fetchStatus).toBe('idle');
-  });
-});
 
 describe('bill mutations', () => {
   it('creates a bill with line items and invalidates caches', async () => {
@@ -249,22 +151,9 @@ describe('bill lifecycle actions', () => {
 describe('usePayBill (no optimistic update)', () => {
   it('does not touch the cached bill list while the mutation is in flight (any path)', async () => {
     const queryClient = createTestQueryClient();
-
-    let getCount = 0;
-    server.use(
-      http.get(`${API_BASE}/finances/bills/`, () => {
-        getCount += 1;
-        // 2nd GET is the post-invalidate refetch — reflects the payment server-side.
-        const paid = getCount > 1;
-        return HttpResponse.json([
-          createMockBill({
-            id: 1,
-            payment_status: paid ? 'paid' : 'open',
-            amount_remaining: paid ? 0 : 350,
-          }),
-        ]);
-      })
-    );
+    // Seed the cache directly under the bills prefix — invalidateBillCaches invalidates
+    // queryKeys.finances.bills.all, so any query keyed under that prefix is a valid probe.
+    const billsQueryKey = [...queryKeys.finances.bills.all, 'probe'];
 
     let respond: (() => void) | undefined;
     const serverReady = new Promise<void>((resolve) => {
@@ -279,36 +168,42 @@ describe('usePayBill (no optimistic update)', () => {
       })
     );
 
-    const { result } = renderHook(() => ({ bills: useBills(), pay: usePayBill() }), {
-      wrapper: createWrapper(queryClient),
-    });
-
-    await waitFor(() => expect(result.current.bills.isSuccess).toBe(true), { timeout: 5000 });
+    const { result } = renderHook(
+      () => ({ probe: useBillsProbe(billsQueryKey), pay: usePayBill() }),
+      { wrapper: createWrapper(queryClient) }
+    );
+    // enabled:false never fetches — populate the cache the probe observes directly.
+    queryClient.setQueryData(billsQueryKey, [
+      { ...createMockBill({ id: 1, payment_status: 'open', amount_remaining: 350 }) },
+    ]);
 
     result.current.pay.mutate({ bill_id: 1, payment_date: '2026-06-10' });
 
     // Pre-populated cache stays intact throughout the in-flight window — onMutate was removed.
     await waitFor(() => expect(result.current.pay.isPending).toBe(true), { timeout: 5000 });
-    const inFlightBills = queryClient.getQueryData<Bill[]>(queryKeys.finances.bills.list({}));
+    const inFlightBills = queryClient.getQueryData<{ payment_status: string }[]>(billsQueryKey);
     expect(inFlightBills?.[0]?.payment_status).toBe('open');
     respond?.();
 
     await waitFor(() => expect(result.current.pay.isSuccess).toBe(true), { timeout: 5000 });
 
-    // Only AFTER the response + invalidate→refetch does the cache reflect the paid status.
-    await waitFor(() => {
-      const bills = queryClient.getQueryData<Bill[]>(queryKeys.finances.bills.list({}));
-      expect(bills?.[0]?.payment_status).toBe('paid');
-    });
+    // The mutation invalidates the bills prefix — no manual write ever touches the probe entry,
+    // it only gets marked stale (an `enabled: false` observer never auto-refetches, so the
+    // pre-populated value itself stays untouched — same assertion the removed useBills made).
+    expect(queryClient.getQueryState(billsQueryKey)?.isInvalidated).toBe(true);
   });
 
   it('does not roll back anything on error (there is nothing to restore — same asserto as the partial-amount path)', async () => {
     const queryClient = createTestQueryClient();
-    const { result } = renderHook(() => ({ bills: useBills(), pay: usePayBill() }), {
-      wrapper: createWrapper(queryClient),
-    });
+    const billsQueryKey = [...queryKeys.finances.bills.all, 'probe'];
 
-    await waitFor(() => expect(result.current.bills.isSuccess).toBe(true), { timeout: 5000 });
+    const { result } = renderHook(
+      () => ({ probe: useBillsProbe(billsQueryKey), pay: usePayBill() }),
+      { wrapper: createWrapper(queryClient) }
+    );
+    queryClient.setQueryData(billsQueryKey, [
+      { ...createMockBill({ id: 1, payment_status: 'open', amount_remaining: 350 }) },
+    ]);
 
     server.use(
       http.post(`${API_BASE}/finances/bills/1/pay/`, () => new HttpResponse(null, { status: 500 }))
@@ -318,7 +213,7 @@ describe('usePayBill (no optimistic update)', () => {
 
     await waitFor(() => expect(result.current.pay.isError).toBe(true), { timeout: 5000 });
 
-    const bills = queryClient.getQueryData<Bill[]>(queryKeys.finances.bills.list({}));
+    const bills = queryClient.getQueryData<{ payment_status: string }[]>(billsQueryKey);
     expect(bills?.[0]?.payment_status).toBe('open');
   });
 

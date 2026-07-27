@@ -1,9 +1,8 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '../client';
 import { queryKeys } from '../query-keys';
-import { parseList } from '../parse-list';
 import { type Bill, type BillLineItem, billSchema } from '@/lib/schemas/finances/bill.schema';
 import {
   type ParsedInvoice,
@@ -14,16 +13,6 @@ import { showFinanceMutationError } from '@/lib/utils/error-handler';
 import { ROUTES } from '@/lib/utils/constants';
 
 const ENDPOINT = '/finances/bills/';
-
-export interface BillFilters {
-  building_id?: number;
-  category_id?: number;
-  competence_month?: string;
-  lifecycle_state?: string;
-  behavior?: string;
-  payment_status?: string;
-  is_overdue?: boolean;
-}
 
 export interface BillLineInput {
   description: string;
@@ -90,33 +79,6 @@ interface PayBillResponse {
 export interface ApplyInvoiceRequest {
   bill_id: number;
   file: File;
-}
-
-export function useBills(filters?: BillFilters) {
-  const cleanFilters = filters
-    ? Object.fromEntries(Object.entries(filters).filter(([, v]) => v !== undefined))
-    : {};
-  return useQuery({
-    queryKey: queryKeys.finances.bills.list(cleanFilters),
-    queryFn: async () => {
-      const { data } = await apiClient.get<unknown>(ENDPOINT, {
-        params: { page_size: 10000, ...cleanFilters },
-      });
-      return parseList(data, billSchema).items;
-    },
-  });
-}
-
-export function useBill(id: number | null) {
-  return useQuery({
-    queryKey: queryKeys.finances.bills.detail(id ?? 0),
-    queryFn: async () => {
-      if (!id) throw new Error('Bill ID is required');
-      const { data } = await apiClient.get<Bill>(`${ENDPOINT}${id}/`);
-      return billSchema.parse(data);
-    },
-    enabled: Boolean(id),
-  });
 }
 
 /** Invalidate the condominium money dashboards (overview, balance, projection, …) that any

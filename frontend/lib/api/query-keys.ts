@@ -148,9 +148,6 @@ export const queryKeys = {
     },
     bills: {
       all: ['finances', 'bills'] as const,
-      list: (filters?: Record<string, unknown>) =>
-        [...queryKeys.finances.bills.all, filters ?? null] as const,
-      detail: (id: number) => [...queryKeys.finances.bills.all, id] as const,
     },
     payments: {
       all: ['finances', 'payments'] as const,

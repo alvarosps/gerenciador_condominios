@@ -10,8 +10,8 @@ import { createMockBill, createMockMonthBoard } from '@/tests/mocks/data/finance
 import BillsPage from '../page';
 
 // Real hooks (useMonthBoard / useGenerateMonthBills / …) hit MSW — no hook is mocked. The board is
-// now the single source of data for this page: `useBills`/GET `/finances/bills/` must never be
-// called from here (S74 contract — the source-of-truth check below asserts 0 calls).
+// the single source of data for this page: GET `/finances/bills/` must never be called from here
+// (S74 contract — the source-of-truth check below asserts 0 calls).
 const API_BASE = 'http://localhost:8008/api';
 
 beforeAll(() => {
@@ -50,8 +50,9 @@ function setMonthBoard(board: ReturnType<typeof createMockMonthBoard>) {
   );
 }
 
-// Registers a spy on GET /finances/bills/ so tests can assert it is never called (S74: useBills
-// leaves the page). Returns the running call count.
+// Registers a spy on GET /finances/bills/ so tests can assert it is never called (S74: the page
+// no longer fetches the flat bill list — it reads exclusively from the month board). Returns the
+// running call count.
 function spyBillsListCalls(): { count: number } {
   const calls = { count: 0 };
   server.use(
