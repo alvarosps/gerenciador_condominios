@@ -1,7 +1,7 @@
 'use client';
 
-import { useMemo, useRef, useState } from 'react';
-import { CalendarPlus, ChevronLeft, ChevronRight, FileUp, Plus } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { ChevronLeft, ChevronRight, FileUp, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import {
@@ -30,32 +30,46 @@ import {
 } from '@/components/ui/select';
 import { DataTable } from '@/components/tables/data-table';
 import { PageHeader } from '@/components/layouts/page-header';
-import {
-  useBills,
-  useDeleteBill,
-  useGenerateMonthBills,
-  useParseInvoice,
-} from '@/lib/api/hooks/use-bills';
+import { useDeleteBill, useParseInvoice } from '@/lib/api/hooks/use-bills';
+import { useMonthBoard } from '@/lib/api/hooks/use-month-board';
 import { useAuthStore } from '@/store/auth-store';
 import { handleError } from '@/lib/utils/error-handler';
-import { formatMonthYear } from '@/lib/utils/formatters';
+import { formatCurrency, formatMonthYear } from '@/lib/utils/formatters';
 import { useCrudPage } from '@/lib/hooks/use-crud-page';
 import type { Bill } from '@/lib/schemas/finances/bill.schema';
-import type { BillFilters } from '@/lib/api/hooks/use-bills';
+import type { BillLifecycleState } from '@/lib/schemas/finances/category.schema';
 import type { ParsedInvoice } from '@/lib/schemas/finances/invoice-parse.schema';
 import { IptuRiskBanner } from '../_components/iptu-risk-banner';
 import { buildBillColumns } from './_components/bill-columns';
 import { BillFormModal } from './_components/bill-form-modal';
 import { BillPaymentDialog } from './_components/bill-payment-dialog';
+import { GenerateMissingBanner } from './_components/generate-missing-banner';
+import { OverdueSection } from './_components/overdue-section';
 
 const ALL = 'all';
 
-const LIFECYCLE_OPTIONS = [
+const LIFECYCLE_OPTIONS: { value: BillLifecycleState; label: string }[] = [
   { value: 'active', label: 'Ativas' },
   { value: 'suspended', label: 'Suspensas' },
   { value: 'deferred', label: 'Adiadas' },
-  { value: 'canceled', label: 'Canceladas' },
-] as const;
+];
+
+type LifecycleFilter = typeof ALL | BillLifecycleState;
+
+const LIFECYCLE_FILTER_VALUES: ReadonlySet<string> = new Set([
+  ALL,
+  ...LIFECYCLE_OPTIONS.map((option) => option.value),
+]);
+
+function isLifecycleFilter(value: string): value is LifecycleFilter {
+  return LIFECYCLE_FILTER_VALUES.has(value);
+}
+
+/** Applies the situação filter to a bill list — client-side, over the board's own sections. */
+function filterByLifecycle(bills: Bill[], lifecycleFilter: LifecycleFilter): Bill[] {
+  if (lifecycleFilter === ALL) return bills;
+  return bills.filter((bill) => bill.lifecycle_state === lifecycleFilter);
+}
 
 export default function BillsPage() {
   const { user } = useAuthStore();
@@ -63,57 +77,34 @@ export default function BillsPage() {
 
   const now = new Date();
   const [period, setPeriod] = useState({ year: now.getFullYear(), month: now.getMonth() + 1 });
-  const [competenceMode, setCompetenceMode] = useState<'month' | typeof ALL>('month');
-  const [lifecycleFilter, setLifecycleFilter] = useState<string>(ALL);
+  const [lifecycleFilter, setLifecycleFilter] = useState<LifecycleFilter>(ALL);
   const [payingBill, setPayingBill] = useState<Bill | null>(null);
   const [importDraft, setImportDraft] = useState<ParsedInvoice | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const parseInvoice = useParseInvoice();
-
-  // Default to the current month's competence so the page no longer pulls every bill in history;
-  // "Todas as competências" opts back into the full set. The ISO is built from period (not a Date)
-  // to stay timezone-safe — it matches the backend's exact-date competence_month filter.
-  const competenceMonthParam =
-    competenceMode === ALL
-      ? undefined
-      : `${String(period.year)}-${String(period.month).padStart(2, '0')}-01`;
-
-  // Building is rendered as one table per building (accordion), not a filter; only the situação
-  // (lifecycle) + competência filters stay — applied server-side across all buildings.
-  const filters: BillFilters = {
-    ...(lifecycleFilter === ALL ? {} : { lifecycle_state: lifecycleFilter }),
-    ...(competenceMonthParam ? { competence_month: competenceMonthParam } : {}),
-  };
 
   function shiftMonth(delta: number) {
     const base = new Date(period.year, period.month - 1 + delta, 1);
     setPeriod({ year: base.getFullYear(), month: base.getMonth() + 1 });
   }
 
-  const { data: bills, isLoading } = useBills(filters);
+  function handleLifecycleFilterChange(value: string) {
+    if (isLifecycleFilter(value)) setLifecycleFilter(value);
+  }
 
-  // One table per building (accordion), derived from each bill's own nested building so it never
-  // depends on a separate buildings list being complete. Bills with building=null go under a
-  // "Condomínio" bucket (the extra group leases/apartments lack). Sorted by street_number, condo
-  // bucket last.
-  const groups = useMemo(() => {
-    const byKey = new Map<string, { key: string; label: string; order: number; bills: Bill[] }>();
-    (bills ?? []).forEach((bill) => {
-      const building = bill.building;
-      const key = building?.id !== undefined ? String(building.id) : 'condominio';
-      const group = byKey.get(key) ?? {
-        key,
-        label: building ? `${building.name} — Nº ${building.street_number}` : 'Condomínio',
-        order: building?.street_number ?? Number.MAX_SAFE_INTEGER,
-        bills: [],
-      };
-      group.bills.push(bill);
-      byKey.set(key, group);
-    });
-    return [...byKey.values()].sort((a, b) => a.order - b.order);
-  }, [bills]);
+  // Single data source (S74): the board already carries the fixed Atrasadas/deferred-suspended
+  // sections plus the per-building groups of the selected competence, so the page no longer pulls
+  // the full bills list nor re-groups/re-sorts/re-sums client-side.
+  const { data: board, isLoading } = useMonthBoard(period.year, period.month);
+
+  const overdue = filterByLifecycle(board?.overdue ?? [], lifecycleFilter);
+  const deferredSuspended = filterByLifecycle(board?.deferred_suspended ?? [], lifecycleFilter);
+  const groups = (board?.groups ?? []).map((group) => ({
+    ...group,
+    bills: filterByLifecycle(group.bills, lifecycleFilter),
+  }));
+
   const deleteMutation = useDeleteBill();
-  const generateMonth = useGenerateMonthBills();
 
   const crud = useCrudPage<Bill>({
     entityName: 'conta',
@@ -134,20 +125,6 @@ export default function BillsPage() {
     },
   });
 
-  function handleGenerateMonth() {
-    generateMonth.mutate(
-      { year: period.year, month: period.month },
-      {
-        onSuccess: (result) => {
-          toast.success(`${String(result.created)} conta(s) gerada(s)`);
-        },
-        onError: (error) => {
-          handleError(error, 'Erro ao gerar contas do mês');
-        },
-      }
-    );
-  }
-
   function handleInvoiceSelected(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     // Reset the input so re-selecting the same file fires change again. The PDF is sent and
@@ -165,6 +142,12 @@ export default function BillsPage() {
     });
   }
 
+  const isEmpty =
+    !isLoading &&
+    overdue.length === 0 &&
+    deferredSuspended.length === 0 &&
+    groups.every((group) => group.bills.length === 0);
+
   return (
     <div>
       <PageHeader
@@ -173,14 +156,6 @@ export default function BillsPage() {
         actions={
           isAdmin && (
             <>
-              <Button
-                variant="outline"
-                onClick={handleGenerateMonth}
-                disabled={generateMonth.isPending}
-              >
-                <CalendarPlus className="mr-2 h-4 w-4" />
-                Gerar contas do mês
-              </Button>
               <input
                 ref={fileInputRef}
                 type="file"
@@ -211,47 +186,37 @@ export default function BillsPage() {
         </div>
       )}
 
+      {isAdmin && board && (
+        <GenerateMissingBanner
+          missingCount={board.generation.missing_count}
+          year={period.year}
+          month={period.month}
+        />
+      )}
+
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-1">
           <Button
             variant="outline"
             size="icon"
             onClick={() => shiftMonth(-1)}
-            disabled={competenceMode === ALL}
             aria-label="Mês anterior"
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <span
-            className={`min-w-[10rem] text-center text-sm font-medium ${
-              competenceMode === ALL ? 'text-muted-foreground' : ''
-            }`}
-          >
+          <span className="min-w-[10rem] text-center text-sm font-medium">
             {formatMonthYear(period.year, period.month)}
           </span>
           <Button
             variant="outline"
             size="icon"
             onClick={() => shiftMonth(1)}
-            disabled={competenceMode === ALL}
             aria-label="Próximo mês"
           >
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
-        <Select
-          value={competenceMode}
-          onValueChange={(value) => setCompetenceMode(value as 'month' | typeof ALL)}
-        >
-          <SelectTrigger className="w-52">
-            <SelectValue placeholder="Competência" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="month">Mês selecionado</SelectItem>
-            <SelectItem value={ALL}>Todas as competências</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={lifecycleFilter} onValueChange={setLifecycleFilter}>
+        <Select value={lifecycleFilter} onValueChange={handleLifecycleFilterChange}>
           <SelectTrigger className="w-40">
             <SelectValue placeholder="Situação" />
           </SelectTrigger>
@@ -266,23 +231,50 @@ export default function BillsPage() {
         </Select>
       </div>
 
-      {!isLoading && groups.length === 0 ? (
+      {board && (
+        <div className="mb-4 flex flex-wrap items-center gap-x-6 gap-y-1 text-sm">
+          <span>
+            A pagar <span className="font-medium">{formatCurrency(board.totals.due)}</span>
+          </span>
+          <span>
+            Pago <span className="font-medium">{formatCurrency(board.totals.paid)}</span>
+          </span>
+          <span>
+            Restante <span className="font-medium">{formatCurrency(board.totals.remaining)}</span>
+          </span>
+          <span>
+            Atrasado <span className="font-medium">{formatCurrency(board.totals.overdue)}</span>
+          </span>
+        </div>
+      )}
+
+      <OverdueSection
+        overdue={overdue}
+        deferredSuspended={deferredSuspended}
+        columns={columns}
+        overdueTotal={board?.totals.overdue ?? '0.00'}
+      />
+
+      {isEmpty ? (
         <p className="rounded-md border-2 border-dashed py-12 text-center text-sm text-muted-foreground">
           Nenhuma conta cadastrada
         </p>
       ) : (
         <Accordion
           // Re-key on the group set so the default-open state re-applies once bills load.
-          key={groups.map((group) => group.key).join(',')}
+          key={groups.map((group) => group.building_id ?? 'condominio').join(',')}
           type="multiple"
-          defaultValue={groups.map((group) => group.key)}
+          defaultValue={groups.map((group) => String(group.building_id ?? 'condominio'))}
           className="space-y-4"
         >
           {groups.map((group) => (
-            <AccordionItem key={group.key} value={group.key}>
+            <AccordionItem
+              key={group.building_id ?? 'condominio'}
+              value={String(group.building_id ?? 'condominio')}
+            >
               <AccordionTrigger className="px-4">
                 <div className="flex items-center gap-2">
-                  <span>{group.label}</span>
+                  <span>{group.building_label}</span>
                   <Badge variant="secondary">{group.bills.length} contas</Badge>
                 </div>
               </AccordionTrigger>

@@ -2,6 +2,7 @@
 
 import { MoreHorizontal, Pencil, Trash2, Wallet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,6 +37,17 @@ export function buildBillColumns({
       key: 'description',
       primary: true,
       sorter: (a, b) => a.description.localeCompare(b.description),
+      render: (_, record) => (
+        <div className="flex flex-wrap items-center gap-2">
+          <span>{record.description}</span>
+          {record.amount_is_estimated && (record.amount_total ?? 0) > 0 && (
+            <Badge variant="outline">valor estimado</Badge>
+          )}
+          {record.amount_is_estimated && (record.amount_total ?? 0) === 0 && (
+            <Badge variant="outline">aguardando fatura</Badge>
+          )}
+        </div>
+      ),
     },
     {
       title: 'Prédio',

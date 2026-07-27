@@ -5,11 +5,13 @@ import userEvent from '@testing-library/user-event';
 import { renderWithProviders, waitForQueriesToSettle } from '@/tests/test-utils';
 import { server } from '@/tests/mocks/server';
 import { useAuthStore } from '@/store/auth-store';
-import { createMockBill } from '@/tests/mocks/data/finances';
+import { createMockBill, createMockMonthBoard } from '@/tests/mocks/data/finances';
 import BillsPage from '../page';
 
-// Real hooks (useBills / useGenerateMonthBills / …) hit MSW — no hook is mocked. The real auth
-// store drives admin gating. generate_month is spied via an MSW request-body capture.
+// Real hooks (useMonthBoard / useGenerateMonthBills / …) hit MSW — no hook is mocked. The real auth
+// store drives admin gating. generate_month is spied via an MSW request-body capture. The page's
+// single data source is month_board (S74) — competence navigation is exercised via the params
+// captured on that endpoint, not on the legacy bills list.
 const API_BASE = 'http://localhost:8008/api';
 
 beforeAll(() => {
@@ -23,15 +25,29 @@ beforeAll(() => {
   }
 });
 
-function setBillsResponse(bills: unknown[]) {
-  server.use(http.get(`${API_BASE}/finances/bills/`, () => HttpResponse.json(bills)));
-}
-
 function setAdmin(isStaff: boolean) {
   useAuthStore.setState({
     user: { id: 1, email: 'a@b.c', first_name: 'A', last_name: 'B', is_staff: isStaff },
     isAuthenticated: true,
   });
+}
+
+function setIptuAlerts() {
+  server.use(
+    http.get(`${API_BASE}/finances/finance-dashboard/iptu_alerts/`, () =>
+      HttpResponse.json({ alerts: [], warning_count: 0, critical_count: 0 })
+    )
+  );
+}
+
+function setBillingAccounts(accounts: unknown[] = []) {
+  server.use(http.get(`${API_BASE}/finances/billing-accounts/`, () => HttpResponse.json(accounts)));
+}
+
+function setMonthBoard(board: ReturnType<typeof createMockMonthBoard>) {
+  server.use(
+    http.get(`${API_BASE}/finances/finance-dashboard/month_board/`, () => HttpResponse.json(board))
+  );
 }
 
 // Spy generate_month via an MSW request-body capture (the real useGenerateMonthBills hook POSTs
@@ -51,54 +67,82 @@ function spyGenerateMonth() {
   return calls;
 }
 
-// setBillsResponse ignores query params; this handler captures competence_month off each request.
-function captureBillsParams() {
-  const captured: { competence_month: string | null } = { competence_month: null };
+// month_board ignores its query params by default; this handler captures year/month off each
+// request so the navigator/generate-month assertions can check what the page actually sent.
+function captureMonthBoardParams() {
+  const captured: { year: string | null; month: string | null } = { year: null, month: null };
   server.use(
-    http.get(`${API_BASE}/finances/bills/`, ({ request }) => {
-      captured.competence_month = new URL(request.url).searchParams.get('competence_month');
-      return HttpResponse.json([]);
+    http.get(`${API_BASE}/finances/finance-dashboard/month_board/`, ({ request }) => {
+      const params = new URL(request.url).searchParams;
+      captured.year = params.get('year');
+      captured.month = params.get('month');
+      return HttpResponse.json(createMockMonthBoard({ groups: [] }));
     })
   );
   return captured;
 }
 
-// Derive expected competence ISO from the same real clock the page reads (deterministic without
-// fake timers; new Date(y, m, 1) normalises year rollover).
-function monthIso(deltaMonths: number): string {
+function currentPeriod(deltaMonths: number): { year: number; month: number } {
   const now = new Date();
   const d = new Date(now.getFullYear(), now.getMonth() + deltaMonths, 1);
-  return `${String(d.getFullYear())}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+  return { year: d.getFullYear(), month: d.getMonth() + 1 };
 }
 
 describe('BillsPage', () => {
   beforeEach(() => {
     setAdmin(false);
+    setIptuAlerts();
+    setBillingAccounts([]);
   });
 
   it('renders the table but hides all write buttons for non-admin users', async () => {
     setAdmin(false);
-    setBillsResponse([createMockBill({ id: 1, description: 'Conta de Luz' })]);
+    setMonthBoard(
+      createMockMonthBoard({
+        groups: [
+          {
+            building_id: 1,
+            building_label: 'Prédio 836',
+            bills: [createMockBill({ id: 1, description: 'Conta de Luz' })],
+          },
+        ],
+      })
+    );
 
     const { queryClient } = renderWithProviders(<BillsPage />);
 
     expect((await screen.findAllByText('Conta de Luz')).length).toBeGreaterThan(0);
     expect(screen.queryByRole('button', { name: /nova conta/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /gerar contas do mês/i })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /gerar contas faltantes/i })
+    ).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /ações da conta/i })).not.toBeInTheDocument();
 
     await waitForQueriesToSettle(queryClient);
   });
 
-  it('shows write buttons for admin and generate-month calls useGenerateMonthBills', async () => {
+  it('shows write buttons for admin and generate-missing-banner calls useGenerateMonthBills', async () => {
     setAdmin(true);
     const calls = spyGenerateMonth();
-    setBillsResponse([createMockBill({ id: 1, description: 'Conta de Luz' })]);
+    setMonthBoard(
+      createMockMonthBoard({
+        groups: [
+          {
+            building_id: 1,
+            building_label: 'Prédio 836',
+            bills: [createMockBill({ id: 1, description: 'Conta de Luz' })],
+          },
+        ],
+        generation: { missing_count: 1 },
+      })
+    );
 
     const { queryClient } = renderWithProviders(<BillsPage />);
 
     expect(await screen.findByRole('button', { name: /nova conta/i })).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: /gerar contas do mês/i }));
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Gerar contas faltantes (1)' })
+    );
 
     await waitFor(() => {
       expect(calls).toHaveLength(1);
@@ -113,11 +157,24 @@ describe('BillsPage', () => {
 
   it('formats competence via split + formatMonthYear and shows "Condomínio" for null building', async () => {
     setAdmin(false);
-    // Use a month distinct from the current-month competence label so the assertion targets the
-    // bill's column ("Março de 2026"), not the navigator label, and await the async bill load.
-    setBillsResponse([
-      createMockBill({ id: 1, competence_month: '2026-03-01', building: null, building_id: null }),
-    ]);
+    setMonthBoard(
+      createMockMonthBoard({
+        groups: [
+          {
+            building_id: null,
+            building_label: 'Condomínio',
+            bills: [
+              createMockBill({
+                id: 1,
+                competence_month: '2026-03-01',
+                building: null,
+                building_id: null,
+              }),
+            ],
+          },
+        ],
+      })
+    );
 
     const { queryClient } = renderWithProviders(<BillsPage />);
 
@@ -129,14 +186,24 @@ describe('BillsPage', () => {
 
   it('renders a lifecycle chip (not "Em atraso") for a deferred bill', async () => {
     setAdmin(false);
-    setBillsResponse([
-      createMockBill({
-        id: 1,
-        lifecycle_state: 'deferred',
-        is_overdue: true,
-        payment_status: 'open',
-      }),
-    ]);
+    setMonthBoard(
+      createMockMonthBoard({
+        groups: [
+          {
+            building_id: 1,
+            building_label: 'Prédio 836',
+            bills: [
+              createMockBill({
+                id: 1,
+                lifecycle_state: 'deferred',
+                is_overdue: true,
+                payment_status: 'open',
+              }),
+            ],
+          },
+        ],
+      })
+    );
 
     const { queryClient } = renderWithProviders(<BillsPage />);
 
@@ -148,14 +215,24 @@ describe('BillsPage', () => {
 
   it('shows the overdue chip for an overdue active bill', async () => {
     setAdmin(false);
-    setBillsResponse([
-      createMockBill({
-        id: 1,
-        lifecycle_state: 'active',
-        is_overdue: true,
-        payment_status: 'open',
-      }),
-    ]);
+    setMonthBoard(
+      createMockMonthBoard({
+        groups: [
+          {
+            building_id: 1,
+            building_label: 'Prédio 836',
+            bills: [
+              createMockBill({
+                id: 1,
+                lifecycle_state: 'active',
+                is_overdue: true,
+                payment_status: 'open',
+              }),
+            ],
+          },
+        ],
+      })
+    );
 
     const { queryClient } = renderWithProviders(<BillsPage />);
 
@@ -167,9 +244,19 @@ describe('BillsPage', () => {
   it('shows a loading skeleton then content', async () => {
     setAdmin(false);
     server.use(
-      http.get(`${API_BASE}/finances/bills/`, async () => {
+      http.get(`${API_BASE}/finances/finance-dashboard/month_board/`, async () => {
         await delay(50);
-        return HttpResponse.json([createMockBill({ id: 1, description: 'Conta de Luz' })]);
+        return HttpResponse.json(
+          createMockMonthBoard({
+            groups: [
+              {
+                building_id: 1,
+                building_label: 'Prédio 836',
+                bills: [createMockBill({ id: 1, description: 'Conta de Luz' })],
+              },
+            ],
+          })
+        );
       })
     );
 
@@ -181,7 +268,7 @@ describe('BillsPage', () => {
 
   it('shows a Portuguese empty state when there are no bills', async () => {
     setAdmin(false);
-    setBillsResponse([]);
+    setMonthBoard(createMockMonthBoard({ overdue: [], deferred_suspended: [], groups: [] }));
 
     const { queryClient } = renderWithProviders(<BillsPage />);
 
@@ -192,117 +279,108 @@ describe('BillsPage', () => {
 
   it('por padrão busca a competência do mês corrente', async () => {
     setAdmin(true);
-    const captured = captureBillsParams();
+    const captured = captureMonthBoardParams();
 
     const { queryClient } = renderWithProviders(<BillsPage />);
 
-    await waitFor(() => expect(captured.competence_month).toBe(monthIso(0)));
+    const expected = currentPeriod(0);
+    await waitFor(() => expect(captured.year).toBe(String(expected.year)));
+    expect(captured.month).toBe(String(expected.month));
 
     await waitForQueriesToSettle(queryClient);
   });
 
-  it('chevron "Mês anterior" muda o competence_month para o mês anterior', async () => {
+  it('chevron "Mês anterior" muda o mês do board para o mês anterior', async () => {
     setAdmin(true);
-    const captured = captureBillsParams();
+    const captured = captureMonthBoardParams();
 
     const { queryClient } = renderWithProviders(<BillsPage />);
-    await waitFor(() => expect(captured.competence_month).toBe(monthIso(0)));
+    const initial = currentPeriod(0);
+    await waitFor(() => expect(captured.month).toBe(String(initial.month)));
 
     await userEvent.click(screen.getByRole('button', { name: 'Mês anterior' }));
 
-    await waitFor(() => expect(captured.competence_month).toBe(monthIso(-1)));
+    const previous = currentPeriod(-1);
+    await waitFor(() => expect(captured.month).toBe(String(previous.month)));
+    expect(captured.year).toBe(String(previous.year));
 
     await waitForQueriesToSettle(queryClient);
   });
 
-  it('chevron "Próximo mês" avança o competence_month', async () => {
+  it('chevron "Próximo mês" avança o mês do board', async () => {
     setAdmin(true);
-    const captured = captureBillsParams();
+    const captured = captureMonthBoardParams();
 
     const { queryClient } = renderWithProviders(<BillsPage />);
-    await waitFor(() => expect(captured.competence_month).toBe(monthIso(0)));
+    const initial = currentPeriod(0);
+    await waitFor(() => expect(captured.month).toBe(String(initial.month)));
 
     await userEvent.click(screen.getByRole('button', { name: 'Próximo mês' }));
 
-    await waitFor(() => expect(captured.competence_month).toBe(monthIso(1)));
+    const next = currentPeriod(1);
+    await waitFor(() => expect(captured.month).toBe(String(next.month)));
+    expect(captured.year).toBe(String(next.year));
 
     await waitForQueriesToSettle(queryClient);
   });
 
-  it('alternar para "Todas as competências" remove o filtro de competência', async () => {
-    setAdmin(true);
-    // pointerEventsCheck:0 lets userEvent drive the Radix Select in happy-dom (same as the
-    // other finance Select tests); findByRole waits for the listbox to open.
-    const user = userEvent.setup({ pointerEventsCheck: 0 });
-    const captured = captureBillsParams();
-
-    const { queryClient } = renderWithProviders(<BillsPage />);
-    await waitFor(() => expect(captured.competence_month).toBe(monthIso(0)));
-
-    await user.click(screen.getByText('Mês selecionado'));
-    await user.click(await screen.findByRole('option', { name: 'Todas as competências' }));
-
-    await waitFor(() => expect(captured.competence_month).toBeNull());
-
-    await waitForQueriesToSettle(queryClient);
-  });
-
-  it('chevrons ficam desabilitados em modo "Todas as competências"', async () => {
-    setAdmin(true);
-    const user = userEvent.setup({ pointerEventsCheck: 0 });
-    setBillsResponse([]);
-
-    const { queryClient } = renderWithProviders(<BillsPage />);
-    await screen.findByRole('button', { name: 'Mês anterior' });
-
-    await user.click(screen.getByText('Mês selecionado'));
-    await user.click(await screen.findByRole('option', { name: 'Todas as competências' }));
-
-    expect(screen.getByRole('button', { name: 'Mês anterior' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Próximo mês' })).toBeDisabled();
-
-    await waitForQueriesToSettle(queryClient);
-  });
-
-  it('"Gerar contas do mês" usa o mês selecionado', async () => {
+  it('"Gerar contas faltantes" usa o mês selecionado', async () => {
     setAdmin(true);
     const calls = spyGenerateMonth();
-    setBillsResponse([]);
+    setMonthBoard(createMockMonthBoard({ groups: [], generation: { missing_count: 1 } }));
 
     const { queryClient } = renderWithProviders(<BillsPage />);
     await userEvent.click(await screen.findByRole('button', { name: 'Mês anterior' }));
-    await userEvent.click(screen.getByRole('button', { name: /gerar contas do mês/i }));
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Gerar contas faltantes (1)' })
+    );
 
     await waitFor(() => expect(calls).toHaveLength(1));
-    const prev = new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1);
-    expect(calls[0]).toMatchObject({ year: prev.getFullYear(), month: prev.getMonth() + 1 });
+    const prev = currentPeriod(-1);
+    expect(calls[0]).toMatchObject({ year: prev.year, month: prev.month });
 
     await waitForQueriesToSettle(queryClient);
   });
 
   it('groups bills into one accordion per building (+ a Condomínio bucket) and shows the Tipo column', async () => {
     setAdmin(false);
-    setBillsResponse([
-      createMockBill({
-        id: 1,
-        description: 'Água DMAE 836',
-        account_type: 'water',
-        building: {
-          id: 1,
-          street_number: 836,
-          name: 'Condomínio Steinmetz',
-          address: 'Av. Circular 836',
-        },
-        building_id: 1,
-      }),
-      createMockBill({
-        id: 2,
-        description: 'IPTU dívida 2026',
-        account_type: 'iptu',
-        building: null,
-        building_id: null,
-      }),
-    ]);
+    setMonthBoard(
+      createMockMonthBoard({
+        groups: [
+          {
+            building_id: 1,
+            building_label: 'Condomínio Steinmetz — Nº 836',
+            bills: [
+              createMockBill({
+                id: 1,
+                description: 'Água DMAE 836',
+                account_type: 'water',
+                building: {
+                  id: 1,
+                  street_number: 836,
+                  name: 'Condomínio Steinmetz',
+                  address: 'Av. Circular 836',
+                },
+                building_id: 1,
+              }),
+            ],
+          },
+          {
+            building_id: null,
+            building_label: 'Condomínio',
+            bills: [
+              createMockBill({
+                id: 2,
+                description: 'IPTU dívida 2026',
+                account_type: 'iptu',
+                building: null,
+                building_id: null,
+              }),
+            ],
+          },
+        ],
+      })
+    );
 
     const { queryClient } = renderWithProviders(<BillsPage />);
 
