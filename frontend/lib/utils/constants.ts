@@ -74,6 +74,7 @@ export const ROUTES = {
   FINANCIAL_MONTH_ADVANCE: '/financial/month-advance',
   // Condomínio (new finances module — coexists with the legacy /financial/* routes)
   FINANCES_BILLS: '/finances/bills',
+  FINANCES_ACCOUNTS: '/finances/accounts',
   FINANCES_RESERVE: '/finances/reserve',
   FINANCES_INCOME: '/finances/income-entries',
   FINANCES_MONTH_CLOSE: '/finances/month-close',

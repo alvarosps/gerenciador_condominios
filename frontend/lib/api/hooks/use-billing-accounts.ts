@@ -15,6 +15,7 @@ export interface BillingAccountFilters {
   building_id?: number;
   category_id?: number;
   lifecycle_state?: string;
+  account_type?: string;
 }
 
 type BillingAccountWrite = Omit<

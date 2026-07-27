@@ -105,4 +105,13 @@ describe('Sidebar', () => {
     // "Virada de Mês" (child of the legacy financial group) stays hidden since that group has no active child.
     expect(screen.queryByRole('button', { name: /virada de mês/i })).not.toBeInTheDocument();
   });
+
+  it('renderiza "Contas cadastradas" no grupo Condomínio e marca ativo em /finances/accounts', () => {
+    vi.mocked(usePathname).mockReturnValue('/finances/accounts');
+    renderWithProviders(<Sidebar />);
+    // The group auto-expands because it owns the active route (same pattern as :95-100).
+    const item = screen.getByRole('button', { name: /contas cadastradas/i });
+    expect(item).toBeInTheDocument();
+    expect(item.className).toContain('text-primary');
+  });
 });

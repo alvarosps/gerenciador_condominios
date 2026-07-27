@@ -66,6 +66,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
   // New "Condomínio" finances module — separate from the legacy "Financeiro" group.
   const condominioChildren: SubMenuItem[] = [
     { key: ROUTES.FINANCES_BILLS, label: 'Contas' },
+    { key: ROUTES.FINANCES_ACCOUNTS, label: 'Contas cadastradas' },
     { key: ROUTES.FINANCES_INSTALLMENT_PLANS, label: 'Parcelas' },
     { key: ROUTES.FINANCES_EMPLOYEES, label: 'Folha' },
     { key: ROUTES.FINANCES_RESERVE, label: 'Reserva' },
