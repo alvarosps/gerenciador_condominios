@@ -82,5 +82,6 @@ export const ROUTES = {
   FINANCES_PROJECTION: '/finances/projection',
   FINANCES_DISTRIBUTION: '/finances/distribution',
   FINANCES_CATEGORIES: '/finances/categories',
+  FINANCES_ACCOUNTS: '/finances/accounts',
   ADMIN_USERS: '/admin/users',
 };

@@ -10,25 +10,11 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { type Column } from '@/components/tables/data-table';
-import { formatCurrency, formatMonthYear } from '@/lib/utils/formatters';
+import { formatCurrency, competenceMonthLabel, dueDateLabel } from '@/lib/utils/formatters';
 import type { Bill } from '@/lib/schemas/finances/bill.schema';
 import { ACCOUNT_TYPE_LABELS } from '@/lib/schemas/finances/billing-account.schema';
 import { BillStatusChip } from '../../../_components/finance-calendar/bill-status-chip';
 import { BillStatusActions } from './bill-status-actions';
-
-/** Format a YYYY-MM-01 competence month as "Junho de 2026" using split (never new Date(iso)). */
-function competenceLabel(competenceMonth: string): string {
-  const [year, month] = competenceMonth.split('-');
-  if (!year || !month) return competenceMonth;
-  return formatMonthYear(Number(year), Number(month));
-}
-
-/** Format a YYYY-MM-DD date as DD/MM/YYYY using split (never new Date(iso)). */
-function dueDateLabel(dueDate: string): string {
-  const [year, month, day] = dueDate.split('-');
-  if (!year || !month || !day) return dueDate;
-  return `${day}/${month}/${year}`;
-}
 
 interface BuildBillColumnsOptions {
   isAdmin: boolean;
@@ -64,7 +50,7 @@ export function buildBillColumns({
     {
       title: 'Competência',
       key: 'competence_month',
-      render: (_, record) => competenceLabel(record.competence_month),
+      render: (_, record) => competenceMonthLabel(record.competence_month),
     },
     {
       title: 'Vencimento',
