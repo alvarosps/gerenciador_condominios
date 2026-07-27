@@ -18,6 +18,10 @@ const SIXTY_DAYS = 60;
  * sections (not just deferred_suspended) because an account's open debt can legitimately span
  * Atrasadas / deferred_suspended / groups — the CTA only triggers from the deferred/suspended row,
  * but the plan should cover the account's whole open balance, mirroring the extrato's dialog (S73).
+ * Filters to `amount_remaining > 0` and `lifecycle_state !== 'canceled'` — the dialog's own prop
+ * contract documents `bills` as "já filtradas" (mirrors `accounts/[id]/page.tsx`); `board.groups`
+ * includes PAID bills by design (`CondoMonthBoardService`), so without this filter a settled bill
+ * would appear selectable and the backend would reject it with a 400 (`_BILL_NOT_OPEN`).
  */
 export function toConsolidableBills(board: MonthBoard, accountId: number): ConsolidableBill[] {
   const allBills = [
@@ -29,6 +33,7 @@ export function toConsolidableBills(board: MonthBoard, accountId: number): Conso
   const result: ConsolidableBill[] = [];
   for (const bill of allBills) {
     if (bill.id === undefined || bill.billing_account?.id !== accountId) continue;
+    if ((bill.amount_remaining ?? 0) <= 0 || bill.lifecycle_state === 'canceled') continue;
     if (seen.has(bill.id)) continue;
     seen.add(bill.id);
     result.push({

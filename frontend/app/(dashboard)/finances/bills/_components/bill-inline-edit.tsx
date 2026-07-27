@@ -113,6 +113,7 @@ export function AmountPopover({ bill }: AmountPopoverProps) {
   const [open, setOpen] = useState(false);
   const line = bill.line_items[0];
   const [value, setValue] = useState(line ? String(line.amount) : '');
+  const [validationError, setValidationError] = useState<string | null>(null);
   const updateWithLines = useUpdateBillWithLines();
 
   if (bill.id === undefined || !line) return null;
@@ -120,12 +121,19 @@ export function AmountPopover({ bill }: AmountPopoverProps) {
 
   function handleOpenChange(next: boolean) {
     setOpen(next);
-    if (next && line) setValue(String(line.amount));
+    if (next && line) {
+      setValue(String(line.amount));
+      setValidationError(null);
+    }
   }
 
   function handleSave() {
     const amount = Number(value);
-    if (Number.isNaN(amount) || amount <= 0 || !line) return;
+    if (Number.isNaN(amount) || amount <= 0 || !line) {
+      setValidationError('O valor deve ser maior que zero');
+      return;
+    }
+    setValidationError(null);
     updateWithLines.mutate(
       {
         bill_id: billId,
@@ -170,6 +178,7 @@ export function AmountPopover({ bill }: AmountPopoverProps) {
             onChange={(e) => setValue(e.target.value)}
           />
         </div>
+        {validationError && <p className="text-sm text-destructive">{validationError}</p>}
         <div className="flex justify-end gap-2">
           <Button type="button" size="sm" onClick={handleSave} disabled={updateWithLines.isPending}>
             Salvar

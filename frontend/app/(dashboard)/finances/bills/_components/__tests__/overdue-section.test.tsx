@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { createMockBill } from '@/tests/mocks/data/finances';
+import { createMockBill, createMockMonthBoard } from '@/tests/mocks/data/finances';
 import { billSchema, type Bill } from '@/lib/schemas/finances/bill.schema';
+import { monthBoardSchema } from '@/lib/schemas/finances/month-board.schema';
 import { buildBillColumns } from '../bill-columns';
-import { daysLate, OverdueSection } from '../overdue-section';
+import { daysLate, OverdueSection, toConsolidableBills } from '../overdue-section';
 
 // Reuses the same column builder as the accordion body (DRY — S74 constraint). Actions are
 // irrelevant here; only Descrição/Total/etc. matter for these assertions.
@@ -112,5 +113,60 @@ describe('OverdueSection', () => {
     expect(screen.getAllByText('Adiada').length).toBeGreaterThan(0);
     // Explanatory text making clear these values are outside the month totals.
     expect(screen.getByText(/não entram nos totais do mês/)).toBeInTheDocument();
+  });
+});
+
+describe('toConsolidableBills', () => {
+  const account = {
+    id: 3,
+    name: 'Água 836',
+    account_type: 'water' as const,
+    external_identifier: 'UC-1',
+    default_due_day: 10,
+    expected_amount: '0.00',
+    lifecycle_state: 'active' as const,
+  };
+
+  it('excludes bills that are already settled (amount_remaining <= 0) or canceled, keeping only open debt of the account (review round 1)', () => {
+    const board = monthBoardSchema.parse(
+      createMockMonthBoard({
+        deferred_suspended: [
+          createMockBill({
+            id: 1,
+            description: 'Já quitada',
+            lifecycle_state: 'suspended',
+            amount_total: '200.00',
+            amount_paid: '200.00',
+            amount_remaining: '0.00',
+            billing_account: account,
+          }),
+          createMockBill({
+            id: 2,
+            description: 'Em aberto',
+            lifecycle_state: 'suspended',
+            amount_total: '300.00',
+            amount_paid: '0.00',
+            amount_remaining: '300.00',
+            billing_account: account,
+          }),
+          createMockBill({
+            id: 3,
+            description: 'Cancelada',
+            lifecycle_state: 'canceled',
+            amount_total: '150.00',
+            amount_paid: '0.00',
+            amount_remaining: '150.00',
+            billing_account: account,
+          }),
+        ],
+        groups: [],
+      })
+    );
+
+    const result = toConsolidableBills(board, 3);
+
+    expect(result).toHaveLength(1);
+    expect(result[0]?.bill_id).toBe(2);
+    expect(result[0]?.description).toBe('Em aberto');
   });
 });

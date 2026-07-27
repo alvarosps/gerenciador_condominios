@@ -189,4 +189,22 @@ describe('AmountPopover', () => {
 
     await waitForQueriesToSettle(queryClient);
   });
+
+  it('shows a PT validation message and never submits when the value is zero or invalid (review round 1 minor)', async () => {
+    const updateBodies = spyUpdateWithLines();
+    const bill = createMockBill({
+      id: 7,
+      line_items: [createMockBillLineItem({ id: 1 })],
+    }) as unknown as Bill;
+
+    renderWithProviders(<AmountPopover bill={bill} />);
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    await user.click(screen.getByRole('button', { name: /editar valor/i }));
+
+    fireEvent.change(screen.getByLabelText(/novo valor/i), { target: { value: '0' } });
+    await user.click(screen.getByRole('button', { name: /^salvar$/i }));
+
+    expect(await screen.findByText(/o valor deve ser maior que zero/i)).toBeInTheDocument();
+    expect(updateBodies).toHaveLength(0);
+  });
 });
