@@ -44,11 +44,13 @@ from finances.models import (
     Reserve,
     ReserveMovement,
     ReserveMovementKind,
+    ThirdPartySettlement,
     WaterBillStatement,
 )
 from finances.money import money_str
 
 _ERR_DUPLICATE_BILLING_ACCOUNT = "Já existe uma conta ativa com este prédio, tipo e inscrição/UC."
+_ERR_SETTLEMENT_AMOUNT_NON_POSITIVE = "O valor do acerto deve ser positivo."
 
 
 def _apply_default_condominium(instance: object, attrs: dict[str, object]) -> None:
@@ -314,6 +316,16 @@ class BillSerializer(serializers.ModelSerializer):
         required=False,
         allow_null=True,
     )
+    # S80 §3b: the cockpit badge (and month_board, which serializes through this class) needs the
+    # purchase's payer. Meta.fields is an explicit allowlist, so it only exists if listed there.
+    paid_by_person = PersonSimpleSerializer(read_only=True)
+    paid_by_person_id = serializers.PrimaryKeyRelatedField(
+        queryset=Person.objects.all(),
+        source="paid_by_person",
+        write_only=True,
+        required=False,
+        allow_null=True,
+    )
     line_items = BillLineItemSerializer(many=True, read_only=True)
     water_statement = serializers.SerializerMethodField()
     electricity_statement = serializers.SerializerMethodField()
@@ -342,6 +354,8 @@ class BillSerializer(serializers.ModelSerializer):
             "behavior",
             "billing_account",
             "billing_account_id",
+            "paid_by_person",
+            "paid_by_person_id",
             "lifecycle_state",
             "notes",
             "line_items",
@@ -818,3 +832,47 @@ class CondoMonthCloseSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = fields
+
+
+class ThirdPartySettlementSerializer(serializers.ModelSerializer):
+    """Acerto com um terceiro (design §4.4). person is MANDATORY — a settlement with nobody
+    on the other side does not exist (unlike Employee.person, which is optional)."""
+
+    condominium = CondominiumSimpleSerializer(read_only=True)
+    condominium_id = serializers.PrimaryKeyRelatedField(
+        queryset=Condominium.objects.all(),
+        source="condominium",
+        write_only=True,
+        required=False,
+    )
+    person = PersonSimpleSerializer(read_only=True)
+    person_id = serializers.PrimaryKeyRelatedField(
+        queryset=Person.objects.all(), source="person", write_only=True
+    )
+
+    class Meta:
+        model = ThirdPartySettlement
+        fields = [
+            "id",
+            "condominium",
+            "condominium_id",
+            "person",
+            "person_id",
+            "settlement_date",
+            "amount",
+            "method",
+            "notes",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "created_at", "updated_at"]
+
+    def validate(self, attrs: dict[str, object]) -> dict[str, object]:
+        # The Acerto form never sends condominium_id (invisible singleton), so default it here.
+        _apply_default_condominium(self.instance, attrs)
+        # DRF skips Model.clean(); mirror ThirdPartySettlement.clean()'s positive-amount rule so
+        # the API returns a 400 instead of a 500 on the CheckConstraint. Single source: the model.
+        amount = cast("Decimal | None", attrs.get("amount", getattr(self.instance, "amount", None)))
+        if amount is not None and amount <= 0:
+            raise serializers.ValidationError({"amount": _ERR_SETTLEMENT_AMOUNT_NON_POSITIVE})
+        return attrs

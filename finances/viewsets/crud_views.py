@@ -25,6 +25,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.serializers import BaseSerializer
 
+from core.models import Building, Condominium, Person
 from core.pagination import CustomPageNumberPagination
 from core.permissions import IsAdminUser
 from core.services.timezone import today_sp
@@ -42,6 +43,7 @@ from finances.models import (
     Payment,
     Reserve,
     ReserveMovement,
+    ThirdPartySettlement,
 )
 from finances.serializers import (
     BillingAccountSerializer,
@@ -54,6 +56,7 @@ from finances.serializers import (
     PaymentSerializer,
     ReserveMovementSerializer,
     ReserveSerializer,
+    ThirdPartySettlementSerializer,
 )
 from finances.services.account_statement_service import AccountStatementService
 from finances.services.bill_generation_service import BillGenerationService
@@ -72,6 +75,12 @@ from finances.services.invoice_draft_service import InvoiceDraftService
 from finances.services.invoice_parsing.base import ParsedInvoice
 from finances.services.invoice_parsing.registry import detect_and_parse
 from finances.services.reserve_service import ReserveService
+from finances.services.third_party_purchase_service import (
+    PurchaseDraft,
+    ThirdPartyPurchaseService,
+)
+from finances.services.third_party_settlement_service import ThirdPartySettlementService
+from finances.services.third_party_statement_service import ThirdPartyStatementService
 from finances.viewsets.query_params import int_param
 
 MONTHS_IN_YEAR = 12
@@ -93,6 +102,12 @@ def _parse_year_month(data: dict[str, object]) -> tuple[int, int]:
     return year, month
 
 
+_THIRD_PARTY_NEEDS_PERSON = "Pagamento de terceiro exige a pessoa que pagou (paid_by_person_id)."
+_UNKNOWN_PERSON = "Pessoa não encontrada."
+_UNKNOWN_CATEGORY = "Categoria não encontrada."
+_UNKNOWN_BUILDING = "Prédio não encontrado."
+
+
 def _validated_funded_from(raw: object) -> str:
     """funded_from coerced to a known FundedFrom value; raise ValueError (-> 400) otherwise.
 
@@ -104,6 +119,36 @@ def _validated_funded_from(raw: object) -> str:
     if value not in FundedFrom.values:
         raise ValueError
     return value
+
+
+def _validated_funding(data: dict[str, object] | QueryDict) -> tuple[str, Person | None]:
+    """Resolve (funded_from, paid_by) together — the single validation point for BOTH pay and
+    bulk_pay (S80 §4).
+
+    bulk_pay must go through here too: skipping it would leave an escape hatch for creating a
+    third-party payment with no person attached, and the debt would belong to nobody. One
+    paid_by_person_id applies to EVERY bill in a bulk_pay — assigning a whole month's bills to
+    the same card is the desired behavior (design §7).
+    """
+    funded_from = _validated_funded_from(data.get("funded_from", "caixa"))
+    raw_person = data.get("paid_by_person_id")
+    if funded_from == FundedFrom.THIRD_PARTY.value and raw_person is None:
+        raise ValidationError(_THIRD_PARTY_NEEDS_PERSON)
+    if raw_person is None:
+        return funded_from, None
+    return funded_from, _person_or_400(raw_person)
+
+
+def _person_or_400(raw: object) -> Person:
+    """Resolve a Person by pk; a missing/non-numeric id is a PT 400, never a 500."""
+    try:
+        person_id = int(cast(str, raw))
+    except (TypeError, ValueError) as exc:
+        raise ValidationError(_UNKNOWN_PERSON) from exc
+    person = Person.objects.filter(pk=person_id).first()
+    if person is None:
+        raise ValidationError(_UNKNOWN_PERSON)
+    return person
 
 
 _NEW_TOTAL_INVALID = "Valor inválido: use no máximo 2 casas decimais."
@@ -501,13 +546,14 @@ class BillViewSet(viewsets.ModelViewSet):
             amount_raw = request.data.get("amount")
             amount = Decimal(str(amount_raw)) if amount_raw is not None else None
             new_total = _parse_new_total(request.data.get("new_total"))
-            funded_from = _validated_funded_from(request.data.get("funded_from", "caixa"))
+            funded_from, paid_by = _validated_funding(request.data)
             BillPaymentService.pay(
                 bill,
                 payment_date,
                 amount,
                 funded_from,
                 new_total=new_total,
+                paid_by=paid_by,
                 user=cast(User, request.user),
             )
         except ValueError, InvalidOperation:
@@ -529,13 +575,15 @@ class BillViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         try:
-            funded_from = _validated_funded_from(request.data.get("funded_from", "caixa"))
+            funded_from, paid_by = _validated_funding(request.data)
             payment_date = date.fromisoformat(str(payment_date_raw))
         except ValueError, InvalidOperation:
             return Response(
                 {"error": "Data ou forma de pagamento inválida."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        except ValidationError as exc:
+            return Response({"error": str(exc.messages[0])}, status=status.HTTP_400_BAD_REQUEST)
         bills = list(Bill.objects.filter(pk__in=bill_ids))
         if len(bills) != len(bill_ids):
             return Response(
@@ -546,11 +594,113 @@ class BillViewSet(viewsets.ModelViewSet):
             with transaction.atomic():
                 for bill in bills:
                     BillPaymentService.pay(
-                        bill, payment_date, None, funded_from, user=cast(User, request.user)
+                        bill,
+                        payment_date,
+                        None,
+                        funded_from,
+                        paid_by=paid_by,
+                        user=cast(User, request.user),
                     )
         except ValidationError as exc:
             return Response({"error": str(exc.messages[0])}, status=status.HTTP_400_BAD_REQUEST)
         return Response([self._serialized_bill(bill) for bill in bills], status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["post"])
+    def create_purchase(self, request: Request) -> Response:
+        """Third-party purchase: N Bills + N Payments, born paid, in ONE transaction (§4.5).
+
+        Returns the list of created bills (one element for a plain purchase, N for a parcelada) so
+        the client never has to guess how many rows a submission produced.
+        """
+        try:
+            person = _person_or_400(request.data.get("person_id"))
+            amount = Decimal(str(request.data.get("amount")))
+            competence_month = date.fromisoformat(str(request.data.get("competence_month")))
+            due_date = date.fromisoformat(str(request.data.get("due_date")))
+            installment_count = int(request.data.get("installment_count", 1))
+            category = self._optional_category(request.data.get("category_id"))
+            building = self._optional_building(request.data.get("building_id"))
+        except ValueError, InvalidOperation, TypeError:
+            return Response(
+                {"error": "Payload inválido: verifique pessoa, valor, competência e vencimento."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except ValidationError as exc:
+            return Response({"error": str(exc.messages[0])}, status=status.HTTP_400_BAD_REQUEST)
+        description = str(request.data.get("description", "")).strip()
+        if not description:
+            return Response(
+                {"error": "Campo description é obrigatório."}, status=status.HTTP_400_BAD_REQUEST
+            )
+        condominium = Condominium.get_default()
+        if condominium is None:
+            return Response(
+                {"error": Condominium.NOT_CONFIGURED_MESSAGE}, status=status.HTTP_400_BAD_REQUEST
+            )
+        try:
+            bills = ThirdPartyPurchaseService.create_purchase(
+                PurchaseDraft(
+                    condominium=condominium,
+                    person=person,
+                    description=description,
+                    amount=amount,
+                    competence_month=competence_month,
+                    due_date=due_date,
+                    category=category,
+                    building=building,
+                    installment_count=installment_count,
+                ),
+                user=cast(User, request.user),
+            )
+        except ValidationError as exc:
+            return Response({"error": str(exc.messages[0])}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            [self._serialized_bill(bill) for bill in bills], status=status.HTTP_201_CREATED
+        )
+
+    @action(detail=True, methods=["delete"])
+    def delete_purchase(self, request: Request, pk: str | None = None) -> Response:
+        """The ONLY way to undo a third-party purchase (§4.3.1) — Bill + Payment, atomically.
+
+        The ordinary delete/cancel routes reject a purchase (assert_not_paid: it is born paid) and
+        unpay rejects its payment, so without this action a mistyped purchase would be permanent.
+        """
+        bill = self.get_object()
+        try:
+            ThirdPartyPurchaseService.delete_purchase(bill, user=cast(User, request.user))
+        except ValidationError as exc:
+            return Response({"error": str(exc.messages[0])}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=True, methods=["post"])
+    def reassign_payer(self, request: Request, pk: str | None = None) -> Response:
+        """Fix a wrong payer on BOTH sides — Bill.paid_by_person and Payment.paid_by (§4.3.1)."""
+        bill = self.get_object()
+        try:
+            person = _person_or_400(request.data.get("paid_by_person_id"))
+            ThirdPartyPurchaseService.reassign_payer(bill, person, user=cast(User, request.user))
+        except ValidationError as exc:
+            return Response({"error": str(exc.messages[0])}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(self._serialized_bill(bill), status=status.HTTP_200_OK)
+
+    @staticmethod
+    def _optional_category(raw: object) -> Category | None:
+        """Resolve an optional category id; an unknown id is a PT 400, never a silent None."""
+        if raw is None:
+            return None
+        category = Category.objects.filter(pk=int(cast(str, raw))).first()
+        if category is None:
+            raise ValidationError(_UNKNOWN_CATEGORY)
+        return category
+
+    @staticmethod
+    def _optional_building(raw: object) -> Building | None:
+        if raw is None:
+            return None
+        building = Building.objects.filter(pk=int(cast(str, raw))).first()
+        if building is None:
+            raise ValidationError(_UNKNOWN_BUILDING)
+        return building
 
     def _transition(self, state: str) -> Response:
         bill = self.get_object()
@@ -1000,3 +1150,107 @@ class CondoMonthCloseViewSet(viewsets.ReadOnlyModelViewSet):
     @action(detail=False, methods=["post"])
     def reopen(self, request: Request) -> Response:
         return self._close_action(request, CondoMonthCloseService.reopen)
+
+
+class ThirdPartySettlementViewSet(viewsets.ModelViewSet):
+    """Acertos com terceiros — NEVER a bare ModelViewSet write path (design §4.4 / S80 §4c).
+
+    A settlement is real cash leaving the condominium, and CondoMonthClose.cash_balance_end is
+    frozen, so create/update/DELETE all route through ThirdPartySettlementService, which asserts
+    the settlement month is open (an update guards the OLD month too). Skipping any of the three
+    would silently corrupt a closed month's snapshot — the same bug class already fixed for
+    payments (B3).
+    """
+
+    serializer_class = ThirdPartySettlementSerializer
+    permission_classes = [IsAdminUser]
+    pagination_class = CustomPageNumberPagination
+
+    def get_queryset(self) -> QuerySet[ThirdPartySettlement]:
+        queryset = ThirdPartySettlement.objects.select_related("condominium", "person")
+        params = self.request.query_params
+        person_id = int_param(params, "person_id")
+        if person_id is not None:
+            queryset = queryset.filter(person_id=person_id)
+        date_from = params.get("date_from")
+        if date_from is not None:
+            queryset = queryset.filter(settlement_date__gte=date_from)
+        date_to = params.get("date_to")
+        if date_to is not None:
+            queryset = queryset.filter(settlement_date__lte=date_to)
+        return queryset
+
+    def perform_create(self, serializer: BaseSerializer[ThirdPartySettlement]) -> None:
+        settlement = ThirdPartySettlement(**serializer.validated_data)
+        ThirdPartySettlementService.create(settlement, user=cast(User, self.request.user))
+        serializer.instance = settlement
+
+    def perform_update(self, serializer: BaseSerializer[ThirdPartySettlement]) -> None:
+        settlement = cast(ThirdPartySettlement, serializer.instance)
+        previous_date = settlement.settlement_date
+        for field, value in serializer.validated_data.items():
+            setattr(settlement, field, value)
+        ThirdPartySettlementService.update(
+            settlement, previous_date, user=cast(User, self.request.user)
+        )
+
+    def perform_destroy(self, instance: ThirdPartySettlement) -> None:
+        ThirdPartySettlementService.delete(instance, user=cast(User, self.request.user))
+
+
+class ThirdPartyViewSet(viewsets.ViewSet):
+    """Read-only third-party index + per-person statement (design §7).
+
+    NOT cached, deliberately: both actions depend on today_sp() (which month counts as overdue),
+    and a midnight rollover is not a write, so a cache would never invalidate — same reasoning as
+    month_board and AccountStatementService.
+    """
+
+    permission_classes = [IsAdminUser]
+
+    @action(detail=False, methods=["get"])
+    def people(self, request: Request) -> Response:
+        today = today_sp()
+        rows = [
+            row
+            for person_id, person_name in Person.objects.order_by("id").values_list("id", "name")
+            if (row := _third_party_row(person_id, person_name, today)) is not None
+        ]
+        rows.sort(key=lambda row: Decimal(cast(str, row["total_em_aberto"])), reverse=True)
+        return Response(rows, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["get"])
+    def statement(self, request: Request) -> Response:
+        raw_person_id = request.query_params.get("person_id")
+        try:
+            person = _person_or_400(raw_person_id)
+        except ValidationError as exc:
+            return Response({"error": str(exc.messages[0])}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            ThirdPartyStatementService.build(person.pk, today_sp()), status=status.HTTP_200_OK
+        )
+
+
+def _third_party_row(person_id: int, person_name: str, today: date) -> dict[str, object] | None:
+    """One index row, or None when the person owes nothing live (design §7).
+
+    Built on ThirdPartyStatementService so the index and the statement can never disagree — the
+    open/overdue totals shown on the card are literally the ones the extrato computes.
+    """
+    statement = ThirdPartyStatementService.build(person_id, today)
+    totals = statement["totals"]
+    if Decimal(totals["total_em_aberto"]) <= 0:
+        return None
+    last_settlement = (
+        ThirdPartySettlement.objects.filter(person_id=person_id)
+        .order_by("-settlement_date")
+        .values_list("settlement_date", flat=True)
+        .first()
+    )
+    return {
+        "person_id": person_id,
+        "person_name": person_name,
+        "total_em_aberto": totals["total_em_aberto"],
+        "total_atrasado": totals["total_atrasado"],
+        "last_settlement_date": last_settlement,
+    }

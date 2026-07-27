@@ -53,6 +53,10 @@ _ERR_BILL_ALREADY_EXISTS = (
 # The Bill partial unique (is_deleted=False, NOT lifecycle-filtered): full_clean() reports its
 # violation under this constraint name, so the raw message is mapped to the PT one below.
 _ACCOUNT_MONTH_CONSTRAINT = "unique_active_bill_per_account_month"
+# S77 made billing_account/installment/employee mutually exclusive (Bill.clean). billing_account is
+# an editable header field, so setting it on a parcela bill now trips that rule and surfaces the
+# generic multi-source message — useless to the user. Rejected up front with a specific one (§3c).
+_ERR_INSTALLMENT_ACCOUNT_CHANGE = "Não é possível trocar a conta de cobrança de uma parcela."
 
 _STATEMENT_MODEL_BY_TYPE: dict[str, type[WaterBillStatement | ElectricityBillStatement]] = {
     BillingAccountType.WATER: WaterBillStatement,
@@ -266,10 +270,20 @@ class BillService:
         competence_month is immutable (the (billing_account, competence_month) identity is fixed
         once a bill exists), so it is never written here — only the _EDITABLE_HEADER_FIELDS the
         serializer validated. full_clean() re-runs the model invariants before the save.
+
+        Attaching a billing_account to a bill that already carries an ``installment`` is rejected
+        here with a dedicated PT message (§3c): full_clean() would reject it anyway via S77's
+        source-exclusivity rule, but under the generic "no máximo uma origem" text.
         """
         changed = [field for field in header if field in _EDITABLE_HEADER_FIELDS]
         if not changed:
             return
+        if (
+            "billing_account" in changed
+            and header["billing_account"] is not None
+            and bill.installment_id is not None
+        ):
+            raise ValidationError(_ERR_INSTALLMENT_ACCOUNT_CHANGE)
         for field in changed:
             setattr(bill, field, header[field])
         bill.updated_by = user

@@ -8,6 +8,8 @@ from finances.viewsets.crud_views import (
     PaymentViewSet,
     ReserveMovementViewSet,
     ReserveViewSet,
+    ThirdPartySettlementViewSet,
+    ThirdPartyViewSet,
 )
 from finances.viewsets.dashboard_views import FinanceCashFlowViewSet, FinanceDashboardViewSet
 from finances.viewsets.installment_payroll_views import (
@@ -31,4 +33,6 @@ __all__ = [
     "PaymentViewSet",
     "ReserveMovementViewSet",
     "ReserveViewSet",
+    "ThirdPartySettlementViewSet",
+    "ThirdPartyViewSet",
 ]

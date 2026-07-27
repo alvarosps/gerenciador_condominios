@@ -348,12 +348,16 @@ class BillQuerySet(models.QuerySet["Bill"]):
         Covers the line-item category (BillLineItemSerializer nests CategorySerializer), the
         installment→plan→billing_account chain (get_account_type) and the directly-linked FKs.
         Shared by BillViewSet.get_queryset and the dashboard ``overdue`` queryset (design §4).
+
+        ``paid_by_person`` is here for the same reason (S80 §3b): BillSerializer nests it, so the
+        cockpit's month_board would issue one extra query per third-party purchase without it.
         """
         return self.select_related(
             "building",
             "category",
             "billing_account",
             "condominium",
+            "paid_by_person",
             "water_statement",
             "electricity_statement",
             "installment__plan__billing_account",

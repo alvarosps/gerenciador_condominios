@@ -25,8 +25,11 @@ from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.db import transaction
 
+from core.models import Person
 from core.services.timezone import today_sp
 from finances.models import (
+    ERR_PERSON_ONLY_THIRD_PARTY,
+    ERR_THIRD_PARTY_NEEDS_PERSON,
     Bill,
     BillLifecycleState,
     BillLineItem,
@@ -57,6 +60,12 @@ _ESTIMATED_MULTIPLE_LINES = "A conta estimada tem mais de uma linha — edite a 
 _NEW_TOTAL_BELOW_INSTALLMENTS = "O novo total é menor que a soma das parcelas embutidas da conta."
 _NEW_TOTAL_BELOW_TOTAL = "Edite a conta para reduzir o valor."
 _SURCHARGE_DESCRIPTION = "Juros/multa"
+# S80 §4b: a third-party purchase is born paid, so reversing its payment would leave the Bill
+# ACTIVE and unpaid — a "conta a pagar do caixa" in the cockpit while the person's statement
+# still charges the debt. The same money twice. delete_purchase is the only correction path.
+ERR_UNPAY_THIRD_PARTY_PURCHASE = (
+    "Uma compra de terceiro não pode ter o pagamento desfeito — exclua a compra."
+)
 
 
 class BillPaymentService:
@@ -69,6 +78,7 @@ class BillPaymentService:
         amount: Decimal | None = None,
         funded_from: str = FundedFrom.CAIXA,
         new_total: Decimal | None = None,
+        paid_by: Person | None = None,
         user: User | None = None,
     ) -> Payment:
         """Pay a Bill (partial or total). Σ(allocation) == payment.amount; over-allocation rejected.
@@ -89,7 +99,16 @@ class BillPaymentService:
         so amount=None defaults to the adjusted remaining and a bad amount rolls the adjustment
         back with everything else (atomic). Installment-linked lines (BillLineItem.installment
         set) are never touched by the adjustment, in any branch.
+
+        paid_by (S80) is the person who funded the payment out of her own pocket. Its position in
+        the signature (after new_total, before user) is load-bearing: the production callers pass
+        bill/payment_date/amount/funded_from positionally. Payment.objects.create() skips
+        full_clean(), so the S77 invariant (THIRD_PARTY needs a person, any other funding forbids
+        one) is enforced HERE, before the row is written. funded_from=THIRD_PARTY debits neither
+        the reserve nor the cash — the money came from the person, and only the settlement that
+        repays her leaves the condominium (design §5).
         """
+        BillPaymentService._assert_paid_by_matches_funding(funded_from, paid_by)
         CondoMonthCloseService.assert_open(bill.competence_month)
         CondoMonthCloseService.assert_open(payment_date.replace(day=1))
         if bill.lifecycle_state != BillLifecycleState.ACTIVE:
@@ -113,6 +132,7 @@ class BillPaymentService:
                 payment_date=payment_date,
                 amount=amount,
                 funded_from=funded_from,
+                paid_by=paid_by,
                 created_by=user,
                 updated_by=user,
             )
@@ -144,7 +164,13 @@ class BillPaymentService:
         reverse a sibling payment's movement). Rejected on a closed competence month OR a closed
         cash month (payment_date) — B3: reversing a payment made in a now-closed cash month would
         change that month's frozen cash_balance_end (assert_open).
+
+        Also rejected (S80 §4b) when any allocated bill is a third-party purchase: the purchase is
+        born paid, so reversing the payment would leave the Bill active-and-unpaid in the cockpit
+        while the person's statement keeps charging the debt. Use
+        ThirdPartyPurchaseService.delete_purchase, which removes both sides atomically.
         """
+        BillPaymentService._assert_reversible(payment)
         with transaction.atomic():
             CondoMonthCloseService.assert_open(payment.payment_date.replace(day=1))
             for allocation in payment.allocations.all():
@@ -154,6 +180,43 @@ class BillPaymentService:
                 movement.delete(deleted_by=user)
             payment.delete(deleted_by=user)
             logger.info("Payment %s reversed", payment.pk)
+
+    @staticmethod
+    def reverse_purchase_payment(payment: Payment, user: User | None = None) -> None:
+        """Internal reversal used ONLY by ThirdPartyPurchaseService.delete_purchase (S80 §4b).
+
+        Same mechanics as unpay (soft-delete allocations + payment) minus the third-party
+        rejection, because here the Bill is being deleted in the SAME transaction — the "active
+        and unpaid" state unpay() protects against never materializes. The closed-month guards
+        still apply; the caller runs them first so nothing is written on a frozen month.
+        """
+        CondoMonthCloseService.assert_open(payment.payment_date.replace(day=1))
+        for allocation in payment.allocations.all():
+            CondoMonthCloseService.assert_open(allocation.bill.competence_month)
+            allocation.delete(deleted_by=user)
+        payment.delete(deleted_by=user)
+
+    @staticmethod
+    def _assert_reversible(payment: Payment) -> None:
+        """Reject reversing a payment that settles a third-party purchase (S80 §4b)."""
+        is_purchase_payment = payment.allocations.filter(
+            bill__paid_by_person__isnull=False
+        ).exists()
+        if is_purchase_payment:
+            raise ValidationError(ERR_UNPAY_THIRD_PARTY_PURCHASE)
+
+    @staticmethod
+    def _assert_paid_by_matches_funding(funded_from: str, paid_by: Person | None) -> None:
+        """Mirror Payment.clean()'s third-party invariant before Payment.objects.create().
+
+        create() skips full_clean(), so without this the model rule would not protect this path
+        at all. The messages are imported from finances.models (single source, S77).
+        """
+        is_third_party = funded_from == FundedFrom.THIRD_PARTY.value
+        if is_third_party and paid_by is None:
+            raise ValidationError(ERR_THIRD_PARTY_NEEDS_PERSON)
+        if not is_third_party and paid_by is not None:
+            raise ValidationError(ERR_PERSON_ONLY_THIRD_PARTY)
 
     @staticmethod
     def _apply_new_total(bill: Bill, new_total: Decimal, user: User | None) -> None:
