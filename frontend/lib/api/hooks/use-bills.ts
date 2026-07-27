@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { apiClient } from '../client';
 import { queryKeys } from '../query-keys';
 import { parseList } from '../parse-list';
@@ -8,6 +9,7 @@ import {
   parsedInvoiceSchema,
 } from '@/lib/schemas/finances/invoice-parse.schema';
 import type { FundedFrom, PaymentStatus } from '@/lib/schemas/finances/category.schema';
+import { getErrorMessage, handleError } from '@/lib/utils/error-handler';
 
 const ENDPOINT = '/finances/bills/';
 
@@ -241,6 +243,12 @@ export function useDeleteBill() {
   });
 }
 
+/**
+ * Generate the month's recurring bills. Both call sites (the always-available header action and
+ * the "faltantes" banner shortcut, S74) share this single mutation instance's success/error
+ * handling — mirrors `useAdvanceMonth`/`useRollbackMonth` (use-month-advance.ts), which also bake
+ * the PT toast into the hook instead of duplicating it at each call site.
+ */
 export function useGenerateMonthBills() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -251,7 +259,14 @@ export function useGenerateMonthBills() {
       );
       return data;
     },
-    onSuccess: () => invalidateBillCaches(queryClient),
+    onSuccess: (result) => {
+      invalidateBillCaches(queryClient);
+      toast.success(`${String(result.created)} conta(s) gerada(s)`);
+    },
+    onError: (error) => {
+      handleError(error, 'Erro ao gerar contas do mês');
+      toast.error(getErrorMessage(error, 'Erro ao gerar contas do mês'));
+    },
   });
 }
 

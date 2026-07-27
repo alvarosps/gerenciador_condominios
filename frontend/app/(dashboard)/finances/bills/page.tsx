@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, FileUp, Plus } from 'lucide-react';
+import { CalendarPlus, ChevronLeft, ChevronRight, FileUp, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import {
@@ -30,7 +30,7 @@ import {
 } from '@/components/ui/select';
 import { DataTable } from '@/components/tables/data-table';
 import { PageHeader } from '@/components/layouts/page-header';
-import { useDeleteBill, useParseInvoice } from '@/lib/api/hooks/use-bills';
+import { useDeleteBill, useGenerateMonthBills, useParseInvoice } from '@/lib/api/hooks/use-bills';
 import { useMonthBoard } from '@/lib/api/hooks/use-month-board';
 import { useAuthStore } from '@/store/auth-store';
 import { handleError } from '@/lib/utils/error-handler';
@@ -82,6 +82,10 @@ export default function BillsPage() {
   const [importDraft, setImportDraft] = useState<ParsedInvoice | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const parseInvoice = useParseInvoice();
+  // Always-available generation path (header action) — shares this mutation's success/error
+  // toast handling (baked into the hook itself, use-bills.ts) with the contextual
+  // GenerateMissingBanner shortcut below, so neither call site duplicates the PT toast logic.
+  const generateMonth = useGenerateMonthBills();
 
   function shiftMonth(delta: number) {
     const base = new Date(period.year, period.month - 1 + delta, 1);
@@ -90,6 +94,10 @@ export default function BillsPage() {
 
   function handleLifecycleFilterChange(value: string) {
     if (isLifecycleFilter(value)) setLifecycleFilter(value);
+  }
+
+  function handleGenerateMonth() {
+    generateMonth.mutate({ year: period.year, month: period.month });
   }
 
   // Single data source (S74): the board already carries the fixed Atrasadas/deferred-suspended
@@ -156,6 +164,14 @@ export default function BillsPage() {
         actions={
           isAdmin && (
             <>
+              <Button
+                variant="outline"
+                onClick={handleGenerateMonth}
+                disabled={generateMonth.isPending}
+              >
+                <CalendarPlus className="mr-2 h-4 w-4" />
+                Gerar contas do mês
+              </Button>
               <input
                 ref={fileInputRef}
                 type="file"

@@ -113,6 +113,7 @@ describe('BillsPage', () => {
 
     expect((await screen.findAllByText('Conta de Luz')).length).toBeGreaterThan(0);
     expect(screen.queryByRole('button', { name: /nova conta/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Gerar contas do mês' })).not.toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: /gerar contas faltantes/i })
     ).not.toBeInTheDocument();
@@ -121,7 +122,7 @@ describe('BillsPage', () => {
     await waitForQueriesToSettle(queryClient);
   });
 
-  it('shows write buttons for admin and generate-missing-banner calls useGenerateMonthBills', async () => {
+  it('shows write buttons (incl. the always-available header action) for admin, and the generate-missing banner calls useGenerateMonthBills', async () => {
     setAdmin(true);
     const calls = spyGenerateMonth();
     setMonthBoard(
@@ -140,6 +141,7 @@ describe('BillsPage', () => {
     const { queryClient } = renderWithProviders(<BillsPage />);
 
     expect(await screen.findByRole('button', { name: /nova conta/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Gerar contas do mês' })).toBeInTheDocument();
     await userEvent.click(
       await screen.findByRole('button', { name: 'Gerar contas faltantes (1)' })
     );

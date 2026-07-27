@@ -347,6 +347,88 @@ describe('BillsPage — month board structure', () => {
   });
 });
 
+describe('BillsPage — "Gerar contas do mês" header action (always-available path)', () => {
+  beforeEach(() => {
+    setIptuAlerts();
+    setBillingAccounts([]);
+  });
+
+  it('shows the header action for admin users', async () => {
+    setAdmin(true);
+    setMonthBoard(createMockMonthBoard({ generation: { missing_count: 0 } }));
+
+    const { queryClient } = renderWithProviders(<BillsPage />);
+
+    expect(await screen.findByRole('button', { name: 'Gerar contas do mês' })).toBeInTheDocument();
+
+    await waitForQueriesToSettle(queryClient);
+  });
+
+  it('hides the header action for non-admin users', async () => {
+    setAdmin(false);
+    setMonthBoard(createMockMonthBoard({ generation: { missing_count: 0 } }));
+
+    const { queryClient } = renderWithProviders(<BillsPage />);
+    await screen.findAllByText('Conta de Luz');
+
+    expect(screen.queryByRole('button', { name: 'Gerar contas do mês' })).not.toBeInTheDocument();
+
+    await waitForQueriesToSettle(queryClient);
+  });
+
+  it('is available even when missing_count is 0 (unlike the contextual banner)', async () => {
+    setAdmin(true);
+    setMonthBoard(createMockMonthBoard({ generation: { missing_count: 0 } }));
+
+    const { queryClient } = renderWithProviders(<BillsPage />);
+
+    expect(await screen.findByRole('button', { name: 'Gerar contas do mês' })).toBeInTheDocument();
+    // The contextual banner stays hidden — the header action is the always-available path.
+    expect(
+      screen.queryByRole('button', { name: /Gerar contas faltantes/ })
+    ).not.toBeInTheDocument();
+
+    await waitForQueriesToSettle(queryClient);
+  });
+
+  it("clicking it posts generate_month with the selected month's {year, month}", async () => {
+    setAdmin(true);
+    setMonthBoard(createMockMonthBoard({ generation: { missing_count: 0 } }));
+    const calls = spyGenerateMonth({ created: 3, bills: [] });
+
+    const { queryClient } = renderWithProviders(<BillsPage />);
+    const button = await screen.findByRole('button', { name: 'Gerar contas do mês' });
+    await userEvent.click(await screen.findByRole('button', { name: 'Mês anterior' }));
+    await userEvent.click(button);
+
+    await waitFor(() => expect(calls).toHaveLength(1));
+    const prev = new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1);
+    expect(calls[0]).toMatchObject({ year: prev.getFullYear(), month: prev.getMonth() + 1 });
+
+    await waitForQueriesToSettle(queryClient);
+  });
+
+  it('shows the backend PT message on a 400 closed-month error from the header action', async () => {
+    setAdmin(true);
+    setMonthBoard(createMockMonthBoard({ generation: { missing_count: 0 } }));
+    server.use(
+      http.post(`${API_BASE}/finances/bills/generate_month/`, () =>
+        HttpResponse.json({ detail: 'Competência 06/2026 está fechada.' }, { status: 400 })
+      )
+    );
+
+    const { queryClient } = renderWithProviders(<BillsPage />);
+    const button = await screen.findByRole('button', { name: 'Gerar contas do mês' });
+    await userEvent.click(button);
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith('Competência 06/2026 está fechada.')
+    );
+
+    await waitForQueriesToSettle(queryClient);
+  });
+});
+
 describe('BillsPage — estimate badges via month board (Descrição column)', () => {
   beforeEach(() => {
     setAdmin(true);

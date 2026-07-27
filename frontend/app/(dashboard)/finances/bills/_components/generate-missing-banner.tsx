@@ -1,11 +1,9 @@
 'use client';
 
 import { CalendarPlus } from 'lucide-react';
-import { toast } from 'sonner';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { useGenerateMonthBills } from '@/lib/api/hooks/use-bills';
-import { getErrorMessage, handleError } from '@/lib/utils/error-handler';
 import { formatMonthYear } from '@/lib/utils/formatters';
 
 interface GenerateMissingBannerProps {
@@ -16,9 +14,11 @@ interface GenerateMissingBannerProps {
 
 /**
  * Actionable banner shown when `month_board.generation.missing_count > 0` (S66): recurring
- * accounts eligible for the competence with no bill generated yet. Renders null at 0 (S74
- * contract). A 400 from a closed month shows the backend's PT message via toast (no link — that
- * is S76's preflight/actionable-toast work).
+ * accounts eligible for the competence with no bill generated yet — the contextual shortcut.
+ * Renders null at 0 (S74 contract). The always-available path is the "Gerar contas do mês" action
+ * in the page header (`page.tsx`) — both share the same `useGenerateMonthBills` mutation instance
+ * per call site, whose success/error toast (PT, backend message on 400 closed-month) lives in the
+ * hook itself (no link yet — that is S76's preflight/actionable-toast work).
  */
 export function GenerateMissingBanner({ missingCount, year, month }: GenerateMissingBannerProps) {
   const generateMonth = useGenerateMonthBills();
@@ -28,18 +28,7 @@ export function GenerateMissingBanner({ missingCount, year, month }: GenerateMis
   }
 
   function handleGenerate() {
-    generateMonth.mutate(
-      { year, month },
-      {
-        onSuccess: (result) => {
-          toast.success(`${String(result.created)} conta(s) gerada(s)`);
-        },
-        onError: (error) => {
-          handleError(error, 'Erro ao gerar contas do mês');
-          toast.error(getErrorMessage(error, 'Erro ao gerar contas do mês'));
-        },
-      }
-    );
+    generateMonth.mutate({ year, month });
   }
 
   return (
