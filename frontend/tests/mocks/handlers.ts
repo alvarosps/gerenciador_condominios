@@ -2383,7 +2383,7 @@ const financeHandlers = [
     if (!bill) return new HttpResponse(null, { status: 404 });
     return HttpResponse.json(bill);
   }),
-  http.put(`${API_BASE}/finances/bills/:id/`, async ({ params, request }) => {
+  http.patch(`${API_BASE}/finances/bills/:id/`, async ({ params, request }) => {
     await delay(100);
     const id = Number(params.id);
     const data = (await request.json()) as Partial<(typeof financeBills)[0]>;

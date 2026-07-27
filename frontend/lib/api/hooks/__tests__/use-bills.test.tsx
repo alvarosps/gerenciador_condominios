@@ -156,10 +156,10 @@ describe('bill mutations', () => {
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['finances', 'overdue-bills'] });
   });
 
-  it('updates a bill, stripping nested read-only objects', async () => {
+  it('updates a bill via PATCH, stripping nested read-only objects', async () => {
     let sentBody: Record<string, unknown> | null = null;
     server.use(
-      http.put(`${API_BASE}/finances/bills/:id/`, async ({ request }) => {
+      http.patch(`${API_BASE}/finances/bills/:id/`, async ({ request }) => {
         sentBody = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json({ id: 1, ...sentBody });
       })

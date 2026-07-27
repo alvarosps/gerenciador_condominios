@@ -12,6 +12,7 @@ const columns = buildBillColumns({
   onEdit: () => undefined,
   onPay: () => undefined,
   onDelete: () => undefined,
+  onImportInvoice: () => undefined,
 });
 
 // createMockBill returns the raw (z.input) shape used by MSW factories — components consume the
@@ -33,7 +34,13 @@ describe('daysLate', () => {
 describe('OverdueSection', () => {
   it('returns null when both lists are empty', () => {
     const { container } = render(
-      <OverdueSection overdue={[]} deferredSuspended={[]} columns={columns} overdueTotal="0.00" />
+      <OverdueSection
+        overdue={[]}
+        deferredSuspended={[]}
+        columns={columns}
+        overdueTotal="0.00"
+        onConsolidate={() => undefined}
+      />
     );
     expect(container).toBeEmptyDOMElement();
   });
@@ -45,6 +52,7 @@ describe('OverdueSection', () => {
         deferredSuspended={[]}
         columns={columns}
         overdueTotal="700.00"
+        onConsolidate={() => undefined}
       />
     );
 
@@ -61,6 +69,7 @@ describe('OverdueSection', () => {
         columns={columns}
         overdueTotal="350.00"
         today="2026-07-11"
+        onConsolidate={() => undefined}
       />
     );
 
@@ -75,6 +84,7 @@ describe('OverdueSection', () => {
         columns={columns}
         overdueTotal="350.00"
         today="2026-07-11"
+        onConsolidate={() => undefined}
       />
     );
 
@@ -91,6 +101,7 @@ describe('OverdueSection', () => {
         ]}
         columns={columns}
         overdueTotal="0.00"
+        onConsolidate={() => undefined}
       />
     );
 

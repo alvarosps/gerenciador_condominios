@@ -3,7 +3,6 @@
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
 import { Info } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -37,33 +36,12 @@ import { usePayBill } from '@/lib/api/hooks/use-bills';
 import { handleError } from '@/lib/utils/error-handler';
 import { formatCurrency } from '@/lib/utils/formatters';
 import { fundedFromValues } from '@/lib/schemas/finances/category.schema';
-import type { FundedFrom } from '@/lib/schemas/finances/category.schema';
-
-function todayISO(): string {
-  const now = new Date();
-  return `${String(now.getFullYear())}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(
-    now.getDate()
-  ).padStart(2, '0')}`;
-}
-
-const paymentFormSchema = z.object({
-  // Empty = pay the full remaining amount (design §8 "amount omitted = total").
-  amount: z
-    .string()
-    .optional()
-    .refine((v) => v === undefined || v === '' || Number(v) > 0, {
-      message: 'O valor deve ser maior que zero',
-    }),
-  funded_from: z.enum(fundedFromValues),
-  payment_date: z.string().min(1, 'Data é obrigatória'),
-});
-
-type PaymentFormValues = z.infer<typeof paymentFormSchema>;
-
-const FUNDED_FROM_LABELS: Record<FundedFrom, string> = {
-  caixa: 'Caixa',
-  reserve: 'Reserva',
-};
+import {
+  FUNDED_FROM_LABELS,
+  type PaymentFormValues,
+  paymentFormSchema,
+  todayISO,
+} from './bill-payment-form';
 
 interface BillPaymentDialogProps {
   open: boolean;

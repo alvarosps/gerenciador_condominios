@@ -214,6 +214,12 @@ export function useUpdateBillWithLines() {
   });
 }
 
+/**
+ * Update a bill's HEADER fields via PATCH — routes to `BillService.update_header` (partial_update,
+ * S65 contract). Money NEVER travels here: it lives in `BillLineItem`, written only through
+ * `useCreateBillWithLines`/`useUpdateBillWithLines`. Callers pass only the header fields they mean
+ * to change (e.g. `{ id, due_date }` for the inline due-date popover, S75).
+ */
 export function useUpdateBill() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -226,7 +232,7 @@ export function useUpdateBill() {
         line_items: _line_items,
         ...updateData
       } = data;
-      const response = await apiClient.put<Bill>(`${ENDPOINT}${data.id}/`, updateData);
+      const response = await apiClient.patch<Bill>(`${ENDPOINT}${data.id}/`, updateData);
       return response.data;
     },
     onSuccess: () => invalidateBillCaches(queryClient),

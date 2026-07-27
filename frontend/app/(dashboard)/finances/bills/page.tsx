@@ -40,11 +40,14 @@ import type { Bill } from '@/lib/schemas/finances/bill.schema';
 import type { BillLifecycleState } from '@/lib/schemas/finances/category.schema';
 import type { ParsedInvoice } from '@/lib/schemas/finances/invoice-parse.schema';
 import { IptuRiskBanner } from '../_components/iptu-risk-banner';
+import { ConsolidateDebtDialog } from '../accounts/[id]/_components/consolidate-debt-dialog';
+import { ApplyInvoiceDialog } from './_components/apply-invoice-dialog';
 import { buildBillColumns } from './_components/bill-columns';
 import { BillFormModal } from './_components/bill-form-modal';
 import { BillPaymentDialog } from './_components/bill-payment-dialog';
 import { GenerateMissingBanner } from './_components/generate-missing-banner';
-import { OverdueSection } from './_components/overdue-section';
+import { OverdueSection, toConsolidableBills } from './_components/overdue-section';
+import { QuickBillDialog } from './_components/quick-bill-dialog';
 
 const ALL = 'all';
 
@@ -80,8 +83,23 @@ export default function BillsPage() {
   const [lifecycleFilter, setLifecycleFilter] = useState<LifecycleFilter>(ALL);
   const [payingBill, setPayingBill] = useState<Bill | null>(null);
   const [importDraft, setImportDraft] = useState<ParsedInvoice | null>(null);
+  const [quickBillOpen, setQuickBillOpen] = useState(false);
+  const [rowImportBill, setRowImportBill] = useState<Bill | null>(null);
+  const [rowImport, setRowImport] = useState<{
+    bill: Bill;
+    file: File;
+    draft: ParsedInvoice;
+  } | null>(null);
+  const [consolidatingAccount, setConsolidatingAccount] = useState<{
+    accountId: number;
+    accountType: NonNullable<Bill['billing_account']>['account_type'];
+  } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const rowFileInputRef = useRef<HTMLInputElement>(null);
   const parseInvoice = useParseInvoice();
+  // Second parse_invoice instance for the row "Importar fatura" flow (step 1 of 2, S75) — kept
+  // separate from the header's `parseInvoice` above so the two entry points never race each other.
+  const rowParseInvoice = useParseInvoice();
   // Always-available generation path (header action) — shares this mutation's success/error
   // toast handling (baked into the hook itself, use-bills.ts) with the contextual
   // GenerateMissingBanner shortcut below, so neither call site duplicates the PT toast logic.
@@ -131,6 +149,10 @@ export default function BillsPage() {
       crud.setItemToDelete(bill);
       if (bill.id !== undefined) crud.handleDeleteClick(bill.id);
     },
+    onImportInvoice: (bill) => {
+      setRowImportBill(bill);
+      rowFileInputRef.current?.click();
+    },
   });
 
   function handleInvoiceSelected(event: React.ChangeEvent<HTMLInputElement>) {
@@ -148,6 +170,39 @@ export default function BillsPage() {
         toast.error('Não foi possível ler a fatura. Verifique o PDF.');
       },
     });
+  }
+
+  /**
+   * Row "Importar fatura" — step 1 of 2 (S75): parses the PDF to a DRAFT (never writes) so the
+   * `ApplyInvoiceDialog` can surface its `warnings` BEFORE the user confirms `apply_invoice`
+   * (the apply endpoint's 200 response never carries warnings, S69 verified).
+   */
+  function handleRowInvoiceSelected(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    const bill = rowImportBill;
+    setRowImportBill(null);
+    if (!file || !bill) return;
+    rowParseInvoice.mutate(file, {
+      onSuccess: (draft) => {
+        setRowImport({ bill, file, draft });
+      },
+      onError: (error) => {
+        handleError(error, 'Não foi possível ler a fatura');
+        toast.error('Não foi possível ler a fatura. Verifique o PDF.');
+      },
+    });
+  }
+
+  function closeRowImport() {
+    setRowImport(null);
+  }
+
+  function handleConsolidate(bill: Bill) {
+    const accountId = bill.billing_account?.id;
+    const accountType = bill.billing_account?.account_type;
+    if (accountId === undefined || accountType === undefined) return;
+    setConsolidatingAccount({ accountId, accountType });
   }
 
   const isEmpty =
@@ -186,6 +241,10 @@ export default function BillsPage() {
               >
                 <FileUp className="mr-2 h-4 w-4" />
                 {parseInvoice.isPending ? 'Lendo fatura...' : 'Importar fatura (PDF)'}
+              </Button>
+              <Button variant="outline" onClick={() => setQuickBillOpen(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                Conta avulsa
               </Button>
               <Button onClick={crud.openCreateModal}>
                 <Plus className="mr-2 h-4 w-4" />
@@ -269,6 +328,7 @@ export default function BillsPage() {
         deferredSuspended={deferredSuspended}
         columns={columns}
         overdueTotal={board?.totals.overdue ?? '0.00'}
+        onConsolidate={handleConsolidate}
       />
 
       {isEmpty ? (
@@ -327,6 +387,41 @@ export default function BillsPage() {
           setPayingBill(null);
         }}
       />
+
+      <QuickBillDialog
+        open={quickBillOpen}
+        onClose={() => setQuickBillOpen(false)}
+        year={period.year}
+        month={period.month}
+      />
+
+      <input
+        ref={rowFileInputRef}
+        type="file"
+        accept="application/pdf"
+        hidden
+        onChange={handleRowInvoiceSelected}
+      />
+
+      {rowImport && (
+        <ApplyInvoiceDialog
+          open
+          bill={rowImport.bill}
+          draft={rowImport.draft}
+          file={rowImport.file}
+          onClose={closeRowImport}
+        />
+      )}
+
+      {consolidatingAccount && board && (
+        <ConsolidateDebtDialog
+          open
+          onClose={() => setConsolidatingAccount(null)}
+          accountId={consolidatingAccount.accountId}
+          accountType={consolidatingAccount.accountType}
+          bills={toConsolidableBills(board, consolidatingAccount.accountId)}
+        />
+      )}
 
       <AlertDialog open={crud.deleteDialogOpen} onOpenChange={crud.setDeleteDialogOpen}>
         <AlertDialogContent>
