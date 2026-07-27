@@ -113,6 +113,15 @@ class BillGenerationService:
     def _ensure_account_bill(
         account: BillingAccount, year: int, month: int, user: User | None
     ) -> Bill:
+        """Ensure the recurring Bill for (account, month), creating it as estimated if new.
+
+        ``amount_is_estimated=True`` enters via these ``defaults`` — the ONLY place the flag is
+        ever set True (design §3.3) — so a freshly created bill starts as "valor estimado"/
+        "aguardando fatura" (when expected_amount is 0, it has no seed line). An idempotent
+        re-run (created=False) never touches an existing bill's flag: ``defaults`` only applies
+        on creation. The same holds when this function is called from the embedded-installment
+        path (_generate_embedded_lines) — the host bill it creates/returns is estimated too.
+        """
         month_start = date(year, month, 1)
         defaults = {
             "condominium": account.condominium,
@@ -123,6 +132,7 @@ class BillGenerationService:
             "due_date": BillGenerationService._due_date_for(account, year, month),
             "description": account.name,
             "external_identifier": account.external_identifier,
+            "amount_is_estimated": True,
             "created_by": user,
             "updated_by": user,
         }

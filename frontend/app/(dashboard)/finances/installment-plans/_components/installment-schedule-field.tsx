@@ -8,15 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useUpdateInstallment } from '@/lib/api/hooks/use-installment-plans';
 import { handleError } from '@/lib/utils/error-handler';
-import { formatCurrency } from '@/lib/utils/formatters';
+import { formatCurrency, dueDateLabel } from '@/lib/utils/formatters';
 import type { Installment } from '@/lib/schemas/finances/installment-plan.schema';
-
-/** Format a YYYY-MM-DD date as DD/MM/YYYY using split (never new Date(iso)). */
-function dueDateLabel(dueDate: string): string {
-  const [year, month, day] = dueDate.split('-');
-  if (!year || !month || !day) return dueDate;
-  return `${day}/${month}/${year}`;
-}
 
 interface ScheduleRowProps {
   installment: Installment;
@@ -55,7 +48,7 @@ function ScheduleRow({ installment, isAdmin }: ScheduleRowProps) {
         onError: (error) => {
           handleError(error, 'Erro ao atualizar parcela');
         },
-      },
+      }
     );
   }
 
@@ -102,7 +95,9 @@ function ScheduleRow({ installment, isAdmin }: ScheduleRowProps) {
         </>
       ) : (
         <>
-          <span className="w-32 text-sm text-muted-foreground">{dueDateLabel(installment.due_date)}</span>
+          <span className="w-32 text-sm text-muted-foreground">
+            {dueDateLabel(installment.due_date)}
+          </span>
           <span className="w-32 text-sm font-medium">{formatCurrency(installment.amount)}</span>
           {installment.is_overdue ? (
             <Badge variant="destructive" className="gap-1">
@@ -132,10 +127,7 @@ interface InstallmentScheduleFieldProps {
   isAdmin: boolean;
 }
 
-export function InstallmentScheduleField({
-  installments,
-  isAdmin,
-}: InstallmentScheduleFieldProps) {
+export function InstallmentScheduleField({ installments, isAdmin }: InstallmentScheduleFieldProps) {
   if (installments.length === 0) {
     return (
       <p className="rounded-md border-2 border-dashed py-8 text-center text-sm text-muted-foreground">

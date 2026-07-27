@@ -50,10 +50,12 @@ from finances.serializers import (
     CategorySerializer,
     CondoMonthCloseSerializer,
     IncomeEntrySerializer,
+    InstallmentPlanSerializer,
     PaymentSerializer,
     ReserveMovementSerializer,
     ReserveSerializer,
 )
+from finances.services.account_statement_service import AccountStatementService
 from finances.services.bill_generation_service import BillGenerationService
 from finances.services.bill_lifecycle_service import BillLifecycleService
 from finances.services.bill_payment_service import BillPaymentService
@@ -64,7 +66,10 @@ from finances.services.bill_service import (
     StatementInput,
 )
 from finances.services.condo_month_close_service import CondoMonthCloseService
+from finances.services.installment_plan_service import InstallmentPlanService
+from finances.services.invoice_apply_service import InvoiceApplyService
 from finances.services.invoice_draft_service import InvoiceDraftService
+from finances.services.invoice_parsing.base import ParsedInvoice
 from finances.services.invoice_parsing.registry import detect_and_parse
 from finances.services.reserve_service import ReserveService
 from finances.viewsets.query_params import int_param
@@ -101,6 +106,96 @@ def _validated_funded_from(raw: object) -> str:
     return value
 
 
+_NEW_TOTAL_INVALID = "Valor inválido: use no máximo 2 casas decimais."
+_NEW_TOTAL_MAX_DECIMAL_PLACES = -2  # Decimal.as_tuple().exponent, money is always cents-scale.
+
+
+def _parse_new_total(raw: object) -> Decimal | None:
+    """new_total as a finite Decimal with at most 2 decimal places, or None (-> PT 400 otherwise).
+
+    ``Decimal(str(raw))`` alone accepts "Infinity"/"NaN" (not caught by ValueError/
+    InvalidOperation) and any decimal scale (e.g. "230.005"), both of which would otherwise
+    reach BillLineItem.full_clean() and surface Django's default (English) validator message
+    verbatim through the action's error shape. Rejected here instead, as a ValidationError (PT,
+    caught by the same handler as every other business-rule rejection in this action) — no
+    scientific/silent rounding: an out-of-range value is a 400, not a truncation.
+    """
+    if raw is None:
+        return None
+    try:
+        value = Decimal(str(raw))
+    except InvalidOperation as exc:
+        raise ValidationError(_NEW_TOTAL_INVALID) from exc
+    if not value.is_finite():
+        raise ValidationError(_NEW_TOTAL_INVALID)
+    # is_finite() guarantees a numeric (int) exponent here — Infinity/NaN ('F'/'n'/'N') are
+    # already rejected above, so this comparison is type-safe (never the sign/payload literals).
+    exponent = value.as_tuple().exponent
+    if isinstance(exponent, str) or exponent < _NEW_TOTAL_MAX_DECIMAL_PLACES:
+        raise ValidationError(_NEW_TOTAL_INVALID)
+    return value
+
+
+_CONSOLIDATE_DEBT_PAYLOAD_INVALID = (
+    "Parâmetros inválidos: bill_ids (lista), embedded, installment_count, "
+    "start_due_date, default_due_day."
+)
+
+
+class _ConsolidateDebtPayload:
+    """Validated request.data for consolidate_debt (Session 70)."""
+
+    __slots__ = ("bill_ids", "default_due_day", "embedded", "installment_count", "start_due_date")
+
+    def __init__(
+        self,
+        bill_ids: list[int],
+        embedded: bool,
+        installment_count: int,
+        start_due_date: date,
+        default_due_day: int,
+    ) -> None:
+        self.bill_ids = bill_ids
+        self.embedded = embedded
+        self.installment_count = installment_count
+        self.start_due_date = start_due_date
+        self.default_due_day = default_due_day
+
+
+def _strict_int(raw: object) -> int:
+    """raw as an int, rejecting bool and float coercion; raise TypeError (-> 400 PT) otherwise.
+
+    isinstance(True, int) is True in Python (bool is an int subclass) and int(3.7) silently
+    truncates to 3, so a bare int(...) cast would accept a JSON bill id of `true` (-> 1) or `3.7`
+    (-> 3) — the same laxness the strict embedded bool check below exists to avoid.
+    """
+    if isinstance(raw, bool) or not isinstance(raw, int):
+        raise TypeError
+    return raw
+
+
+def _parse_consolidate_debt_payload(data: dict[str, object]) -> _ConsolidateDebtPayload:
+    """Parse consolidate_debt's body; raise KeyError/ValueError/TypeError (-> 400 PT) otherwise.
+
+    embedded must be a strict JSON bool (isinstance check) — bool("false") is True in Python, so
+    coercing via bool(...) would silently accept the string "false" as True. bill_ids items and
+    installment_count/default_due_day are strict JSON ints for the same reason (_strict_int).
+    """
+    bill_ids_raw = data["bill_ids"]
+    if not isinstance(bill_ids_raw, list) or not bill_ids_raw:
+        raise TypeError
+    bill_ids = [_strict_int(item) for item in bill_ids_raw]
+    embedded = data["embedded"]
+    if not isinstance(embedded, bool):
+        raise TypeError
+    installment_count = _strict_int(data["installment_count"])
+    start_due_date = date.fromisoformat(str(data["start_due_date"]))
+    default_due_day = _strict_int(data["default_due_day"])
+    return _ConsolidateDebtPayload(
+        bill_ids, embedded, installment_count, start_due_date, default_due_day
+    )
+
+
 class CategoryViewSet(viewsets.ModelViewSet):
     serializer_class = CategorySerializer
     permission_classes = [IsAdminUser]
@@ -124,7 +219,11 @@ class BillingAccountViewSet(viewsets.ModelViewSet):
     pagination_class = CustomPageNumberPagination
 
     def get_queryset(self) -> QuerySet[BillingAccount]:
-        queryset = BillingAccount.objects.select_related("building", "category", "condominium")
+        # with_open_balance(today_sp()) exposes the S67 open_balance annotation on every read
+        # (list + retrieve) — no cache here, same as before (design §4).
+        queryset = BillingAccount.objects.with_open_balance(today_sp()).select_related(
+            "building", "category", "condominium"
+        )
         params = self.request.query_params
         building_id = int_param(params, "building_id")
         if building_id is not None:
@@ -139,6 +238,43 @@ class BillingAccountViewSet(viewsets.ModelViewSet):
         if account_type is not None:
             queryset = queryset.filter(account_type=account_type)
         return queryset
+
+    @action(detail=True, methods=["get"])
+    def statement(self, request: Request, pk: str | None = None) -> Response:
+        # NO cache (design §4/§10): depends on payment state + today_sp(); midnight rollover is
+        # not a write, so cache would never be invalidated — same rationale as
+        # month_board/iptu_alerts/overdue.
+        account = self.get_object()  # 404 for unknown/soft-deleted account (live manager)
+        return Response(
+            AccountStatementService.build(account.pk, today_sp()), status=status.HTTP_200_OK
+        )
+
+    @action(detail=True, methods=["post"])
+    def consolidate_debt(self, request: Request, pk: str | None = None) -> Response:
+        """Consolida N contas em aberto desta conta em 1 plano (cancela as origens)."""
+        account = self.get_object()  # 404 for unknown/soft-deleted account (live manager)
+        try:
+            payload = _parse_consolidate_debt_payload(request.data)
+        except KeyError, ValueError, TypeError:
+            return Response(
+                {"error": _CONSOLIDATE_DEBT_PAYLOAD_INVALID}, status=status.HTTP_400_BAD_REQUEST
+            )
+        try:
+            plan = InstallmentPlanService.consolidate_open_bills(
+                account=account,
+                bill_ids=payload.bill_ids,
+                embedded=payload.embedded,
+                installment_count=payload.installment_count,
+                start_due_date=payload.start_due_date,
+                default_due_day=payload.default_due_day,
+                user=cast(User, request.user),
+            )
+        except ValidationError as exc:
+            return Response({"error": str(exc.messages[0])}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            InstallmentPlanSerializer(plan, context={"request": request}).data,
+            status=status.HTTP_201_CREATED,
+        )
 
 
 class BillSkipViewSet(viewsets.ModelViewSet):
@@ -364,9 +500,15 @@ class BillViewSet(viewsets.ModelViewSet):
             payment_date = date.fromisoformat(str(payment_date_raw))
             amount_raw = request.data.get("amount")
             amount = Decimal(str(amount_raw)) if amount_raw is not None else None
+            new_total = _parse_new_total(request.data.get("new_total"))
             funded_from = _validated_funded_from(request.data.get("funded_from", "caixa"))
             BillPaymentService.pay(
-                bill, payment_date, amount, funded_from, user=cast(User, request.user)
+                bill,
+                payment_date,
+                amount,
+                funded_from,
+                new_total=new_total,
+                user=cast(User, request.user),
             )
         except ValueError, InvalidOperation:
             return Response(
@@ -538,15 +680,14 @@ class BillViewSet(viewsets.ModelViewSet):
             return Response({"error": message}, status=status.HTTP_400_BAD_REQUEST)
         return Response(self._serialized_bill(bill), status=status.HTTP_200_OK)
 
-    @action(detail=False, methods=["post"], parser_classes=[MultiPartParser])
-    def parse_invoice(self, request: Request) -> Response:
-        """Receive a utility invoice PDF (multipart), parse it in MEMORY and return a DRAFT.
+    def _read_parsed_invoice(self, request: Request) -> ParsedInvoice | Response:
+        """Read+validate the uploaded invoice PDF and parse it in MEMORY (shared by
+        parse_invoice/apply_invoice — DRY, identical 400/422 PT on both).
 
-        Writes NOTHING (past-immutable, design §6): the draft is persisted later via
-        create_with_lines/update_with_lines (S58), from the modal (S63). is_staff is enforced by
-        IsAdminUser (admin-only viewset). The PDF is validated and discarded — never stored
-        (decisão #4). The only external I/O boundary is pdfplumber.open; the positional parsing
-        lives in the S59 registry.
+        Returns the parsed invoice on success or the PT error Response on failure (the caller
+        checks ``isinstance(result, ParsedInvoice)`` and returns the Response verbatim otherwise).
+        The PDF is validated and discarded — never stored (decisão #4). The only external I/O
+        boundary is pdfplumber.open; the positional parsing lives in the S59 registry.
         """
         uploaded = request.FILES.get("file")
         if uploaded is None:
@@ -560,11 +701,46 @@ class BillViewSet(viewsets.ModelViewSet):
         if not has_pages:
             return Response({"error": _ERR_NOT_PDF}, status=status.HTTP_400_BAD_REQUEST)
         try:
-            parsed = detect_and_parse(pdf_bytes)
+            return detect_and_parse(pdf_bytes)
         except ValueError as exc:
             return Response({"error": str(exc)}, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+    @action(detail=False, methods=["post"], parser_classes=[MultiPartParser])
+    def parse_invoice(self, request: Request) -> Response:
+        """Receive a utility invoice PDF (multipart), parse it in MEMORY and return a DRAFT.
+
+        Writes NOTHING (past-immutable, design §6): the draft is persisted later via
+        create_with_lines/update_with_lines (S58), from the modal (S63). is_staff is enforced by
+        IsAdminUser (admin-only viewset). The PDF is validated and discarded — never stored
+        (decisão #4). The only external I/O boundary is pdfplumber.open; the positional parsing
+        lives in the S59 registry.
+        """
+        parsed = self._read_parsed_invoice(request)
+        if not isinstance(parsed, ParsedInvoice):
+            return parsed
         draft = InvoiceDraftService.build_draft(parsed)
         return Response(draft, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"], parser_classes=[MultiPartParser])
+    def apply_invoice(self, request: Request, pk: str | None = None) -> Response:
+        """Receive a utility invoice PDF (multipart), parse it in MEMORY and APPLY it to THIS bill.
+
+        Unlike parse_invoice (a read-only draft for the modal), this writes: lines + statement +
+        editable header (due_date/external_identifier) are replaced on the SAME transaction via
+        InvoiceApplyService.apply -> BillService.update_with_lines (S69, design §3.3). 400 PT on
+        account/competence mismatch, a non-ACTIVE bill, a paid bill or a closed month (the last
+        two rejected by update_with_lines' own guards, delegated). 422 PT on an unknown issuer
+        (same status as parse_invoice). The PDF is validated and discarded — never stored.
+        """
+        bill = self.get_object()
+        parsed = self._read_parsed_invoice(request)
+        if not isinstance(parsed, ParsedInvoice):
+            return parsed
+        try:
+            InvoiceApplyService.apply(bill, parsed, user=cast(User, request.user))
+        except ValidationError as exc:
+            return Response({"error": str(exc.messages[0])}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(self._serialized_bill(bill), status=status.HTTP_200_OK)
 
     def create(self, request: Request, *args: object, **kwargs: object) -> Response:
         # The default create cannot write line items (amount_total derives from them), so a bill

@@ -141,17 +141,14 @@ describe('BillPaymentDialog', () => {
     await waitForQueriesToSettle(queryClient);
   });
 
-  it('logs the PT error and does not close on a 400 rejection', async () => {
-    // The dialog routes failures through handleError(error, 'Erro ao pagar conta'), which writes
-    // the resolved PT message to console.error (the sink) — assert it lands there with the server's
-    // PT message; no success toast / onClose side effect should fire. (This console.error is the
-    // component's own logging, not an unhandled rejection.)
+  it('shows the PT error toast and does not close on a 400 rejection', async () => {
+    // S76: failures route through showFinanceMutationError(error, 'Erro ao pagar conta', …), which
+    // shows the server's PT message via toast.error — no success toast / onClose side effect fires.
     server.use(
       http.post(`${API_BASE}/finances/bills/7/pay/`, () =>
         HttpResponse.json({ error: 'Saldo insuficiente na reserva.' }, { status: 400 })
       )
     );
-    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const onClose = vi.fn();
 
     const { queryClient } = renderWithProviders(
@@ -161,15 +158,36 @@ describe('BillPaymentDialog', () => {
     await submit();
 
     await waitFor(() => {
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        '[Erro ao pagar conta] Saldo insuficiente na reserva.',
-        expect.anything()
-      );
+      expect(toast.error).toHaveBeenCalledWith('Saldo insuficiente na reserva.');
     });
     expect(toast.success).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
 
-    consoleErrorSpy.mockRestore();
+    await waitForQueriesToSettle(queryClient);
+  });
+
+  it('shows an actionable "Abrir fechamento" toast on a closed-month 400', async () => {
+    server.use(
+      http.post(`${API_BASE}/finances/bills/7/pay/`, () =>
+        HttpResponse.json({ detail: 'Competência 06/2026 está fechada.' }, { status: 400 })
+      )
+    );
+
+    const { queryClient } = renderWithProviders(
+      <BillPaymentDialog open billId={7} amountRemaining={350} onClose={vi.fn()} />
+    );
+
+    await submit();
+
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith(
+        'Competência 06/2026 está fechada.',
+        expect.objectContaining({
+          action: expect.objectContaining({ label: 'Abrir fechamento' }) as unknown,
+        })
+      );
+    });
+
     await waitForQueriesToSettle(queryClient);
   });
 

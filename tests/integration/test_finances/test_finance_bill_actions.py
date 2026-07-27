@@ -7,7 +7,7 @@ import pytest
 from freezegun import freeze_time
 from rest_framework import status
 
-from finances.models import Bill, BillLifecycleState, Payment, PaymentAllocation
+from finances.models import Bill, BillLifecycleState, BillLineItem, Payment, PaymentAllocation
 from tests.factories import (
     make_bill,
     make_bill_line_item,
@@ -198,6 +198,112 @@ def test_cancel_rejects_paid_bill(authenticated_api_client):
     assert resp.status_code == status.HTTP_400_BAD_REQUEST
     bill.refresh_from_db()
     assert bill.lifecycle_state == BillLifecycleState.ACTIVE
+
+
+# --- Session 68: pay(new_total=...) at the action level ---
+
+
+@freeze_time(FROZEN)
+def test_pay_action_accepts_new_total_string(authenticated_api_client):
+    """Action repassa new_total (decimal string) e devolve a bill ajustada."""
+    bill = make_bill(amount_is_estimated=True)
+    make_bill_line_item(bill=bill, amount=Decimal("200.00"), description=bill.description)
+    resp = authenticated_api_client.post(
+        f"/api/finances/bills/{bill.id}/pay/",
+        {"payment_date": "2026-06-05", "amount": "230.00", "new_total": "230.00"},
+        format="json",
+    )
+    assert resp.status_code == status.HTTP_200_OK
+    assert resp.data["amount_total"] == "230.00"
+    assert resp.data["amount_is_estimated"] is False
+
+
+@freeze_time(FROZEN)
+def test_pay_action_invalid_new_total_returns_400(authenticated_api_client):
+    """new_total inválido (não-numérico) -> 400 PT.
+
+    _parse_new_total intercepts InvalidOperation before the generic amount/date/funded_from
+    catch-all (Round 2 fix, I-1), so a non-numeric new_total now gets the specific PT format
+    message instead of the generic one — still 400, still PT, just more precise.
+    """
+    bill = _bill_total("300.00")
+    resp = authenticated_api_client.post(
+        f"/api/finances/bills/{bill.id}/pay/",
+        {"payment_date": "2026-06-05", "new_total": "abc"},
+        format="json",
+    )
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    assert resp.data["error"] == "Valor inválido: use no máximo 2 casas decimais."
+
+
+@freeze_time(FROZEN)
+def test_pay_action_new_total_too_many_decimal_places_returns_pt_400(authenticated_api_client):
+    """new_total com 3+ casas decimais -> 400 PT (nunca a mensagem em inglês do Django)."""
+    bill = _bill_total("300.00")
+    resp = authenticated_api_client.post(
+        f"/api/finances/bills/{bill.id}/pay/",
+        {"payment_date": "2026-06-05", "new_total": "230.005"},
+        format="json",
+    )
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    assert resp.data["error"] == "Valor inválido: use no máximo 2 casas decimais."
+
+
+@freeze_time(FROZEN)
+@pytest.mark.parametrize("bad_value", ["Infinity", "-Infinity", "NaN"])
+def test_pay_action_new_total_non_finite_returns_pt_400(authenticated_api_client, bad_value):
+    """new_total não-finito (Infinity/NaN) -> 400 PT (nunca a mensagem em inglês do Django)."""
+    bill = _bill_total("300.00")
+    resp = authenticated_api_client.post(
+        f"/api/finances/bills/{bill.id}/pay/",
+        {"payment_date": "2026-06-05", "new_total": bad_value},
+        format="json",
+    )
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    assert resp.data["error"] == "Valor inválido: use no máximo 2 casas decimais."
+
+
+@freeze_time(FROZEN)
+def test_pay_action_new_total_two_decimal_places_still_works(authenticated_api_client):
+    """Casos válidos (<=2 casas decimais) continuam funcionando após o guard de formato."""
+    bill = make_bill(amount_is_estimated=True)
+    make_bill_line_item(bill=bill, amount=Decimal("200.00"), description=bill.description)
+    resp = authenticated_api_client.post(
+        f"/api/finances/bills/{bill.id}/pay/",
+        {"payment_date": "2026-06-05", "amount": "230.00", "new_total": "230.00"},
+        format="json",
+    )
+    assert resp.status_code == status.HTTP_200_OK
+    assert resp.data["amount_total"] == "230.00"
+
+
+@freeze_time(FROZEN)
+def test_pay_action_confirmed_reduction_returns_400(authenticated_api_client):
+    """Erro de negócio PT atravessa a action como 400."""
+    bill = _bill_total("300.00")
+    resp = authenticated_api_client.post(
+        f"/api/finances/bills/{bill.id}/pay/",
+        {"payment_date": "2026-06-05", "new_total": "280.00"},
+        format="json",
+    )
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    assert resp.data["error"] == "Edite a conta para reduzir o valor."
+
+
+@freeze_time(FROZEN)
+def test_bulk_pay_ignores_new_total(authenticated_api_client):
+    """bulk_pay não ganha ajuste (contrato S68)."""
+    cond = make_condominium()
+    bill = _bill_total("100.00", condominium=cond)
+    resp = authenticated_api_client.post(
+        "/api/finances/bills/bulk_pay/",
+        {"bill_ids": [bill.id], "payment_date": "2026-06-05", "new_total": "500.00"},
+        format="json",
+    )
+    assert resp.status_code == status.HTTP_200_OK
+    assert resp.data[0]["amount_total"] == "100.00"
+    assert resp.data[0]["payment_status"] == "paid"
+    assert not BillLineItem.objects.filter(bill=bill, description="Juros/multa").exists()
 
 
 def test_create_with_lines_negative_rejected(authenticated_api_client):

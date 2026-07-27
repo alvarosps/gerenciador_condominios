@@ -129,6 +129,42 @@ _TYPED_IDENTITY_ACCOUNT_TYPES = frozenset(
 _ERR_IDENTIFIER_REQUIRED = "Informe a inscrição/UC para contas de água, luz ou IPTU."
 
 
+def _open_balance_lines_subquery(arm_filter: Q, group_field: str) -> Subquery:
+    """Σ net line-item total (non-offset − offset) of non-canceled, non-deleted bills matching
+    ``arm_filter``, grouped by ``group_field`` (the lookup up to the OWNING billing account, NOT
+    the bill) — mirrors with_amounts' total_subquery (:231-238), scoped per-account."""
+    return Subquery(
+        BillLineItem.objects.filter(arm_filter, bill__is_deleted=False)
+        .exclude(bill__lifecycle_state=BillLifecycleState.CANCELED)
+        .values(group_field)
+        .annotate(
+            total=Coalesce(Sum("amount", filter=Q(is_offset=False)), _ZERO_MONEY)
+            - Coalesce(Sum("amount", filter=Q(is_offset=True)), _ZERO_MONEY)
+        )
+        .values("total"),
+        output_field=_MONEY,
+    )
+
+
+def _open_balance_paid_subquery(arm_filter: Q, group_field: str) -> Subquery:
+    """Σ live PaymentAllocation amount of non-canceled, non-deleted bills matching ``arm_filter``,
+    grouped by ``group_field`` (lookup up to the OWNING billing account) — mirrors with_amounts'
+    paid_subquery (:242-248), including the payment__is_deleted=False guard (a soft-deleted
+    Payment must not count)."""
+    return Subquery(
+        PaymentAllocation.objects.filter(
+            arm_filter,
+            bill__is_deleted=False,
+            payment__is_deleted=False,
+        )
+        .exclude(bill__lifecycle_state=BillLifecycleState.CANCELED)
+        .values(group_field)
+        .annotate(paid=Coalesce(Sum("amount"), _ZERO_MONEY))
+        .values("paid"),
+        output_field=_MONEY,
+    )
+
+
 class BillingAccountQuerySet(models.QuerySet["BillingAccount"]):
     def recurring_for_generation(self) -> BillingAccountQuerySet:
         """Active accounts that generate a recurring Bill — IPTU is registry-only (design §10.3).
@@ -140,6 +176,39 @@ class BillingAccountQuerySet(models.QuerySet["BillingAccount"]):
         """
         return self.filter(lifecycle_state=BillingAccountState.ACTIVE).exclude(
             account_type=BillingAccountType.IPTU
+        )
+
+    def with_open_balance(self, today: date) -> BillingAccountQuerySet:
+        """Annotate ``open_balance`` = Σ (amount_total − amount_paid) of the account's
+        non-canceled (ACTIVE+SUSPENDED+DEFERRED), non-deleted bills — summed across BOTH FK
+        arms: the direct ``billing_account`` FK, and the standalone-parcela chain
+        ``installment__plan__billing_account`` (arm B excludes rows already owned by arm A, so
+        a bill matching both arms — billing_account set AND an installment on a plan of that
+        SAME account — is never double-counted).
+
+        Built as four explicit correlated subqueries (lines/paid × arm A/arm B), in the style of
+        with_amounts (:231-248) — never a Sum() over the with_amounts() amount_remaining
+        annotation (that is F(total)-F(paid) over two already-scalar subqueries, not directly
+        aggregable per-account). ``today`` is part of the signature for parity with
+        with_amounts(); the balance itself is date-independent (never used in a filter).
+        """
+        arm_a = Q(bill__billing_account=OuterRef("pk"))
+        arm_b = Q(bill__installment__plan__billing_account=OuterRef("pk")) & ~Q(
+            bill__billing_account=OuterRef("pk")
+        )
+        return self.annotate(
+            open_balance=(
+                Coalesce(_open_balance_lines_subquery(arm_a, "bill__billing_account"), _ZERO_MONEY)
+                - Coalesce(_open_balance_paid_subquery(arm_a, "bill__billing_account"), _ZERO_MONEY)
+                + Coalesce(
+                    _open_balance_lines_subquery(arm_b, "bill__installment__plan__billing_account"),
+                    _ZERO_MONEY,
+                )
+                - Coalesce(
+                    _open_balance_paid_subquery(arm_b, "bill__installment__plan__billing_account"),
+                    _ZERO_MONEY,
+                )
+            )
         )
 
 
@@ -334,6 +403,12 @@ class Bill(AuditMixin, SoftDeleteMixin, models.Model):
     lifecycle_state = models.CharField(
         max_length=20, choices=BillLifecycleState.choices, default=BillLifecycleState.ACTIVE
     )
+    # True only for a bill freshly generated with an unconfirmed value (design §3.3 — cockpit
+    # badge "valor estimado"/"aguardando fatura"). Set exclusively by
+    # BillGenerationService._ensure_account_bill (via get_or_create defaults, on creation) and
+    # cleared exclusively by BillService.update_with_lines / BillPaymentService.pay, once the
+    # real value is known — never in a viewset/serializer (S65).
+    amount_is_estimated = models.BooleanField(default=False)
     attachment = models.FileField(null=True, blank=True, upload_to="finances/bills/")
     notes = models.TextField(blank=True)
 

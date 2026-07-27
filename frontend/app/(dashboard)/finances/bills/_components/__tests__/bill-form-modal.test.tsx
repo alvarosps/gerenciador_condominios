@@ -47,11 +47,11 @@ function spyCreate() {
   return bodies;
 }
 
-// Spy the edit-mode PUT (useUpdateBill) via an MSW request-body capture.
+// Spy the edit-mode PATCH (useUpdateBill) via an MSW request-body capture.
 function spyUpdate() {
   const bodies: (Record<string, unknown> & { id: number })[] = [];
   server.use(
-    http.put(`${API_BASE}/finances/bills/:id/`, async ({ params, request }) => {
+    http.patch(`${API_BASE}/finances/bills/:id/`, async ({ params, request }) => {
       const body = (await request.json()) as Record<string, unknown>;
       bodies.push({ ...body, id: Number(params.id) });
       return HttpResponse.json(createMockBill({ id: Number(params.id) }));

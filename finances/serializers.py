@@ -149,6 +149,7 @@ class BillingAccountSerializer(serializers.ModelSerializer):
         required=False,
         allow_null=True,
     )
+    open_balance = serializers.SerializerMethodField()
 
     class Meta:
         model = BillingAccount
@@ -174,6 +175,7 @@ class BillingAccountSerializer(serializers.ModelSerializer):
             "tracking_start_month",
             "end_date",
             "notes",
+            "open_balance",
             "created_at",
             "updated_at",
         ]
@@ -233,6 +235,9 @@ class BillingAccountSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {"external_identifier": _ERR_DUPLICATE_BILLING_ACCOUNT}
             )
+
+    def get_open_balance(self, obj: BillingAccount) -> str:
+        return money_str(getattr(obj, "open_balance", Decimal(0)))
 
 
 class BillLineItemSerializer(serializers.ModelSerializer):
@@ -347,11 +352,14 @@ class BillSerializer(serializers.ModelSerializer):
             "amount_remaining",
             "payment_status",
             "is_overdue",
+            "amount_is_estimated",
             "account_type",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "created_at", "updated_at"]
+        # amount_is_estimated is set/cleared only in services (BillGenerationService/
+        # BillService/BillPaymentService — S65); the API exposes it read-only.
+        read_only_fields = ["id", "amount_is_estimated", "created_at", "updated_at"]
         # The (billing_account, competence_month) uniqueness is a partial DB constraint;
         # DRF's auto UniqueTogetherValidator would wrongly force billing_account_id to be
         # present on every write (avulsa bills have billing_account=None).

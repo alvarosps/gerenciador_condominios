@@ -2,10 +2,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
 import { queryKeys } from '../query-keys';
 import { parseList } from '../parse-list';
+import { invalidateFinanceMoneyCaches } from './use-bills';
 import {
   type BillingAccount,
   billingAccountSchema,
 } from '@/lib/schemas/finances/billing-account.schema';
+import { installmentPlanSchema } from '@/lib/schemas/finances/installment-plan.schema';
 
 const ENDPOINT = '/finances/billing-accounts/';
 
@@ -13,6 +15,7 @@ export interface BillingAccountFilters {
   building_id?: number;
   category_id?: number;
   lifecycle_state?: string;
+  account_type?: string;
 }
 
 type BillingAccountWrite = Omit<
@@ -51,6 +54,7 @@ function invalidateBillingAccountCaches(queryClient: ReturnType<typeof useQueryC
   void queryClient.invalidateQueries({ queryKey: queryKeys.finances.billingAccounts.all });
   void queryClient.invalidateQueries({ queryKey: queryKeys.finances.combinedCalendar.all });
   void queryClient.invalidateQueries({ queryKey: queryKeys.finances.overdueBills.all });
+  void queryClient.invalidateQueries({ queryKey: queryKeys.finances.monthBoard.all });
 }
 
 export function useCreateBillingAccount() {
@@ -88,5 +92,38 @@ export function useDeleteBillingAccount() {
       await apiClient.delete(`${ENDPOINT}${id}/`);
     },
     onSuccess: () => invalidateBillingAccountCaches(queryClient),
+  });
+}
+
+export interface ConsolidateDebtRequest {
+  account_id: number;
+  bill_ids: number[];
+  embedded: boolean;
+  installment_count: number;
+  start_due_date: string; // YYYY-MM-DD
+  default_due_day: number;
+}
+
+/**
+ * Consolidate the account's open bills into a single installment plan (S70) — cancels the
+ * source bills in the same backend transaction. Both sides need a refetch on success.
+ */
+export function useConsolidateDebt() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ account_id, ...body }: ConsolidateDebtRequest) => {
+      const { data } = await apiClient.post<unknown>(
+        `${ENDPOINT}${account_id}/consolidate_debt/`,
+        body
+      );
+      return installmentPlanSchema.parse(data); // 201 with the plan serialized (S70)
+    },
+    onSuccess: () => {
+      invalidateBillingAccountCaches(queryClient);
+      void queryClient.invalidateQueries({ queryKey: queryKeys.finances.installmentPlans.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.finances.installments.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.finances.bills.all });
+      invalidateFinanceMoneyCaches(queryClient);
+    },
   });
 }

@@ -20,9 +20,13 @@ describe('useBillingAccounts', () => {
       http.get(`${API_BASE}/finances/billing-accounts/`, () =>
         // Raw API shape: expected_amount is a string Decimal that the schema transforms to number.
         HttpResponse.json([
-          { ...createMockBillingAccount(), expected_amount: '120.50', lifecycle_state: 'suspended' },
-        ]),
-      ),
+          {
+            ...createMockBillingAccount(),
+            expected_amount: '120.50',
+            lifecycle_state: 'suspended',
+          },
+        ])
+      )
     );
 
     const { result } = renderHook(() => useBillingAccounts(), { wrapper: createWrapper() });
@@ -47,12 +51,12 @@ describe('useBillingAccounts', () => {
           lifecycle_state: params.get('lifecycle_state') ?? '',
         };
         return HttpResponse.json([]);
-      }),
+      })
     );
 
     const { result } = renderHook(
       () => useBillingAccounts({ building_id: 7, lifecycle_state: 'active' }),
-      { wrapper: createWrapper() },
+      { wrapper: createWrapper() }
     );
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true), { timeout: 5000 });
@@ -76,12 +80,41 @@ describe('useBillingAccounts', () => {
     server.use(
       http.get(
         `${API_BASE}/finances/billing-accounts/`,
-        () => new HttpResponse(null, { status: 500 }),
-      ),
+        () => new HttpResponse(null, { status: 500 })
+      )
     );
 
     const { result } = renderHook(() => useBillingAccounts(), { wrapper: createWrapper() });
     await waitFor(() => expect(result.current.isError).toBe(true), { timeout: 5000 });
+  });
+
+  it('parses a payload WITHOUT open_balance (compat with parseList — S71)', async () => {
+    server.use(
+      http.get(`${API_BASE}/finances/billing-accounts/`, () => {
+        const { open_balance: _open_balance, ...rest } = createMockBillingAccount();
+        return HttpResponse.json([rest]);
+      })
+    );
+
+    const { result } = renderHook(() => useBillingAccounts(), { wrapper: createWrapper() });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true), { timeout: 5000 });
+
+    expect(result.current.data?.length).toBe(1);
+    expect(result.current.data?.[0]?.open_balance).toBeUndefined();
+  });
+
+  it('coerces open_balance string -> number when present (S67)', async () => {
+    server.use(
+      http.get(`${API_BASE}/finances/billing-accounts/`, () =>
+        HttpResponse.json([createMockBillingAccount({ open_balance: '482.30' })])
+      )
+    );
+
+    const { result } = renderHook(() => useBillingAccounts(), { wrapper: createWrapper() });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true), { timeout: 5000 });
+
+    expect(typeof result.current.data?.[0]?.open_balance).toBe('number');
+    expect(result.current.data?.[0]?.open_balance).toBe(482.3);
   });
 });
 
@@ -122,7 +155,7 @@ describe('billing-account mutations', () => {
       http.put(`${API_BASE}/finances/billing-accounts/:id/`, async ({ request }) => {
         sentBody = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json({ id: 1, ...sentBody });
-      }),
+      })
     );
 
     const queryClient = createTestQueryClient();

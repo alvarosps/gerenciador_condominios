@@ -29,6 +29,7 @@ from finances.money import money_str, quantize_money
 from finances.serializers import BillSerializer
 from finances.services.condo_balance_service import CondoBalanceService
 from finances.services.condo_calendar_service import CondoCalendarService
+from finances.services.condo_month_board_service import CondoMonthBoardService
 from finances.services.condo_projection_service import CondoProjectionService
 from finances.services.condo_simulation_service import CondoSimulationService
 from finances.services.iptu_alert_service import IptuAlertService
@@ -303,6 +304,21 @@ class FinanceDashboardViewSet(viewsets.ViewSet):
             },
             status=status.HTTP_200_OK,
         )
+
+    @action(detail=False, methods=["get"])
+    def month_board(self, request: Request) -> Response:
+        # NO cache (design §10): the cockpit board depends on payment state + today_sp();
+        # midnight rollover is not a write, so cache would never be invalidated — same
+        # rationale as combined_calendar/overdue/iptu_alerts.
+        try:
+            year, month = _parse_year_month_query(request, current_month_sp())
+        except ValueError:
+            return Response(
+                {"error": "Parâmetros year/month inválidos (mês entre 1 e 12)."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        data = CondoMonthBoardService.build(year, month, today_sp())
+        return Response(data, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=["get"])
     def overview(self, request: Request) -> Response:

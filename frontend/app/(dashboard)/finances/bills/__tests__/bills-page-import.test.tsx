@@ -8,6 +8,7 @@ import { useAuthStore } from '@/store/auth-store';
 import {
   createMockBill,
   createMockBillingAccount,
+  createMockMonthBoard,
   createMockParsedInvoice,
 } from '@/tests/mocks/data/finances';
 import BillsPage from '../page';
@@ -31,8 +32,21 @@ beforeAll(() => {
   }
 });
 
-function setBillsResponse(bills: unknown[]) {
-  server.use(http.get(`${API_BASE}/finances/bills/`, () => HttpResponse.json(bills)));
+function setMonthBoard(board: ReturnType<typeof createMockMonthBoard>) {
+  server.use(
+    http.get(`${API_BASE}/finances/finance-dashboard/month_board/`, () => HttpResponse.json(board))
+  );
+}
+
+function setBillsInBoard(bills: unknown[]) {
+  setMonthBoard(
+    createMockMonthBoard({
+      groups:
+        bills.length === 0
+          ? []
+          : [{ building_id: null, building_label: 'Condomínio', bills: bills as never[] }],
+    })
+  );
 }
 
 function setBillingAccounts(accounts: unknown[]) {
@@ -113,7 +127,7 @@ describe('BillsPage — import fatura + disambiguated accounts', () => {
 
   it('hides "Importar fatura" and "Nova Conta" for non-admin users', async () => {
     setAdmin(false);
-    setBillsResponse([createMockBill({ id: 1, description: 'Conta de Luz' })]);
+    setBillsInBoard([createMockBill({ id: 1, description: 'Conta de Luz' })]);
 
     const { queryClient } = renderWithProviders(<BillsPage />);
 
@@ -126,7 +140,7 @@ describe('BillsPage — import fatura + disambiguated accounts', () => {
 
   it('shows "Importar fatura" for admin users', async () => {
     setAdmin(true);
-    setBillsResponse([createMockBill({ id: 1, description: 'Conta de Luz' })]);
+    setBillsInBoard([createMockBill({ id: 1, description: 'Conta de Luz' })]);
 
     const { queryClient } = renderWithProviders(<BillsPage />);
 
@@ -178,7 +192,7 @@ describe('BillsPage — import fatura + disambiguated accounts', () => {
       warnings: ['Aviso de teste'],
     });
     setParseInvoice(draft);
-    setBillsResponse([createMockBill({ id: 1, description: 'Conta de Luz' })]);
+    setBillsInBoard([createMockBill({ id: 1, description: 'Conta de Luz' })]);
 
     const { queryClient } = renderWithProviders(<BillsPage />);
 
@@ -201,7 +215,7 @@ describe('BillsPage — import fatura + disambiguated accounts', () => {
 
   it('renders two same-type accounts with distinct disambiguated labels "name — tipo · external_identifier"', async () => {
     setAdmin(true);
-    setBillsResponse([createMockBill({ id: 1, description: 'Conta de Luz' })]);
+    setBillsInBoard([createMockBill({ id: 1, description: 'Conta de Luz' })]);
     setBillingAccounts([
       createMockBillingAccount({
         id: 1,
@@ -248,7 +262,7 @@ describe('BillsPage — import fatura + disambiguated accounts', () => {
     setParseInvoice(draft);
     const createBodies = spyCreateWithLines();
     const updateBodies = spyUpdateWithLines();
-    setBillsResponse([createMockBill({ id: 1 })]);
+    setBillsInBoard([createMockBill({ id: 1 })]);
 
     const { queryClient } = renderWithProviders(<BillsPage />);
 
@@ -276,7 +290,7 @@ describe('BillsPage — import fatura + disambiguated accounts', () => {
     setParseInvoice(draft);
     const createBodies = spyCreateWithLines();
     const updateBodies = spyUpdateWithLines();
-    setBillsResponse([createMockBill({ id: 1 })]);
+    setBillsInBoard([createMockBill({ id: 1 })]);
 
     const { queryClient } = renderWithProviders(<BillsPage />);
 

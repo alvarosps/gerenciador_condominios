@@ -2,6 +2,7 @@
 
 import { Ban, CalendarClock, PauseCircle, PlayCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { useRouter } from 'next/navigation';
 import { DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import {
   useCancelBill,
@@ -9,7 +10,8 @@ import {
   useReactivateBill,
   useSuspendBill,
 } from '@/lib/api/hooks/use-bills';
-import { handleError } from '@/lib/utils/error-handler';
+import { showFinanceMutationError } from '@/lib/utils/error-handler';
+import { ROUTES } from '@/lib/utils/constants';
 import type { Bill } from '@/lib/schemas/finances/bill.schema';
 
 interface BillStatusActionsProps {
@@ -25,6 +27,7 @@ export function BillStatusActions({ bill }: BillStatusActionsProps) {
   const defer = useDeferBill();
   const cancel = useCancelBill();
   const reactivate = useReactivateBill();
+  const router = useRouter();
 
   if (bill.id === undefined) return null;
   const billId = bill.id;
@@ -32,14 +35,16 @@ export function BillStatusActions({ bill }: BillStatusActionsProps) {
   function run(
     action: { mutate: typeof suspend.mutate },
     successMessage: string,
-    errorContext: string,
+    errorFallback: string
   ) {
     action.mutate(billId, {
       onSuccess: () => {
         toast.success(successMessage);
       },
       onError: (error) => {
-        handleError(error, errorContext);
+        showFinanceMutationError(error, errorFallback, () =>
+          router.push(ROUTES.FINANCES_MONTH_CLOSE)
+        );
       },
     });
   }
@@ -50,7 +55,9 @@ export function BillStatusActions({ bill }: BillStatusActionsProps) {
     <>
       {isActive ? (
         <>
-          <DropdownMenuItem onClick={() => run(suspend, 'Conta suspensa', 'Erro ao suspender conta')}>
+          <DropdownMenuItem
+            onClick={() => run(suspend, 'Conta suspensa', 'Erro ao suspender conta')}
+          >
             <PauseCircle className="mr-2 h-4 w-4" />
             Suspender
           </DropdownMenuItem>
@@ -58,7 +65,9 @@ export function BillStatusActions({ bill }: BillStatusActionsProps) {
             <CalendarClock className="mr-2 h-4 w-4" />
             Deferir
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => run(cancel, 'Conta cancelada', 'Erro ao cancelar conta')}>
+          <DropdownMenuItem
+            onClick={() => run(cancel, 'Conta cancelada', 'Erro ao cancelar conta')}
+          >
             <Ban className="mr-2 h-4 w-4" />
             Cancelar
           </DropdownMenuItem>

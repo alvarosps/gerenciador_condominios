@@ -31,6 +31,8 @@ O `core` legado misturava finanças pessoais do locador com o caixa do condomín
 - "Hoje / mês corrente" só via `core.services.timezone.today_sp()` (settings é UTC).
 - Geração mensal (`BillGenerationService.ensure_month_bills`) é **idempotente e race-safe** (get_or_create nas partial-uniques + tolerância a IntegrityError).
 - FKs de origem do `Bill` usam `SET_NULL` — apagar a fonte nunca apaga o histórico.
+- `Bill.amount_is_estimated` (BooleanField, default `False`): `True` quando a bill nasce da geração mensal (`BillGenerationService._ensure_account_bill`, inclusive via parcela embutida); `False` em `create_with_lines`/`update_with_lines`/`pay`/`apply_invoice`; `unpay` NUNCA re-marca. Badge "valor estimado" no frontend; conta com `expected_amount=0` gera bill sem linha ("aguardando fatura").
+- `BillingAccountQuerySet.with_open_balance(today)` → anotação `open_balance` = soma de `amount_total − amount_paid` das bills não-canceladas (ACTIVE+SUSPENDED+DEFERRED), somando os DOIS braços de FK (`billing_account` direto **e** `installment__plan__billing_account` — sem o segundo, conta IPTU registry-only zeraria).
 
 ## Fechamento mensal (`CondoMonthClose`)
 
@@ -39,6 +41,14 @@ Snapshot imutável: ao fechar, as figuras (income_total/expenses_total/net/cash)
 ## Contas tipadas + parser de fatura
 
 Statements (água/luz) são 1:1 com a Bill e **só leituras**. O parser DMAE/CEEE roda **em memória, sem anexar o PDF** (`POST /api/finances/bills/parse_invoice/` lê → monta o rascunho → descarta o PDF). IPTU é conta-registro (não auto-gera): planos avulsos + dívida diferida; alerta IPTU = banner load-bearing + push agregado SP-aware via o cron `send_finance_alerts`.
+
+## Cockpit operacional (`month_board`, extrato por conta, consolidação de dívida)
+
+- **`CondoMonthBoardService.build(year, month, today)`** → `GET finance-dashboard/month_board?year&month` (**sem cache**, `IsAdminUser`): payload `{ overdue[], deferred_suspended[], groups[], totals{due,paid,remaining,overdue}, generation{missing_count} }`. `overdue` = bills `ACTIVE` com resto>0 e `due_date<hoje`, **qualquer competência** (critério próprio, não reusa `is_overdue`/`overdue` legado); `deferred_suspended` = `SUSPENDED`/`DEFERRED` com resto>0, **fora dos totais do mês**; `groups` = bills `ACTIVE` da competência (pagas incluídas), agrupadas por prédio (bucket sem prédio = "Condomínio", por último); `CANCELED` nunca aparece; `generation.missing_count` = contas elegíveis (`BillGenerationService.is_account_eligible`) sem bill não-deletada no mês.
+- **`AccountStatementService.build(account_id, today)`** → `GET billing-accounts/{id}/statement` (**sem cache**, `IsAdminUser`, 404 se conta inexistente): payload `{ account, stats{open_balance, open_bills_count, avg_delay_days}, months[], plans[] }`. Bills agregadas por `Q(billing_account=conta) | Q(installment__plan__billing_account=conta)`; `avg_delay_days` = média de `paid_date − due_date` das últimas 12 bills **quitadas** (`amount_remaining=0` **e** `amount_total>0`), só alocações/payments vivos (espelha `with_amounts`); `months[]` exclui `CANCELED`.
+- **`POST bills/{id}/apply_invoice`** (MultiPartParser, `IsAdminUser`): reparsa o PDF em memória e aplica direto à bill alvo via `BillService.update_with_lines` na mesma transação (substitui só linhas sem FK `installment`; limpa `amount_is_estimated`); 400 PT se conta/competência/prédio divergem, bill não-`ACTIVE`, paga/parcial, ou mês fechado. Resposta = bill serializada (sem `warnings` — o preview é feito via `parse_invoice`, passo 1 do fluxo de 2 passos).
+- **`InstallmentPlanService.consolidate_open_bills`** → `POST billing-accounts/{id}/consolidate_debt` `{bill_ids[], embedded, installment_count, start_due_date, default_due_day}` → 201 com o plano: cria 1 `InstallmentPlan` (`total = Σ amount_remaining` das bills selecionadas, parciais contam o resto) e **cancela as bills de origem na mesma transação** (evita dupla contagem em Atrasadas/`open_balance`). Rejeita bill com FK `installment` viva ou linha de parcela embutida de plano vivo ("pureza v1" — trate/cancele o plano antigo antes).
+- Fechamento mensal ganhou um **preflight no frontend** (não altera `close`/`reopen` no backend): antes de confirmar o fechamento, a UI busca o `month_board` da competência e lista as bills em aberto, exigindo confirmação explícita quando há alguma; falha na busca não bloqueia o fechamento (informativo, o guard real continua no backend via `CondoMonthCloseService.assert_open`).
 
 ## Permissões e RLS
 
@@ -49,4 +59,4 @@ Statements (água/luz) são 1:1 com a Bill e **só leituras**. O parser DMAE/CEE
 
 `finance-categories`, `billing-accounts`, `bills`, `bill-skips`, `payments`, `installment-plans`, `installments`, `employees`, `reserves`, `reserve-movements`, `income-entries`, `condo-month-closes`, `finance-dashboard`, `finance-cash-flow`.
 
-**Actions:** `bills/{id}/{pay,suspend}/`, `bills/{bulk_pay,generate_month,create_with_lines,parse_invoice}/`, `bills/{id}/update_with_lines/`, `condo-month-closes/{close,reopen}/`, `finance-dashboard/{overview,monthly_balance,iptu_alerts,overdue,combined_calendar,by_category,by_owner}`, `finance-cash-flow/projection`.
+**Actions:** `bills/{id}/{pay,suspend,defer,cancel,reactivate}/`, `bills/{bulk_pay,generate_month,create_with_lines,parse_invoice}/`, `bills/{id}/{update_with_lines,apply_invoice}/`, `billing-accounts/{id}/{statement,consolidate_debt}/`, `condo-month-closes/{close,reopen}/`, `finance-dashboard/{overview,monthly_balance,iptu_alerts,overdue,combined_calendar,by_category,by_owner,month_board}`, `finance-cash-flow/{projection,simulate}`.

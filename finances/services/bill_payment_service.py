@@ -29,6 +29,7 @@ from core.services.timezone import today_sp
 from finances.models import (
     Bill,
     BillLifecycleState,
+    BillLineItem,
     FundedFrom,
     Payment,
     PaymentAllocation,
@@ -42,15 +43,20 @@ logger = logging.getLogger(__name__)
 
 
 class _BillRemaining(Protocol):
-    # Bill.objects.with_amounts(today) annotates amount_remaining; django-stubs does not
-    # propagate dynamic annotations onto the model instance, so we read it via this cast.
+    # Bill.objects.with_amounts(today) annotates amount_remaining/amount_total; django-stubs
+    # does not propagate dynamic annotations onto the model instance, so we read them via cast.
     amount_remaining: Decimal
+    amount_total: Decimal
 
 
 _AMOUNT_NON_POSITIVE = "O valor do pagamento deve ser positivo."
 _OVER_ALLOCATION = "O valor do pagamento excede o saldo devedor da conta."
 _NO_RESERVE = "Nenhuma reserva configurada para o condomínio."
 _BILL_NOT_ACTIVE = "Só é possível pagar uma conta ativa."
+_ESTIMATED_MULTIPLE_LINES = "A conta estimada tem mais de uma linha — edite a conta pelas linhas."
+_NEW_TOTAL_BELOW_INSTALLMENTS = "O novo total é menor que a soma das parcelas embutidas da conta."
+_NEW_TOTAL_BELOW_TOTAL = "Edite a conta para reduzir o valor."
+_SURCHARGE_DESCRIPTION = "Juros/multa"
 
 
 class BillPaymentService:
@@ -62,6 +68,7 @@ class BillPaymentService:
         payment_date: date,
         amount: Decimal | None = None,
         funded_from: str = FundedFrom.CAIXA,
+        new_total: Decimal | None = None,
         user: User | None = None,
     ) -> Payment:
         """Pay a Bill (partial or total). Σ(allocation) == payment.amount; over-allocation rejected.
@@ -70,6 +77,18 @@ class BillPaymentService:
         ReserveMovement(withdrawal, bill=..., payment=...) with a balance guard (design §4.3).
         Only an ACTIVE bill is payable — a CANCELED/SUSPENDED/DEFERRED one would be a double
         charge (its expense is already excluded from the result), so it is rejected (PT 400).
+        A payment (total OR partial) means the real value is now known, so a still-estimated
+        bill has its amount_is_estimated flag cleared in the SAME transaction (S65) — bulk_pay
+        covers this by delegating to pay() per bill.
+
+        new_total (S68, design §3.3/§9): when the real value differs from the current total
+        (estimated bill) or a late invoice adds interest (confirmed bill), adjusts amount_total
+        to exactly new_total BEFORE allocating, in the SAME transaction, via _apply_new_total —
+        never by summing amount_remaining + delta in Python. The over-allocation/positive-amount
+        guards below therefore run AFTER the adjustment (remaining is re-read post-adjustment),
+        so amount=None defaults to the adjusted remaining and a bad amount rolls the adjustment
+        back with everything else (atomic). Installment-linked lines (BillLineItem.installment
+        set) are never touched by the adjustment, in any branch.
         """
         CondoMonthCloseService.assert_open(bill.competence_month)
         CondoMonthCloseService.assert_open(payment_date.replace(day=1))
@@ -78,6 +97,8 @@ class BillPaymentService:
         today = today_sp()
         with transaction.atomic():
             locked = Bill.objects.select_for_update().get(pk=bill.pk)
+            if new_total is not None:
+                BillPaymentService._apply_new_total(locked, new_total, user)
             # amount_remaining is the with_amounts annotation (never sum in Python, design §4.4).
             annotated = cast(_BillRemaining, Bill.objects.with_amounts(today).get(pk=locked.pk))
             remaining: Decimal = annotated.amount_remaining
@@ -106,6 +127,11 @@ class BillPaymentService:
                 BillPaymentService._withdraw_reserve_for_bill(
                     locked, payment, amount, payment_date, user
                 )
+            if locked.amount_is_estimated:
+                locked.amount_is_estimated = False
+                locked.updated_by = user
+                # AuditMixin.save appends updated_at to update_fields automatically.
+                locked.save(update_fields=["amount_is_estimated", "updated_by"])
             logger.info("Bill %s paid %s (funded_from=%s)", locked.pk, amount, funded_from)
         return payment
 
@@ -128,6 +154,86 @@ class BillPaymentService:
                 movement.delete(deleted_by=user)
             payment.delete(deleted_by=user)
             logger.info("Payment %s reversed", payment.pk)
+
+    @staticmethod
+    def _apply_new_total(bill: Bill, new_total: Decimal, user: User | None) -> None:
+        """Adjust bill's amount_total to exactly new_total, before allocation (S68).
+
+        Dispatches on the S65 amount_is_estimated flag: an estimated bill adjusts (or creates)
+        its single seed line by delta; a confirmed bill (any number of lines — an imported
+        multi-line invoice paid late is exactly the Juros/multa case) only ever grows via a
+        surcharge line, never shrinks (that is an edit, not a payment).
+        """
+        if bill.amount_is_estimated:
+            BillPaymentService._adjust_estimated_seed(bill, new_total, user)
+        else:
+            BillPaymentService._append_surcharge_line(bill, new_total, user)
+
+    @staticmethod
+    def _adjust_estimated_seed(bill: Bill, new_total: Decimal, user: User | None) -> None:
+        """Adjust (or create) the single non-installment seed line of an estimated bill by delta.
+
+        Installment-linked lines are never seeds (they are the embedded parcela, S41) and are
+        excluded from both the count and the adjustment. Exactly one seed -> shift its amount by
+        (new_total - current total); zero seeds ("aguardando fatura", expected_amount=0 at
+        generation) -> create one in the shape BillGenerationService._ensure_account_bill uses;
+        more than one is an ambiguous edit, rejected (PT). full_clean() enforces amount >= 0 —
+        the seed CAN land on exactly 0 (new_total == the embedded installments' sum) but never
+        negative.
+        """
+        seeds = list(BillLineItem.objects.filter(bill=bill, installment__isnull=True))
+        current_total = cast(
+            _BillRemaining, Bill.objects.with_amounts(today_sp()).get(pk=bill.pk)
+        ).amount_total
+        delta = new_total - current_total
+        if len(seeds) == 0:
+            seed = BillLineItem(
+                bill=bill,
+                description=bill.description,
+                amount=delta,
+                is_offset=False,
+                category=bill.category,
+                created_by=user,
+                updated_by=user,
+            )
+        elif len(seeds) == 1:
+            seed = seeds[0]
+            seed.amount += delta
+            seed.updated_by = user
+        else:
+            raise ValidationError(_ESTIMATED_MULTIPLE_LINES)
+        if seed.amount < 0:
+            raise ValidationError(_NEW_TOTAL_BELOW_INSTALLMENTS)
+        seed.full_clean(exclude=["bill"])
+        seed.save()
+
+    @staticmethod
+    def _append_surcharge_line(bill: Bill, new_total: Decimal, user: User | None) -> None:
+        """Grow a confirmed bill's total to new_total via a 'Juros/multa' line; never shrink it.
+
+        Applies regardless of how many lines the bill already has (an imported CEEE/DMAE
+        multi-line invoice paid late is exactly this case). Equal totals are a no-op; a lower
+        new_total is rejected (PT) — reducing a confirmed total is an edit (update_with_lines),
+        not a payment.
+        """
+        current_total = cast(
+            _BillRemaining, Bill.objects.with_amounts(today_sp()).get(pk=bill.pk)
+        ).amount_total
+        if new_total < current_total:
+            raise ValidationError(_NEW_TOTAL_BELOW_TOTAL)
+        if new_total == current_total:
+            return
+        surcharge = BillLineItem(
+            bill=bill,
+            description=_SURCHARGE_DESCRIPTION,
+            amount=new_total - current_total,
+            is_offset=False,
+            category=None,
+            created_by=user,
+            updated_by=user,
+        )
+        surcharge.full_clean(exclude=["bill"])
+        surcharge.save()
 
     @staticmethod
     def _withdraw_reserve_for_bill(

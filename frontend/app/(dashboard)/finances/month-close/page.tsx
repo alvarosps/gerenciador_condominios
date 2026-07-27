@@ -210,6 +210,11 @@ export default function MonthClosePage() {
 
   const isPending = closeMutation.isPending || reopenMutation.isPending;
 
+  // Split the dialog's own competence — the SAME `reference_month` split used by handleConfirm
+  // (never `new Date`) — so the preflight fetches the board for the record actually shown, not
+  // the header's currently-selected month.
+  const [dialogYear, dialogMonth] = (dialogRecord?.reference_month ?? '').split('-').map(Number);
+
   return (
     <div>
       <PageHeader
@@ -269,6 +274,8 @@ export default function MonthClosePage() {
         open={dialogRecord !== null}
         close={dialogRecord}
         action={dialogAction}
+        year={dialogYear ?? 0}
+        month={dialogMonth ?? 0}
         isPending={isPending}
         onConfirm={() => {
           void handleConfirm();

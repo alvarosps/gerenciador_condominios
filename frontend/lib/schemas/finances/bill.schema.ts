@@ -70,6 +70,8 @@ export const billSchema = z.object({
   is_overdue: z.boolean().optional(),
   // Derived structural type (água/luz directly, IPTU parcela via installment→plan, else generic).
   account_type: billingAccountTypeEnum.optional(),
+  // Whether the bill's total is a placeholder pending the real invoice (S65).
+  amount_is_estimated: z.boolean().default(false),
   created_at: z.string().optional(),
   updated_at: z.string().optional(),
 });

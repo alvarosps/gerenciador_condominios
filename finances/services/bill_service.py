@@ -278,6 +278,42 @@ class BillService:
         bill.save(update_fields=[*changed, "updated_by"])
 
     @staticmethod
+    def _write_lines_preserving_installments(
+        bill: Bill, lines: list[BillLineInput], user: User | None
+    ) -> None:
+        """Replace the bill's non-parcela lines; an embedded-installment line is NEVER replaced.
+
+        Only ``BillLineItem.objects.filter(bill=bill, installment__isnull=True)`` is soft-deleted
+        — a line carrying the ``installment`` FK (the embedded parcela materialized by
+        generation/S41) survives with its original pk, untouched. An incoming line whose
+        ``installment`` already has a LIVE line on this bill (either pre-existing OR already
+        queued earlier in THIS same payload — ``live_installment_ids`` is updated as each
+        incoming line is accepted, so a payload that repeats the same installment twice dedupes
+        the second occurrence too) is a re-send (the modal resubmits the locked parcela line,
+        S63; the parser re-emits the reconciled 'PARCELA X/N' line, S69) and is skipped — dedup
+        on (bill, installment), mirroring BillGenerationService._generate_embedded_lines
+        (bill_generation_service.py:207), so the parcela's money is never doubled. An incoming
+        line with an ``installment`` that has no live line yet is created normally (a new
+        parcela entering this bill for the first time).
+        """
+        for existing_line in BillLineItem.objects.filter(bill=bill, installment__isnull=True):
+            existing_line.delete(deleted_by=user)
+        live_installment_ids = set(
+            BillLineItem.objects.filter(bill=bill, installment__isnull=False).values_list(
+                "installment_id", flat=True
+            )
+        )
+        to_write: list[BillLineInput] = []
+        for incoming_line in lines:
+            installment = incoming_line.get("installment")
+            if installment is not None:
+                if installment.pk in live_installment_ids:
+                    continue  # dedup: this parcela already has a live line on the bill
+                live_installment_ids.add(installment.pk)
+            to_write.append(incoming_line)
+        BillService._write_lines(bill, to_write, user)
+
+    @staticmethod
     def update_with_lines(
         bill: Bill,
         lines: list[BillLineInput],
@@ -291,19 +327,26 @@ class BillService:
         with_amounts — never summed in Python) and its competence month is OPEN
         (CondoMonthCloseService.assert_open). When ``header`` is given (a re-imported corrected
         invoice), its editable fields (due_date/external_identifier/issue_date/building/category/…)
-        are persisted in the SAME atomic transaction; competence_month stays immutable. Old lines
-        are soft-deleted (audit history kept); with_amounts ignores soft-deleted lines. Raises (PT)
-        when paid or month closed.
+        are persisted in the SAME atomic transaction; competence_month stays immutable. Only lines
+        WITHOUT the ``installment`` FK are replaced — an embedded-parcela line is untouchable, and
+        an incoming line whose parcela already has a live line is deduped, never doubled (S69, see
+        ``_write_lines_preserving_installments``); with_amounts ignores soft-deleted lines. The
+        lines replaced here are a confirmed real value, so a still-estimated bill has its
+        amount_is_estimated flag cleared in the SAME transaction (S65 — a bill already confirmed
+        stays False, no-op). Raises (PT) when paid or month closed.
         """
         assert_not_paid(bill)
         CondoMonthCloseService.assert_open(bill.competence_month)
         with transaction.atomic():
             if header is not None:
                 BillService._apply_header(bill, header, user)
-            for line in BillLineItem.objects.filter(bill=bill):
-                line.delete(deleted_by=user)
-            BillService._write_lines(bill, lines, user)
+            BillService._write_lines_preserving_installments(bill, lines, user)
             BillService._upsert_statement(bill, bill.billing_account, statement, user)
+            if bill.amount_is_estimated:
+                bill.amount_is_estimated = False
+                bill.updated_by = user
+                # AuditMixin.save appends updated_at to update_fields automatically.
+                bill.save(update_fields=["amount_is_estimated", "updated_by"])
         return bill
 
     @staticmethod
