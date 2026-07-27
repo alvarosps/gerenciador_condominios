@@ -163,17 +163,33 @@ class TestAllocateFifoPure:
         assert totals["saldo_credor"] == Decimal(0)
 
     def test_pool_only_receives_settlements_up_to_the_month(self) -> None:
-        """A settlement in July cannot pay a June charge — June stays overdue."""
+        """Availability is min(settlement month, first month) once the money has been handed over.
+
+        With current_month=AUGUST a JULY settlement is already made, so it clears the JUNE
+        charge — the routine "settle the previous month" case (design §6.2, rev. 3).
+        """
         charges = [MonthCharge(month=JUNE, devido=Decimal("300.00"))]
         settlements = [Settlement(month=JULY, amount=Decimal("300.00"))]
 
         rows, totals = allocate_fifo(charges, settlements, current_month=AUGUST)
 
         june = next(row for row in rows if row.month == JUNE)
+        assert june.aplicado == Decimal("300.00")
+        assert june.resto == Decimal(0)
+        assert june.status == "paid"
+        assert totals["total_atrasado"] == Decimal(0)
+        assert totals["saldo_credor"] == Decimal(0)
+
+    def test_pool_withholds_a_settlement_dated_in_the_future(self) -> None:
+        """The other half of the cut: money not yet handed over cannot clear anything."""
+        charges = [MonthCharge(month=JUNE, devido=Decimal("300.00"))]
+        settlements = [Settlement(month=AUGUST, amount=Decimal("300.00"))]
+
+        rows, totals = allocate_fifo(charges, settlements, current_month=JULY)
+
+        june = next(row for row in rows if row.month == JUNE)
         assert june.aplicado == Decimal(0)
-        assert june.resto == Decimal("300.00")
         assert june.status == "overdue"
-        assert totals["total_atrasado"] == Decimal("300.00")
         assert totals["saldo_credor"] == Decimal("300.00")
 
     def test_negative_devido_credit_propagates_forward(self) -> None:
@@ -462,9 +478,31 @@ class TestSettlements:
     def test_settlement_after_the_charge_month_does_not_backfill_it(
         self, condominium: Condominium, person: Person
     ) -> None:
-        """Temporal cut: a July settlement cannot make June green (design §6.2)."""
+        """An ALREADY-MADE settlement DOES clear an earlier month (design §6.2, rev. 3).
+
+        The owners settle the previous month as a matter of routine — June paid on 10 July is
+        normal, not late. Refusing it would report "atrasado R$500" to someone who already paid
+        and leave the money dangling in saldo_credor. What stays blocked is the future-dated
+        settlement (see test_future_dated_settlement_cannot_green_an_earlier_month).
+        """
         purchase(condominium, person, "500.00", JUNE)
-        settle(condominium, person, "500.00", date(2026, 7, 10))
+        settle(condominium, person, "500.00", date(2026, 7, 10))  # <= TODAY (2026-07-15)
+
+        result = ThirdPartyStatementService.build(person.pk, TODAY)
+
+        june = month_row(result, JUNE)
+        assert june["aplicado"] == "500.00"
+        assert june["resto"] == "0.00"
+        assert june["status"] == "paid"
+        assert result["totals"]["total_atrasado"] == "0.00"
+        assert result["totals"]["saldo_credor"] == "0.00"
+
+    def test_future_dated_settlement_cannot_green_an_earlier_month(
+        self, condominium: Condominium, person: Person
+    ) -> None:
+        """The hazard the temporal cut still blocks: money that has NOT been handed over yet."""
+        purchase(condominium, person, "500.00", JUNE)
+        settle(condominium, person, "500.00", date(2026, 9, 10))  # > TODAY (2026-07-15)
 
         result = ThirdPartyStatementService.build(person.pk, TODAY)
 
@@ -488,9 +526,11 @@ class TestSettlements:
     def test_realistic_sequence_ends_at_zero(
         self, condominium: Condominium, person: Person
     ) -> None:
-        # May: compra 400; acerto parcial 150 -> resto 250 (overdue)
-        # June: compra 200 -> devido 200; acerto 450 em junho paga 250 (maio? não: FIFO só
-        #       avança) — o pool de junho tem 450, paga junho (200) e sobra 250 de crédito.
+        # Cobrado 600 (maio 400 + junho 200); acertado 600 (150 em maio + 450 em junho).
+        # Hoje é 15/07, então os DOIS acertos já foram feitos e ficam disponíveis desde o
+        # início da janela (design §6.2, rev. 3) — FIFO quita maio (400) e depois junho (200),
+        # e a pessoa fica zerada. Antes da rev. 3 este mesmo cenário deixava maio "atrasado
+        # 250" com 250 pendurados em saldo_credor, apesar de tudo ter sido pago.
         purchase(condominium, person, "400.00", MAY)
         settle(condominium, person, "150.00", date(2026, 5, 20))
         purchase(condominium, person, "200.00", JUNE)
@@ -500,9 +540,9 @@ class TestSettlements:
 
         may = month_row(result, MAY)
         assert may["devido"] == "400.00"
-        assert may["aplicado"] == "150.00"
-        assert may["resto"] == "250.00"
-        assert may["status"] == "overdue"
+        assert may["aplicado"] == "400.00"
+        assert may["resto"] == "0.00"
+        assert may["status"] == "paid"
         june = month_row(result, JUNE)
         assert june["devido"] == "200.00"
         assert june["aplicado"] == "200.00"
@@ -510,10 +550,10 @@ class TestSettlements:
         assert june["status"] == "paid"
         totals = result["totals"]
         assert totals["total_devido"] == "600.00"
-        assert totals["total_pago"] == "350.00"
-        assert totals["total_em_aberto"] == "250.00"
-        assert totals["total_atrasado"] == "250.00"
-        assert totals["saldo_credor"] == "250.00"
+        assert totals["total_pago"] == "600.00"
+        assert totals["total_em_aberto"] == "0.00"
+        assert totals["total_atrasado"] == "0.00"
+        assert totals["saldo_credor"] == "0.00"  # cobrado == acertado, ninguém fica devendo
 
 
 # --- 5. build(): window, shape and items --------------------------------------------

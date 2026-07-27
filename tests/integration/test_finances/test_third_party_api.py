@@ -662,7 +662,10 @@ def test_people_orders_by_open_debt_desc_and_omits_whoever_owes_nothing(
     rows = response.data
     assert [row["person_id"] for row in rows] == [other_person.pk, person.pk]
     assert rows[0]["total_em_aberto"] == "450.00"
-    assert rows[0]["total_atrasado"] == "100.00"
+    # A compra é de JUNHO e o acerto de 05/07 já foi feito (hoje 15/07), então ele abate junho
+    # (design §6.2, rev. 3) e o que sobra dele — 450 — está atrasado por inteiro. Antes da rev. 3
+    # o acerto não alcançava junho e ficava pendurado em saldo_credor.
+    assert rows[0]["total_atrasado"] == "450.00"
     assert rows[0]["last_settlement_date"] == date(2026, 7, 5)
     assert rows[1]["total_em_aberto"] == "100.00"
     assert rows[1]["last_settlement_date"] is None

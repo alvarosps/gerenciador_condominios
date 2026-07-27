@@ -155,10 +155,15 @@ def allocate_fifo(
     Pure function over already-fetched lists — no I/O, so it is testable in isolation and the
     ORM work stays in ``build``.
 
-    **Temporal cut**: at month M only settlements whose ``settlement_date`` falls in M or earlier
-    enter the pool. Without it a January settlement would clear a June purchase, painting a month
-    green before the debt even existed and making ``total_atrasado`` — the one number the owners
-    actually look at — lie.
+    **Temporal cut**: a settlement joins the pool at ``min(its month, current_month)``. In other
+    words, money ALREADY handed over (``settlement_date <= today``) pays off earlier months, while
+    a future-dated settlement waits for its month.
+
+    The owners pay the previous month's bills as a matter of routine (a June purchase settled on
+    5 July is normal, not late), so refusing to let a past settlement clear June would report
+    "atrasado R$300" to someone who already paid R$120 and leave that money dangling in
+    ``saldo_credor``. What the cut still prevents is the real hazard: a settlement dated in the
+    FUTURE cannot paint a month green before the money exists.
 
     A month with negative ``devido`` (offset lines outweigh charges) is a credit: its absolute
     value joins the pool and propagates forward instead of being "collected".
@@ -166,7 +171,24 @@ def allocate_fifo(
     ``total_devido`` sums ``max(0, devido)`` (design §6.3): summing signed months would let a
     credit month cancel a charge month and report "R$ 0 owed" to someone who is owed money.
     """
-    pending = sorted(settlements, key=lambda settlement: settlement.month)
+    # Availability month: a settlement ALREADY made (month <= current_month) is available from the
+    # first month of the window — the owners routinely settle June in July, and that money must
+    # clear June rather than sit in saldo_credor while June reads "atrasado". A FUTURE-dated
+    # settlement stays parked at its own month, so it can never green a month before the money
+    # exists.
+    first_month = charges[0].month if charges else current_month
+    pending = sorted(
+        (
+            Settlement(
+                month=min(settlement.month, first_month)
+                if settlement.month <= current_month
+                else settlement.month,
+                amount=settlement.amount,
+            )
+            for settlement in settlements
+        ),
+        key=lambda settlement: settlement.month,
+    )
     next_settlement = 0
 
     pool = ZERO
@@ -260,10 +282,26 @@ def _default_condominium_id() -> int:
 
 
 def _payments_queryset(person_id: int, condominium_id: int) -> QuerySet[Payment]:
+    """Third-party payments that are THEMSELVES a debt — never the ones settling a purchase.
+
+    Both sides of ``devido`` (§6.1) count money the person spent for the owners, but a purchase
+    produces BOTH a ``Bill(paid_by_person=P)`` AND the ``Payment(THIRD_PARTY, paid_by=P)`` that
+    marks it born-paid (§3.1/§4.5). Counting both doubles the same R$: a R$300 purchase reported
+    R$600 owed, and ``total_atrasado`` — the one figure the owners actually look at — reported
+    double. The purchase Bill is the debt; that payment is only the mechanism that settles it.
+
+    So exclude payments allocated to a purchase Bill (``bill.paid_by_person`` set), and keep the
+    ones settling an ORDINARY condominium bill (water/power/IPTU paid on the person's card),
+    which have no purchase Bill representing them and would otherwise vanish from the statement.
+    ``allocations__is_deleted=False``: a reversed allocation must not keep excluding the payment.
+    """
     return Payment.objects.filter(
         condominium_id=condominium_id,
         funded_from=FundedFrom.THIRD_PARTY,
         paid_by_id=person_id,
+    ).exclude(
+        allocations__is_deleted=False,
+        allocations__bill__paid_by_person__isnull=False,
     )
 
 

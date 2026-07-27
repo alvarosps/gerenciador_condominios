@@ -234,16 +234,30 @@ Porta direta da regra do *family loans*, com a direção invertida. **Função p
 
 ```
 devido(M) = Σ pagamentos de contas feitos pela pessoa (funded_from=THIRD_PARTY, paid_by=P, payment_date em M)
+              EXCETO os que quitam uma Bill de compra dela      <-- ver dupla contagem
           + Σ amount_total das Bills de compra da pessoa (paid_by_person=P, competence_month = M, não canceladas)
 ```
+
+**Dupla contagem (bug achado na execução da S80, corrigido).** Uma compra nasce paga (§3.1), logo gera **as duas coisas**: a `Bill(paid_by_person=P)` **e** o `Payment(THIRD_PARTY, paid_by=P)` que a quita. Somar os dois lados sem filtro conta o **mesmo dinheiro duas vezes** — uma compra de R$300 reportava R$600 devidos, e `total_atrasado` (o número que os proprietários olham) vinha dobrado.
+
+A `Bill` de compra **é** a dívida; aquele pagamento é só o mecanismo que a marca paga. Portanto excluem-se os pagamentos alocados a uma bill com `paid_by_person`. Mantêm-se os que quitam uma conta **comum** do condomínio (água/luz/IPTU no cartão da pessoa) — esses não têm Bill de compra representando-os e sumiriam do extrato.
+
+Verificado nos dois cenários: compra de R$300 → devido R$300 (item `purchase`); terceiro paga conta de luz de R$200 → devido R$200 (item `payment`).
+
+**Por que a S79 não pegou:** o helper de teste dela criava a Bill de compra **sem** o pagamento, e o pagamento **sem** `paid_by_person` — a combinação "nasce paga", que é justamente a que a S80 produz, nunca foi exercitada. Cobertura de 100% e ainda assim o buraco existia.
 
 O agrupamento usa `payment_date` para pagamentos e `competence_month` para compras — a competência da compra é o **mês em que cai no cartão dele**, que é o análogo direto do `billingMonth` da referência. Numa compra parcelada, cada parcela é uma `Bill` com sua própria competência, então cada parcela cai no mês certo sem lógica extra.
 
 ### 6.2 Alocação FIFO (pura, sem I/O)
 
-**Pool com corte temporal (correção pós-revisão).** A referência *family loans* usa um pool único sem data, o que deixa um acerto de janeiro quitar uma compra de junho — o mês fica verde antes de a dívida existir, e `total_atrasado` mente. Como "atrasado" é justamente o número que os proprietários vão olhar, isso não serve.
+**Pool com corte temporal (rev. 3 — decidido pelo usuário em 2026-07-27).** A referência *family loans* usa um pool único sem data nenhuma, o que deixaria um acerto **ainda não feito** quitar uma compra — mês verde antes de o dinheiro existir.
 
-Regra: **no mês M só entram no pool os acertos com `settlement_date <= último dia de M`.** FIFO cronológico é preservado; sobra vira crédito para os meses seguintes, como antes.
+A primeira tentativa de corte (rev. 2: "no mês M só entram acertos datados até M") errou para o outro lado e quebrou a rotina real do usuário: **ele paga sempre o mês anterior**. Uma compra de junho acertada em 5 de julho é o caso NORMAL, e a regra reportava "junho atrasado R$300" com os R$120 pagos pendurados em `saldo_credor`, soltos.
+
+**Regra vigente:** um acerto fica disponível a partir de `min(mês do acerto, primeiro mês da janela)` **se já foi feito** (`settlement_date <= hoje`); um acerto **datado no futuro** fica parado no mês dele.
+
+- Dinheiro já entregue abate meses anteriores → a rotina "acertar o mês passado" funciona.
+- Dinheiro ainda não entregue não pinta mês nenhum de verde → o risco original continua bloqueado.
 
 **Armadilha do pseudocódigo (achada na implementação da S79):** implementar isso como um dicionário "acertos agrupados por mês da cobrança" **perde silenciosamente** todo acerto cujo mês não tem cobrança — ele some do `saldo_credor`. Usar ponteiro cronológico sobre a lista ordenada e, no fim, **drenar os acertos restantes** (posteriores à última cobrança) para o `saldo_credor`: são dinheiro já entregue.
 
