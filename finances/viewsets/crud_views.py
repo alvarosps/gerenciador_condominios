@@ -54,6 +54,7 @@ from finances.serializers import (
     ReserveMovementSerializer,
     ReserveSerializer,
 )
+from finances.services.account_statement_service import AccountStatementService
 from finances.services.bill_generation_service import BillGenerationService
 from finances.services.bill_lifecycle_service import BillLifecycleService
 from finances.services.bill_payment_service import BillPaymentService
@@ -124,7 +125,11 @@ class BillingAccountViewSet(viewsets.ModelViewSet):
     pagination_class = CustomPageNumberPagination
 
     def get_queryset(self) -> QuerySet[BillingAccount]:
-        queryset = BillingAccount.objects.select_related("building", "category", "condominium")
+        # with_open_balance(today_sp()) exposes the S67 open_balance annotation on every read
+        # (list + retrieve) — no cache here, same as before (design §4).
+        queryset = BillingAccount.objects.with_open_balance(today_sp()).select_related(
+            "building", "category", "condominium"
+        )
         params = self.request.query_params
         building_id = int_param(params, "building_id")
         if building_id is not None:
@@ -139,6 +144,16 @@ class BillingAccountViewSet(viewsets.ModelViewSet):
         if account_type is not None:
             queryset = queryset.filter(account_type=account_type)
         return queryset
+
+    @action(detail=True, methods=["get"])
+    def statement(self, request: Request, pk: str | None = None) -> Response:
+        # NO cache (design §4/§10): depends on payment state + today_sp(); midnight rollover is
+        # not a write, so cache would never be invalidated — same rationale as
+        # month_board/iptu_alerts/overdue.
+        account = self.get_object()  # 404 for unknown/soft-deleted account (live manager)
+        return Response(
+            AccountStatementService.build(account.pk, today_sp()), status=status.HTTP_200_OK
+        )
 
 
 class BillSkipViewSet(viewsets.ModelViewSet):

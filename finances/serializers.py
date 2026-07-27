@@ -149,6 +149,7 @@ class BillingAccountSerializer(serializers.ModelSerializer):
         required=False,
         allow_null=True,
     )
+    open_balance = serializers.SerializerMethodField()
 
     class Meta:
         model = BillingAccount
@@ -174,6 +175,7 @@ class BillingAccountSerializer(serializers.ModelSerializer):
             "tracking_start_month",
             "end_date",
             "notes",
+            "open_balance",
             "created_at",
             "updated_at",
         ]
@@ -233,6 +235,9 @@ class BillingAccountSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {"external_identifier": _ERR_DUPLICATE_BILLING_ACCOUNT}
             )
+
+    def get_open_balance(self, obj: BillingAccount) -> str:
+        return money_str(getattr(obj, "open_balance", Decimal(0)))
 
 
 class BillLineItemSerializer(serializers.ModelSerializer):
