@@ -253,6 +253,45 @@ def test_update_with_lines_dedups_incoming_installment_line() -> None:
     assert annotated.amount_total == Decimal("620.24")  # 90 + 530.24 — parcela never doubled
 
 
+def test_update_with_lines_dedups_installment_repeated_within_same_payload() -> None:
+    """The SAME installment sent twice in ONE payload, with no pre-existing live line for it,
+    must still create only ONE line — live_installment_ids has to be updated as each incoming
+    line is accepted, not just photographed once before the loop (review round 1, Minor 1)."""
+    account = make_billing_account(account_type="water", external_identifier="UC-REPEAT")
+    plan = make_installment_plan(
+        embedded=True,
+        billing_account=account,
+        lifecycle_state=InstallmentPlanState.ACTIVE,
+    )
+    installment = make_installment(plan=plan, number=1, amount=Decimal("200.00"))
+    bill = make_bill(
+        billing_account=account,
+        competence_month=date(2026, 6, 1),
+        behavior=BillBehavior.RECURRING,
+    )
+    # No pre-existing live installment line on this bill for `installment`.
+
+    BillService.update_with_lines(
+        bill,
+        [
+            {
+                "description": "Parcela 1/12",
+                "amount": Decimal("200.00"),
+                "installment": installment,
+            },
+            {
+                "description": "Parcela 1/12 (duplicada)",
+                "amount": Decimal("200.00"),
+                "installment": installment,
+            },
+        ],
+    )
+
+    assert BillLineItem.objects.filter(bill=bill, installment=installment).count() == 1
+    annotated = Bill.objects.with_amounts(date(2026, 7, 1)).get(pk=bill.pk)
+    assert annotated.amount_total == Decimal("200.00")
+
+
 def test_update_with_lines_creates_new_installment_line_when_absent() -> None:
     account = make_billing_account(account_type="water", external_identifier="UC-NEWLINE")
     plan = make_installment_plan(

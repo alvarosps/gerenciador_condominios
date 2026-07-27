@@ -286,12 +286,15 @@ class BillService:
         Only ``BillLineItem.objects.filter(bill=bill, installment__isnull=True)`` is soft-deleted
         — a line carrying the ``installment`` FK (the embedded parcela materialized by
         generation/S41) survives with its original pk, untouched. An incoming line whose
-        ``installment`` already has a LIVE line on this bill is a re-send (the modal resubmits the
-        locked parcela line, S63; the parser re-emits the reconciled 'PARCELA X/N' line, S69) and
-        is skipped — dedup on (bill, installment), mirroring
-        BillGenerationService._generate_embedded_lines (bill_generation_service.py:207), so the
-        parcela's money is never doubled. An incoming line with an ``installment`` that has no
-        live line yet is created normally (a new parcela entering this bill for the first time).
+        ``installment`` already has a LIVE line on this bill (either pre-existing OR already
+        queued earlier in THIS same payload — ``live_installment_ids`` is updated as each
+        incoming line is accepted, so a payload that repeats the same installment twice dedupes
+        the second occurrence too) is a re-send (the modal resubmits the locked parcela line,
+        S63; the parser re-emits the reconciled 'PARCELA X/N' line, S69) and is skipped — dedup
+        on (bill, installment), mirroring BillGenerationService._generate_embedded_lines
+        (bill_generation_service.py:207), so the parcela's money is never doubled. An incoming
+        line with an ``installment`` that has no live line yet is created normally (a new
+        parcela entering this bill for the first time).
         """
         for existing_line in BillLineItem.objects.filter(bill=bill, installment__isnull=True):
             existing_line.delete(deleted_by=user)
@@ -303,8 +306,10 @@ class BillService:
         to_write: list[BillLineInput] = []
         for incoming_line in lines:
             installment = incoming_line.get("installment")
-            if installment is not None and installment.pk in live_installment_ids:
-                continue  # dedup: this parcela already has a live line on the bill
+            if installment is not None:
+                if installment.pk in live_installment_ids:
+                    continue  # dedup: this parcela already has a live line on the bill
+                live_installment_ids.add(installment.pk)
             to_write.append(incoming_line)
         BillService._write_lines(bill, to_write, user)
 
