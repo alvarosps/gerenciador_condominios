@@ -95,6 +95,28 @@ export function formatMonthYear(year: number, month: number): string {
 }
 
 /**
+ * Format a YYYY-MM-01 competence month as "Junho/2026" via string split — never `new Date(iso)`
+ * (avoids the off-by-one-day/timezone pitfall `parseDateString` exists to work around). Shared by
+ * every competence-month column/label across the finances module (bills, account statement,
+ * consolidate-debt dialog).
+ */
+export function competenceMonthLabel(competenceMonth: string): string {
+  const [year, month] = competenceMonth.split('-');
+  if (!year || !month) return competenceMonth;
+  return formatMonthYear(Number(year), Number(month));
+}
+
+/**
+ * Format a YYYY-MM-DD date as DD/MM/YYYY via string split — never `new Date(iso)`. Shared by
+ * every due-date column/label across the finances module.
+ */
+export function dueDateLabel(dueDate: string): string {
+  const [year, month, day] = dueDate.split('-');
+  if (!year || !month || !day) return dueDate;
+  return `${day}/${month}/${year}`;
+}
+
+/**
  * Format date to ISO format (YYYY-MM-DD) for API
  */
 export function formatDateISO(date: Date | null | undefined): string {

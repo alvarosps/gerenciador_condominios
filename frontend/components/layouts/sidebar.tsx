@@ -39,6 +39,31 @@ interface SidebarProps {
   onNavigate?: () => void;
 }
 
+/**
+ * A route key is a "candidate" for the current pathname when it is an exact match or a path
+ * segment prefix of it (`/finances/accounts` matches `/finances/accounts/7`, never
+ * `/finances/accountsX`).
+ */
+function isRouteCandidate(pathname: string, key: string): boolean {
+  return pathname === key || pathname.startsWith(`${key}/`);
+}
+
+/**
+ * Longest-match route resolution: among every key in `keys` that is a candidate for `pathname`
+ * (see `isRouteCandidate`), only the longest one is the active route. Plain prefix matching is
+ * not enough — sibling routes are themselves prefixes of one another (e.g. `/financial` is a
+ * prefix of `/financial/expenses`), so without picking the longest candidate a parent route
+ * would falsely light up alongside its more specific sibling/child.
+ */
+function resolveActiveKey(pathname: string, keys: string[]): string | null {
+  let best: string | null = null;
+  for (const key of keys) {
+    if (!isRouteCandidate(pathname, key)) continue;
+    if (best === null || key.length > best.length) best = key;
+  }
+  return best;
+}
+
 export function Sidebar({ onNavigate }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -141,8 +166,18 @@ export function Sidebar({ onNavigate }: SidebarProps) {
       : []),
   ];
 
+  // Single longest-match resolution across every route in the sidebar (root items + every
+  // group's children) — a route is active only if its key is the longest candidate for the
+  // current pathname among ALL of them, so a group's root key (e.g. FINANCES_BILLS, reused as
+  // "Condomínio") never outranks a more specific child (e.g. FINANCES_ACCOUNTS) and vice versa.
+  const allRouteKeys = mainMenuItems.flatMap((item) => [
+    item.key,
+    ...(item.children ?? []).map((child) => child.key),
+  ]);
+  const activeKey = resolveActiveKey(pathname, allRouteKeys);
+
   const isChildActive = (children: SubMenuItem[]): boolean => {
-    return children.some((child) => pathname === child.key);
+    return children.some((child) => child.key === activeKey);
   };
 
   const handleMenuClick = (key: string): void => {
@@ -195,7 +230,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
                 {isExpanded && (
                   <div>
                     {item.children.map((child) => {
-                      const isActive = pathname === child.key;
+                      const isActive = child.key === activeKey;
                       return (
                         <button
                           key={child.key}
@@ -217,7 +252,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
             );
           }
 
-          const isActive = pathname === item.key;
+          const isActive = item.key === activeKey;
           return (
             <button
               key={item.key}
