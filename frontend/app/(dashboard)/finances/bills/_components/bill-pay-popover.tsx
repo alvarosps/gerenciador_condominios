@@ -27,6 +27,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { usePayBill } from '@/lib/api/hooks/use-bills';
+import { usePersons } from '@/lib/api/hooks/use-persons';
 import { showFinanceMutationError } from '@/lib/utils/error-handler';
 import { fundedFromValues } from '@/lib/schemas/finances/category.schema';
 import { ROUTES } from '@/lib/utils/constants';
@@ -67,6 +68,11 @@ interface BillPayPopoverProps {
   bill: Bill;
 }
 
+/** Sentinel for "no person chosen" — Radix Select forbids an empty-string item value. */
+const NO_PERSON = 'none';
+
+const EMPTY_FORM = { amount: '', funded_from: 'caixa', paid_by_person_id: 0 } as const;
+
 /** "Pagar" popover on the row (S75) — data default today, amount empty = remainder. */
 export function BillPayPopover({ bill }: BillPayPopoverProps) {
   const [open, setOpen] = useState(false);
@@ -74,23 +80,33 @@ export function BillPayPopover({ bill }: BillPayPopoverProps) {
   const [blockedMessage, setBlockedMessage] = useState<string | null>(null);
   const payBill = usePayBill();
   const router = useRouter();
+  // Only fetched to populate the "Terceiro" selector. The list is small and already cached by the
+  // rest of the app, so no extra gating is needed.
+  const { data: persons } = usePersons();
 
   const form = useForm<PaymentFormValues>({
     resolver: zodResolver(paymentFormSchema),
-    defaultValues: { amount: '', funded_from: 'caixa', payment_date: todayISO() },
+    defaultValues: { ...EMPTY_FORM, payment_date: todayISO() },
   });
+
+  const amountField = form.watch('amount');
+  const fundedFrom = form.watch('funded_from');
+  const paidByPersonId = form.watch('paid_by_person_id');
 
   if (bill.id === undefined) return null;
   const billId = bill.id;
   const resto = bill.amount_remaining ?? 0;
-  const amountField = form.watch('amount');
   const valor = amountField && amountField !== '' ? Number(amountField) : undefined;
   const showJurosMultaOption = !bill.amount_is_estimated && valor !== undefined && valor > resto;
+  const isThirdParty = fundedFrom === 'third_party';
+  // The backend also rejects a third-party payment with no person, but the user must never learn
+  // the rule from an error toast (S82 §1) — the button simply stays disabled.
+  const missingPerson = isThirdParty && paidByPersonId <= 0;
 
   function handleOpenChange(next: boolean) {
     setOpen(next);
     if (next) {
-      form.reset({ amount: '', funded_from: 'caixa', payment_date: todayISO() });
+      form.reset({ ...EMPTY_FORM, payment_date: todayISO() });
       setAddJurosMulta(false);
       setBlockedMessage(null);
     }
@@ -115,6 +131,9 @@ export function BillPayPopover({ bill }: BillPayPopoverProps) {
         ...(amount !== undefined ? { amount } : {}),
         funded_from: values.funded_from,
         ...(newTotal !== undefined ? { new_total: newTotal } : {}),
+        ...(values.funded_from === 'third_party'
+          ? { paid_by_person_id: values.paid_by_person_id }
+          : {}),
       },
       {
         onSuccess: () => {
@@ -208,6 +227,46 @@ export function BillPayPopover({ bill }: BillPayPopoverProps) {
               )}
             />
 
+            {isThirdParty && (
+              <FormField
+                control={form.control}
+                name="paid_by_person_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Quem pagou *</FormLabel>
+                    <Select
+                      onValueChange={(value) =>
+                        field.onChange(value === NO_PERSON ? 0 : Number(value))
+                      }
+                      // Always a DEFINED value: handing Radix `undefined` first and a string
+                      // later flips the Select from uncontrolled to controlled and silently
+                      // breaks the enclosing form's submit.
+                      value={field.value > 0 ? String(field.value) : NO_PERSON}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione a pessoa" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {(persons ?? []).map((person) =>
+                          person.id === undefined ? null : (
+                            <SelectItem key={person.id} value={String(person.id)}>
+                              {person.name}
+                            </SelectItem>
+                          )
+                        )}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Não sai do caixa: a conta é quitada e vira dívida com essa pessoa.
+                    </p>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+
             <FormField
               control={form.control}
               name="payment_date"
@@ -223,7 +282,7 @@ export function BillPayPopover({ bill }: BillPayPopoverProps) {
             />
 
             <div className="flex justify-end">
-              <Button type="submit" size="sm" disabled={payBill.isPending}>
+              <Button type="submit" size="sm" disabled={payBill.isPending || missingPerson}>
                 {payBill.isPending ? 'Pagando...' : 'Confirmar pagamento'}
               </Button>
             </div>

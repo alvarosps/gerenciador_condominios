@@ -8,8 +8,14 @@ import { type billLineItemSchema, type billSchema } from '@/lib/schemas/finances
 import { type parsedInvoiceSchema } from '@/lib/schemas/finances/invoice-parse.schema';
 import { type monthBoardSchema } from '@/lib/schemas/finances/month-board.schema';
 import { type accountStatementSchema } from '@/lib/schemas/finances/account-statement.schema';
+import {
+  type thirdPartyPersonSchema,
+  type thirdPartySettlementSchema,
+  type thirdPartyStatementSchema,
+} from '@/lib/schemas/finances/third-party.schema';
 import type { IptuAlertRow } from '@/lib/api/hooks/use-iptu-alerts';
 import type { BillSkip } from '@/lib/schemas/finances/bill-skip.schema';
+import { type personSimpleSchema } from '@/lib/schemas/credit-card.schema';
 import { type financeCategorySchema } from '@/lib/schemas/finances/category.schema';
 import { type employeeSchema } from '@/lib/schemas/finances/employee.schema';
 import {
@@ -52,6 +58,26 @@ type CondoMonthCloseRaw = z.input<typeof condoMonthCloseSchema>;
 type ParsedInvoiceRaw = z.input<typeof parsedInvoiceSchema>;
 type MonthBoardRaw = z.input<typeof monthBoardSchema>;
 type AccountStatementRaw = z.input<typeof accountStatementSchema>;
+type ThirdPartyPersonRaw = z.input<typeof thirdPartyPersonSchema>;
+type ThirdPartyStatementRaw = z.input<typeof thirdPartyStatementSchema>;
+type ThirdPartySettlementRaw = z.input<typeof thirdPartySettlementSchema>;
+
+type PersonSimpleRaw = z.input<typeof personSimpleSchema>;
+
+/** Nested person as `PersonSimpleSerializer` returns it — shared by settlements and paid_by_person. */
+export function createMockPersonSimple(overrides: Partial<PersonSimpleRaw> = {}): PersonSimpleRaw {
+  return {
+    id: 1,
+    name: 'Alvaro',
+    relationship: 'Filho',
+    phone: '',
+    email: '',
+    is_owner: false,
+    is_employee: false,
+    notes: '',
+    ...overrides,
+  };
+}
 
 export function createMockFinanceCategory(
   overrides: Partial<FinanceCategoryRaw> = {}
@@ -567,4 +593,138 @@ export function createMockCondoSimulation(months = 12): CondoSimulationResult {
     total_net_delta: '0.00',
   };
   return { base, simulated, comparison };
+}
+
+// --- Terceiros (S81) ---------------------------------------------------------------------
+// GET /finances/third-party/people/ is a PLAIN array; GET .../statement/ a PLAIN object. Money
+// fields are decimal STRINGS, matching ThirdPartyStatementService's money_str output.
+
+export function createMockThirdPartyPerson(
+  overrides: Partial<ThirdPartyPersonRaw> = {}
+): ThirdPartyPersonRaw {
+  return {
+    person_id: 1,
+    person_name: 'Alvaro',
+    total_em_aberto: '450.00',
+    total_atrasado: '450.00',
+    last_settlement_date: '2026-07-05',
+    ...overrides,
+  };
+}
+
+export function createMockThirdPartyPeople(): ThirdPartyPersonRaw[] {
+  return [
+    createMockThirdPartyPerson({ person_id: 1, person_name: 'Alvaro' }),
+    createMockThirdPartyPerson({
+      person_id: 2,
+      person_name: 'Tiago',
+      total_em_aberto: '100.00',
+      total_atrasado: '0.00',
+      last_settlement_date: null,
+    }),
+  ];
+}
+
+/**
+ * Default statement exercising ALL SIX month statuses — `empty` included, since it is the one the
+ * UI must never paint as "Quitado" (S79 regression guard).
+ */
+export function createMockThirdPartyStatement(
+  overrides: Partial<ThirdPartyStatementRaw> = {}
+): ThirdPartyStatementRaw {
+  return {
+    person_id: 1,
+    person_name: 'Alvaro',
+    months: [
+      {
+        month: '2026-02-01',
+        devido: '200.00',
+        aplicado: '200.00',
+        resto: '0.00',
+        status: 'paid',
+        items: [
+          {
+            kind: 'purchase',
+            id: 10,
+            description: 'Material de limpeza',
+            amount: '200.00',
+            date: '2026-02-01',
+          },
+        ],
+      },
+      {
+        month: '2026-03-01',
+        devido: '0.00',
+        aplicado: '0.00',
+        resto: '0.00',
+        status: 'empty',
+        items: [],
+      },
+      {
+        month: '2026-04-01',
+        devido: '-50.00',
+        aplicado: '0.00',
+        resto: '0.00',
+        status: 'credit',
+        items: [],
+      },
+      {
+        month: '2026-05-01',
+        devido: '300.00',
+        aplicado: '0.00',
+        resto: '300.00',
+        status: 'overdue',
+        items: [
+          {
+            kind: 'payment',
+            id: 20,
+            description: 'Água DMAE 836',
+            amount: '300.00',
+            date: '2026-05-12',
+          },
+        ],
+      },
+      {
+        month: '2026-06-01',
+        devido: '150.00',
+        aplicado: '50.00',
+        resto: '100.00',
+        status: 'partially_paid',
+        items: [],
+      },
+      {
+        month: '2026-07-01',
+        devido: '120.00',
+        aplicado: '0.00',
+        resto: '120.00',
+        status: 'open',
+        items: [],
+      },
+    ],
+    totals: {
+      total_devido: '770.00',
+      total_pago: '250.00',
+      total_em_aberto: '520.00',
+      total_atrasado: '400.00',
+      saldo_credor: '0.00',
+    },
+    ...overrides,
+  };
+}
+
+export function createMockThirdPartySettlement(
+  overrides: Partial<ThirdPartySettlementRaw> = {}
+): ThirdPartySettlementRaw {
+  return {
+    id: 1,
+    condominium: { id: 1, name: 'Condomínio' },
+    person: createMockPersonSimple(),
+    settlement_date: '2026-07-05',
+    amount: '120.00',
+    method: 'PIX',
+    notes: '',
+    created_at: '2026-07-05T00:00:00Z',
+    updated_at: '2026-07-05T00:00:00Z',
+    ...overrides,
+  };
 }

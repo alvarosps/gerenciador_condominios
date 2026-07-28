@@ -94,6 +94,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
     { key: ROUTES.FINANCES_ACCOUNTS, label: 'Contas cadastradas' },
     { key: ROUTES.FINANCES_INSTALLMENT_PLANS, label: 'Parcelas' },
     { key: ROUTES.FINANCES_EMPLOYEES, label: 'Folha' },
+    { key: ROUTES.FINANCES_THIRD_PARTY, label: 'Terceiros' },
     { key: ROUTES.FINANCES_RESERVE, label: 'Reserva' },
     { key: ROUTES.FINANCES_INCOME, label: 'Receitas' },
     { key: ROUTES.FINANCES_MONTH_CLOSE, label: 'Fechamento' },

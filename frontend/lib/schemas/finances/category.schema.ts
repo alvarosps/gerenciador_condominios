@@ -5,7 +5,13 @@ export const billingAccountStateValues = ['active', 'suspended', 'deferred', 'en
 export const billLifecycleStateValues = ['active', 'suspended', 'deferred', 'canceled'] as const;
 export const billBehaviorValues = ['one_time', 'recurring', 'installment'] as const;
 export const paymentStatusValues = ['open', 'partial', 'paid'] as const;
-export const fundedFromValues = ['caixa', 'reserve'] as const;
+/**
+ * Payment funding sources. `third_party` (S80) means a person paid with her own money: the bill is
+ * settled but NOTHING leaves the caixa — the debt migrates from the utility to that person, and it
+ * is only extinguished by a `ThirdPartySettlement`. It therefore ALWAYS travels with a
+ * `paid_by_person_id` (the backend rejects it otherwise).
+ */
+export const fundedFromValues = ['caixa', 'reserve', 'third_party'] as const;
 
 export const billingAccountStateEnum = z.enum(billingAccountStateValues);
 export const billLifecycleStateEnum = z.enum(billLifecycleStateValues);

@@ -12,6 +12,8 @@ Rules (design §4):
   FinancialSettings.initial_balance; only the open tail is re-walked (mirrors
   DailyControlService._get_starting_balance but condo-scoped, not the commingled MonthSnapshot).
 - Reserve is the deposit/withdrawal ledger; transfers are zero-sum on the total balance.
+- A third-party payment is NOT a cash outflow (the person paid from his own pocket); the
+  ThirdPartySettlement that repays him IS (design §5, S78).
 - Internal sums are raw Decimals; the figure is quantized once at the output boundary
   (quantize_money), so the dashboard and the frozen CondoMonthClose never differ by a cent.
 - "today / current month" only via core.services.timezone (settings is UTC).
@@ -36,6 +38,7 @@ from finances.models import (
     PaymentAllocation,
     ReserveMovement,
     ReserveMovementKind,
+    ThirdPartySettlement,
 )
 from finances.money import quantize_money
 
@@ -59,6 +62,7 @@ class _Components(NamedTuple):
     caixa_outflow: Decimal  # Σ caixa-funded PaymentAllocation by payment_date in the month
     reserve_to_cash: Decimal  # Σ withdrawal(bill=null) = reserve -> cash transfer (cash in)
     deposit_out: Decimal  # Σ deposit = cash -> reserve transfer (cash out)
+    settlements_out: Decimal  # Σ ThirdPartySettlement by settlement_date in the month (cash out)
 
 
 class CondoBalanceService:
@@ -119,12 +123,15 @@ class CondoBalanceService:
 
         In = received_collectible_total + IncomeEntry received in the month + reserve->cash
         withdrawals (bill=null). Out = caixa-funded PaymentAllocation in the month + cash->reserve
-        deposits. A funded_from='reserve' payment is NOT a cash outflow (it debits only the
-        reserve — design §4.3). ``components`` shares an already-computed split (P5.1).
+        deposits + third-party settlements. A funded_from='reserve' payment is NOT a cash outflow
+        (it debits only the reserve — design §4.3), and neither is a funded_from='third_party' one:
+        the third party paid from his own pocket, so the debt only changed creditor — the cash
+        leaves only when the owners settle with him (ThirdPartySettlement — design §5).
+        ``components`` shares an already-computed split (P5.1).
         """
         comp = components or CondoBalanceService._components(year, month, building_id)
         cash_in = comp.received_collectible + comp.income_cash + comp.reserve_to_cash
-        cash_out = comp.caixa_outflow + comp.deposit_out
+        cash_out = comp.caixa_outflow + comp.deposit_out + comp.settlements_out
         return quantize_money(cash_in - cash_out)
 
     @staticmethod
@@ -262,7 +269,13 @@ class CondoBalanceService:
 
     @staticmethod
     def _components(year: int, month: int, building_id: int | None) -> _Components:
-        """All raw monthly figures from one place (so result/cash_change/wedge stay consistent)."""
+        """All raw monthly figures from one place (so result/cash_change/wedge stay consistent).
+
+        Per-building caveat (design §5.1): a third-party PURCHASE may carry a building and so
+        enters the building-filtered expense_competence, while the settlement that repays the
+        person never does (it has no building — design §4.4). Per-building cash is therefore NOT
+        a bank-reconcilable figure; only the condo-wide view is.
+        """
         reference_month = date(year, month, 1)
         received_collectible = RentScheduleService.received_collectible_total(
             reference_month, building_id
@@ -293,9 +306,15 @@ class CondoBalanceService:
         expense_competence = CondoBalanceService._expense_competence(reference_month, building_id)
         caixa_outflow = CondoBalanceService._caixa_outflow(year, month, building_id)
 
-        # Reserve transfers are condo-level (no building) — only in the condo-wide view.
+        # Reserve transfers and third-party settlements are condo-level (no building) — only in
+        # the condo-wide view. Zeroing settlements_out is safe for the wedge for the SAME reason
+        # as deposit_out/reserve_to_cash: the term CANCELS on both sides of the identity (it is
+        # subtracted from cash_out and from delta_payables), so the residual stays 0.00 either
+        # way. "It has no building" alone is NOT the rule — applying it to a term that does not
+        # cancel would break the reconciliation.
         reserve_to_cash = ZERO
         deposit_out = ZERO
+        settlements_out = ZERO
         if building_id is None:
             reserve_to_cash = CondoBalanceService._reserve_movement_sum(
                 year, month, ReserveMovementKind.WITHDRAWAL, bill_isnull=True
@@ -303,6 +322,7 @@ class CondoBalanceService:
             deposit_out = CondoBalanceService._reserve_movement_sum(
                 year, month, ReserveMovementKind.DEPOSIT, bill_isnull=None
             )
+            settlements_out = CondoBalanceService._settlements_out(year, month)
 
         return _Components(
             received_collectible=received_collectible,
@@ -313,6 +333,7 @@ class CondoBalanceService:
             caixa_outflow=caixa_outflow,
             reserve_to_cash=reserve_to_cash,
             deposit_out=deposit_out,
+            settlements_out=settlements_out,
         )
 
     @staticmethod
@@ -344,6 +365,21 @@ class CondoBalanceService:
         if building_id is not None:
             queryset = queryset.filter(bill__building_id=building_id)
         return queryset.aggregate(total=Sum("amount"))["total"] or ZERO
+
+    @staticmethod
+    def _settlements_out(year: int, month: int) -> Decimal:
+        """Σ live ThirdPartySettlement.amount by settlement_date in the month (design §5).
+
+        No condominium filter, exactly like _caixa_outflow and _reserve_movement_sum:
+        _components has no condominium in scope and the service is single-condominium by
+        construction. The default manager already excludes soft-deleted rows.
+        """
+        return (
+            ThirdPartySettlement.objects.filter(
+                settlement_date__year=year, settlement_date__month=month
+            ).aggregate(total=Sum("amount"))["total"]
+            or ZERO
+        )
 
     @staticmethod
     def _reserve_movement_sum(
@@ -428,13 +464,21 @@ class CondoBalanceService:
 
             result_of_month - cash_change_of_month == Δreceivables - Δpayables - reserve_net, where
             Δreceivables = expected_unpaid + (income_competence - income_cash),
-            Δpayables    = expense_competence - caixa_outflow,
+            Δpayables    = expense_competence - caixa_outflow - settlements_out,
             reserve_net  = reserve_to_cash - deposit_out.
 
         The left side reads the public, quantized result_of_month()/cash_change_of_month() — NOT an
         inline copy of their formulas — so a real definitional or quantization drift in either KPI
         yields a non-zero residual. overview.wedge_ok therefore reports a genuine reconciliation,
         not an algebraic tautology that can never fail.
+
+        settlements_out in Δpayables (design §5.2): a third-party purchase enters
+        expense_competence (an active Bill) and not caixa_outflow — already balanced, like any
+        unpaid bill. The settlement, however, is a cash outflow with NO competence expense of its
+        own (the expense was recognized when the purchase became a Bill), so without this term a
+        month with a settlement would show a false wedge break. Note this term is a WEAK guard:
+        it cancels on both sides, so the residual is 0.00 for any value of settlements_out —
+        only the dedicated cash tests pin it (tests/unit/test_finances/test_third_party_cash_impact.py).
         """
         comp = components or CondoBalanceService._components(year, month, building_id)
         result = CondoBalanceService.result_of_month(year, month, building_id, components=comp)
@@ -442,7 +486,7 @@ class CondoBalanceService:
             year, month, building_id, components=comp
         )
         delta_receivables = comp.expected_unpaid + (comp.income_competence - comp.income_cash)
-        delta_payables = comp.expense_competence - comp.caixa_outflow
+        delta_payables = comp.expense_competence - comp.caixa_outflow - comp.settlements_out
         reserve_net = comp.reserve_to_cash - comp.deposit_out
         expected_difference = delta_receivables - delta_payables - reserve_net
         return quantize_money((result - cash_change) - expected_difference)

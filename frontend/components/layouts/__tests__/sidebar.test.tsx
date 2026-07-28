@@ -142,6 +142,27 @@ describe('Sidebar', () => {
     dashboardButtons.forEach((button) => expect(button).not.toHaveClass('text-primary'));
   });
 
+  it('renderiza "Terceiros" no grupo Condomínio e marca ativo em /finances/third-party', () => {
+    vi.mocked(usePathname).mockReturnValue('/finances/third-party');
+    renderWithProviders(<Sidebar />);
+
+    const item = screen.getByRole('button', { name: /^terceiros$/i });
+    expect(item).toBeInTheDocument();
+    expect(item).toHaveClass('text-primary');
+  });
+
+  it('mantém "Terceiros" ativo na subrota /finances/third-party/7 (longest-match)', () => {
+    vi.mocked(usePathname).mockReturnValue('/finances/third-party/7');
+    renderWithProviders(<Sidebar />);
+
+    const thirdPartyButton = screen.getByRole('button', { name: /^terceiros$/i });
+    expect(thirdPartyButton).toHaveClass('text-primary');
+
+    // /finances/bills (the "Condomínio" group key, label "Contas") must lose the longest-match.
+    const billsButton = screen.getByRole('button', { name: /^contas$/i });
+    expect(billsButton).not.toHaveClass('text-primary');
+  });
+
   it('em /finances/accounts/123 o ativo é "Contas cadastradas" (não "Contas")', () => {
     vi.mocked(usePathname).mockReturnValue('/finances/accounts/123');
     renderWithProviders(<Sidebar />);

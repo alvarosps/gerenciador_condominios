@@ -50,8 +50,12 @@ import {
   createMockOverdueResponse,
   createMockOwnerDistribution,
   createMockPayment,
+  createMockPersonSimple,
   createMockReserve,
   createMockReserveMovement,
+  createMockThirdPartyPeople,
+  createMockThirdPartySettlement,
+  createMockThirdPartyStatement,
 } from './data/finances';
 
 const API_BASE = 'http://localhost:8008/api';
@@ -2312,6 +2316,29 @@ const financeHandlers = [
     await delay(50);
     return HttpResponse.json(createMockParsedInvoice());
   }),
+  // Third-party purchase (S80): returns an ARRAY — one bill per parcela, each born paid.
+  http.post(`${API_BASE}/finances/bills/create_purchase/`, async ({ request }) => {
+    await delay(50);
+    const body = (await request.json()) as Record<string, unknown>;
+    const text = (value: unknown, fallback: string) =>
+      typeof value === 'string' ? value : fallback;
+    const count = typeof body.installment_count === 'number' ? body.installment_count : 1;
+    const created = Array.from({ length: count }, (_, index) =>
+      createMockBill({
+        id: financeBills.length + index + 1,
+        description: text(body.description, 'Compra'),
+        competence_month: text(body.competence_month, '2026-07-01'),
+        due_date: text(body.due_date, '2026-07-10'),
+        payment_status: 'paid',
+        amount_remaining: '0.00',
+        paid_by_person: createMockPersonSimple({
+          id: typeof body.person_id === 'number' ? body.person_id : 1,
+        }),
+      })
+    );
+    financeBills.push(...created);
+    return HttpResponse.json(created, { status: 201 });
+  }),
   http.post(`${API_BASE}/finances/bills/generate_month/`, async ({ request }) => {
     await delay(100);
     const body = (await request.json()) as { year: number; month: number };
@@ -2829,6 +2856,73 @@ const financesDashboardHandlers = [
 ];
 
 /**
+ * Terceiros (S81). `third-party/people|statement` are plain payloads (array / object); the
+ * settlements resource is a normal paginated DRF collection. The two read routes are registered
+ * before nothing else — `third-party` and `third-party-settlements` are distinct prefixes, so no
+ * ordering hazard exists here (unlike billing-accounts' `:id` capture).
+ */
+const thirdPartySettlements = [createMockThirdPartySettlement()];
+
+const thirdPartyHandlers = [
+  http.get(`${API_BASE}/finances/third-party/people/`, async () => {
+    await delay(50);
+    return HttpResponse.json(createMockThirdPartyPeople());
+  }),
+
+  http.get(`${API_BASE}/finances/third-party/statement/`, async ({ request }) => {
+    await delay(50);
+    const personId = new URL(request.url).searchParams.get('person_id');
+    if (!personId) {
+      return HttpResponse.json({ error: 'person_id é obrigatório.' }, { status: 400 });
+    }
+    return HttpResponse.json(createMockThirdPartyStatement({ person_id: Number(personId) }));
+  }),
+
+  http.get(`${API_BASE}/finances/third-party-settlements/`, async ({ request }) => {
+    await delay(50);
+    const personId = new URL(request.url).searchParams.get('person_id');
+    const rows = personId
+      ? thirdPartySettlements.filter((s) => s.person?.id === Number(personId))
+      : thirdPartySettlements;
+    return HttpResponse.json({ count: rows.length, next: null, previous: null, results: rows });
+  }),
+
+  http.post(`${API_BASE}/finances/third-party-settlements/`, async ({ request }) => {
+    await delay(50);
+    const body = (await request.json()) as Record<string, unknown>;
+    const created = createMockThirdPartySettlement({
+      id: thirdPartySettlements.length + 1,
+      settlement_date: String(body.settlement_date),
+      amount: String(body.amount),
+      method: typeof body.method === 'string' ? body.method : '',
+      notes: typeof body.notes === 'string' ? body.notes : '',
+    });
+    thirdPartySettlements.push(created);
+    return HttpResponse.json(created, { status: 201 });
+  }),
+
+  http.patch(`${API_BASE}/finances/third-party-settlements/:id/`, async ({ params, request }) => {
+    await delay(50);
+    const id = Number(params.id);
+    const index = thirdPartySettlements.findIndex((s) => s.id === id);
+    const existing = thirdPartySettlements[index];
+    if (!existing) return new HttpResponse(null, { status: 404 });
+    const body = (await request.json()) as Record<string, unknown>;
+    const updated = { ...existing, ...body };
+    thirdPartySettlements[index] = updated;
+    return HttpResponse.json(updated);
+  }),
+
+  http.delete(`${API_BASE}/finances/third-party-settlements/:id/`, async ({ params }) => {
+    await delay(50);
+    const index = thirdPartySettlements.findIndex((s) => s.id === Number(params.id));
+    if (index === -1) return new HttpResponse(null, { status: 404 });
+    thirdPartySettlements.splice(index, 1);
+    return new HttpResponse(null, { status: 204 });
+  }),
+];
+
+/**
  * All handlers combined
  */
 export const handlers = [
@@ -2868,4 +2962,5 @@ export const handlers = [
   ...financesIncomeEntryHandlers,
   ...financesCondoMonthCloseHandlers,
   ...financesDashboardHandlers,
+  ...thirdPartyHandlers,
 ];

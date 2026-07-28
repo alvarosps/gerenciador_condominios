@@ -58,14 +58,24 @@ class CondoMonthCloseService:
     """Stateless chronological close / reopen / closed-month guard."""
 
     @staticmethod
-    def assert_open(competence_month: date) -> None:
-        """Raise (PT) if the competence month is closed. No CondoMonthClose = open (no-op)."""
+    def assert_open(competence_month: date, *, name_month: bool = False) -> None:
+        """Raise (PT) if the competence month is closed. No CondoMonthClose = open (no-op).
+
+        ``name_month`` puts the month in the message. An operation that touches TWO different
+        months (a third-party purchase spans the card invoice's competence and the cash date)
+        otherwise leaves the user with a bare "Este mês está fechado" and no way to tell which
+        one to reopen. Single source of the closed-month rule — callers never re-query it.
+        """
         reference_month = competence_month.replace(day=1)
         is_closed = CondoMonthClose.objects.filter(
             reference_month=reference_month, status=CondoMonthCloseStatus.CLOSED
         ).exists()
         if is_closed:
-            raise ValidationError(_MONTH_CLOSED)
+            raise ValidationError(
+                f"O mês {reference_month:%m/%Y} está fechado e não aceita lançamentos."
+                if name_month
+                else _MONTH_CLOSED
+            )
 
     @staticmethod
     def close(year: int, month: int, user: User | None = None) -> CondoMonthClose:

@@ -1,6 +1,6 @@
 'use client';
 
-import { FileUp, MoreHorizontal, Pencil, Trash2, Wallet } from 'lucide-react';
+import { FileUp, MoreHorizontal, Pencil, Trash2, User, Wallet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -63,6 +63,12 @@ export function buildBillColumns({
       render: (_, record) => (
         <div className="flex flex-wrap items-center gap-2">
           <span>{record.description}</span>
+          {record.paid_by_person && (
+            <Badge variant="secondary">
+              <User className="mr-1 h-3 w-3" />
+              {record.paid_by_person.name}
+            </Badge>
+          )}
           {record.amount_is_estimated && (record.amount_total ?? 0) > 0 && (
             <Badge variant="outline">valor estimado</Badge>
           )}

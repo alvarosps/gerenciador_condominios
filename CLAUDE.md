@@ -36,6 +36,10 @@ Condominium (tenancy-root, core/models.py) → Building.condominium (FK)
 BillingAccount (tipada: water/electricity/iptu/internet/generic) → Bill → BillLineItem (is_offset POSITIVO, subtraído)
 Payment → PaymentAllocation; InstallmentPlan → Installment; Employee; Reserve → ReserveMovement
 IncomeEntry; CondoMonthClose (snapshot mensal congelado); Water/ElectricityBillStatement (1:1 c/ Bill, só leituras); BillSkip
+Terceiros: Bill.paid_by_person (FK Person — compra feita por terceiro, nasce QUITADA; ORTOGONAL às
+  3 FKs de origem, não é uma quarta), Payment.paid_by + FundedFrom.THIRD_PARTY (terceiro quitou uma
+  conta), ThirdPartySettlement (o acerto — a ÚNICA das três que sai do caixa). Extrato = FIFO
+  computado a cada leitura, NUNCA persistido. Ver docs/FINANCES.md
 Dinheiro via Bill.objects.with_amounts(today) (nunca property Python); today_sp() (timezone SP)
 
 --- Módulo Financeiro PESSOAL (LEGADO/DEPRECATED — só corrigir bugs de dinheiro; remoção em P7; ver docs/LESSONS_LEARNED.md) ---
@@ -117,7 +121,7 @@ npm run lint && npm run type-check            # ESLint + TypeScript
 - Templates: `/api/templates/current/`, `save/`, `backups/`, `restore/`, `preview/`
 - Dashboard: `financial_summary/`, `late_payment_summary/`, `lease_metrics/`, `tenant_statistics/`, `building_statistics/`
 - Export: client-side (sem rotas de API) — `frontend/lib/hooks/use-export.ts` gera xlsx/csv no browser a partir dos dados já carregados
-- **Condomínio (`finances/`) — `/api/finances/` (ATUAL):** `finance-categories`, `billing-accounts`, `bills`, `bill-skips`, `payments`, `installment-plans`, `installments`, `employees`, `reserves`, `reserve-movements`, `income-entries`, `condo-month-closes`, `finance-dashboard`, `finance-cash-flow`. Actions: `bills/{id}/{pay,suspend,defer,cancel,reactivate}/`, `bills/{bulk_pay,generate_month,create_with_lines,parse_invoice}/`, `bills/{id}/{update_with_lines,apply_invoice}/`, `billing-accounts/{id}/{statement,consolidate_debt}/`, `condo-month-closes/{close,reopen}/`, `finance-dashboard/{overview,monthly_balance,iptu_alerts,overdue,combined_calendar,month_board}`, `finance-cash-flow/{projection,simulate}`. Cockpit operacional: `/finances/bills` (redesenhado, fonte única `month_board`), `/finances/accounts` (CRUD `BillingAccount`) e `/finances/accounts/[id]` (extrato — primeira rota `[id]` do dashboard).
+- **Condomínio (`finances/`) — `/api/finances/` (ATUAL):** `finance-categories`, `billing-accounts`, `bills`, `bill-skips`, `payments`, `installment-plans`, `installments`, `employees`, `reserves`, `reserve-movements`, `income-entries`, `condo-month-closes`, `finance-dashboard`, `finance-cash-flow`, `third-party-settlements`, `third-party`. Actions: `bills/{id}/{pay,suspend,defer,cancel,reactivate}/`, `bills/{bulk_pay,generate_month,create_with_lines,parse_invoice,create_purchase}/`, `bills/{id}/{update_with_lines,apply_invoice,delete_purchase,reassign_payer}/`, `billing-accounts/{id}/{statement,consolidate_debt}/`, `condo-month-closes/{close,reopen}/`, `finance-dashboard/{overview,monthly_balance,iptu_alerts,overdue,combined_calendar,month_board}`, `finance-cash-flow/{projection,simulate}`, `third-party/{people,statement}/`. `pay`/`bulk_pay` aceitam `funded_from="third_party"` + `paid_by_person_id` (obrigatórios juntos). Cockpit operacional: `/finances/bills` (redesenhado, fonte única `month_board`; origem "Terceiro" no popover + badge da pessoa + "Nova compra de terceiro"), `/finances/accounts` (CRUD `BillingAccount`), `/finances/accounts/[id]` (extrato) e `/finances/third-party` + `/finances/third-party/[id]` (índice + extrato FIFO por pessoa).
 - Financeiro PESSOAL (LEGADO/DEPRECATED — remoção em P7): `persons`, `credit-cards`, `expense-categories`, `expenses`, `expense-installments`, `incomes`, `rent-payments`, `employee-payments`, `person-incomes`, `person-payments`, `financial-settings`; `financial-dashboard/*`; `cash-flow/*`; `daily-control/*`.
 
 ## Migrations
