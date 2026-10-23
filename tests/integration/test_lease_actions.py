@@ -554,3 +554,60 @@ class TestTransferLease:
             format="json",
         )
         assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+
+@pytest.mark.django_db
+class TestTerminationFeePreview:
+    def test_estimate_uses_agreed_rent(self, authenticated_api_client, lease):
+        response = authenticated_api_client.get(
+            f"/api/leases/{lease.pk}/calculate_termination_fee/",
+            {"terminated_on": "2026-02-01"},
+        )
+        assert response.status_code == 200
+        assert response.data == {"termination_fee_estimate": "3437.50"}
+        lease.refresh_from_db()
+        assert not lease.is_deleted
+
+    @pytest.mark.parametrize("day", ["bad", "2025-12-31", ""])
+    def test_invalid_day(self, authenticated_api_client, lease, day):
+        response = authenticated_api_client.get(
+            f"/api/leases/{lease.pk}/calculate_termination_fee/", {"terminated_on": day}
+        )
+        assert response.status_code == 400
+
+    def test_admin_only(self, regular_authenticated_api_client, lease):
+        response = regular_authenticated_api_client.get(
+            f"/api/leases/{lease.pk}/calculate_termination_fee/",
+            {"terminated_on": "2026-02-01"},
+        )
+        assert response.status_code == 403
+
+
+@pytest.mark.django_db
+def test_termination_preview_uses_effective_pending_rent(authenticated_api_client, lease):
+    lease.pending_rental_value = Decimal(1800)
+    lease.pending_rental_value_date = date(2026, 2, 1)
+    lease.save(update_fields=["pending_rental_value", "pending_rental_value_date"])
+    response = authenticated_api_client.get(
+        f"/api/leases/{lease.pk}/calculate_termination_fee/",
+        {"terminated_on": "2026-02-01"},
+    )
+    assert response.status_code == 200
+    assert response.data["termination_fee_estimate"] == "4125.00"
+
+
+@pytest.mark.django_db
+@freeze_time("2026-02-01 12:00:00")
+def test_termination_preview_defaults_to_server_today(authenticated_api_client, lease):
+    response = authenticated_api_client.get(f"/api/leases/{lease.pk}/calculate_termination_fee/")
+    assert response.status_code == 200
+    assert response.data["termination_fee_estimate"] == "3437.50"
+
+
+@pytest.mark.django_db
+@freeze_time("2025-12-01")
+def test_cancelling_future_lease_preserves_existing_flow(authenticated_api_client, lease):
+    response = authenticated_api_client.post(f"/api/leases/{lease.pk}/terminate/")
+    assert response.status_code == 200
+    assert response.data["termination_fee_estimate"] is None
+    assert not Lease.objects.filter(pk=lease.pk).exists()

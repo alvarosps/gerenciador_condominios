@@ -339,3 +339,17 @@ export function useTerminateLease() {
     },
   });
 }
+
+export function useTerminationFee(leaseId: number | undefined, day?: string, updatedAt?: string) {
+  return useQuery({
+    queryKey: [...queryKeys.leases.detail(leaseId ?? 0), 'termination-fee', day, updatedAt],
+    queryFn: async () => {
+      const { data } = await apiClient.get<{ termination_fee_estimate: string }>(
+        `/leases/${String(leaseId)}/calculate_termination_fee/`,
+        { params: { terminated_on: day } }
+      );
+      return data.termination_fee_estimate;
+    },
+    enabled: Boolean(leaseId),
+  });
+}

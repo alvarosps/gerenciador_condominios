@@ -12,6 +12,7 @@ from calendar import monthrange
 from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
 
+from dateutil.relativedelta import relativedelta
 from django.conf import settings
 from django.core.exceptions import ValidationError
 
@@ -25,6 +26,34 @@ class FeeCalculatorService:
 
     All calculations use Decimal for precision with currency values.
     """
+
+    TERMINATION_RENT_MULTIPLIER = Decimal("2.5")
+    TERMINATION_MONTHS = 12
+
+    @staticmethod
+    def calculate_termination_fee(
+        rental_value: Decimal, start_date: date, terminated_on: date
+    ) -> Decimal:
+        """Reduce 2.5 rents over 12 calendar months, prorating incomplete months."""
+        if rental_value < 0:
+            msg = "rental_value must be non-negative"
+            raise ValueError(msg)
+        if terminated_on < start_date:
+            msg = "A saída não pode ser anterior ao início da locação."
+            raise ValueError(msg)
+        months = FeeCalculatorService.TERMINATION_MONTHS
+        anniversaries = [start_date + relativedelta(months=i) for i in range(months + 1)]
+        if terminated_on >= anniversaries[-1]:
+            return Decimal("0.00")
+        completed = max(
+            i for i, anniversary in enumerate(anniversaries) if anniversary <= terminated_on
+        )
+        elapsed_days = (terminated_on - anniversaries[completed]).days
+        month_days = (anniversaries[completed + 1] - anniversaries[completed]).days
+        remaining = Decimal(months - completed) - Decimal(elapsed_days) / Decimal(month_days)
+        return (
+            rental_value * FeeCalculatorService.TERMINATION_RENT_MULTIPLIER * remaining / months
+        ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
     @staticmethod
     def calculate_daily_rate(rental_value: Decimal) -> Decimal:

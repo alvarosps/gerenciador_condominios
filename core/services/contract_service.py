@@ -202,6 +202,9 @@ class ContractService:
         db_rules = ContractRule.get_active_rules()
         rules = [sanitize_contract_html(rule) for rule in (db_rules or regras_condominio)]
 
+        termination_full_fee = FeeCalculatorService.calculate_termination_fee(
+            lease.rental_value, lease.start_date, lease.start_date
+        )
         context = {
             "landlord": landlord,
             "tenant": lease.responsible_tenant,
@@ -213,6 +216,10 @@ class ContractService:
             "start_date": formatted_dates["start_date_formatted"],
             "final_date": final_date,
             "rental_value": lease.rental_value,
+            "termination_full_fee": termination_full_fee,
+            "termination_monthly_reduction": (
+                termination_full_fee / FeeCalculatorService.TERMINATION_MONTHS
+            ),
             "next_month_date": next_month_date,
             "tag_fee": lease.tag_fee,
             "cleaning_fee": lease.apartment.cleaning_fee,

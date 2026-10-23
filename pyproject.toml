@@ -74,7 +74,7 @@ dependencies = [
 # Dev/test dependencies — must stay in sync with requirements-dev.txt
 dev = [
     # Linting & Formatting
-    "ruff>=0.15.0,<1.0",
+    "ruff==0.15.11",
     # Type Checking
     "mypy>=1.16.0,<2.0",
     "django-stubs[compatible-mypy]>=5.2.0,<6.0",

@@ -352,13 +352,10 @@
       <strong>O PRAZO da locação do imóvel</strong> terá validade de
       <strong>{{ validity }} meses</strong>, iniciando no dia
       <strong>{{ start_date }}</strong>, e
-      <strong>terminando no dia {{ final_date }}</strong>. A partir desta data,
-      tanto LOCADOR como LOCATÁRIO podem pedir o encerramento do contrato de
-      locação, sem multas, com aviso prévio de 30 dias. Caso o LOCATÁRIO não
-      saia do imóvel após os 30 dias, o mesmo será considerado como
-      <strong>inquilino irregular</strong>, e o LOCADOR poderá pedir a
-      <strong>desocupação do imóvel</strong> judicialmente, e o LOCATÁRIO será
-      responsável por todas as despesas judiciais e honorários advocatícios.
+      <strong>terminando no dia {{ final_date }}</strong>. Após os primeiros
+      12 meses, permanecendo o LOCATÁRIO no imóvel, a locação será prorrogada
+      por prazo indeterminado. A desocupação, o aviso prévio e a multa seguem
+      a cláusula de rescisão antecipada e as hipóteses legais aplicáveis.
     </p>
 
     <p>
@@ -528,31 +525,59 @@
 
     <h1 class="contract-title">CONTRATO RESIDENCIAL DE ALUGUEL</h1>
 
+    <p><strong>CLÁUSULA – DA RESCISÃO ANTECIPADA, MULTA CONTRATUAL E AVISO PRÉVIO</strong></p>
     <p>
-      Em caso de <strong>rescisão antecipada</strong> por parte do LOCATÁRIO,
-      sem motivo legal que justifique a quebra imediata do contrato, este se
-      compromete a:
+      Em caso de rescisão antecipada por iniciativa do LOCATÁRIO, antes de
+      completar 12 (doze) meses de locação, será devida ao LOCADOR multa
+      equivalente a 2,5 (dois e meio) aluguéis, ressalvadas as hipóteses legais
+      de dispensa. Considerando o aluguel mensal de {{ rental_value | currency }}
+      ({{ rental_value | extenso }} reais), a multa integral inicial corresponde a
+      {{ termination_full_fee | currency }} ({{ termination_full_fee | extenso }} reais).
     </p>
-    <ul>
-      <li>
-        Notificar o LOCADOR com antecedência mínima de 30 (trinta) dias, por
-        escrito;
-      </li>
-      <li>
-        Pagar uma multa no valor equivalente a 1 (um) mês de aluguel vigente na
-        data da notificação;
-      </li>
-      <li>
-        Caso exista caução no valor correspondente a 1 (um) mês de aluguel, esta
-        poderá ser utilizada para o pagamento da multa, desde que não existam
-        débitos pendentes ou danos ao imóvel;
-      </li>
-      <li>
-        No caso de rescisão solicitada pelo LOCADOR, sem que haja infração
-        contratual por parte do LOCATÁRIO, deverá ser concedido aviso prévio
-        mínimo de 30 (trinta) dias, por escrito.
-      </li>
-    </ul>
+    <p>
+      <strong>Parágrafo Primeiro:</strong> A multa será proporcional ao período
+      restante dos 12 meses, conforme o artigo 4º da Lei nº 8.245/1991:
+      <strong>multa devida = multa integral × (período restante ÷ 12 meses)</strong>.
+      A base de cálculo será o aluguel vigente na data da efetiva devolução do imóvel.
+    </p>
+    <p>
+      <strong>Parágrafo Segundo:</strong> Para cada mês completo cumprido, haverá
+      redução de 1/12 da multa integral, correspondente inicialmente a
+      {{ termination_monthly_reduction | currency }} por mês. As frações de mês
+      serão proporcionais aos dias decorridos entre os aniversários mensais do
+      início da locação, usando o último dia do mês quando não existir o dia
+      correspondente. O valor será arredondado para centavos apenas no resultado final.
+    </p>
+    <p>
+      <strong>Parágrafo Terceiro:</strong> O LOCATÁRIO deverá comunicar ao LOCADOR,
+      por escrito, com antecedência mínima de 30 (trinta) dias, sua intenção de
+      desocupar o imóvel, durante os primeiros 12 meses ou após a prorrogação por
+      prazo indeterminado, observadas as disposições legais aplicáveis. A comunicação
+      poderá ser feita por mensagem eletrônica, inclusive WhatsApp, desde que seja
+      possível comprovar seu recebimento.
+    </p>
+    <p>
+      <strong>Parágrafo Quarto:</strong> A rescisão não dispensa o pagamento dos
+      aluguéis e encargos devidos até a efetiva devolução do imóvel e entrega das
+      chaves, nem a reparação de danos comprovados que ultrapassem o desgaste
+      natural do uso regular.
+    </p>
+    <p>
+      <strong>Parágrafo Quinto:</strong> Após o cumprimento integral dos 12 (doze)
+      meses, permanecendo o LOCATÁRIO no imóvel, a locação será automaticamente
+      prorrogada por prazo indeterminado, sem necessidade de novo contrato, e não
+      haverá mais a multa por rescisão antecipada desta cláusula. O LOCATÁRIO deverá
+      comunicar a saída por escrito com antecedência mínima de 30 (trinta) dias.
+      Na ausência desse aviso durante a locação por prazo indeterminado, o LOCADOR
+      poderá exigir o valor equivalente a 1 (um) mês de aluguel e encargos vigentes,
+      conforme o artigo 6º da Lei nº 8.245/1991.
+    </p>
+    <p>
+      A multa por rescisão antecipada não será exigida nas hipóteses legais de dispensa,
+      especialmente na transferência do LOCATÁRIO por seu empregador para outra
+      localidade, mediante aviso escrito ao LOCADOR com antecedência mínima de
+      30 (trinta) dias, conforme o artigo 4º, parágrafo único, da Lei nº 8.245/1991.
+    </p>
 
     <p>
       RESCISÃO <strong>imediata</strong> do presente contrato,

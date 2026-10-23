@@ -262,3 +262,48 @@ class TestCalculateTotalValue:
             tag_fee=Decimal(0),
         )
         assert total == Decimal(0)
+
+
+@pytest.mark.unit
+class TestTerminationFee:
+    @pytest.mark.parametrize("months", range(14))
+    def test_monthly_reduction(self, months):
+        from dateutil.relativedelta import relativedelta
+
+        start = date(2026, 10, 23)
+        result = FeeCalculatorService.calculate_termination_fee(
+            Decimal(840), start, start + relativedelta(months=months)
+        )
+        assert result == Decimal(175 * max(12 - months, 0)).quantize(Decimal("0.01"))
+
+    def test_fraction_of_calendar_month(self):
+        assert FeeCalculatorService.calculate_termination_fee(
+            Decimal(840), date(2026, 10, 23), date(2026, 11, 7)
+        ) == Decimal("2015.32")
+
+    def test_month_end_anniversaries(self):
+        assert FeeCalculatorService.calculate_termination_fee(
+            Decimal(840), date(2026, 1, 31), date(2026, 2, 28)
+        ) == Decimal("1925.00")
+
+    def test_leap_anniversary(self):
+        assert FeeCalculatorService.calculate_termination_fee(
+            Decimal(840), date(2024, 2, 29), date(2025, 2, 28)
+        ) == Decimal("0.00")
+
+    def test_round_only_final_amount(self):
+        assert FeeCalculatorService.calculate_termination_fee(
+            Decimal(1000), date(2026, 10, 23), date(2027, 9, 23)
+        ) == Decimal("208.33")
+
+    def test_rejects_date_before_start(self):
+        with pytest.raises(ValueError, match="início"):
+            FeeCalculatorService.calculate_termination_fee(
+                Decimal(840), date(2026, 10, 23), date(2026, 10, 22)
+            )
+
+    def test_rejects_negative_rent(self):
+        with pytest.raises(ValueError, match="non-negative"):
+            FeeCalculatorService.calculate_termination_fee(
+                Decimal(-1), date(2026, 10, 23), date(2026, 10, 23)
+            )
