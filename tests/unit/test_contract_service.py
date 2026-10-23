@@ -7,7 +7,7 @@ import pytest
 from django.conf import settings
 from django.core.exceptions import ValidationError
 
-from core.models import ContractRule, Landlord
+from core.models import ContractRule, ContractTemplate, Landlord
 from core.services.contract_service import ContractService
 from core.utils import format_currency
 from tests.factories import (
@@ -570,3 +570,37 @@ class TestGeneratePdfWithInfrastructureCleanup:
         # Should complete normally — OSError in finally is swallowed
         result = service.generate_pdf_with_infrastructure("<html></html>", "123/cleanup.pdf")
         assert result == "/stored/path.pdf"
+
+
+def test_base_template_renders_proportional_termination_clause(lease, landlord):
+    context = ContractService.prepare_contract_context(lease)
+    content = (Path(settings.BASE_DIR) / "core/templates/contract_template.html").read_text(
+        encoding="utf-8"
+    )
+    ContractTemplate.save_version(content)
+    html = ContractService.render_contract_template(context)
+    assert context["termination_full_fee"] == Decimal("3750.00")
+    assert "3.750,00" in html
+    assert "2,5 (dois e meio)" in html
+    assert "redução de 1/12" in html
+    assert "WhatsApp" in html
+    assert "entrega das" in html
+    assert "artigo 6º" in html
+    assert context["termination_monthly_reduction"] == Decimal("312.50")
+    assert "inquilino irregular" not in html
+    assert "multa no valor equivalente a 1 (um) mês" not in html
+
+
+def test_termination_clause_matches_840_example(lease, landlord):
+    lease.rental_value = Decimal(840)
+    context = ContractService.prepare_contract_context(lease)
+    content = (Path(settings.BASE_DIR) / "core/templates/contract_template.html").read_text(
+        encoding="utf-8"
+    )
+    ContractTemplate.save_version(content)
+    html = ContractService.render_contract_template(context)
+    assert context["termination_full_fee"] == Decimal("2100.00")
+    assert context["termination_monthly_reduction"] == Decimal(175)
+    assert "2.100,00" in html
+    assert "175,00" in html
+    assert "dois mil e cem reais" in html

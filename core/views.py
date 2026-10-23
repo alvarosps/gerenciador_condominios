@@ -513,6 +513,23 @@ class LeaseViewSet(viewsets.ModelViewSet):
             filename=f"contrato_apto_{lease.apartment.number}.pdf",
         )
 
+    @action(detail=True, methods=["get"], permission_classes=[IsAdminUser])
+    def calculate_termination_fee(self, request: Request, pk: int | None = None) -> Response:
+        lease = self.get_object()
+        day = serializers.DateField().run_validation(
+            request.query_params.get("terminated_on", today_sp().isoformat())
+        )
+        if day < lease.start_date:
+            raise serializers.ValidationError(
+                {"terminated_on": "A saída não pode ser anterior ao início da locação."}
+            )
+        fee = FeeCalculatorService.calculate_termination_fee(
+            RentScheduleService.effective_rental_value(lease, day.replace(day=1)),
+            lease.start_date,
+            day,
+        )
+        return Response({"termination_fee_estimate": str(fee)})
+
     # Endpoint para cálculo de multa de atraso
     @action(detail=True, methods=["get"], permission_classes=[IsTenantOrAdmin])
     def calculate_late_fee(self, request: Request, pk: int | None = None) -> Response:
@@ -648,8 +665,24 @@ class LeaseViewSet(viewsets.ModelViewSet):
     def terminate(self, request: Request, pk: int | None = None) -> Response:
         """Terminate a lease contract."""
         lease = self.get_object()
+        today = today_sp()
+        fee = (
+            FeeCalculatorService.calculate_termination_fee(
+                RentScheduleService.effective_rental_value(lease, today.replace(day=1)),
+                lease.start_date,
+                today,
+            )
+            if today >= lease.start_date
+            else None
+        )
         terminate_lease(lease.id, request.user)
-        return Response({"detail": "Contrato encerrado com sucesso."}, status=status.HTTP_200_OK)
+        return Response(
+            {
+                "detail": "Contrato encerrado com sucesso.",
+                "termination_fee_estimate": str(fee) if fee is not None else None,
+            },
+            status=status.HTTP_200_OK,
+        )
 
     @action(detail=True, methods=["post"], url_path="transfer", permission_classes=[IsAdminUser])
     def transfer(self, request: Request, pk: int | None = None) -> Response:

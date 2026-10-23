@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo, useCallback, useEffect } from 'react';
+import { TerminationFeeEstimate } from './_components/termination-fee-estimate';
 import { useLeaseModals } from './_hooks/use-lease-modals';
 import dynamic from 'next/dynamic';
 import { Button } from '@/components/ui/button';
@@ -526,6 +527,9 @@ export default function LeasesPage() {
               disponível.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {modals.isOpen('terminate') && modals.actionLease?.id && (
+            <TerminationFeeEstimate leaseId={modals.actionLease.id} />
+          )}
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction

@@ -4,11 +4,7 @@ import React, { useState, useCallback, useMemo } from 'react';
 import { type Editor } from '@tiptap/react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Select,
   SelectContent,
@@ -153,6 +149,18 @@ const TEMPLATE_VARIABLES: VariableDefinition[] = [
     category: 'locacao',
   },
   {
+    name: 'termination_full_fee',
+    label: 'Multa Integral de Rescisão',
+    description: '2,5 vezes o aluguel inicial',
+    category: 'locacao',
+  },
+  {
+    name: 'termination_monthly_reduction',
+    label: 'Redução Mensal da Multa',
+    description: '1/12 da multa integral',
+    category: 'locacao',
+  },
+  {
     name: 'cleaning_fee',
     label: 'Taxa de Limpeza',
     description: 'Valor da limpeza',
@@ -216,8 +224,7 @@ export const VariableInserter: React.FC<VariableInserterProps> = React.memo(
           searchTerm === '' ||
           v.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
           v.label.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesCategory =
-          selectedCategory === 'all' || v.category === selectedCategory;
+        const matchesCategory = selectedCategory === 'all' || v.category === selectedCategory;
         return matchesSearch && matchesCategory;
       });
     }, [searchTerm, selectedCategory]);
@@ -235,11 +242,7 @@ export const VariableInserter: React.FC<VariableInserterProps> = React.memo(
     const handleInsertVariable = useCallback(
       (variable: VariableDefinition) => {
         const filter = selectedFilter !== 'none' ? selectedFilter : undefined;
-        editor
-          .chain()
-          .focus()
-          .insertTemplateVariable({ variable: variable.name, filter })
-          .run();
+        editor.chain().focus().insertTemplateVariable({ variable: variable.name, filter }).run();
         setIsOpen(false);
         setSearchTerm('');
         setSelectedFilter('none');
@@ -248,15 +251,8 @@ export const VariableInserter: React.FC<VariableInserterProps> = React.memo(
     );
 
     const handleInsertBlock = useCallback(
-      (
-        blockType: 'if' | 'for' | 'endif' | 'endfor',
-        content?: string
-      ) => {
-        editor
-          .chain()
-          .focus()
-          .insertTemplateBlock({ blockType, content })
-          .run();
+      (blockType: 'if' | 'for' | 'endif' | 'endfor', content?: string) => {
+        editor.chain().focus().insertTemplateBlock({ blockType, content }).run();
         setIsOpen(false);
       },
       [editor]
@@ -282,10 +278,7 @@ export const VariableInserter: React.FC<VariableInserterProps> = React.memo(
               />
             </div>
             <div className="flex gap-2">
-              <Select
-                value={selectedCategory}
-                onValueChange={setSelectedCategory}
-              >
+              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
                 <SelectTrigger className="flex-1 h-8">
                   <SelectValue />
                 </SelectTrigger>
@@ -297,10 +290,7 @@ export const VariableInserter: React.FC<VariableInserterProps> = React.memo(
                   <SelectItem value="locacao">Locação</SelectItem>
                 </SelectContent>
               </Select>
-              <Select
-                value={selectedFilter}
-                onValueChange={setSelectedFilter}
-              >
+              <Select value={selectedFilter} onValueChange={setSelectedFilter}>
                 <SelectTrigger className="flex-1 h-8">
                   <SelectValue />
                 </SelectTrigger>
